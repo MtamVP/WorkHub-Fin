@@ -2759,129 +2759,125 @@ function goToTaskInProject(projectId) {
   setTimeout(tryPick, 200);
 }
 
-// ==========================================
-// 5.7 QUẢN LÝ NGƯỜI DÙNG (ADMIN) — ported từ WorkHub org
-// ==========================================
-// Chỉ quản lý hồ sơ quyền (public.users), không tạo/xóa được tài khoản đăng nhập Supabase
-// Auth thật (trừ lúc cấp quyền mới — xem provision-user-form wiring bên dưới). Gate quyền
-// chỉ ở client, cùng mức bảo mật hiện có của cả app.
-
-const USER_GROUP_LABELS = { guest: 'Guest', 'workhub-fin': 'Finance', admin: 'Admin', all: 'All (Toàn quyền)' };
+//  QUẢN LÝ NGƯỜI DÙNG (ADMIN) — bê nguyên xi từ WorkHub org, chỉ đổi chatUser thành
+// CURRENT_USER (tên biến người dùng hiện tại của app này). Không đổi logic, không đổi
+// danh sách quyền, không đổi gì khác — để hành vi khớp 100% với org.
+const USER_GROUP_LABELS = { guest: 'Guest', finance: 'Finance', science: 'Science', all: 'All (Toàn quyền)' };
 
 async function loadAdminUsers() {
-  const guard = document.getElementById('admin-users-guard');
-  const body = document.getElementById('admin-users-body');
-  if (!guard || !body) return;
+    const guard = document.getElementById('admin-users-guard');
+    const body = document.getElementById('admin-users-body');
+    if (!guard || !body) return;
 
-  body.style.display = 'none';
-  guard.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra quyền...</div>';
+    body.style.display = 'none';
+    guard.innerHTML = '<div class="text-center text-muted py-5"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra quyền...</div>';
 
-  if (!CURRENT_USER.email) {
-    guard.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0;">Chưa đăng nhập.</div>';
-    return;
-  }
+    const email = CURRENT_USER.email || null;
+    if (!email) {
+        guard.innerHTML = '<div class="text-center text-muted py-5">Chưa đăng nhập.</div>';
+        return;
+    }
 
-  // Khớp đúng như org: chỉ 'all' mới được vào trang này (RLS trên Supabase cũng chỉ
-  // cho phép đúng 'all' sửa/xóa users — nới thêm 'admin' ở đây trước đó gây lệch với
-  // org và với RLS thật, khiến sửa/xóa báo thành công nhưng không có tác dụng).
-  if (CURRENT_USER.groupKey !== 'all') {
-    guard.innerHTML = '<div style="text-align:center; color:var(--danger-color); padding: 40px 0;"><i class="fa-solid fa-lock" style="font-size:1.6em; margin-bottom:8px; display:block;"></i>Bạn không có quyền truy cập trang này.</div>';
-    return;
-  }
-
-  guard.innerHTML = '';
-  body.style.display = 'block';
-  loadAdminUsersTable();
+    try {
+        const groupResp = await callGAS('getUserGroup', { email });
+        const myGroup = groupResp.status === 'success' ? groupResp.data : 'guest';
+        if (myGroup !== 'all') {
+            guard.innerHTML = '<div class="text-center text-danger py-5"><i class="fa-solid fa-lock fa-2x mb-2"></i><br>Bạn không có quyền truy cập trang này.</div>';
+            return;
+        }
+        guard.innerHTML = '';
+        body.style.display = 'block';
+        loadAdminUsersTable();
+    } catch (err) {
+        guard.innerHTML = `<div class="text-danger text-center py-5">Lỗi: ${err.message}</div>`;
+    }
 }
 
 async function loadAdminUsersTable() {
-  const tbody = document.getElementById('admin-users-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = skeletonTableRows(5, 5);
+    const tbody = document.getElementById('admin-users-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = skeletonTableRows(5, 5);
 
-  try {
-    const users = await API.user.listAll();
-    renderAdminUsersTable(users || []);
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger-color); text-align:center; padding: 16px 0;">Lỗi: ${escapeHtml(err.message || String(err))}</td></tr>`;
-  }
+    try {
+        const response = await callGAS('listAllUsers', {});
+        if (response.status !== 'success') throw new Error(response.message);
+        renderAdminUsersTable(response.data || []);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-4">Lỗi: ${err.message}</td></tr>`;
+    }
 }
 
 function renderAdminUsersTable(users) {
-  const tbody = document.getElementById('admin-users-table-body');
-  if (!tbody) return;
+    const tbody = document.getElementById('admin-users-table-body');
+    if (!tbody) return;
 
-  if (!users || users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Chưa có hồ sơ người dùng nào.</td></tr>';
-    return;
-  }
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Chưa có hồ sơ người dùng nào.</td></tr>';
+        return;
+    }
 
-  const myEmail = CURRENT_USER.email || null;
+    const myEmail = CURRENT_USER.email || null;
 
-  tbody.innerHTML = users.map(u => {
-    const safeEmail = escapeHtml(escapeJs(u.email));
-    // Luôn giữ đúng giá trị quyền thật của người dùng làm option, kể cả khi nó là
-    // giá trị cũ/lạ (vd. 'finance'/'science' từ trước khi đổi sang 'workhub-fin')
-    // không có trong USER_GROUP_LABELS — nếu không <select> sẽ không tìm thấy option
-    // khớp và trình duyệt tự nhảy về option đầu tiên (Guest), hiện sai quyền thật.
-    const groupKeys = Object.keys(USER_GROUP_LABELS);
-    if (u.group_key && !groupKeys.includes(u.group_key)) groupKeys.push(u.group_key);
-    const groupOptions = groupKeys.map(g =>
-      `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g] || g}</option>`
-    ).join('');
-    const createdStr = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
-    const isSelf = !!(myEmail && myEmail.toLowerCase() === (u.email || '').toLowerCase());
+    tbody.innerHTML = users.map(u => {
+        const safeEmail = escapeHtml(escapeJs(u.email));
+        const groupOptions = Object.keys(USER_GROUP_LABELS).map(g =>
+            `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g]}</option>`
+        ).join('');
+        const createdStr = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
+        const isSelf = !!(myEmail && myEmail.toLowerCase() === (u.email || '').toLowerCase());
 
-    return `
-      <tr>
-        <td>${escapeHtml(u.email)}${isSelf ? ' <span class="status-pill pill-neutral">Bạn</span>' : ''}</td>
-        <td>${escapeHtml(u.nickname || '')}</td>
-        <td>
-          <select class="form-select" style="min-width:160px;" onchange="updateUserGroupAction('${safeEmail}', this.value)">
-            ${groupOptions}
-          </select>
-        </td>
-        <td style="font-size:12.5px; color:var(--text-muted);">${createdStr}</td>
-        <td style="text-align:center;">
-          <button class="icon-btn danger" title="Thu hồi quyền" onclick="removeUserAction('${safeEmail}', ${isSelf})">
-            <i class="fa-solid fa-user-slash"></i>
-          </button>
-        </td>
-      </tr>`;
-  }).join('');
+        return `
+            <tr>
+                <td>${escapeHtml(u.email)}${isSelf ? ' <span class="badge bg-secondary">Bạn</span>' : ''}</td>
+                <td>${escapeHtml(u.nickname || '')}</td>
+                <td>
+                    <select class="form-select form-select-sm" style="min-width:140px;" onchange="updateUserGroupAction('${safeEmail}', this.value)">
+                        ${groupOptions}
+                    </select>
+                </td>
+                <td class="small text-muted">${createdStr}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm text-danger border-0" title="Thu hồi quyền" onclick="removeUserAction('${safeEmail}', ${isSelf})">
+                        <i class="fa-solid fa-user-slash"></i>
+                    </button>
+                </td>
+            </tr>`;
+    }).join('');
 }
 
 async function updateUserGroupAction(email, newGroup) {
-  try {
-    const message = await API.user.updateGroup(email, newGroup);
-    showToast(message, 'success');
-  } catch (err) {
-    showToast('Lỗi: ' + (err.message || err), 'error');
-    loadAdminUsersTable();
-  }
+    try {
+        const response = await callGAS('updateUserGroup', { email, groupKey: newGroup });
+        if (response.status !== 'success') throw new Error(response.message);
+        showToast(response.data || response.message, 'success');
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'error');
+        loadAdminUsersTable();
+    }
 }
 
 function removeUserAction(email, isSelf) {
-  Swal.fire({
-    title: isSelf ? 'Bạn đang tự thu hồi quyền của chính mình?' : `Thu hồi quyền của ${email}?`,
-    text: isSelf
-      ? 'Bạn sẽ mất quyền truy cập ngay khi hồ sơ bị xóa. Hành động khó hoàn tác nếu không còn ai khác có quyền "all".'
-      : 'Người này sẽ không truy cập được app nữa. Tài khoản đăng nhập của họ (nếu có) vẫn còn tồn tại, chỉ mất hồ sơ quyền.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: 'var(--danger-color)',
-    confirmButtonText: 'Thu hồi',
-    cancelButtonText: 'Hủy'
-  }).then(async (result) => {
-    if (!result.isConfirmed) return;
-    try {
-      const message = await API.user.remove(email);
-      showToast(message, 'success');
-      loadAdminUsersTable();
-    } catch (err) {
-      showToast('Lỗi: ' + (err.message || err), 'error');
-    }
-  });
+    Swal.fire({
+        title: isSelf ? 'Bạn đang tự thu hồi quyền của chính mình?' : `Thu hồi quyền của ${email}?`,
+        text: isSelf
+            ? 'Bạn sẽ mất quyền truy cập ngay khi hồ sơ bị xóa. Hành động khó hoàn tác nếu không còn ai khác có quyền "all".'
+            : 'Người này sẽ không truy cập được app nữa. Tài khoản đăng nhập của họ (nếu có) vẫn còn tồn tại, chỉ mất hồ sơ quyền.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: 'var(--danger-color)',
+        confirmButtonText: 'Thu hồi',
+        cancelButtonText: 'Hủy'
+    }).then(async (result) => {
+        if (!result.isConfirmed) return;
+        try {
+            const response = await callGAS('removeUser', { email });
+            if (response.status !== 'success') throw new Error(response.message);
+            showToast(response.data || response.message, 'success');
+            loadAdminUsersTable();
+        } catch (err) {
+            showToast('Lỗi: ' + err.message, 'error');
+        }
+    });
 }
 
 // ==========================================
@@ -3082,7 +3078,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyFilterBtn.addEventListener('click', () => loadFileList(true));
   }
 
-  // ----- Admin: Form cấp quyền trước cho người dùng mới -----
+  //  8.9b FORM CẤP QUYỀN TRƯỚC CHO NGƯỜI DÙNG (ADMIN)
   const provisionUserForm = document.getElementById('provision-user-form');
   if (provisionUserForm) {
     provisionUserForm.addEventListener('submit', async (e) => {
@@ -3092,15 +3088,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const groupSelect = document.getElementById('provision-group');
       const email = emailInput ? emailInput.value.trim() : '';
       if (!email) return;
-      const nickname = nicknameInput ? nicknameInput.value.trim() : '';
-      const groupKey = groupSelect ? groupSelect.value : 'guest';
 
       try {
-        const message = await API.user.provision(email, nickname, groupKey);
+        const response = await callGAS('provisionUser', {
+          email,
+          nickname: nicknameInput ? nicknameInput.value.trim() : '',
+          groupKey: groupSelect ? groupSelect.value : 'guest'
+        });
+        if (response.status !== 'success') throw new Error(response.message);
 
-        // Tự động tạo user bên Supabase Auth với mật khẩu mặc định 123456, dùng client phụ
-        // để không làm văng phiên đăng nhập của Admin hiện tại — khớp hành vi bên app org
-        // (nếu không có bước này, người được cấp quyền trước sẽ không đăng nhập được).
+        // Tự động tạo user bên Supabase Auth với mật khẩu mặc định 123456
+        // Dùng client phụ để không làm văng phiên đăng nhập của Admin hiện tại
         if (window.supabase) {
           const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
@@ -3108,18 +3106,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           const signUpRes = await tempClient.auth.signUp({
             email: email,
             password: '123456',
-            options: { data: { nickname: nickname } }
+            options: {
+              data: { nickname: nicknameInput ? nicknameInput.value.trim() : '' }
+            }
           });
           if (signUpRes.error && signUpRes.error.message !== 'User already registered') {
             console.warn('Cảnh báo Auth:', signUpRes.error.message);
           }
         }
 
-        showToast(message, 'success');
+        showToast(response.data || response.message, 'success');
         provisionUserForm.reset();
-        loadAdminUsersTable();
+        if (typeof loadAdminUsersTable === 'function') loadAdminUsersTable();
       } catch (err) {
-        showToast('Lỗi: ' + (err.message || err), 'error');
+        showToast('Lỗi: ' + err.message, 'error');
       }
     });
   }
