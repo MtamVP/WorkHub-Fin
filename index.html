@@ -15,7 +15,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 </head>
@@ -103,9 +103,6 @@
         </li>
         <li class="nav-item" data-section="ai" onclick="switchSection('ai')">
           <i class="fa-solid fa-robot"></i><span> AI</span>
-        </li>
-        <li class="nav-item" data-section="admin-users" onclick="switchSection('admin-users')">
-          <i class="fa-solid fa-user-gear"></i><span> Quản lý người dùng</span>
         </li>
       </ul>
     </nav>
@@ -611,55 +608,6 @@
       </div>
     </section>
 
-    <!-- ================= ADMIN USERS SECTION ("Quản lý người dùng") ================= -->
-    <section class="app-section" id="admin-users-section">
-      <h2 class="m-0 text-primary mb-3"><i class="fa-solid fa-user-gear"></i>Quản lý người dùng</h2>
-      <div id="admin-users-guard"></div>
-      <div id="admin-users-body" style="display:none;">
-        <div class="card p-3 mb-3">
-          <h5 class="mb-3">Cấp quyền trước cho email mới</h5>
-          <form id="provision-user-form" class="row g-2 align-items-end">
-            <div class="col-12 col-md-4">
-              <label class="form-label small">Email</label>
-              <input type="email" id="provision-email" class="text-input w-100" required placeholder="ten@vidu.com">
-            </div>
-            <div class="col-12 col-md-3">
-              <label class="form-label small">Biệt danh</label>
-              <input type="text" id="provision-nickname" class="text-input w-100" placeholder="(tùy chọn)">
-            </div>
-            <div class="col-8 col-md-3">
-              <label class="form-label small">Quyền</label>
-              <select id="provision-group" class="form-select">
-                <option value="guest">Guest</option>
-                <option value="finance">Finance</option>
-                <option value="science">Science</option>
-                <option value="all">All (Toàn quyền)</option>
-              </select>
-            </div>
-            <div class="col-4 col-md-2">
-              <button type="submit" class="primary-btn w-100">Cấp quyền</button>
-            </div>
-          </form>
-          <div class="small text-muted mt-2"><i class="fa-solid fa-circle-info me-1"></i>Người được cấp quyền trước vẫn cần tự đăng ký tài khoản đăng nhập bằng đúng email này thì mới vào được.</div>
-        </div>
-
-        <div style="overflow-x:auto;">
-          <table class="monday-table">
-            <thead class="table-light">
-              <tr>
-                <th>Email</th>
-                <th>Biệt danh</th>
-                <th>Quyền</th>
-                <th>Ngày tạo hồ sơ</th>
-                <th class="text-center">Hành động</th>
-              </tr>
-            </thead>
-            <tbody id="admin-users-table-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
     </main>
   </div>
 
@@ -905,8 +853,8 @@
     </div>
   </div>
 
-  <script src="api.js?v=4"></script>
+  <script src="api.js?v=5"></script>
 
-  <script src="script.js?v=4"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>

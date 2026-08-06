@@ -101,9 +101,9 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'tools', 'ai', 'admin-users'];
+const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'tools', 'ai'];
 let currentSectionKey = 'pipeline';
-const SECTION_LOADED = { projects: false, calendar: false, drive: false, mytasks: false, adminUsers: false };
+const SECTION_LOADED = { projects: false, calendar: false, drive: false, mytasks: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -764,11 +764,6 @@ function switchSection(sectionKey) {
   if (sectionKey === 'mytasks' && !SECTION_LOADED.mytasks) {
     SECTION_LOADED.mytasks = true;
     loadMyTasks();
-  }
-
-  if (sectionKey === 'admin-users' && !SECTION_LOADED.adminUsers) {
-    SECTION_LOADED.adminUsers = true;
-    loadAdminUsers();
   }
 }
 
@@ -2759,127 +2754,6 @@ function goToTaskInProject(projectId) {
   setTimeout(tryPick, 200);
 }
 
-//  QUẢN LÝ NGƯỜI DÙNG (ADMIN) — bê nguyên xi từ WorkHub org, chỉ đổi chatUser thành
-// CURRENT_USER (tên biến người dùng hiện tại của app này). Không đổi logic, không đổi
-// danh sách quyền, không đổi gì khác — để hành vi khớp 100% với org.
-const USER_GROUP_LABELS = { guest: 'Guest', finance: 'Finance', science: 'Science', all: 'All (Toàn quyền)' };
-
-async function loadAdminUsers() {
-    const guard = document.getElementById('admin-users-guard');
-    const body = document.getElementById('admin-users-body');
-    if (!guard || !body) return;
-
-    body.style.display = 'none';
-    guard.innerHTML = '<div class="text-center text-muted py-5"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra quyền...</div>';
-
-    const email = CURRENT_USER.email || null;
-    if (!email) {
-        guard.innerHTML = '<div class="text-center text-muted py-5">Chưa đăng nhập.</div>';
-        return;
-    }
-
-    try {
-        const groupResp = await callGAS('getUserGroup', { email });
-        const myGroup = groupResp.status === 'success' ? groupResp.data : 'guest';
-        if (myGroup !== 'all') {
-            guard.innerHTML = '<div class="text-center text-danger py-5"><i class="fa-solid fa-lock fa-2x mb-2"></i><br>Bạn không có quyền truy cập trang này.</div>';
-            return;
-        }
-        guard.innerHTML = '';
-        body.style.display = 'block';
-        loadAdminUsersTable();
-    } catch (err) {
-        guard.innerHTML = `<div class="text-danger text-center py-5">Lỗi: ${err.message}</div>`;
-    }
-}
-
-async function loadAdminUsersTable() {
-    const tbody = document.getElementById('admin-users-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = skeletonTableRows(5, 5);
-
-    try {
-        const response = await callGAS('listAllUsers', {});
-        if (response.status !== 'success') throw new Error(response.message);
-        renderAdminUsersTable(response.data || []);
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-4">Lỗi: ${err.message}</td></tr>`;
-    }
-}
-
-function renderAdminUsersTable(users) {
-    const tbody = document.getElementById('admin-users-table-body');
-    if (!tbody) return;
-
-    if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Chưa có hồ sơ người dùng nào.</td></tr>';
-        return;
-    }
-
-    const myEmail = CURRENT_USER.email || null;
-
-    tbody.innerHTML = users.map(u => {
-        const safeEmail = escapeHtml(escapeJs(u.email));
-        const groupOptions = Object.keys(USER_GROUP_LABELS).map(g =>
-            `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g]}</option>`
-        ).join('');
-        const createdStr = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
-        const isSelf = !!(myEmail && myEmail.toLowerCase() === (u.email || '').toLowerCase());
-
-        return `
-            <tr>
-                <td>${escapeHtml(u.email)}${isSelf ? ' <span class="badge bg-secondary">Bạn</span>' : ''}</td>
-                <td>${escapeHtml(u.nickname || '')}</td>
-                <td>
-                    <select class="form-select form-select-sm" style="min-width:140px;" onchange="updateUserGroupAction('${safeEmail}', this.value)">
-                        ${groupOptions}
-                    </select>
-                </td>
-                <td class="small text-muted">${createdStr}</td>
-                <td class="text-center">
-                    <button class="btn btn-sm text-danger border-0" title="Thu hồi quyền" onclick="removeUserAction('${safeEmail}', ${isSelf})">
-                        <i class="fa-solid fa-user-slash"></i>
-                    </button>
-                </td>
-            </tr>`;
-    }).join('');
-}
-
-async function updateUserGroupAction(email, newGroup) {
-    try {
-        const response = await callGAS('updateUserGroup', { email, groupKey: newGroup });
-        if (response.status !== 'success') throw new Error(response.message);
-        showToast(response.data || response.message, 'success');
-    } catch (err) {
-        showToast('Lỗi: ' + err.message, 'error');
-        loadAdminUsersTable();
-    }
-}
-
-function removeUserAction(email, isSelf) {
-    Swal.fire({
-        title: isSelf ? 'Bạn đang tự thu hồi quyền của chính mình?' : `Thu hồi quyền của ${email}?`,
-        text: isSelf
-            ? 'Bạn sẽ mất quyền truy cập ngay khi hồ sơ bị xóa. Hành động khó hoàn tác nếu không còn ai khác có quyền "all".'
-            : 'Người này sẽ không truy cập được app nữa. Tài khoản đăng nhập của họ (nếu có) vẫn còn tồn tại, chỉ mất hồ sơ quyền.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: 'var(--danger-color)',
-        confirmButtonText: 'Thu hồi',
-        cancelButtonText: 'Hủy'
-    }).then(async (result) => {
-        if (!result.isConfirmed) return;
-        try {
-            const response = await callGAS('removeUser', { email });
-            if (response.status !== 'success') throw new Error(response.message);
-            showToast(response.data || response.message, 'success');
-            loadAdminUsersTable();
-        } catch (err) {
-            showToast('Lỗi: ' + err.message, 'error');
-        }
-    });
-}
-
 // ==========================================
 // 6. INITIALIZATION
 // ==========================================
@@ -3078,49 +2952,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyFilterBtn.addEventListener('click', () => loadFileList(true));
   }
 
-  //  8.9b FORM CẤP QUYỀN TRƯỚC CHO NGƯỜI DÙNG (ADMIN)
-  const provisionUserForm = document.getElementById('provision-user-form');
-  if (provisionUserForm) {
-    provisionUserForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const emailInput = document.getElementById('provision-email');
-      const nicknameInput = document.getElementById('provision-nickname');
-      const groupSelect = document.getElementById('provision-group');
-      const email = emailInput ? emailInput.value.trim() : '';
-      if (!email) return;
-
-      try {
-        const response = await callGAS('provisionUser', {
-          email,
-          nickname: nicknameInput ? nicknameInput.value.trim() : '',
-          groupKey: groupSelect ? groupSelect.value : 'guest'
-        });
-        if (response.status !== 'success') throw new Error(response.message);
-
-        // Tự động tạo user bên Supabase Auth với mật khẩu mặc định 123456
-        // Dùng client phụ để không làm văng phiên đăng nhập của Admin hiện tại
-        if (window.supabase) {
-          const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-          });
-          const signUpRes = await tempClient.auth.signUp({
-            email: email,
-            password: '123456',
-            options: {
-              data: { nickname: nicknameInput ? nicknameInput.value.trim() : '' }
-            }
-          });
-          if (signUpRes.error && signUpRes.error.message !== 'User already registered') {
-            console.warn('Cảnh báo Auth:', signUpRes.error.message);
-          }
-        }
-
-        showToast(response.data || response.message, 'success');
-        provisionUserForm.reset();
-        if (typeof loadAdminUsersTable === 'function') loadAdminUsersTable();
-      } catch (err) {
-        showToast('Lỗi: ' + err.message, 'error');
-      }
-    });
-  }
 });
