@@ -80,6 +80,23 @@
 
   <main class="app-container">
 
+    <nav class="section-nav" id="app-section-nav">
+      <button type="button" class="section-nav-btn active" data-section="pipeline" onclick="switchSection('pipeline')">
+        <i class="fa-solid fa-diagram-project"></i> Pipeline
+      </button>
+      <button type="button" class="section-nav-btn" data-section="task" onclick="switchSection('task')">
+        <i class="fa-solid fa-list-check"></i> Nhiệm Vụ
+      </button>
+      <button type="button" class="section-nav-btn" data-section="progress" onclick="switchSection('progress')">
+        <i class="fa-solid fa-chart-line"></i> Tiến Độ
+      </button>
+      <button type="button" class="section-nav-btn" data-section="calendar" onclick="switchSection('calendar')">
+        <i class="fa-solid fa-calendar-days"></i> Lịch
+      </button>
+    </nav>
+
+    <section class="app-section active" id="pipeline-section">
+
     <section class="pipeline-overview-card">
       <div class="pipeline-header-row">
         <div class="pipeline-headline">
@@ -188,6 +205,225 @@
       </div>
     </section>
 
+    </section>
+
+    <!-- ================= TASK SECTION ("Nhiệm Vụ") ================= -->
+    <section class="app-section" id="task-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-list-check" style="color: var(--gold);"></i> Quản Lý Công Việc</h3>
+          <p>Danh sách công việc theo từng dự án của nhóm Finance.</p>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="openAddTask()"><i class="fa-solid fa-plus"></i> Công việc mới</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 18px 20px;">
+        <div class="filter-bar">
+          <div class="form-group">
+            <label class="form-label">Dự án</label>
+            <select id="task-project-select" class="form-select" onchange="onProjectChange()">
+              <option value="">-- Đang tải... --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tên công việc</label>
+            <select id="filter-task-name" class="form-select" onchange="applyTaskFilters()">
+              <option value="">-- Tất cả --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Trạng thái</label>
+            <select id="filter-status" class="form-select" onchange="applyTaskFilters()">
+              <option value="all">Tất cả</option>
+              <option value="Not Started">Not Started</option>
+              <option value="Working on it">Working on it</option>
+              <option value="Stuck">Stuck</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ưu tiên</label>
+            <select id="filter-priority" class="form-select" onchange="applyTaskFilters()">
+              <option value="all">Tất cả</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Người thực hiện</label>
+            <select id="filter-assignee" class="form-select" onchange="applyTaskFilters()">
+              <option value="all">Tất cả</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nhãn</label>
+            <select id="filter-label" class="form-select" onchange="applyTaskFilters()">
+              <option value="all">Tất cả nhãn</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container" style="margin-top: 16px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 26%;">Công việc</th>
+              <th style="width: 12%;">Thành viên</th>
+              <th style="width: 20%;">Mô tả</th>
+              <th style="width: 12%;">Trạng thái</th>
+              <th style="width: 10%;">Hạn chót</th>
+              <th style="width: 10%;">Ưu tiên</th>
+              <th style="width: 10%;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="task-table-body">
+            <tr><td colspan="7" class="empty-state">Vui lòng chọn dự án để xem công việc.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= PROGRESS SECTION ("Tiến Độ") ================= -->
+    <section class="app-section" id="progress-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-chart-line" style="color: var(--gold);"></i> Tiến Độ Dự Án</h3>
+          <p>Theo dõi tiến độ các dự án của nhóm Finance & Economics.</p>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 20px 22px;">
+        <div class="grid-2">
+          <div>
+            <div class="form-group">
+              <label class="form-label">Dự án đã có (để cập nhật) hoặc bỏ trống để tạo mới</label>
+              <select id="project-select" class="form-select">
+                <option value="">-- Chọn Dự án đã có hoặc Nhập mới --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tên dự án mới</label>
+              <input type="text" id="progress-project-name" class="form-control" placeholder="Hoặc nhập Tên dự án mới">
+            </div>
+          </div>
+          <div>
+            <div class="form-group">
+              <label class="form-label">Trạng thái</label>
+              <select id="progress-status-select" class="form-select">
+                <option value="Planning">Planning</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="On Hold">On Hold</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mô tả / ghi chú</label>
+              <textarea id="progress-note-input" class="form-control" rows="2" placeholder="Mô tả / ghi chú (tùy chọn)"></textarea>
+            </div>
+          </div>
+        </div>
+        <button id="update-progress-btn" type="button" class="btn btn-primary" onclick="handleProjectCreationOrUpdate()">
+          <i class="fa-solid fa-plus"></i> Tạo / Cập Nhật
+        </button>
+      </div>
+
+      <div class="card" style="margin-top: 16px; padding: 18px 20px;">
+        <div class="filter-bar">
+          <div class="form-group">
+            <label class="form-label">Người tạo</label>
+            <select id="progress-search-input" class="form-select">
+              <option value="">-- Tất cả --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Dự án</label>
+            <select id="progress-project-filter" class="form-select">
+              <option value="">-- Tất cả dự án --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sắp xếp</label>
+            <select id="progress-sort-select" class="form-select">
+              <option value="date_desc">Mới nhất</option>
+              <option value="date_asc">Cũ nhất</option>
+              <option value="percent_desc">% Giảm dần</option>
+              <option value="percent_asc">% Tăng dần</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 0 0 auto;">
+            <label class="form-label">&nbsp;</label>
+            <button type="button" id="toggle-archived-btn" class="btn btn-outline" onclick="toggleArchivedProjectsView()">
+              <i class="fa-solid fa-box-archive"></i> Xem kho lưu trữ
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container" style="margin-top: 16px;">
+        <table class="data-table" id="progress-table">
+          <thead>
+            <tr>
+              <th style="width: 24%;">Tên Dự án</th>
+              <th style="width: 18%;">Tiến Độ</th>
+              <th style="width: 18%;">Mô tả</th>
+              <th style="width: 10%; text-align:center;">Chia sẻ</th>
+              <th style="width: 14%;">Cập nhật</th>
+              <th style="width: 10%;">Người tạo</th>
+              <th style="width: 6%; text-align:center;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="progress-table-body">
+            <tr><td colspan="7" class="empty-state">Chưa có dự án nào.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= CALENDAR SECTION ("Lịch") ================= -->
+    <section class="app-section" id="calendar-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-calendar-days" style="color: var(--gold);"></i> Lịch Nhóm Finance</h3>
+          <p>Sự kiện và mốc thời gian của nhóm Finance & Economics.</p>
+        </div>
+      </div>
+
+      <div class="calendar-layout" style="margin-top: 16px;">
+        <div class="calendar-main-view card">
+          <div id="full-calendar-display" class="calendar-container"></div>
+        </div>
+        <div class="calendar-side-panel">
+          <div class="card today-events-widget">
+            <h3>Sự Kiện Hôm Nay</h3>
+            <div id="today-event-list">
+              <p style="color: var(--text-muted); text-align:center; margin-top: 12px;">Đang kiểm tra lịch trình...</p>
+            </div>
+          </div>
+          <div class="card" style="padding: 20px;">
+            <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 14px;">Thao Tác Sự Kiện</h3>
+            <button id="add-event-btn" class="btn btn-primary" style="width:100%; margin-bottom: 10px;">
+              <i class="fa-solid fa-plus-circle"></i> Thêm Sự Kiện Mới
+            </button>
+            <button id="manage-event-btn" class="btn btn-secondary" style="width:100%; margin-bottom: 14px;" disabled>
+              <i class="fa-solid fa-pen-to-square"></i> Quản Lý Sự Kiện
+            </button>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="calendar-toggle">Phân loại lịch</label>
+              <select id="calendar-toggle" class="form-select">
+                <option value="group">Lịch Nhóm</option>
+                <option value="personal">Lịch Cá Nhân</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <aside id="observation-drawer">
@@ -274,6 +510,160 @@
             <button type="submit" class="btn btn-primary" id="auth-submit-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Task Modal -->
+  <div class="modal-overlay" id="add-task-modal">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-list-check" style="color: var(--gold);"></i> Thêm / Sửa Công Việc</h3>
+        <button class="header-btn" onclick="closeAppModal('add-task-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="task-form" onsubmit="handleTaskFormSubmit(event)">
+          <input type="hidden" id="new-task-project-id">
+          <input type="hidden" id="task-id">
+          <input type="hidden" id="new-task-parent-id">
+
+          <div class="form-group">
+            <label class="form-label">Tên công việc</label>
+            <input type="text" id="new-task-name" class="form-control" placeholder="Ví dụ: Đối soát báo cáo Quý 3" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Mô tả / Ghi chú</label>
+            <textarea id="new-task-desc" class="form-control" rows="2" placeholder="Chi tiết công việc..."></textarea>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label">Trạng thái</label>
+              <select id="new-task-status" class="form-select">
+                <option value="Not Started">Not Started</option>
+                <option value="Working on it">Working on it</option>
+                <option value="Stuck">Stuck</option>
+                <option value="Done">Done</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mức độ ưu tiên</label>
+              <select id="new-task-priority" class="form-select">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label">Hạn chót</label>
+              <input type="date" id="new-task-duedate" class="form-control">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Người thực hiện</label>
+              <div class="multiselect-container">
+                <div class="selectBox" onclick="showCheckboxes()">
+                  <select class="form-select"><option>-- Chọn thành viên --</option></select>
+                  <div class="overSelect"></div>
+                </div>
+                <div id="checkboxes">
+                  <div class="p-2" style="padding:8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-task-labels">Nhãn</label>
+            <input type="text" id="new-task-labels" class="form-control" placeholder="Ngăn cách bằng dấu phẩy. Ví dụ: gấp, đối ngoại">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('add-task-modal')">Hủy</button>
+        <button type="submit" form="task-form" class="btn btn-primary">Lưu Công Việc</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Event Modal -->
+  <div class="modal-overlay" id="add-event-modal">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="event-modal-title"><i class="fa-solid fa-calendar-plus" style="color: var(--gold);"></i> Thêm Sự Kiện Lịch Mới</h3>
+        <button class="header-btn" onclick="closeAppModal('add-event-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="event-form" onsubmit="handleEventFormSubmit(event)">
+          <input type="hidden" id="event-id" value="">
+          <div class="form-group">
+            <label class="form-label" for="event-title">Tên Sự kiện</label>
+            <input type="text" id="event-title" name="title" class="form-control" required>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label" for="start-date">Ngày Bắt đầu</label>
+              <input type="date" id="start-date" name="startDate" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="start-time">Giờ Bắt đầu</label>
+              <input type="time" id="start-time" name="startTime" class="form-control" value="09:00" required>
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label" for="end-date">Ngày Kết thúc</label>
+              <input type="date" id="end-date" name="endDate" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="end-time">Giờ Kết thúc</label>
+              <input type="time" id="end-time" name="endTime" class="form-control" value="10:00" required>
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label" for="event-recurrence">Lặp lại</label>
+              <select id="event-recurrence" name="recurrence" class="form-select" onchange="toggleRecurrenceEndVisibility()">
+                <option value="none">Không lặp lại</option>
+                <option value="daily">Hằng ngày</option>
+                <option value="weekly">Hằng tuần</option>
+                <option value="monthly">Hằng tháng</option>
+              </select>
+            </div>
+            <div class="form-group" id="recurrence-end-group" style="display:none;">
+              <label class="form-label" for="event-recurrence-end">Lặp đến ngày</label>
+              <input type="date" id="event-recurrence-end" name="recurrenceEnd" class="form-control">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mời thành viên tham dự</label>
+            <div class="multiselect-container">
+              <div class="selectBox" onclick="showEventAttendeeCheckboxes()">
+                <select class="form-select"><option>-- Chọn thành viên --</option></select>
+                <div class="overSelect"></div>
+              </div>
+              <div id="event-attendee-checkboxes">
+                <div class="p-2" style="padding:8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="location">Địa điểm</label>
+            <input type="text" id="location" name="location" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="description">Mô tả</label>
+            <textarea id="description" name="description" class="form-control" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('add-event-modal')">Hủy</button>
+        <button type="submit" form="event-form" class="btn btn-primary" id="event-form-submit-btn">Tạo Sự Kiện</button>
       </div>
     </div>
   </div>
