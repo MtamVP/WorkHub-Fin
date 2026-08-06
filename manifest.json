@@ -1,0 +1,16 @@
+{
+  "name": "WorkHub Economics Pipeline",
+  "short_name": "WorkHub-Fin",
+  "description": "Economics & Finance Knowledge Lakehouse Pipeline Workspace",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0A0A0F",
+  "theme_color": "#C9A84C",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%23C9A84C'/%3E%3Ctext%20x='32'%20y='43'%20font-size='27'%20font-family='Arial'%20font-weight='bold'%20fill='%23111118'%20text-anchor='middle'%3EWF%3C/text%3E%3C/svg%3E",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    }
+  ]
+}

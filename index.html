@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Economics & Finance Pipeline Workspace — Quy trình 7 giai đoạn thu thập, chuẩn hóa, phân tích và phát hành tri thức tài chính">
+  <title>Economics Pipeline — WorkHub Finance</title>
+  
+  <!-- Google Fonts: DM Sans & DM Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome & SweetAlert2 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- Supabase CDN (Cho xác thực và dữ liệu) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Style CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header id="app-header">
+    <div class="brand-section">
+      <div class="brand-logo"><i class="fa-solid fa-coins"></i></div>
+      <div class="brand-title-group">
+        <h1>WorkHub <span class="brand-badge">Economics Pipeline</span></h1>
+        <p class="brand-subtitle">Financial Knowledge & Data Lakehouse Architecture</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Quick Switch to Science Pipeline -->
+      <a href="../workhub-sci/index.html" class="header-btn" title="Chuyển sang Science Pipeline" style="width: auto; padding: 0 14px; font-size: 13px; font-weight: 600; gap: 6px; color: var(--gold); border-color: rgba(201,168,76,0.3);">
+        <i class="fa-solid fa-atom"></i>
+        <span>Science Pipeline</span>
+      </a>
+
+      <button class="header-btn" id="theme-toggle-btn" title="Dark/Light Mode">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+      
+      <button class="header-btn" id="observation-toggle-btn" title="Observatory">
+        <i class="fa-solid fa-bell"></i>
+        <span class="noti-badge" id="noti-unread-indicator"></span>
+      </button>
+
+      <a href="../index.html" class="header-btn" title="WorkHub Home">
+        <i class="fa-solid fa-house"></i>
+      </a>
+
+      <div class="user-profile-badge" id="user-badge">
+        <div class="user-avatar" id="user-avatar-text">EF</div>
+        <span id="user-display-name">Finance Specialist</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    
+    <!-- Top Pipeline Overview & Stepper Bar -->
+    <section class="pipeline-overview-card">
+      <div class="pipeline-header-row">
+        <div class="pipeline-headline">
+          <h2>Pipeline gồm 7 giai đoạn (Maybe)</h2>
+          <p>Từ dữ liệu thô (Bronze Layer) qua chuẩn hóa (Silver Layer) đến báo cáo và cuối cùng đi vô (Gold Layer)</p>
+        </div>
+        <div class="quick-stats-grid">
+          <div class="stat-chip">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>Bronze Ingested: <strong id="stat-bronze-count">142</strong></span>
+          </div>
+          <div class="stat-chip">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>Validation Rate: <strong id="stat-val-rate">98.4%</strong></span>
+          </div>
+          <div class="stat-chip">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Gold Published: <strong id="stat-gold-count">38</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Stepper -->
+      <div class="pipeline-stepper-container">
+        <div class="pipeline-stepper">
+          <div class="stepper-progress-line">
+            <div class="stepper-progress-fill" id="stepper-progress-fill"></div>
+          </div>
+
+          <!-- Step 1 -->
+          <div class="step-item active" data-stage="e1" onclick="switchStage('e1')">
+            <div class="step-circle"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+            <div class="step-text">
+              <span class="step-code">E1</span>
+              <span class="step-title">Ingest</span>
+              <span class="step-layer-tag tag-bronze">Bronze</span>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-item" data-stage="e2" onclick="switchStage('e2')">
+            <div class="step-circle"><i class="fa-solid fa-shield-check"></i></div>
+            <div class="step-text">
+              <span class="step-code">E2</span>
+              <span class="step-title">Validation</span>
+              <span class="step-layer-tag tag-bronze">Bronze</span>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-item" data-stage="e3" onclick="switchStage('e3')">
+            <div class="step-circle"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div class="step-text">
+              <span class="step-code">E3</span>
+              <span class="step-title">Standardize</span>
+              <span class="step-layer-tag tag-silver">Silver</span>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step-item" data-stage="e4" onclick="switchStage('e4')">
+            <div class="step-circle"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="step-text">
+              <span class="step-code">E4</span>
+              <span class="step-title">Analysis</span>
+              <span class="step-layer-tag tag-silver">Silver</span>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="step-item" data-stage="e5" onclick="switchStage('e5')">
+            <div class="step-circle"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+            <div class="step-text">
+              <span class="step-code">E5</span>
+              <span class="step-title">Report Gen</span>
+              <span class="step-layer-tag tag-silver">Artifacts</span>
+            </div>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="step-item" data-stage="e6" onclick="switchStage('e6')">
+            <div class="step-circle"><i class="fa-solid fa-user-check"></i></div>
+            <div class="step-text">
+              <span class="step-code">E6</span>
+              <span class="step-title">Human QA</span>
+              <span class="step-layer-tag tag-gold">Review Gate</span>
+            </div>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="step-item" data-stage="e7" onclick="switchStage('e7')">
+            <div class="step-circle"><i class="fa-solid fa-award"></i></div>
+            <div class="step-text">
+              <span class="step-code">E7</span>
+              <span class="step-title">Publish</span>
+              <span class="step-layer-tag tag-gold">Gold</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stage Summary & Inspector Card -->
+    <section class="card" id="stage-detail-card" style="margin-top: 24px; padding: 28px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <span class="status-pill pill-info" id="stage-badge-layer" style="font-size: 13px; font-weight: 700;">Lớp Bronze</span>
+            <h3 id="stage-title" style="font-size: 1.4rem; font-weight: 700; margin: 0; color: var(--text-primary);">E1 - Ingest (Thu thập dữ liệu thô)</h3>
+          </div>
+          <p id="stage-desc" style="color: var(--text-secondary); font-size: 14px; max-width: 800px; line-height: 1.6; margin: 0;">
+            Thu thập dữ liệu từ Website, API hoặc upload file (như JSON) để đưa vào lớp Bronze (WorkHub Storage). Yêu cầu nguồn phải hợp lệ, file đọc được và có siêu dữ liệu (metadata) tối thiểu.
+          </p>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline" id="prev-stage-btn" onclick="navStage(-1)"><i class="fa-solid fa-arrow-left"></i> Giai đoạn trước</button>
+          <button class="btn btn-primary" id="next-stage-btn" onclick="navStage(1)">Giai đoạn tiếp theo <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top: 24px;">
+        <div class="metric-box">
+          <div class="label">Vị trí lưu trữ dữ liệu</div>
+          <div class="value" id="stage-storage-tier" style="font-size: 1.1rem; color: var(--gold);">WorkHub Storage (Bronze)</div>
+          <div class="desc">Chế độ phân tầng tự động</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">Trạng thái phát triển</div>
+          <div class="value" style="font-size: 1.1rem; color: var(--success-color);">Overview Ready</div>
+          <div class="desc">Chờ chốt phương án chi tiết bên dưới</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">Tương tác quan sát</div>
+          <div class="value" style="font-size: 1.1rem; color: var(--cyan-accent);">Live Observation</div>
+          <div class="desc">Đồng bộ Supabase system_logs</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       OBSERVATION DRAWER (FINANCE NOTIFICATION & AUDIT LOGS)
+       ========================================================================= -->
+  <aside id="observation-drawer">
+    <div class="drawer-header">
+      <h4><i class="fa-solid fa-radar" style="color: var(--gold);"></i> Observation & Nhật Ký</h4>
+      <button class="header-btn" id="drawer-close-btn" onclick="toggleObservationDrawer()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-body" id="observation-logs-container">
+      <!-- Live Finance Event Logs via JS -->
+    </div>
+  </aside>
+
+  <!-- Shared WorkHub Supabase API & Auth -->
+  <script src="../api.js"></script>
+  <!-- Finance Pipeline Controller -->
+  <script src="script.js"></script>
+</body>
+</html>
