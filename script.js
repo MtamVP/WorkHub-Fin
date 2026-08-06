@@ -2820,8 +2820,14 @@ function renderAdminUsersTable(users) {
 
   tbody.innerHTML = users.map(u => {
     const safeEmail = escapeHtml(escapeJs(u.email));
-    const groupOptions = Object.keys(USER_GROUP_LABELS).map(g =>
-      `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g]}</option>`
+    // Luôn giữ đúng giá trị quyền thật của người dùng làm option, kể cả khi nó là
+    // giá trị cũ/lạ (vd. 'finance'/'science' từ trước khi đổi sang 'workhub-fin')
+    // không có trong USER_GROUP_LABELS — nếu không <select> sẽ không tìm thấy option
+    // khớp và trình duyệt tự nhảy về option đầu tiên (Guest), hiện sai quyền thật.
+    const groupKeys = Object.keys(USER_GROUP_LABELS);
+    if (u.group_key && !groupKeys.includes(u.group_key)) groupKeys.push(u.group_key);
+    const groupOptions = groupKeys.map(g =>
+      `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g] || g}</option>`
     ).join('');
     const createdStr = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
     const isSelf = !!(myEmail && myEmail.toLowerCase() === (u.email || '').toLowerCase());
