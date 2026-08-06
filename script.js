@@ -2,56 +2,56 @@
 const STAGES_META = {
   e1: {
     code: 'E1',
-    title: 'E1 - Ingest (Thu thập dữ liệu thô)',
-    layer: 'Lớp Bronze (WorkHub Storage)',
+    title: 'E1 - Ingest Data',
+    layer: 'Bronze-storage',
     layerClass: 'pill-warning',
     storageTier: 'WorkHub Storage: finance_bucket/bronze/',
-    desc: 'Thu thập dữ liệu từ Website, API hoặc upload file (như JSON) để đưa vào lớp Bronze. Giai đoạn này yêu cầu nguồn phải hợp lệ, file đọc được và có siêu dữ liệu (metadata) tối thiểu.'
+    desc: 'Lấy data từ bên ngoài đưa vào để tiến hành pipeline'
   },
   e2: {
     code: 'E2',
-    title: 'E2 - Source Validation (Xác thực nguồn)',
-    layer: 'Lớp Bronze (WorkHub Storage)',
+    title: 'E2 - Source Validation',
+    layer: 'Bronze-storage',
     layerClass: 'pill-warning',
     storageTier: 'WorkHub Storage: finance_bucket/bronze/',
-    desc: 'Đánh giá độ tin cậy, độ mới (freshness), độ phủ và giấy phép của dữ liệu để đảm bảo điểm nguồn đạt ngưỡng yêu cầu.'
+    desc: 'Đảm bảo dữ liệu đầu vào hợp lệ.'
   },
   e3: {
     code: 'E3',
-    title: 'E3 - Standardization (Chuẩn hóa)',
-    layer: 'Lớp Silver (WorkHub-Tools Storage)',
+    title: 'E3 - Standardization',
+    layer: 'Silver-storage',
     layerClass: 'pill-info',
     storageTier: 'WorkHub-Tools Storage: silver_bucket/silver/',
-    desc: 'Làm sạch, chuẩn hóa, ánh xạ (mapping) và phân giải thực thể để chuyển dữ liệu lên lớp Silver. Quá trình này sẽ kiểm tra schema, tính toàn vẹn và gắn cờ các dữ liệu dị biệt (anomaly).'
+    desc: 'Tiến hành làm sạch, chuẩn hóa dữ liệu, tách thông tin và đưa vào lớp Silver. Quá trình này sẽ kiểm tra schema, tính toàn vẹn và gắn cờ các dữ liệu khác thường.'
   },
   e4: {
     code: 'E4',
-    title: 'E4 - Analysis (Phân tích)',
-    layer: 'Lớp Silver (WorkHub-Tools Storage)',
+    title: 'E4 - Analysis',
+    layer: 'Silver-storage',
     layerClass: 'pill-info',
     storageTier: 'WorkHub-Tools Storage: silver_bucket/silver/',
-    desc: 'Tính toán các chỉ số kinh tế, chạy các mô hình tài chính và phân tích kịch bản. Yêu cầu mô hình phải rõ ràng, kết quả có thể giải thích được và có kiểm tra độ nhạy.'
+    desc: 'Tính toán các chỉ số kinh tế và phân tích dữ liệu.'
   },
   e5: {
     code: 'E5',
-    title: 'E5 - Reporting (Tạo báo cáo)',
-    layer: 'Lớp Silver Artifacts (WorkHub-Tools)',
+    title: 'E5 - Reporting',
+    layer: 'Silver-storage',
     layerClass: 'pill-info',
     storageTier: 'WorkHub-Tools Storage: silver_bucket/reports/',
-    desc: 'Tự động tạo dự thảo báo cáo, biểu đồ và tóm tắt theo các mẫu (template) có sẵn. Cần kiểm tra tính đầy đủ của các phần bắt buộc trước khi chuyển sang khâu kiểm duyệt.'
+    desc: 'Tự động tạo báo cáo theo các mẫu (template) có sẵn.'
   },
   e6: {
     code: 'E6',
-    title: 'E6 - Human QA (Kiểm duyệt chuyên gia)',
-    layer: 'Lớp Gold Gate (WorkHub-Tools)',
+    title: 'E6 - Human QA',
+    layer: 'Gold-storage',
     layerClass: 'pill-success',
     storageTier: 'WorkHub-Tools Storage: gold_bucket/pending_review/',
-    desc: 'Chuyên gia (con người) đọc, kiểm tra các điểm bất thường, ghi chú và quyết định phê duyệt (Approve) hoặc yêu cầu chỉnh sửa (Reject). Bắt buộc phải có ý kiến phản hồi nếu từ chối.'
+    desc: 'Cần người check lại trước khi XUẤT'
   },
   e7: {
     code: 'E7',
-    title: 'E7 - Publish (Phát hành tri thức)',
-    layer: 'Lớp Gold (WorkHub-Tools Storage)',
+    title: 'E7 - Publish',
+    layer: 'Gold-storage',
     layerClass: 'pill-success',
     storageTier: 'WorkHub-Tools Storage: gold_bucket/gold/',
     desc: 'Đưa báo cáo/dữ liệu đã duyệt vào kho tri thức Gold, đánh phiên bản (versioning), lưu trữ bất biến và xuất bản cho các bên liên quan sử dụng.'
@@ -64,7 +64,7 @@ let currentStageIndex = 0;
 const ALLOWED_GROUPS = ['finance', 'admin', 'all'];
 
 async function checkAccessGuard() {
-  const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || 'finance.lead@workhub.internal';
+  const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
   let userGroup = localStorage.getItem('userGroup');
 
   if (window.supabaseClient && userEmail) {
@@ -102,7 +102,7 @@ async function checkAccessGuard() {
       confirmButtonColor: '#C9A84C',
       allowOutsideClick: false
     }).then(() => {
-      window.location.href = '../index.html';
+      window.location.href = 'https://workhub-ai.pages.dev/';
     });
     return false;
   }
@@ -158,19 +158,12 @@ function updateStageUI(stageKey) {
     badgeEl.className = `status-pill ${meta.layerClass}`;
   }
   if (storageTierEl) storageTierEl.textContent = meta.storageTier;
-
-  logPipelineEvent(`Xem tổng quan ${meta.title}`, 'info', `VIEW_${stageKey.toUpperCase()}`);
 }
 
-let LOCAL_LOGS = [
-  { time: '14:32:10', type: 'success', text: 'E7: Báo cáo Vĩ mô v2.4.0 đã ký duyệt và lưu trữ Gold Layer tại WorkHub-Tools.' },
-  { time: '14:20:05', type: 'info', text: 'E6: Chuyên gia Trần Thị Thu Trang bắt đầu rà soát tài liệu Q2 Banking.' },
-  { time: '13:58:44', type: 'warning', text: 'E3: Phát hiện 1 dị biệt giao dịch thỏa thuận NVL (Z-Score = 3.82).' },
-  { time: '13:30:00', type: 'success', text: 'E1: Luồng nạp HOSE & HNX hoàn tất nạp 24.5 MB vào WorkHub Storage (Bronze).' }
-];
+let LOCAL_LOGS = [];
 
 async function fetchLiveObservationLogs() {
-  const email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
+  const email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
   if (window.API && window.API.notification) {
     try {
       const logs = await window.API.notification.get('finance', 25, email);
@@ -191,6 +184,15 @@ async function fetchLiveObservationLogs() {
 function renderObservationLogs() {
   const container = document.getElementById('observation-logs-container');
   if (!container) return;
+  if (LOCAL_LOGS.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 40px 16px; font-size: 13px;">
+        <i class="fa-regular fa-folder-open" style="font-size: 28px; margin-bottom: 10px; display: block; opacity: 0.4;"></i>
+        Chưa có nhật ký hoạt động
+      </div>
+    `;
+    return;
+  }
   container.innerHTML = LOCAL_LOGS.map(log => `
     <div class="event-log-card" style="border-left-color: var(--${log.type === 'success' ? 'success-color' : (log.type === 'warning' ? 'warning-color' : (log.type === 'danger' ? 'danger-color' : 'gold'))});">
       <div class="event-log-time">
@@ -211,7 +213,7 @@ async function logPipelineEvent(text, type = 'info', action = 'PIPELINE_FIN_ACTI
   const unreadIndicator = document.getElementById('noti-unread-indicator');
   if (unreadIndicator) unreadIndicator.style.display = 'block';
 
-  const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || 'finance.lead@workhub.internal';
+  const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
   const traceId = "TRC_FIN_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
   if (window.API && window.API.system && window.API.system.logAction) {
     try {
@@ -261,6 +263,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const notiBtn = document.getElementById('observation-toggle-btn');
   if (notiBtn) notiBtn.addEventListener('click', toggleObservationDrawer);
-
-  console.log("Economics Workspace Pipeline Overview (workhub-fin) Initialized.");
 });
