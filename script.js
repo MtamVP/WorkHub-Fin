@@ -101,9 +101,9 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar'];
+const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'tools', 'ai', 'admin-users'];
 let currentSectionKey = 'pipeline';
-const SECTION_LOADED = { projects: false, calendar: false };
+const SECTION_LOADED = { projects: false, calendar: false, drive: false, mytasks: false, adminUsers: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -754,6 +754,21 @@ function switchSection(sectionKey) {
     SECTION_LOADED.calendar = true;
     loadCalendarData();
     if (typeof loadEventAttendeeCheckboxes === 'function') loadEventAttendeeCheckboxes();
+  }
+
+  if (sectionKey === 'drive' && !SECTION_LOADED.drive) {
+    SECTION_LOADED.drive = true;
+    loadFileList();
+  }
+
+  if (sectionKey === 'mytasks' && !SECTION_LOADED.mytasks) {
+    SECTION_LOADED.mytasks = true;
+    loadMyTasks();
+  }
+
+  if (sectionKey === 'admin-users' && !SECTION_LOADED.adminUsers) {
+    SECTION_LOADED.adminUsers = true;
+    loadAdminUsers();
   }
 }
 
@@ -2247,6 +2262,622 @@ async function handleToggleImportantClick() {
 }
 
 // ==========================================
+// 5.5 DRIVE / UPLOAD FILE MODULE (ported từ WorkHub org)
+// ==========================================
+
+function handleUploadSuccess(message) {
+  const uploadStatus = document.getElementById('upload-status');
+  const submitUploadBtn = document.getElementById('submit-upload-btn');
+  const fileNameDisplay = document.getElementById('file-name-display');
+  const descriptionTextarea = document.querySelector('#upload-file-form textarea[name="description"]');
+
+  if (uploadStatus) {
+    uploadStatus.className = 'status-message success-message';
+    let content = message;
+    if (typeof message === 'object' && message !== null) {
+      content = message.message || message.data || JSON.stringify(message);
+    }
+    uploadStatus.textContent = content;
+  }
+
+  if (submitUploadBtn) {
+    submitUploadBtn.disabled = false;
+    submitUploadBtn.innerHTML = '<i class="fa-solid fa-upload"></i> Tải Lên Drive';
+  }
+
+  if (descriptionTextarea) descriptionTextarea.value = '';
+
+  const fileInput = document.getElementById('file-input');
+  if (fileInput) fileInput.value = '';
+  if (fileNameDisplay) fileNameDisplay.textContent = ' (Chưa có file nào)';
+
+  loadFileList(false, { quiet: true });
+}
+
+function handleUploadFailure(error) {
+  const uploadStatus = document.getElementById('upload-status');
+  const submitUploadBtn = document.getElementById('submit-upload-btn');
+
+  let errorMsg = error;
+  if (typeof error === 'object' && error !== null) {
+    errorMsg = error.message || error.error || error.data || JSON.stringify(error);
+  }
+
+  if (uploadStatus) {
+    uploadStatus.className = 'status-message error-message';
+    uploadStatus.textContent = 'Lỗi tải lên: ' + errorMsg;
+  }
+
+  if (submitUploadBtn) {
+    submitUploadBtn.disabled = false;
+    submitUploadBtn.innerHTML = '<i class="fa-solid fa-upload"></i> Tải Lên Drive';
+  }
+}
+
+function populateUploaderFilter(fileData) {
+  const filterUploader = document.getElementById('filter-uploader');
+  if (!filterUploader) return;
+
+  const uploaderEmails = new Set();
+  if (Array.isArray(fileData)) {
+    fileData.forEach(file => {
+      if (file.uploader) uploaderEmails.add(file.uploader);
+    });
+  }
+
+  const prevUploader = filterUploader.value;
+
+  filterUploader.innerHTML = '<option value="">Tất cả Người Tải</option>';
+  uploaderEmails.forEach(email => {
+    const option = document.createElement('option');
+    option.value = email;
+    option.textContent = email.split('@')[0];
+    filterUploader.appendChild(option);
+  });
+
+  // Giữ lại lựa chọn cũ để bộ lọc không tự reset sau mỗi lần tải lại
+  if (prevUploader && uploaderEmails.has(prevUploader)) filterUploader.value = prevUploader;
+}
+
+// quiet = true: tải lại sau khi upload/xóa/chia sẻ một file, không xóa trắng bảng ra
+// placeholder — cùng mẫu đã dùng cho Task và Progress. Lưu ý: API.file.list hiện chỉ lọc
+// theo groupKey ở server, các filter còn lại (tên/loại/người tải/ngày/sắp xếp) chưa được
+// Supabase backend áp dụng — giữ nguyên hành vi hiện có của api.js, không tự ý mở rộng.
+async function loadFileList(isFiltering = false, options) {
+  const quiet = !!(options && options.quiet);
+  const fileTableBody = document.querySelector('#file-table tbody');
+  if (!fileTableBody) return;
+
+  const searchInput = document.getElementById('search-name');
+  const filterSelect = document.getElementById('filter-type');
+  const filterUploaderSelect = document.getElementById('filter-uploader');
+  const filterDateInput = document.getElementById('filter-date');
+  const filterSortSelect = document.getElementById('filter-sort');
+
+  const filters = {
+    searchName: searchInput ? searchInput.value : '',
+    mimeType: filterSelect ? filterSelect.value : '',
+    uploader: filterUploaderSelect ? filterUploaderSelect.value : '',
+    date: filterDateInput ? filterDateInput.value : '',
+    sortBy: filterSortSelect ? filterSortSelect.value : 'date_desc'
+  };
+
+  if (!quiet) {
+    fileTableBody.innerHTML = skeletonTableRows(7, 6);
+  }
+
+  try {
+    const fileData = await API.file.list(CURRENT_USER.groupKey, filters);
+
+    if (!isFiltering) populateUploaderFilter(fileData);
+
+    renderFileTable(fileData);
+    renderFileStats(fileData);
+
+  } catch (error) {
+    console.error("Lỗi tải file:", error);
+    if (!quiet) {
+      handleFileLoadFailure(error);
+    } else {
+      showToast("Lỗi kết nối: " + (error.message || error), "error");
+    }
+  }
+}
+
+function renderFileTable(fileData) {
+  const fileTableBody = document.querySelector('#file-table tbody');
+  const fileTableHeadRow = document.querySelector('#file-table thead tr');
+
+  if (!fileTableBody || !fileTableHeadRow) return;
+
+  fileTableBody.innerHTML = '';
+
+  const showGroupCol = CURRENT_USER.groupKey === 'all';
+
+  let headerHTML = '<th>Tên File</th><th>Đường dẫn</th><th>Mô tả</th>';
+  if (showGroupCol) headerHTML += '<th style="text-align:center;">Nhóm</th>';
+  headerHTML += '<th>Người Tải</th><th>Ngày Tải</th><th style="text-align:center;">Xem</th>';
+  if (!showGroupCol) headerHTML += '<th style="text-align:center;">Share</th>';
+  headerHTML += '<th style="text-align:center;">Xóa</th>';
+
+  fileTableHeadRow.innerHTML = headerHTML;
+
+  if (!fileData || fileData.length === 0) {
+    const colCount = fileTableHeadRow.children.length;
+    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+    return;
+  }
+
+  fileData.forEach(file => {
+    const row = fileTableBody.insertRow();
+
+    row.insertCell().textContent = file.name;
+    row.insertCell().textContent = file.folderPath || '/';
+    row.insertCell().textContent = file.description || '';
+
+    if (showGroupCol) {
+      const groupCell = row.insertCell();
+      groupCell.style.textAlign = 'center';
+      groupCell.innerHTML = `<span class="status-pill pill-info">${escapeHtml(file.groupKey || 'workhub-fin')}</span>`;
+    }
+
+    row.insertCell().textContent = (file.uploader || 'Unknown').split('@')[0];
+    row.insertCell().textContent = file.date;
+
+    const viewCell = row.insertCell();
+    viewCell.style.textAlign = 'center';
+    const viewLink = document.createElement('a');
+    viewLink.href = file.url;
+    viewLink.target = '_blank';
+    viewLink.title = 'Xem file';
+    viewLink.innerHTML = '<i class="fa-solid fa-eye"></i>';
+    viewCell.appendChild(viewLink);
+
+    if (!showGroupCol) {
+      const shareCell = row.insertCell();
+      shareCell.style.textAlign = 'center';
+
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'icon-btn' + (file.isShared ? ' success' : '');
+      shareBtn.onclick = () => shareFileAction(file.id, file.name);
+
+      if (file.isShared) {
+        shareBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        shareBtn.title = 'Đã chia sẻ. Bấm để chia sẻ lại';
+      } else {
+        shareBtn.innerHTML = '<i class="fa-solid fa-share-from-square"></i>';
+        shareBtn.title = 'Chia sẻ ra toàn hệ thống';
+      }
+
+      shareCell.appendChild(shareBtn);
+    }
+
+    const deleteCell = row.insertCell();
+    deleteCell.style.textAlign = 'center';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'icon-btn danger';
+    deleteBtn.title = 'Xóa file';
+    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    deleteBtn.onclick = () => deleteFileAction(file.id, file.name);
+    deleteCell.appendChild(deleteBtn);
+  });
+}
+
+function handleFileLoadFailure(error) {
+  const fileTableBody = document.querySelector('#file-table tbody');
+  const fileTableHeadRow = document.querySelector('#file-table thead tr');
+  if (fileTableBody) {
+    let msg = error;
+    if (typeof error === 'object' && error !== null) {
+      msg = error.message || error.data || JSON.stringify(error);
+    }
+    const colCount = fileTableHeadRow ? fileTableHeadRow.children.length : 7;
+    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" style="color: var(--danger-color); text-align: center;">Lỗi tải dữ liệu: ${escapeHtml(msg)}</td></tr>`;
+  }
+  console.error('Lỗi Drive API:', error);
+}
+
+function handleDeleteSuccess(message) {
+  console.log(message);
+  loadFileList(false, { quiet: true });
+  showToast(message);
+}
+
+function handleDeleteFailure(error) {
+  console.error("Lỗi xóa file:", error);
+
+  let msg = error;
+  if (typeof error === 'object' && error !== null) {
+    msg = error.message || error.data || JSON.stringify(error);
+  }
+
+  showToast("Lỗi xóa file: " + msg, 'error');
+}
+
+function deleteFileAction(fileId, fileName) {
+  Swal.fire({
+    title: 'Xóa File?',
+    text: `Bạn có chắc muốn xóa file "${fileName}"?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: 'var(--danger-color)',
+    cancelButtonColor: 'var(--text-muted)',
+    confirmButtonText: 'Xóa',
+    cancelButtonText: 'Hủy'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+
+    Swal.fire({
+      title: 'Đang xóa...',
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      const message = await API.file.delete(fileId, CURRENT_USER.groupKey);
+      Swal.close();
+      handleDeleteSuccess(message);
+    } catch (err) {
+      Swal.close();
+      handleDeleteFailure(err);
+    }
+  });
+}
+
+// Dùng cho widget tổng quan (nếu có #myfiles-list-view trong DOM) — hiện app này chưa có
+// dashboard widget riêng nên hàm này an toàn no-op, giữ lại để tương thích khi cần dùng sau.
+function renderRecentFiles(fileData) {
+  const fileView = document.getElementById('myfiles-list-view');
+  if (!fileView) return;
+
+  if (!fileData || fileData.length === 0) {
+    fileView.innerHTML = '<p style="color:var(--text-secondary);">Chưa có tài liệu nào được tải lên.</p>';
+    return;
+  }
+
+  let html = '<ul style="list-style: none; padding: 0;">';
+  fileData.forEach(file => {
+    const fileNameLower = (file.name || '').toLowerCase();
+
+    let icon = 'fa-file';
+    if (fileNameLower.endsWith('.pdf')) icon = 'fa-file-pdf';
+    else if (fileNameLower.endsWith('.docx')) icon = 'fa-file-word';
+    else if (fileNameLower.endsWith('.xlsx')) icon = 'fa-file-excel';
+    else if (fileNameLower.endsWith('.pptx')) icon = 'fa-file-powerpoint';
+    else if (file.mimeType && file.mimeType.includes('image/')) icon = 'fa-file-image';
+    else if (fileNameLower.endsWith('.zip') || fileNameLower.endsWith('.rar')) icon = 'fa-file-zipper';
+
+    html += `
+      <li style="display: flex; align-items: center; margin-bottom: 8px;">
+        <i class="fa-solid ${icon}" style="color: var(--info-color); margin-right: 8px;"></i>
+        <a href="${file.url}" target="_blank" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>
+      </li>`;
+  });
+  html += '</ul>';
+  fileView.innerHTML = html;
+}
+
+function renderFileStats(fileData) {
+  if (!Array.isArray(fileData)) {
+    console.error("Dữ liệu không phải là mảng:", fileData);
+    return;
+  }
+  const totalFiles = fileData.length;
+
+  const stats = fileData.reduce((acc, file) => {
+    if (!file) return acc;
+
+    const mime = file.mimeType || file.mime_type || file.type || file.fileType || '';
+    const fileName = file.name || file.title || 'Không rõ tên';
+    const fileNameLower = fileName.toLowerCase();
+
+    if (mime.includes('pdf') || fileNameLower.endsWith('.pdf')) {
+      acc.pdf++;
+    } else if (
+      mime.includes('word') || mime.includes('google-apps.document') ||
+      fileNameLower.endsWith('.doc') || fileNameLower.endsWith('.docx')
+    ) {
+      acc.word++;
+    } else if (
+      mime.includes('spreadsheet') || mime.includes('excel') || mime.includes('google-apps.spreadsheet') ||
+      fileNameLower.endsWith('.xls') || fileNameLower.endsWith('.xlsx')
+    ) {
+      acc.excel++;
+    } else if (
+      mime.includes('image/') || /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileNameLower)
+    ) {
+      acc.image++;
+    } else if (
+      mime.includes('presentation') || mime.includes('powerpoint') || mime.includes('google-apps.presentation') ||
+      fileNameLower.endsWith('.ppt') || fileNameLower.endsWith('.pptx')
+    ) {
+      acc.pptx++;
+    } else if (
+      mime.includes('zip') || mime.includes('rar') ||
+      fileNameLower.endsWith('.zip') || fileNameLower.endsWith('.rar')
+    ) {
+      acc.zip++;
+    }
+
+    return acc;
+  }, { pdf: 0, word: 0, excel: 0, image: 0, pptx: 0, zip: 0 });
+
+  const setContent = (id, count) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = count;
+  };
+
+  setContent('word-cnt', stats.word);
+  setContent('excel-cnt', stats.excel);
+  setContent('pdf-cnt', stats.pdf);
+  setContent('image-cnt', stats.image);
+  setContent('pptx-cnt', stats.pptx);
+  setContent('zip-cnt', stats.zip);
+  setContent('total-cnt', totalFiles);
+}
+
+function shareFileAction(fileId, fileName) {
+  Swal.fire({
+    title: 'Chia sẻ file?',
+    html: `Bạn muốn chia sẻ file <b>"${escapeHtml(fileName)}"</b> ra toàn hệ thống?<br>
+            <small style="color:var(--text-muted);">Tất cả thành viên sẽ nhìn thấy file này.</small>`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: 'var(--gold)',
+    cancelButtonColor: 'var(--text-muted)',
+    confirmButtonText: 'Chia sẻ',
+    cancelButtonText: 'Hủy'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+
+    Swal.fire({
+      title: 'Đang xử lý...',
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      const message = await API.file.share(fileId, CURRENT_USER.groupKey);
+      Swal.fire('Thành công!', message, 'success');
+      loadFileList(false, { quiet: true });
+    } catch (err) {
+      Swal.fire('Lỗi!', err.message || String(err), 'error');
+    }
+  });
+}
+
+// ==========================================
+// 5.6 VIỆC CỦA TÔI (My Tasks + khối lượng công việc nhóm) — ported từ WorkHub org
+// ==========================================
+
+async function loadMyTasks() {
+  const container = document.getElementById('mytasks-list');
+  if (!container) return;
+  container.innerHTML = skeletonListItems(4);
+
+  if (!CURRENT_USER.email) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0; grid-column: 1 / -1;">Chưa đăng nhập.</div>';
+    return;
+  }
+
+  try {
+    const tasks = await API.task.listMine(CURRENT_USER.email, CURRENT_USER.groupKey);
+    renderMyTasks(tasks || []);
+  } catch (err) {
+    container.innerHTML = `<div style="text-align:center; color:var(--danger-color); padding: 40px 0; grid-column: 1 / -1;">Lỗi: ${escapeHtml(err.message || String(err))}</div>`;
+  }
+
+  loadWorkload();
+}
+
+async function loadWorkload() {
+  const tbody = document.getElementById('workload-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 14px 0;"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+
+  try {
+    const rows = await API.task.workload(CURRENT_USER.groupKey);
+    renderWorkload(rows || []);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color: var(--danger-color); text-align:center; padding: 14px 0;">Lỗi: ${escapeHtml(err.message || String(err))}</td></tr>`;
+  }
+}
+
+function renderWorkload(rows) {
+  const tbody = document.getElementById('workload-table-body');
+  if (!tbody) return;
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Không có công việc nào đang mở.</td></tr>';
+    return;
+  }
+
+  const busiest = Math.max(...rows.map(r => r.total), 1);
+
+  tbody.innerHTML = rows.map(r => {
+    // Thanh nền thể hiện tương quan với người đang ôm nhiều việc nhất
+    const share = Math.round((r.total / busiest) * 100);
+    return `<tr>
+      <td style="font-weight:700;">
+        ${escapeHtml(r.name)}
+        <div class="workload-bar"><span style="width:${share}%"></span></div>
+      </td>
+      <td style="text-align:center; font-weight:700;">${r.total}</td>
+      <td style="text-align:center; color:var(--text-muted);">${r.notStarted}</td>
+      <td style="text-align:center;">${r.working}</td>
+      <td style="text-align:center; ${r.stuck > 0 ? 'color:var(--danger-color); font-weight:700;' : 'color:var(--text-muted);'}">${r.stuck}</td>
+      <td style="text-align:center; ${r.overdue > 0 ? 'color:var(--danger-color); font-weight:700;' : 'color:var(--text-muted);'}">${r.overdue}</td>
+      <td style="text-align:center; ${r.highPriority > 0 ? 'color:var(--warning-color); font-weight:700;' : 'color:var(--text-muted);'}">${r.highPriority}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderMyTasks(tasks) {
+  const container = document.getElementById('mytasks-list');
+  if (!container) return;
+
+  if (!tasks || tasks.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0; grid-column: 1 / -1;">Bạn không có công việc nào đang được giao.</div>';
+    return;
+  }
+
+  container.innerHTML = tasks.map(t => {
+    const safeName = escapeHtml(t.name);
+    const safeProjectId = escapeHtml(escapeJs(t.project_id));
+    const statusColor = getStatusColor(t.status);
+    return `
+      <div class="task-card" style="border-left-color:${statusColor};" onclick="goToTaskInProject('${safeProjectId}')">
+        <div class="card-row" style="align-items:flex-start;">
+          <span class="task-title" style="margin:0;">${safeName}</span>
+          ${renderBadge('priority', t.priority)}
+        </div>
+        <div style="font-size:12.5px; color:var(--text-muted);"><i class="fa-solid fa-diagram-project" style="margin-right:6px;"></i>${escapeHtml(t.projectName || '')}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          ${renderBadge('status', t.status)}
+          ${t.dueDate ? `<span style="font-size:12px; color:var(--text-muted);">Hạn: ${escapeHtml(t.dueDate)}</span>` : ''}
+          ${getDueDateBadge(t.dueDate, t.status)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Nhảy từ "Việc của tôi" sang màn Task của đúng dự án chứa task đó
+function goToTaskInProject(projectId) {
+  const taskNavItem = document.querySelector('.nav-item[data-section="task"]');
+  if (taskNavItem) taskNavItem.click();
+
+  let attempts = 0;
+  const tryPick = () => {
+    const select = document.getElementById('task-project-select');
+    const hasOption = select && Array.from(select.options).some(o => o.value === projectId);
+    if (hasOption) {
+      select.value = projectId;
+      select.dispatchEvent(new Event('change'));
+    } else if (attempts < 20) {
+      attempts++;
+      setTimeout(tryPick, 200);
+    }
+  };
+  setTimeout(tryPick, 200);
+}
+
+// ==========================================
+// 5.7 QUẢN LÝ NGƯỜI DÙNG (ADMIN) — ported từ WorkHub org
+// ==========================================
+// Chỉ quản lý hồ sơ quyền (public.users), không tạo/xóa được tài khoản đăng nhập Supabase
+// Auth thật (trừ lúc cấp quyền mới — xem provision-user-form wiring bên dưới). Gate quyền
+// chỉ ở client, cùng mức bảo mật hiện có của cả app.
+
+const USER_GROUP_LABELS = { guest: 'Guest', 'workhub-fin': 'Finance', admin: 'Admin', all: 'All (Toàn quyền)' };
+
+async function loadAdminUsers() {
+  const guard = document.getElementById('admin-users-guard');
+  const body = document.getElementById('admin-users-body');
+  if (!guard || !body) return;
+
+  body.style.display = 'none';
+  guard.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra quyền...</div>';
+
+  if (!CURRENT_USER.email) {
+    guard.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 40px 0;">Chưa đăng nhập.</div>';
+    return;
+  }
+
+  // Rộng hơn org một chút: fin công nhận cả 'admin' lẫn 'all' là quyền cao nhất (khớp
+  // ALLOWED_GROUPS của app này), thay vì chỉ 'all' như bản gốc.
+  if (CURRENT_USER.groupKey !== 'all' && CURRENT_USER.groupKey !== 'admin') {
+    guard.innerHTML = '<div style="text-align:center; color:var(--danger-color); padding: 40px 0;"><i class="fa-solid fa-lock" style="font-size:1.6em; margin-bottom:8px; display:block;"></i>Bạn không có quyền truy cập trang này.</div>';
+    return;
+  }
+
+  guard.innerHTML = '';
+  body.style.display = 'block';
+  loadAdminUsersTable();
+}
+
+async function loadAdminUsersTable() {
+  const tbody = document.getElementById('admin-users-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = skeletonTableRows(5, 5);
+
+  try {
+    const users = await API.user.listAll();
+    renderAdminUsersTable(users || []);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger-color); text-align:center; padding: 16px 0;">Lỗi: ${escapeHtml(err.message || String(err))}</td></tr>`;
+  }
+}
+
+function renderAdminUsersTable(users) {
+  const tbody = document.getElementById('admin-users-table-body');
+  if (!tbody) return;
+
+  if (!users || users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Chưa có hồ sơ người dùng nào.</td></tr>';
+    return;
+  }
+
+  const myEmail = CURRENT_USER.email || null;
+
+  tbody.innerHTML = users.map(u => {
+    const safeEmail = escapeHtml(escapeJs(u.email));
+    const groupOptions = Object.keys(USER_GROUP_LABELS).map(g =>
+      `<option value="${g}" ${g === u.group_key ? 'selected' : ''}>${USER_GROUP_LABELS[g]}</option>`
+    ).join('');
+    const createdStr = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
+    const isSelf = !!(myEmail && myEmail.toLowerCase() === (u.email || '').toLowerCase());
+
+    return `
+      <tr>
+        <td>${escapeHtml(u.email)}${isSelf ? ' <span class="status-pill pill-neutral">Bạn</span>' : ''}</td>
+        <td>${escapeHtml(u.nickname || '')}</td>
+        <td>
+          <select class="form-select" style="min-width:160px;" onchange="updateUserGroupAction('${safeEmail}', this.value)">
+            ${groupOptions}
+          </select>
+        </td>
+        <td style="font-size:12.5px; color:var(--text-muted);">${createdStr}</td>
+        <td style="text-align:center;">
+          <button class="icon-btn danger" title="Thu hồi quyền" onclick="removeUserAction('${safeEmail}', ${isSelf})">
+            <i class="fa-solid fa-user-slash"></i>
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function updateUserGroupAction(email, newGroup) {
+  try {
+    const message = await API.user.updateGroup(email, newGroup);
+    showToast(message, 'success');
+  } catch (err) {
+    showToast('Lỗi: ' + (err.message || err), 'error');
+    loadAdminUsersTable();
+  }
+}
+
+function removeUserAction(email, isSelf) {
+  Swal.fire({
+    title: isSelf ? 'Bạn đang tự thu hồi quyền của chính mình?' : `Thu hồi quyền của ${email}?`,
+    text: isSelf
+      ? 'Bạn sẽ mất quyền truy cập ngay khi hồ sơ bị xóa. Hành động khó hoàn tác nếu không còn ai khác có quyền "all".'
+      : 'Người này sẽ không truy cập được app nữa. Tài khoản đăng nhập của họ (nếu có) vẫn còn tồn tại, chỉ mất hồ sơ quyền.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: 'var(--danger-color)',
+    confirmButtonText: 'Thu hồi',
+    cancelButtonText: 'Hủy'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const message = await API.user.remove(email);
+      showToast(message, 'success');
+      loadAdminUsersTable();
+    } catch (err) {
+      showToast('Lỗi: ' + (err.message || err), 'error');
+    }
+  });
+}
+
+// ==========================================
 // 6. INITIALIZATION
 // ==========================================
 
@@ -2293,4 +2924,196 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const notiBtn = document.getElementById('observation-toggle-btn');
   if (notiBtn) notiBtn.addEventListener('click', toggleObservationDrawer);
+
+  // ----- Drive / Upload File: wiring một lần duy nhất -----
+  const uploadForm = document.getElementById('upload-file-form');
+  if (uploadForm) {
+    const driveFileInput = document.getElementById('file-input');
+    const driveFolderInput = document.getElementById('folder-input');
+    const uploadLabel = document.getElementById('upload-label');
+    const submitUploadBtn = document.getElementById('submit-upload-btn');
+    const uploadTypeRadios = uploadForm.querySelectorAll('input[name="uploadType"]');
+
+    uploadTypeRadios.forEach(radio => {
+      radio.addEventListener('change', function () {
+        if (this.value === 'folder') {
+          if (uploadLabel) {
+            uploadLabel.setAttribute('for', 'folder-input');
+            uploadLabel.innerHTML = '<i class="fa-solid fa-folder-tree"></i> Chọn thư mục từ máy tính<span id="file-name-display"> (Chưa chọn thư mục)</span>';
+          }
+        } else {
+          if (uploadLabel) {
+            uploadLabel.setAttribute('for', 'file-input');
+            uploadLabel.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Chọn file từ máy tính<span id="file-name-display"> (Chưa có file nào)</span>';
+          }
+        }
+        const preview = document.getElementById('file-icon-preview');
+        if (preview) preview.innerHTML = '';
+      });
+    });
+
+    const handleDriveFileInputChange = function () {
+      if (this.files.length > 0) {
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const fileIconPreview = document.getElementById('file-icon-preview');
+
+        if (this.files.length === 1) {
+          const file = this.files[0];
+          const fileName = file.name.toLowerCase();
+          if (fileNameDisplay) fileNameDisplay.textContent = ' (' + file.name + ')';
+
+          let iconClass = 'fa-file';
+          if (fileName.endsWith('.pdf')) iconClass = 'fa-file-pdf';
+          else if (fileName.endsWith('.docx')) iconClass = 'fa-file-word';
+          else if (file.type && file.type.startsWith('image/')) iconClass = 'fa-file-image';
+          else if (fileName.endsWith('.xlsx')) iconClass = 'fa-file-excel';
+
+          if (fileIconPreview) fileIconPreview.innerHTML = `<i class="fa-solid ${iconClass}" style="font-size: 36px; color: var(--text-secondary);"></i>`;
+        } else {
+          if (fileNameDisplay) fileNameDisplay.textContent = ' (Đã chọn ' + this.files.length + ' files)';
+          if (fileIconPreview) fileIconPreview.innerHTML = `<i class="fa-solid fa-copy" style="font-size: 36px; color: var(--text-secondary);"></i>`;
+        }
+        if (submitUploadBtn) submitUploadBtn.disabled = false;
+      }
+    };
+
+    if (driveFileInput) driveFileInput.addEventListener('change', handleDriveFileInputChange);
+    if (driveFolderInput) driveFolderInput.addEventListener('change', handleDriveFileInputChange);
+
+    uploadForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const checkedTypeRadio = document.querySelector('input[name="uploadType"]:checked');
+      const uploadType = checkedTypeRadio ? checkedTypeRadio.value : 'file';
+      const inputElement = uploadType === 'folder' ? driveFolderInput : driveFileInput;
+
+      if (!inputElement || !inputElement.files.length) {
+        showToast('Vui lòng chọn file/thư mục để tải lên!', 'error');
+        return;
+      }
+
+      if (submitUploadBtn) submitUploadBtn.disabled = true;
+      const originalBtnText = submitUploadBtn ? submitUploadBtn.innerHTML : '';
+
+      const descInput = uploadForm.querySelector('[name="description"]');
+      const descriptionValue = descInput ? descInput.value : "";
+      const totalFiles = inputElement.files.length;
+      let successCount = 0;
+
+      const readFileAsBase64 = (f) => new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = (ev) => resolve(ev.target.result.split(',')[1]);
+        r.readAsDataURL(f);
+      });
+
+      try {
+        for (let i = 0; i < totalFiles; i++) {
+          const file = inputElement.files[i];
+          if (submitUploadBtn) submitUploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ${i + 1}/${totalFiles}...`;
+
+          const base64Data = await readFileAsBase64(file);
+
+          let folderPath = "";
+          if (uploadType === 'folder' && file.webkitRelativePath) {
+            const parts = file.webkitRelativePath.split('/');
+            parts.pop();
+            folderPath = parts.join('/');
+          }
+
+          await API.file.upload(base64Data, file.name, file.type || 'application/octet-stream', CURRENT_USER.groupKey, descriptionValue, CURRENT_USER.email, folderPath);
+          successCount++;
+        }
+
+        showToast(`Tải lên thành công ${successCount} file!`, "success");
+        uploadForm.reset();
+        loadFileList(false, { quiet: true });
+
+        const checkedRadioAfter = document.querySelector('input[name="uploadType"]:checked');
+        if (checkedRadioAfter) {
+          checkedRadioAfter.dispatchEvent(new Event('change'));
+        } else {
+          const displaySpan = document.getElementById('file-name-display');
+          if (displaySpan) displaySpan.textContent = ' (Chưa có file nào)';
+        }
+
+        const iconPreviewEl = document.getElementById('file-icon-preview');
+        if (iconPreviewEl) iconPreviewEl.innerHTML = '';
+
+      } catch (err) {
+        handleUploadFailure(err);
+        showToast("Lỗi tải file: " + (err.message || err), "error");
+      } finally {
+        if (submitUploadBtn) {
+          submitUploadBtn.disabled = false;
+          submitUploadBtn.innerHTML = originalBtnText;
+        }
+      }
+    });
+  }
+
+  // ----- Drive / Bộ lọc: wiring một lần duy nhất -----
+  const driveSearchInput = document.getElementById('search-name');
+  let driveSearchTimeout = null;
+  if (driveSearchInput) {
+    driveSearchInput.addEventListener('input', () => {
+      if (driveSearchTimeout) clearTimeout(driveSearchTimeout);
+      driveSearchTimeout = setTimeout(() => loadFileList(true), 500);
+    });
+  }
+
+  [
+    document.getElementById('filter-sort'),
+    document.getElementById('filter-type'),
+    document.getElementById('filter-uploader'),
+    document.getElementById('filter-date')
+  ].forEach(el => {
+    if (el) el.addEventListener('change', () => loadFileList(true));
+  });
+
+  const applyFilterBtn = document.getElementById('apply-filter-btn');
+  if (applyFilterBtn) {
+    applyFilterBtn.addEventListener('click', () => loadFileList(true));
+  }
+
+  // ----- Admin: Form cấp quyền trước cho người dùng mới -----
+  const provisionUserForm = document.getElementById('provision-user-form');
+  if (provisionUserForm) {
+    provisionUserForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const emailInput = document.getElementById('provision-email');
+      const nicknameInput = document.getElementById('provision-nickname');
+      const groupSelect = document.getElementById('provision-group');
+      const email = emailInput ? emailInput.value.trim() : '';
+      if (!email) return;
+      const nickname = nicknameInput ? nicknameInput.value.trim() : '';
+      const groupKey = groupSelect ? groupSelect.value : 'guest';
+
+      try {
+        const message = await API.user.provision(email, nickname, groupKey);
+
+        // Tự động tạo user bên Supabase Auth với mật khẩu mặc định 123456, dùng client phụ
+        // để không làm văng phiên đăng nhập của Admin hiện tại — khớp hành vi bên app org
+        // (nếu không có bước này, người được cấp quyền trước sẽ không đăng nhập được).
+        if (window.supabase) {
+          const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+          });
+          const signUpRes = await tempClient.auth.signUp({
+            email: email,
+            password: '123456',
+            options: { data: { nickname: nickname } }
+          });
+          if (signUpRes.error && signUpRes.error.message !== 'User already registered') {
+            console.warn('Cảnh báo Auth:', signUpRes.error.message);
+          }
+        }
+
+        showToast(message, 'success');
+        provisionUserForm.reset();
+        loadAdminUsersTable();
+      } catch (err) {
+        showToast('Lỗi: ' + (err.message || err), 'error');
+      }
+    });
+  }
 });
