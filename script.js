@@ -54,7 +54,7 @@ const STAGES_META = {
     layer: 'Gold-storage',
     layerClass: 'pill-success',
     storageTier: 'WorkHub-Tools Storage: gold_bucket/gold/',
-    desc: 'Đưa báo cáo/dữ liệu đã duyệt vào kho tri thức Gold, đánh phiên bản (versioning), lưu trữ bất biến và xuất bản cho các bên liên quan sử dụng.'
+    desc: 'Xuất báo cáo...'
   }
 };
 
