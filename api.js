@@ -11,8 +11,24 @@ window.escapeJs = function (value) {
 const SUPABASE_URL = "https://gqsbsqaxzpzcloaopzvv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_sl9uOpcIzfzN9NZ5D_ZdsQ_FQZchyUR";
 
+const TOOLS_SUPABASE_URL = "https://jbibxrhorqmbbyjuxcgo.supabase.co";
+const TOOLS_SUPABASE_KEY = "sb_publishable_RgXnbjszBBJJUswXTzlpSA_ixYR3nJ-";
+
 const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const toolsSbClient = window.supabase ? window.supabase.createClient(TOOLS_SUPABASE_URL, TOOLS_SUPABASE_KEY) : null;
+
 window.supabaseClient = sbClient;
+window.toolsSupabaseClient = toolsSbClient;
+window.WORKHUB_CONFIG = {
+    main: {
+        url: SUPABASE_URL,
+        key: SUPABASE_KEY
+    },
+    tools: {
+        url: TOOLS_SUPABASE_URL,
+        key: TOOLS_SUPABASE_KEY
+    }
+};
 
 function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
     const byteCharacters = atob(b64Data);
