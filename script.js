@@ -60,12 +60,12 @@ const STAGES_META = {
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
 
-const ALLOWED_GROUPS = ['finance', 'admin', 'all', 'Finance', 'Admin', 'All'];
+const ALLOWED_GROUPS = ['workhub-fin', 'admin', 'all'];
 
 let CURRENT_USER = {
   email: '',
   nickname: '',
-  groupKey: 'finance'
+  groupKey: ''
 };
 
 let FINANCE_MEMBERS = [];
@@ -73,53 +73,38 @@ let CURRENT_MEMBER_FILTER = 'all';
 let presenceInterval = null;
 let presenceChannel = null;
 
+const auth = sbClient ? sbClient.auth : null;
+
 // ==========================================
-// 1. AUTHENTICATION & ACCESS GUARD
+// 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
 // ==========================================
 
-async function initAuth() {
-  let userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
-  let userNickname = localStorage.getItem('userNickname') || '';
-  let userGroup = localStorage.getItem('userGroup');
+function lockApp() {
+  document.body.classList.add('app-locked');
+  openAuthModal(true);
+}
 
-  if (!userEmail) {
-    userEmail = 'vophucminhtam@gmail.com';
-    userNickname = 'Minh Tâm';
-    userGroup = 'finance';
-    localStorage.setItem('userEmail', userEmail);
-    localStorage.setItem('userNickname', userNickname);
-    localStorage.setItem('userGroup', userGroup);
+function unlockApp() {
+  document.body.classList.remove('app-locked');
+  closeAuthModal(true);
+}
+
+async function resolveUserProfile(user) {
+  CURRENT_USER.email = user.email;
+
+  try {
+    const info = await API.auth.getUserInfo(user.email);
+    CURRENT_USER.nickname = (info && info.name) || user.user_metadata?.display_name || user.email.split('@')[0];
+    CURRENT_USER.groupKey = (info && info.group) || 'guest';
+  } catch (err) {
+    console.warn("Lỗi lấy thông tin user:", err);
+    CURRENT_USER.nickname = user.email.split('@')[0];
+    CURRENT_USER.groupKey = 'guest';
   }
 
-  CURRENT_USER.email = userEmail;
-  CURRENT_USER.nickname = userNickname || userEmail.split('@')[0];
-  CURRENT_USER.groupKey = userGroup || 'finance';
-
-  if (window.supabaseClient && userEmail) {
-    try {
-      const { data } = await window.supabaseClient
-        .from('users')
-        .select('group_key, nickname, email')
-        .eq('email', userEmail)
-        .maybeSingle();
-
-      if (data) {
-        if (data.group_key) {
-          CURRENT_USER.groupKey = data.group_key;
-          localStorage.setItem('userGroup', data.group_key);
-        }
-        if (data.nickname) {
-          CURRENT_USER.nickname = data.nickname;
-          localStorage.setItem('userNickname', data.nickname);
-        }
-      }
-    } catch (err) {
-      console.warn("Lỗi kiểm tra auth Supabase:", err);
-    }
-  }
-
-  // Permission Check
   if (!ALLOWED_GROUPS.includes(CURRENT_USER.groupKey)) {
+    document.body.classList.add('app-locked');
+    closeAuthModal(true);
     if (typeof Swal !== 'undefined') {
       Swal.fire({
         icon: 'error',
@@ -128,10 +113,11 @@ async function initAuth() {
         showCancelButton: true,
         confirmButtonText: 'Đổi tài khoản',
         cancelButtonText: 'Về trang chủ',
-        confirmButtonColor: '#C9A84C'
+        confirmButtonColor: '#C9A84C',
+        allowOutsideClick: false
       }).then((res) => {
         if (res.isConfirmed) {
-          openAuthModal();
+          auth.signOut().then(() => openAuthModal(true));
         } else {
           window.location.href = 'https://workhub-ai.pages.dev/';
         }
@@ -140,9 +126,37 @@ async function initAuth() {
     return false;
   }
 
+  unlockApp();
   updateUserProfileUI();
   startPresenceSystem();
+
+  if (!window.__financeSessionBootstrapped) {
+    window.__financeSessionBootstrapped = true;
+    fetchLiveObservationLogs();
+    loadFinanceMembers();
+  }
+
   return true;
+}
+
+async function initAuth() {
+  if (!auth) {
+    console.error('Supabase auth chưa sẵn sàng — kiểm tra api.js.');
+    return;
+  }
+
+  auth.onAuthStateChange(async (event, session) => {
+    const user = session?.user;
+    if (user) {
+      await resolveUserProfile(user);
+      if (event === 'SIGNED_IN') {
+        logPipelineEvent(`Đã đăng nhập tài khoản: ${user.email}`, 'success', 'USER_LOGIN');
+      }
+    } else {
+      CURRENT_USER = { email: '', nickname: '', groupKey: '' };
+      lockApp();
+    }
+  });
 }
 
 function updateUserProfileUI() {
@@ -195,18 +209,23 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function openAuthModal() {
+function openAuthModal(forced) {
   const modal = document.getElementById('auth-modal');
   if (modal) {
     modal.classList.add('open');
+    const cancelBtn = document.getElementById('auth-cancel-btn');
+    const closeBtn = document.getElementById('auth-modal-close-btn');
+    if (cancelBtn) cancelBtn.style.display = forced ? 'none' : '';
+    if (closeBtn) closeBtn.style.display = forced ? 'none' : '';
     const emailInput = document.getElementById('auth-email-input');
-    const nickInput = document.getElementById('auth-nickname-input');
     if (emailInput) emailInput.value = CURRENT_USER.email || '';
-    if (nickInput) nickInput.value = CURRENT_USER.nickname || '';
+    const errBox = document.getElementById('auth-error-msg');
+    if (errBox) errBox.style.display = 'none';
   }
 }
 
-function closeAuthModal() {
+function closeAuthModal(force) {
+  if (document.body.classList.contains('app-locked') && !force) return;
   const modal = document.getElementById('auth-modal');
   if (modal) modal.classList.remove('open');
 }
@@ -214,63 +233,61 @@ function closeAuthModal() {
 async function handleAuthSubmit(e) {
   e.preventDefault();
   const email = (document.getElementById('auth-email-input')?.value || '').trim().toLowerCase();
-  const nickname = (document.getElementById('auth-nickname-input')?.value || '').trim();
+  const password = document.getElementById('auth-password-input')?.value || '';
+  const errBox = document.getElementById('auth-error-msg');
+  const submitBtn = document.getElementById('auth-submit-btn');
 
-  if (!email || !email.includes('@')) {
-    alert("Vui lòng nhập địa chỉ email hợp lệ.");
+  if (!email || !password) {
+    if (errBox) { errBox.textContent = 'Vui lòng nhập đầy đủ email và mật khẩu.'; errBox.style.display = 'block'; }
     return;
   }
 
-  localStorage.setItem('userEmail', email);
-  if (nickname) localStorage.setItem('userNickname', nickname);
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực...'; }
+  if (errBox) errBox.style.display = 'none';
 
-  closeAuthModal();
-  await initAuth();
-  await loadFinanceMembers(true);
-  logPipelineEvent(`Đã đăng nhập tài khoản: ${email}`, 'success', 'USER_LOGIN');
+  try {
+    const realEmail = (await API.auth.getRealEmail(email)) || email;
+    const { error } = await auth.signInWithPassword({ email: realEmail, password });
+    if (error) throw error;
+    // auth.onAuthStateChange picks up the SIGNED_IN event and finishes the flow
+  } catch (err) {
+    let msg = err.message || 'Đăng nhập thất bại.';
+    if (msg.includes('Invalid login credentials')) msg = 'Sai email hoặc mật khẩu.';
+    if (errBox) { errBox.textContent = msg; errBox.style.display = 'block'; }
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Đăng nhập'; }
+  }
 }
 
-function quickSelectAccount(email, nickname) {
-  const emailInput = document.getElementById('auth-email-input');
-  const nickInput = document.getElementById('auth-nickname-input');
-  if (emailInput) emailInput.value = email;
-  if (nickInput) nickInput.value = nickname;
+async function switchAccount() {
+  if (auth) await auth.signOut();
+  openAuthModal(true);
 }
 
 async function handleLogout() {
-  if (window.API && window.API.presence) {
-    await window.API.presence.setOffline(CURRENT_USER.email);
+  if (API && API.presence && CURRENT_USER.email) {
+    await API.presence.setOffline(CURRENT_USER.email);
   }
-  localStorage.removeItem('userEmail');
-  localStorage.removeItem('currentUser');
-  localStorage.removeItem('userNickname');
-  localStorage.removeItem('userGroup');
-
-  CURRENT_USER = {
-    email: 'guest@workhub.internal',
-    nickname: 'Khách',
-    groupKey: 'guest'
-  };
-  updateUserProfileUI();
-  
+  if (auth) await auth.signOut();
+  // auth.onAuthStateChange fires SIGNED_OUT -> clears CURRENT_USER and locks the app
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       icon: 'info',
       title: 'Đã đăng xuất',
       text: 'Vui lòng đăng nhập lại với tài khoản nhóm Finance.',
-      confirmButtonText: 'Đăng nhập lại',
+      confirmButtonText: 'OK',
       confirmButtonColor: '#C9A84C'
-    }).then(() => {
-      openAuthModal();
     });
-  } else {
-    openAuthModal();
   }
 }
 
 async function refreshFinanceSession() {
-  await initAuth();
-  await loadFinanceMembers(true);
+  if (!auth) return;
+  const { data: { user } } = await auth.getUser();
+  if (user) {
+    await resolveUserProfile(user);
+    await loadFinanceMembers(true);
+  }
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       icon: 'success',
@@ -287,11 +304,11 @@ async function refreshFinanceSession() {
 // ==========================================
 
 function startPresenceSystem() {
-  if (!CURRENT_USER.email || !window.API || !window.API.presence) return;
+  if (!CURRENT_USER.email || !API || !API.presence) return;
 
   const pingPresence = async () => {
     try {
-      await window.API.presence.setOnline(CURRENT_USER.email, CURRENT_USER.nickname, 'finance');
+      await API.presence.setOnline(CURRENT_USER.email, CURRENT_USER.nickname, 'workhub-fin');
     } catch (err) {
       console.warn("Lỗi ping presence:", err);
     }
@@ -303,8 +320,8 @@ function startPresenceSystem() {
   presenceInterval = setInterval(pingPresence, 45000);
 
   window.addEventListener('beforeunload', () => {
-    if (window.API && window.API.presence && CURRENT_USER.email) {
-      window.API.presence.setOffline(CURRENT_USER.email);
+    if (API && API.presence && CURRENT_USER.email) {
+      API.presence.setOffline(CURRENT_USER.email);
     }
   });
 
@@ -360,8 +377,8 @@ async function loadFinanceMembers(showToast = false) {
   
   try {
     let members = [];
-    if (window.API && window.API.presence) {
-      members = await window.API.presence.getFinanceMembers();
+    if (API && API.presence) {
+      members = await API.presence.getFinanceMembers();
     }
 
     // Default fallback members if database returned empty
@@ -370,42 +387,42 @@ async function loadFinanceMembers(showToast = false) {
         {
           email: 'vophucminhtam@gmail.com',
           nickname: 'Minh Tâm',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: true,
           last_changed: new Date().toISOString()
         },
         {
           email: 'phucbui281207@gmail.com',
           nickname: 'Phúc Bùi',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: false,
           last_changed: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'id-test-1785592017660@gmail.com',
           nickname: 'Finance QA Bot',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: false,
           last_changed: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'ta-test-1785580354510@gmail.com',
           nickname: 'Analytics Engine',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: false,
           last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'fn-test-1785579721390@gmail.com',
           nickname: 'Reporting Daemon',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: false,
           last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'rt-test-1785370194902@gmail.com',
           nickname: 'Realtime Auditor',
-          group_key: 'finance',
+          group_key: 'workhub-fin',
           isOnline: false,
           last_changed: new Date(Date.now() - 9 * 24 * 3600 * 1000).toISOString()
         }
@@ -421,7 +438,7 @@ async function loadFinanceMembers(showToast = false) {
       members.unshift({
         email: CURRENT_USER.email,
         nickname: CURRENT_USER.nickname || CURRENT_USER.email.split('@')[0],
-        group_key: CURRENT_USER.groupKey || 'finance',
+        group_key: CURRENT_USER.groupKey || 'workhub-fin',
         isOnline: true,
         last_changed: new Date().toISOString()
       });
@@ -550,7 +567,7 @@ function renderMembersList() {
     const isMe = member.email.toLowerCase() === CURRENT_USER.email.toLowerCase();
 
     return `
-      <div class="member-item-card" title="${member.email} (${member.group_key || 'finance'})">
+      <div class="member-item-card" title="${member.email} (${member.group_key || 'workhub-fin'})">
         <div class="member-avatar-box">
           <div class="member-avatar-circle">
             ${initials}
@@ -631,9 +648,9 @@ let LOCAL_LOGS = [];
 
 async function fetchLiveObservationLogs() {
   const email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
-  if (window.API && window.API.notification) {
+  if (API && API.notification) {
     try {
-      const logs = await window.API.notification.get('finance', 25, email);
+      const logs = await API.notification.get('workhub-fin', 25, email);
       if (logs && logs.length > 0) {
         LOCAL_LOGS = logs.map(l => ({
           time: new Date(l.timestamp).toTimeString().slice(0, 8),
@@ -682,9 +699,9 @@ async function logPipelineEvent(text, type = 'info', action = 'PIPELINE_FIN_ACTI
 
   const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
   const traceId = "TRC_FIN_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
-  if (window.API && window.API.system && window.API.system.logAction) {
+  if (API && API.system && API.system.logAction) {
     try {
-      await window.API.system.logAction(traceId, action, text, type === 'danger' ? 'error' : 'success', userEmail, 'finance', null);
+      await API.system.logAction(traceId, action, text, type === 'danger' ? 'error' : 'success', userEmail, 'workhub-fin', null);
     } catch (err) {
       console.warn("Không thể ghi log lên Supabase system_logs:", err);
     }
@@ -725,13 +742,10 @@ function setupThemeToggle() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   setupThemeToggle();
-  const hasAccess = await initAuth();
-  if (!hasAccess) return;
-
   renderObservationLogs();
   updateStageUI('e1');
-  await fetchLiveObservationLogs();
-  await loadFinanceMembers();
+
+  await initAuth();
 
   const notiBtn = document.getElementById('observation-toggle-btn');
   if (notiBtn) notiBtn.addEventListener('click', toggleObservationDrawer);

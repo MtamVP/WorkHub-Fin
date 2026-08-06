@@ -812,6 +812,15 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 .modal-overlay.open { display: flex; }
 
+body.app-locked main.app-container,
+body.app-locked #observation-drawer,
+body.app-locked #members-drawer,
+body.app-locked .members-btn,
+body.app-locked #observation-toggle-btn,
+body.app-locked .user-profile-wrapper {
+  display: none !important;
+}
+
 .modal-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);

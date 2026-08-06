@@ -17,7 +17,7 @@
 
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="app-locked">
 
   <header id="app-header">
     <div class="brand-section">
@@ -69,7 +69,7 @@
           </div>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item" onclick="toggleMembersDrawer()"><i class="fa-solid fa-users"></i> Xem nhóm Finance</button>
-          <button class="dropdown-item" onclick="openAuthModal()"><i class="fa-solid fa-user-gear"></i> Đổi tài khoản / Đăng nhập</button>
+          <button class="dropdown-item" onclick="switchAccount()"><i class="fa-solid fa-user-gear"></i> Đổi tài khoản</button>
           <button class="dropdown-item" onclick="refreshFinanceSession()"><i class="fa-solid fa-rotate"></i> Làm mới quyền truy cập</button>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item item-danger" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
@@ -244,50 +244,34 @@
     </div>
   </aside>
 
-  <!-- Auth / User Switch Modal -->
+  <!-- Auth / Login Modal -->
   <div class="modal-overlay" id="auth-modal">
     <div class="modal-card auth-modal-card">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-shield-halved" style="color: var(--gold);"></i> Xác thực tài khoản Finance</h3>
-        <button class="header-btn" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
+        <h3><i class="fa-solid fa-shield-halved" style="color: var(--gold);"></i> Đăng nhập WorkHub Finance</h3>
+        <button class="header-btn" id="auth-modal-close-btn" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
         <p style="color: var(--text-secondary); font-size: 13.5px; margin-bottom: 18px;">
-          Đăng nhập hoặc chọn email tài khoản để truy cập các tính năng của nhóm Finance & Economics Pipeline.
+          Đăng nhập bằng tài khoản WorkHub của bạn để truy cập Economics Pipeline.
         </p>
 
         <form id="auth-form" onsubmit="handleAuthSubmit(event)">
           <div class="form-group">
             <label class="form-label" for="auth-email-input">Email tài khoản WorkHub:</label>
-            <input type="email" id="auth-email-input" class="form-control" placeholder="vidu: specialist@gmail.com" required>
+            <input type="email" id="auth-email-input" class="form-control" placeholder="vidu: specialist@gmail.com" required autocomplete="username">
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="auth-nickname-input">Biệt danh hiển thị (Tùy chọn):</label>
-            <input type="text" id="auth-nickname-input" class="form-control" placeholder="vidu: Finance Specialist">
+            <label class="form-label" for="auth-password-input">Mật khẩu:</label>
+            <input type="password" id="auth-password-input" class="form-control" placeholder="Mật khẩu WorkHub" required autocomplete="current-password">
           </div>
 
-          <div class="quick-accounts-section">
-            <span class="quick-accounts-label"><i class="fa-solid fa-bolt" style="color: var(--gold);"></i> Hoặc chọn nhanh tài khoản trong nhóm:</span>
-            <div class="quick-accounts-grid" id="quick-accounts-list">
-              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('vophucminhtam@gmail.com', 'Minh Tâm (Lead)')">
-                <span class="acc-avatar">MT</span>
-                <span class="acc-text"><strong>vophucminhtam@gmail.com</strong><small>Lead Finance</small></span>
-              </button>
-              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('phucbui281207@gmail.com', 'Phúc Bùi')">
-                <span class="acc-avatar">PB</span>
-                <span class="acc-text"><strong>phucbui281207@gmail.com</strong><small>Specialist</small></span>
-              </button>
-              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('finance.specialist@workhub.internal', 'Finance Analyst')">
-                <span class="acc-avatar">FA</span>
-                <span class="acc-text"><strong>finance.specialist@workhub.internal</strong><small>Specialist Demo</small></span>
-              </button>
-            </div>
-          </div>
+          <div id="auth-error-msg" class="auth-error-message" style="display:none; color: var(--danger-color); font-size: 13px; margin-top: 6px;"></div>
 
           <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; background: transparent; border-top: 1px solid var(--border-color);">
-            <button type="button" class="btn btn-secondary" onclick="closeAuthModal()">Hủy</button>
-            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập & Xác thực</button>
+            <button type="button" class="btn btn-secondary" id="auth-cancel-btn" onclick="closeAuthModal()">Hủy</button>
+            <button type="submit" class="btn btn-primary" id="auth-submit-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
           </div>
         </form>
       </div>
