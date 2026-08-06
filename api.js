@@ -109,6 +109,125 @@ const API = {
         }
     },
 
+    presence: {
+        setOnline: async (email, nickname, groupKey = 'finance') => {
+            if (!sbClient || !email) return;
+            const cleanEmail = email.trim().toLowerCase();
+            const displayName = nickname || cleanEmail.split('@')[0];
+            try {
+                await sbClient.from('user_status').upsert({
+                    uid: cleanEmail,
+                    email: cleanEmail,
+                    display_name: displayName,
+                    state: 'online',
+                    last_changed: new Date().toISOString(),
+                    current_group: groupKey,
+                    photo_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=80e8dd&color=0d2b27&bold=true`
+                });
+            } catch (err) {
+                console.warn("Không thể cập nhật presence online:", err);
+            }
+        },
+        setOffline: async (email) => {
+            if (!sbClient || !email) return;
+            const cleanEmail = email.trim().toLowerCase();
+            try {
+                await sbClient.from('user_status').update({
+                    state: 'offline',
+                    last_changed: new Date().toISOString()
+                }).eq('email', cleanEmail);
+            } catch (err) {
+                console.warn("Không thể cập nhật presence offline:", err);
+            }
+        },
+        getFinanceMembers: async () => {
+            if (!sbClient) return [];
+            try {
+                // 1. Get users belonging to finance, admin, or all
+                const { data: usersData, error: userErr } = await sbClient
+                    .from('users')
+                    .select('email, nickname, group_key, created_at')
+                    .in('group_key', ['finance', 'admin', 'all', 'Finance', 'Admin', 'All'])
+                    .order('created_at', { ascending: false });
+
+                if (userErr) console.warn("Lỗi lấy users:", userErr);
+
+                // 2. Get status for all active users
+                const { data: statusData, error: statusErr } = await sbClient
+                    .from('user_status')
+                    .select('*')
+                    .order('last_changed', { ascending: false });
+
+                if (statusErr) console.warn("Lỗi lấy user_status:", statusErr);
+
+                const statusMap = {};
+                (statusData || []).forEach(st => {
+                    if (st.email) statusMap[st.email.toLowerCase()] = st;
+                    if (st.uid) statusMap[st.uid.toLowerCase()] = st;
+                });
+
+                const memberMap = new Map();
+
+                // Add from users table
+                (usersData || []).forEach(u => {
+                    const email = (u.email || '').toLowerCase();
+                    if (!email) return;
+                    const st = statusMap[email];
+                    memberMap.set(email, {
+                        email: u.email,
+                        nickname: u.nickname || (st ? st.display_name : '') || email.split('@')[0],
+                        group_key: u.group_key || 'finance',
+                        last_changed: st ? st.last_changed : u.created_at,
+                        state: st ? st.state : 'offline',
+                        photo_url: st ? st.photo_url : null
+                    });
+                });
+
+                // Also add any status users whose current_group is finance or who aren't yet in memberMap
+                (statusData || []).forEach(st => {
+                    const email = (st.email || st.uid || '').toLowerCase();
+                    if (email && !memberMap.has(email) && (st.current_group === 'finance' || !st.current_group)) {
+                        memberMap.set(email, {
+                            email: st.email || st.uid,
+                            nickname: st.display_name || email.split('@')[0],
+                            group_key: st.current_group || 'finance',
+                            last_changed: st.last_changed,
+                            state: st.state || 'offline',
+                            photo_url: st.photo_url
+                        });
+                    }
+                });
+
+                const now = new Date().getTime();
+                const ONLINE_THRESHOLD = 3 * 60 * 1000; // 3 mins
+
+                const members = Array.from(memberMap.values()).map(m => {
+                    const lastSeenDate = m.last_changed ? new Date(m.last_changed) : new Date(0);
+                    const timeDiff = now - lastSeenDate.getTime();
+                    const isOnline = m.state === 'online' && timeDiff < ONLINE_THRESHOLD;
+                    return {
+                        ...m,
+                        isOnline,
+                        lastSeenDate,
+                        timeDiff
+                    };
+                });
+
+                // Sort: Online users first, then by latest active, then alphabetical
+                members.sort((a, b) => {
+                    if (a.isOnline && !b.isOnline) return -1;
+                    if (!a.isOnline && b.isOnline) return 1;
+                    return b.lastSeenDate.getTime() - a.lastSeenDate.getTime();
+                });
+
+                return members;
+            } catch (err) {
+                console.error("Lỗi getFinanceMembers:", err);
+                return [];
+            }
+        }
+    },
+
     user: {
         listAll: async () => {
             if (!sbClient) return [];

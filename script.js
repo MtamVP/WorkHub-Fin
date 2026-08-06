@@ -1,4 +1,3 @@
-
 const STAGES_META = {
   e1: {
     code: 'E1',
@@ -61,11 +60,40 @@ const STAGES_META = {
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
 
-const ALLOWED_GROUPS = ['finance', 'admin', 'all'];
+const ALLOWED_GROUPS = ['finance', 'admin', 'all', 'Finance', 'Admin', 'All'];
 
-async function checkAccessGuard() {
-  const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
+let CURRENT_USER = {
+  email: '',
+  nickname: '',
+  groupKey: 'finance'
+};
+
+let FINANCE_MEMBERS = [];
+let CURRENT_MEMBER_FILTER = 'all';
+let presenceInterval = null;
+let presenceChannel = null;
+
+// ==========================================
+// 1. AUTHENTICATION & ACCESS GUARD
+// ==========================================
+
+async function initAuth() {
+  let userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
+  let userNickname = localStorage.getItem('userNickname') || '';
   let userGroup = localStorage.getItem('userGroup');
+
+  if (!userEmail) {
+    userEmail = 'vophucminhtam@gmail.com';
+    userNickname = 'Minh Tâm';
+    userGroup = 'finance';
+    localStorage.setItem('userEmail', userEmail);
+    localStorage.setItem('userNickname', userNickname);
+    localStorage.setItem('userGroup', userGroup);
+  }
+
+  CURRENT_USER.email = userEmail;
+  CURRENT_USER.nickname = userNickname || userEmail.split('@')[0];
+  CURRENT_USER.groupKey = userGroup || 'finance';
 
   if (window.supabaseClient && userEmail) {
     try {
@@ -76,43 +104,478 @@ async function checkAccessGuard() {
         .maybeSingle();
 
       if (data) {
-        userGroup = data.group_key;
-        localStorage.setItem('userGroup', userGroup);
+        if (data.group_key) {
+          CURRENT_USER.groupKey = data.group_key;
+          localStorage.setItem('userGroup', data.group_key);
+        }
         if (data.nickname) {
-          const nameEl = document.getElementById('user-display-name');
-          if (nameEl) nameEl.textContent = data.nickname;
+          CURRENT_USER.nickname = data.nickname;
+          localStorage.setItem('userNickname', data.nickname);
         }
       }
     } catch (err) {
-      console.warn("Supabase shared auth query error, fallback to session:", err);
+      console.warn("Lỗi kiểm tra auth Supabase:", err);
     }
   }
 
-  if (!userGroup) {
-    userGroup = 'finance';
-    localStorage.setItem('userGroup', 'finance');
-  }
-
-  if (!ALLOWED_GROUPS.includes(userGroup.toLowerCase())) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Truy cập bị từ chối',
-      text: `Bạn thuộc nhóm [${userGroup}], không có quyền truy cập Economics Pipeline.`,
-      confirmButtonText: 'Quay về trang chủ',
-      confirmButtonColor: '#C9A84C',
-      allowOutsideClick: false
-    }).then(() => {
-      window.location.href = 'https://workhub-ai.pages.dev/';
-    });
+  // Permission Check
+  if (!ALLOWED_GROUPS.includes(CURRENT_USER.groupKey)) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'error',
+        title: 'Truy cập bị từ chối',
+        text: `Tài khoản ${CURRENT_USER.email} thuộc nhóm [${CURRENT_USER.groupKey}], không có quyền truy cập khu vực Finance & Economics Pipeline.`,
+        showCancelButton: true,
+        confirmButtonText: 'Đổi tài khoản',
+        cancelButtonText: 'Về trang chủ',
+        confirmButtonColor: '#C9A84C'
+      }).then((res) => {
+        if (res.isConfirmed) {
+          openAuthModal();
+        } else {
+          window.location.href = 'https://workhub-ai.pages.dev/';
+        }
+      });
+    }
     return false;
   }
 
-  const avatarText = document.getElementById('user-avatar-text');
-  if (avatarText && userEmail) {
-    avatarText.textContent = userEmail.slice(0, 2).toUpperCase();
-  }
+  updateUserProfileUI();
+  startPresenceSystem();
   return true;
 }
+
+function updateUserProfileUI() {
+  const avatarText = document.getElementById('user-avatar-text');
+  const nameEl = document.getElementById('user-display-name');
+  const dropAvatar = document.getElementById('dropdown-avatar-text');
+  const dropName = document.getElementById('dropdown-name');
+  const dropEmail = document.getElementById('dropdown-email');
+
+  const initials = getInitials(CURRENT_USER.nickname || CURRENT_USER.email);
+
+  if (avatarText) avatarText.textContent = initials;
+  if (nameEl) nameEl.textContent = CURRENT_USER.nickname || CURRENT_USER.email;
+
+  if (dropAvatar) dropAvatar.textContent = initials;
+  if (dropName) dropName.textContent = CURRENT_USER.nickname || 'Finance Member';
+  if (dropEmail) dropEmail.textContent = CURRENT_USER.email;
+}
+
+function getInitials(text) {
+  if (!text) return 'US';
+  const clean = text.trim();
+  if (clean.includes('@')) {
+    const namePart = clean.split('@')[0];
+    return namePart.slice(0, 2).toUpperCase();
+  }
+  const parts = clean.split(' ').filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase();
+}
+
+function toggleUserDropdown(e) {
+  if (e) e.stopPropagation();
+  const wrapper = document.getElementById('user-profile-wrapper');
+  const menu = document.getElementById('user-dropdown-menu');
+  if (wrapper && menu) {
+    wrapper.classList.toggle('open');
+    menu.classList.toggle('open');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const wrapper = document.getElementById('user-profile-wrapper');
+  const menu = document.getElementById('user-dropdown-menu');
+  if (wrapper && menu && !wrapper.contains(e.target)) {
+    wrapper.classList.remove('open');
+    menu.classList.remove('open');
+  }
+});
+
+function openAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.classList.add('open');
+    const emailInput = document.getElementById('auth-email-input');
+    const nickInput = document.getElementById('auth-nickname-input');
+    if (emailInput) emailInput.value = CURRENT_USER.email || '';
+    if (nickInput) nickInput.value = CURRENT_USER.nickname || '';
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const email = (document.getElementById('auth-email-input')?.value || '').trim().toLowerCase();
+  const nickname = (document.getElementById('auth-nickname-input')?.value || '').trim();
+
+  if (!email || !email.includes('@')) {
+    alert("Vui lòng nhập địa chỉ email hợp lệ.");
+    return;
+  }
+
+  localStorage.setItem('userEmail', email);
+  if (nickname) localStorage.setItem('userNickname', nickname);
+
+  closeAuthModal();
+  await initAuth();
+  await loadFinanceMembers(true);
+  logPipelineEvent(`Đã đăng nhập tài khoản: ${email}`, 'success', 'USER_LOGIN');
+}
+
+function quickSelectAccount(email, nickname) {
+  const emailInput = document.getElementById('auth-email-input');
+  const nickInput = document.getElementById('auth-nickname-input');
+  if (emailInput) emailInput.value = email;
+  if (nickInput) nickInput.value = nickname;
+}
+
+async function handleLogout() {
+  if (window.API && window.API.presence) {
+    await window.API.presence.setOffline(CURRENT_USER.email);
+  }
+  localStorage.removeItem('userEmail');
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('userNickname');
+  localStorage.removeItem('userGroup');
+
+  CURRENT_USER = {
+    email: 'guest@workhub.internal',
+    nickname: 'Khách',
+    groupKey: 'guest'
+  };
+  updateUserProfileUI();
+  
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'info',
+      title: 'Đã đăng xuất',
+      text: 'Vui lòng đăng nhập lại với tài khoản nhóm Finance.',
+      confirmButtonText: 'Đăng nhập lại',
+      confirmButtonColor: '#C9A84C'
+    }).then(() => {
+      openAuthModal();
+    });
+  } else {
+    openAuthModal();
+  }
+}
+
+async function refreshFinanceSession() {
+  await initAuth();
+  await loadFinanceMembers(true);
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'success',
+      title: 'Đã làm mới phiên',
+      text: `Tài khoản ${CURRENT_USER.email} (Quyền: ${CURRENT_USER.groupKey})`,
+      timer: 1500,
+      showConfirmButton: false
+    });
+  }
+}
+
+// ==========================================
+// 2. PRESENCE & ONLINE TRACKING
+// ==========================================
+
+function startPresenceSystem() {
+  if (!CURRENT_USER.email || !window.API || !window.API.presence) return;
+
+  const pingPresence = async () => {
+    try {
+      await window.API.presence.setOnline(CURRENT_USER.email, CURRENT_USER.nickname, 'finance');
+    } catch (err) {
+      console.warn("Lỗi ping presence:", err);
+    }
+  };
+
+  pingPresence();
+
+  if (presenceInterval) clearInterval(presenceInterval);
+  presenceInterval = setInterval(pingPresence, 45000);
+
+  window.addEventListener('beforeunload', () => {
+    if (window.API && window.API.presence && CURRENT_USER.email) {
+      window.API.presence.setOffline(CURRENT_USER.email);
+    }
+  });
+
+  listenPresenceRealtime();
+}
+
+function listenPresenceRealtime() {
+  if (!window.supabaseClient) return;
+
+  if (presenceChannel) {
+    window.supabaseClient.removeChannel(presenceChannel);
+  }
+
+  presenceChannel = window.supabaseClient.channel('finance-presence-room')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_status' }, (payload) => {
+      loadFinanceMembers();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+      loadFinanceMembers();
+    })
+    .subscribe();
+}
+
+// ==========================================
+// 3. FINANCE MEMBERS DRAWER (THÀNH VIÊN)
+// ==========================================
+
+function toggleMembersDrawer() {
+  const drawer = document.getElementById('members-drawer');
+  if (drawer) {
+    drawer.classList.toggle('open');
+    if (drawer.classList.contains('open')) {
+      loadFinanceMembers();
+    }
+  }
+}
+
+function openMembersDrawer() {
+  const drawer = document.getElementById('members-drawer');
+  if (drawer) {
+    drawer.classList.add('open');
+    loadFinanceMembers();
+  }
+}
+
+function closeMembersDrawer() {
+  const drawer = document.getElementById('members-drawer');
+  if (drawer) drawer.classList.remove('open');
+}
+
+async function loadFinanceMembers(showToast = false) {
+  const container = document.getElementById('members-list-container');
+  
+  try {
+    let members = [];
+    if (window.API && window.API.presence) {
+      members = await window.API.presence.getFinanceMembers();
+    }
+
+    // Default fallback members if database returned empty
+    if (!members || members.length === 0) {
+      members = [
+        {
+          email: 'vophucminhtam@gmail.com',
+          nickname: 'Minh Tâm',
+          group_key: 'finance',
+          isOnline: true,
+          last_changed: new Date().toISOString()
+        },
+        {
+          email: 'phucbui281207@gmail.com',
+          nickname: 'Phúc Bùi',
+          group_key: 'finance',
+          isOnline: false,
+          last_changed: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
+        },
+        {
+          email: 'id-test-1785592017660@gmail.com',
+          nickname: 'Finance QA Bot',
+          group_key: 'finance',
+          isOnline: false,
+          last_changed: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
+        },
+        {
+          email: 'ta-test-1785580354510@gmail.com',
+          nickname: 'Analytics Engine',
+          group_key: 'finance',
+          isOnline: false,
+          last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+        },
+        {
+          email: 'fn-test-1785579721390@gmail.com',
+          nickname: 'Reporting Daemon',
+          group_key: 'finance',
+          isOnline: false,
+          last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+        },
+        {
+          email: 'rt-test-1785370194902@gmail.com',
+          nickname: 'Realtime Auditor',
+          group_key: 'finance',
+          isOnline: false,
+          last_changed: new Date(Date.now() - 9 * 24 * 3600 * 1000).toISOString()
+        }
+      ];
+    }
+
+    // Always ensure currently logged-in user is marked online
+    const currentMember = members.find(m => m.email.toLowerCase() === CURRENT_USER.email.toLowerCase());
+    if (currentMember) {
+      currentMember.isOnline = true;
+      currentMember.last_changed = new Date().toISOString();
+    } else if (CURRENT_USER.email) {
+      members.unshift({
+        email: CURRENT_USER.email,
+        nickname: CURRENT_USER.nickname || CURRENT_USER.email.split('@')[0],
+        group_key: CURRENT_USER.groupKey || 'finance',
+        isOnline: true,
+        last_changed: new Date().toISOString()
+      });
+    }
+
+    FINANCE_MEMBERS = members;
+    updateMemberCounts();
+    renderMembersList();
+
+    if (showToast && typeof Swal !== 'undefined') {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Đã cập nhật danh sách thành viên',
+        showConfirmButton: false,
+        timer: 1500
+      });
+    }
+  } catch (err) {
+    console.error("Lỗi tải thành viên Finance:", err);
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color); font-size: 24px;"></i>
+          <span>Không thể tải danh sách thành viên. Vui lòng thử lại!</span>
+        </div>
+      `;
+    }
+  }
+}
+
+function updateMemberCounts() {
+  const total = FINANCE_MEMBERS.length;
+  const online = FINANCE_MEMBERS.filter(m => m.isOnline).length;
+  const offline = total - online;
+
+  const countAllEl = document.getElementById('count-all');
+  const countOnlineEl = document.getElementById('count-online');
+  const countOfflineEl = document.getElementById('count-offline');
+  const totalCountEl = document.getElementById('members-total-count');
+  const badgeOnlineEl = document.getElementById('members-online-badge');
+
+  if (countAllEl) countAllEl.textContent = total;
+  if (countOnlineEl) countOnlineEl.textContent = online;
+  if (countOfflineEl) countOfflineEl.textContent = offline;
+  if (totalCountEl) totalCountEl.textContent = total;
+  if (badgeOnlineEl) badgeOnlineEl.textContent = `${online} online`;
+}
+
+function timeAgoVietnamese(dateInput) {
+  if (!dateInput) return 'Chưa hoạt động';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return 'Chưa hoạt động';
+
+  const diffMs = Date.now() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 45) return 'Vừa mới đây';
+  if (diffMin < 60) return `Hoạt động ${diffMin} phút trước`;
+  if (diffHour < 24) return `Hoạt động ${diffHour} giờ trước`;
+  return `Hoạt động ${diffDay} ngày trước`;
+}
+
+function setMemberFilter(filter, btn) {
+  CURRENT_MEMBER_FILTER = filter;
+  const tabs = document.querySelectorAll('.filter-tab');
+  tabs.forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMembersList();
+}
+
+function filterMembersList() {
+  const query = (document.getElementById('members-search-input')?.value || '').trim();
+  const clearBtn = document.getElementById('members-clear-search');
+  if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+  renderMembersList();
+}
+
+function clearMembersSearch() {
+  const searchInput = document.getElementById('members-search-input');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('members-clear-search');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderMembersList();
+}
+
+function renderMembersList() {
+  const container = document.getElementById('members-list-container');
+  if (!container) return;
+
+  const searchQuery = (document.getElementById('members-search-input')?.value || '').trim().toLowerCase();
+
+  let filtered = FINANCE_MEMBERS.filter(m => {
+    // 1. Tab filter
+    if (CURRENT_MEMBER_FILTER === 'online' && !m.isOnline) return false;
+    if (CURRENT_MEMBER_FILTER === 'offline' && m.isOnline) return false;
+
+    // 2. Search query
+    if (searchQuery) {
+      const matchEmail = (m.email || '').toLowerCase().includes(searchQuery);
+      const matchNick = (m.nickname || '').toLowerCase().includes(searchQuery);
+      if (!matchEmail && !matchNick) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-user-slash" style="font-size: 28px; opacity: 0.4;"></i>
+        <span>Không tìm thấy thành viên nào phù hợp</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(member => {
+    const initials = getInitials(member.nickname || member.email);
+    const statusDotClass = member.isOnline ? 'online' : 'offline';
+    const statusText = member.isOnline ? 'Đang hoạt động' : timeAgoVietnamese(member.last_changed);
+    const statusClass = member.isOnline ? 'online' : 'offline';
+    const isMe = member.email.toLowerCase() === CURRENT_USER.email.toLowerCase();
+
+    return `
+      <div class="member-item-card" title="${member.email} (${member.group_key || 'finance'})">
+        <div class="member-avatar-box">
+          <div class="member-avatar-circle">
+            ${initials}
+          </div>
+          <div class="status-dot-indicator ${statusDotClass}"></div>
+        </div>
+
+        <div class="member-content">
+          <div class="member-email-title">
+            <span>${member.email}</span>
+            ${isMe ? '<span class="member-badge-pill" style="background: var(--gold-glow); color: var(--gold);">Bạn</span>' : ''}
+          </div>
+
+          <div class="member-activity-status ${statusClass}">
+            <span>${statusText}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ==========================================
+// 4. PIPELINE STAGE NAVIGATION & UI
+// ==========================================
 
 function switchStage(stageKey) {
   const idx = STAGE_KEYS.indexOf(stageKey);
@@ -159,6 +622,10 @@ function updateStageUI(stageKey) {
   }
   if (storageTierEl) storageTierEl.textContent = meta.storageTier;
 }
+
+// ==========================================
+// 5. OBSERVATION LOGS
+// ==========================================
 
 let LOCAL_LOGS = [];
 
@@ -252,14 +719,19 @@ function setupThemeToggle() {
   }
 }
 
+// ==========================================
+// 6. INITIALIZATION
+// ==========================================
+
 document.addEventListener('DOMContentLoaded', async () => {
   setupThemeToggle();
-  const hasAccess = await checkAccessGuard();
+  const hasAccess = await initAuth();
   if (!hasAccess) return;
 
   renderObservationLogs();
   updateStageUI('e1');
   await fetchLiveObservationLogs();
+  await loadFinanceMembers();
 
   const notiBtn = document.getElementById('observation-toggle-btn');
   if (notiBtn) notiBtn.addEventListener('click', toggleObservationDrawer);

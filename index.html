@@ -35,6 +35,12 @@
         <span>Trang chủ</span>
       </a>
 
+      <button class="header-btn members-btn" id="members-toggle-btn" title="Danh sách thành viên nhóm Finance" onclick="toggleMembersDrawer()" style="width: auto; padding: 0 14px; font-size: 13px; font-weight: 600; gap: 6px; color: var(--text-primary);">
+        <i class="fa-solid fa-users" style="color: var(--gold);"></i>
+        <span>Thành Viên</span>
+        <span class="online-indicator-pill" id="members-online-badge">0 online</span>
+      </button>
+
       <button class="header-btn" id="theme-toggle-btn" title="Dark/Light Mode">
         <i class="fa-solid fa-moon"></i>
       </button>
@@ -44,9 +50,30 @@
         <span class="noti-badge" id="noti-unread-indicator"></span>
       </button>
 
-      <div class="user-profile-badge" id="user-badge">
-        <div class="user-avatar" id="user-avatar-text">EF</div>
-        <span id="user-display-name">Finance Specialist</span>
+      <div class="user-profile-wrapper" id="user-profile-wrapper">
+        <div class="user-profile-badge" id="user-badge" title="Tài khoản cá nhân" onclick="toggleUserDropdown(event)">
+          <div class="user-avatar" id="user-avatar-text">US</div>
+          <div class="user-meta-header">
+            <span id="user-display-name">Finance Specialist</span>
+          </div>
+          <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+        </div>
+
+        <div class="user-dropdown-menu" id="user-dropdown-menu">
+          <div class="dropdown-user-info">
+            <div class="dropdown-avatar" id="dropdown-avatar-text">US</div>
+            <div class="dropdown-text">
+              <strong id="dropdown-name">User</strong>
+              <small id="dropdown-email">user@workhub.vn</small>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" onclick="toggleMembersDrawer()"><i class="fa-solid fa-users"></i> Xem nhóm Finance</button>
+          <button class="dropdown-item" onclick="openAuthModal()"><i class="fa-solid fa-user-gear"></i> Đổi tài khoản / Đăng nhập</button>
+          <button class="dropdown-item" onclick="refreshFinanceSession()"><i class="fa-solid fa-rotate"></i> Làm mới quyền truy cập</button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item item-danger" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+        </div>
       </div>
     </div>
   </header>
@@ -172,6 +199,100 @@
 
     </div>
   </aside>
+
+  <!-- Members Drawer (Thành Viên) -->
+  <aside id="members-drawer" class="members-drawer">
+    <div class="members-drawer-header">
+      <div class="drawer-title-group">
+        <h4><i class="fa-solid fa-users" style="color: var(--gold);"></i> Thành Viên</h4>
+        <span class="members-total-count" id="members-total-count">0</span>
+      </div>
+      <button class="header-btn drawer-close-btn" id="members-drawer-close-btn" onclick="toggleMembersDrawer()" title="Đóng"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="members-search-box">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" id="members-search-input" placeholder="Tìm kiếm theo email, tên..." oninput="filterMembersList()">
+      <button id="members-clear-search" class="clear-search-btn" style="display:none;" onclick="clearMembersSearch()"><i class="fa-solid fa-circle-xmark"></i></button>
+    </div>
+
+    <div class="members-filter-tabs">
+      <button class="filter-tab active" data-filter="all" onclick="setMemberFilter('all', this)">
+        Tất cả (<span id="count-all">0</span>)
+      </button>
+      <button class="filter-tab" data-filter="online" onclick="setMemberFilter('online', this)">
+        Online (<span id="count-online">0</span>)
+      </button>
+      <button class="filter-tab" data-filter="offline" onclick="setMemberFilter('offline', this)">
+        Offline (<span id="count-offline">0</span>)
+      </button>
+    </div>
+
+    <div class="members-drawer-body" id="members-list-container">
+      <div class="loading-state">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <span>Đang tải danh sách thành viên Finance...</span>
+      </div>
+    </div>
+
+    <div class="members-drawer-footer">
+      <div class="footer-group-info">
+        <i class="fa-solid fa-shield-halved" style="color: var(--gold);"></i>
+        <span>Nhóm: <strong>Finance & Economics</strong></span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="loadFinanceMembers(true)" title="Tải lại danh sách"><i class="fa-solid fa-arrows-rotate"></i> Làm mới</button>
+    </div>
+  </aside>
+
+  <!-- Auth / User Switch Modal -->
+  <div class="modal-overlay" id="auth-modal">
+    <div class="modal-card auth-modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-shield-halved" style="color: var(--gold);"></i> Xác thực tài khoản Finance</h3>
+        <button class="header-btn" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); font-size: 13.5px; margin-bottom: 18px;">
+          Đăng nhập hoặc chọn email tài khoản để truy cập các tính năng của nhóm Finance & Economics Pipeline.
+        </p>
+
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" for="auth-email-input">Email tài khoản WorkHub:</label>
+            <input type="email" id="auth-email-input" class="form-control" placeholder="vidu: specialist@gmail.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="auth-nickname-input">Biệt danh hiển thị (Tùy chọn):</label>
+            <input type="text" id="auth-nickname-input" class="form-control" placeholder="vidu: Finance Specialist">
+          </div>
+
+          <div class="quick-accounts-section">
+            <span class="quick-accounts-label"><i class="fa-solid fa-bolt" style="color: var(--gold);"></i> Hoặc chọn nhanh tài khoản trong nhóm:</span>
+            <div class="quick-accounts-grid" id="quick-accounts-list">
+              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('vophucminhtam@gmail.com', 'Minh Tâm (Lead)')">
+                <span class="acc-avatar">MT</span>
+                <span class="acc-text"><strong>vophucminhtam@gmail.com</strong><small>Lead Finance</small></span>
+              </button>
+              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('phucbui281207@gmail.com', 'Phúc Bùi')">
+                <span class="acc-avatar">PB</span>
+                <span class="acc-text"><strong>phucbui281207@gmail.com</strong><small>Specialist</small></span>
+              </button>
+              <button type="button" class="quick-acc-btn" onclick="quickSelectAccount('finance.specialist@workhub.internal', 'Finance Analyst')">
+                <span class="acc-avatar">FA</span>
+                <span class="acc-text"><strong>finance.specialist@workhub.internal</strong><small>Specialist Demo</small></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; background: transparent; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn btn-secondary" onclick="closeAuthModal()">Hủy</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập & Xác thực</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script src="api.js"></script>
 
