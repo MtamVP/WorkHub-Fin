@@ -735,7 +735,7 @@ function switchSection(sectionKey) {
   if (!SECTION_KEYS.includes(sectionKey)) return;
   currentSectionKey = sectionKey;
 
-  document.querySelectorAll('.section-nav-btn').forEach(btn => {
+  document.querySelectorAll('#app-sidebar .nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-section') === sectionKey);
   });
   document.querySelectorAll('.app-section').forEach(sec => sec.classList.remove('active'));
@@ -2254,6 +2254,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupThemeToggle();
   renderObservationLogs();
   updateStageUI('e1');
+
+  // Sidebar điều hướng: mặc định mở rộng trên desktop, thu gọn trên mobile
+  const sidebarEl = document.getElementById('app-sidebar');
+  const hamburgerBtn = document.getElementById('hamburger-menu');
+  if (sidebarEl && window.innerWidth > 768) sidebarEl.classList.add('expanded');
+  if (hamburgerBtn && sidebarEl) {
+    hamburgerBtn.addEventListener('click', () => sidebarEl.classList.toggle('expanded'));
+  }
 
   // ----- Task / Progress / Calendar module: DOM refs + wiring một lần duy nhất -----
   todayEventList = document.getElementById('today-event-list');

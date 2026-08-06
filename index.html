@@ -73,22 +73,27 @@
     </div>
   </header>
 
-  <main class="app-container">
+  <div id="main-container">
 
-    <nav class="section-nav" id="app-section-nav">
-      <button type="button" class="section-nav-btn active" data-section="pipeline" onclick="switchSection('pipeline')">
-        <i class="fa-solid fa-diagram-project"></i> Pipeline
-      </button>
-      <button type="button" class="section-nav-btn" data-section="task" onclick="switchSection('task')">
-        <i class="fa-solid fa-list-check"></i> Nhiệm Vụ
-      </button>
-      <button type="button" class="section-nav-btn" data-section="progress" onclick="switchSection('progress')">
-        <i class="fa-solid fa-chart-line"></i> Tiến Độ
-      </button>
-      <button type="button" class="section-nav-btn" data-section="calendar" onclick="switchSection('calendar')">
-        <i class="fa-solid fa-calendar-days"></i> Lịch
-      </button>
+    <nav id="app-sidebar">
+      <div id="hamburger-menu" title="Thu gọn / Mở rộng thanh điều hướng"><i class="fa-solid fa-bars"></i></div>
+      <ul>
+        <li class="nav-item active" data-section="pipeline" onclick="switchSection('pipeline')">
+          <i class="fa-solid fa-diagram-project"></i><span> Pipeline</span>
+        </li>
+        <li class="nav-item" data-section="task" onclick="switchSection('task')">
+          <i class="fa-solid fa-list-check"></i><span> Nhiệm Vụ</span>
+        </li>
+        <li class="nav-item" data-section="progress" onclick="switchSection('progress')">
+          <i class="fa-solid fa-chart-line"></i><span> Tiến Độ</span>
+        </li>
+        <li class="nav-item" data-section="calendar" onclick="switchSection('calendar')">
+          <i class="fa-solid fa-calendar-days"></i><span> Lịch</span>
+        </li>
+      </ul>
     </nav>
+
+    <main id="main-content">
 
     <section class="app-section active" id="pipeline-section">
 
@@ -419,7 +424,8 @@
       </div>
     </section>
 
-  </main>
+    </main>
+  </div>
 
   <aside id="observation-drawer">
     <div class="drawer-header">

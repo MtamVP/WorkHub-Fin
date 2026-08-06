@@ -52,6 +52,8 @@
   --font-mono: 'DM Mono', monospace;
 
   --header-height: 66px;
+  --sidebar-width: 250px;
+  --sidebar-collapsed: 72px;
 }
 
 [data-theme="light"] {
@@ -224,16 +226,57 @@ button { font-family: inherit; cursor: pointer; border: none; }
   font-weight: 700;
 }
 
-.app-container {
-  flex: 1;
+#main-container { display: flex; height: calc(100vh - var(--header-height)); overflow: hidden; }
+
+#main-content {
+  flex-grow: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 24px;
-  max-width: 1600px;
-  width: 100%;
-  margin: 0 auto;
   gap: 24px;
 }
+
+/* --- Left sidebar (matches workhub-org's #app-sidebar/.nav-item pattern) --- */
+#app-sidebar {
+  width: var(--sidebar-collapsed);
+  background: var(--card-bg);
+  border-right: 1px solid var(--border-color);
+  padding-top: 15px; flex-shrink: 0; height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; flex-direction: column; overflow-x: hidden;
+}
+#app-sidebar.expanded { width: var(--sidebar-width); }
+#app-sidebar ul { list-style: none; padding: 0 12px; margin: 0; }
+
+#hamburger-menu {
+  text-align: center; padding: 10px; margin-bottom: 10px; cursor: pointer;
+  font-size: 18px; color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+#hamburger-menu:hover { color: var(--text-primary); }
+
+.nav-item {
+  display: flex; align-items: center; padding: 11px 14px; margin-bottom: 2px;
+  cursor: pointer; border-radius: var(--radius-sm);
+  color: var(--text-secondary); font-weight: 500; font-size: 14px;
+  transition: all 0.2s ease;
+  justify-content: center; white-space: nowrap;
+  border-left: 2px solid transparent;
+}
+.nav-item span { font-size: 15px; font-weight: 500; }
+.nav-item:hover { background-color: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold-light);
+  font-weight: 600;
+  border-left-color: var(--gold);
+}
+.nav-item i { font-size: 17px; min-width: 24px; text-align: center; }
+
+#app-sidebar.expanded .nav-item { justify-content: flex-start; }
+#app-sidebar.expanded .nav-item span { display: inline-block; margin-left: 14px; }
+#app-sidebar:not(.expanded) .nav-item span { display: none; }
 
 .pipeline-overview-card {
   background: var(--card-bg);
@@ -812,7 +855,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 .modal-overlay.open { display: flex; }
 
-body.app-locked main.app-container,
+body.app-locked #main-container,
 body.app-locked #observation-drawer,
 body.app-locked #members-drawer,
 body.app-locked .members-btn,
@@ -1414,47 +1457,9 @@ body.app-locked .user-profile-wrapper {
 }
 
 /* ==========================================================================
-   SECTION NAVIGATION (Pipeline / Task / Progress / Calendar tabs)
+   SECTION NAVIGATION (Pipeline / Task / Progress / Calendar content panes —
+   the tab switching itself is driven by the left #app-sidebar .nav-item list)
    ========================================================================== */
-
-.section-nav {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-}
-
-.section-nav-btn {
-  flex: 1;
-  min-width: 140px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px 14px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13.5px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.section-nav-btn:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
-}
-
-.section-nav-btn.active {
-  background: var(--gold);
-  color: var(--on-gold);
-  box-shadow: var(--shadow-gold);
-}
 
 .app-section { display: none; }
 .app-section.active { display: block; animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -1657,11 +1662,10 @@ body.app-locked .user-profile-wrapper {
 .btn-edit-event-mini:hover { color: var(--info-color); background: color-mix(in srgb, var(--info-color) 12%, transparent); }
 
 @media (max-width: 768px) {
-  .app-container { padding: 16px; }
+  #main-content { padding: 16px; }
   .grid-2 { grid-template-columns: 1fr; }
   #app-header { padding: 0 16px; }
   .members-drawer { width: 100%; max-width: 100%; }
   .form-row-2 { grid-template-columns: 1fr; }
   .calendar-layout { flex-direction: column; }
-  .section-nav-btn { min-width: 45%; }
 }
