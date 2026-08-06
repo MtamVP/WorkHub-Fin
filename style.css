@@ -127,15 +127,18 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .brand-logo {
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, var(--gold), #7A5812);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--on-gold);
-  font-size: 19px;
-  font-weight: 800;
   box-shadow: var(--shadow-gold);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand-title-group h1 {
