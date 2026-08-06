@@ -36,10 +36,6 @@ async function getUserId(emailOrUsername) {
     return data ? data.id : null;
 }
 
-// ID dạng "PREFIX_timestamp_random" — timestamp một mình có thể trùng nếu 2 người tạo
-// cùng lúc (từng xảy ra ở id file/trace log, đã tự vá riêng lẻ ở 2 chỗ đó bằng cách
-// tương tự). Hàm này dùng chung cho mọi chỗ sinh id còn lại, vẫn ra chuỗi text bình
-// thường nên không cần đổi kiểu cột nào.
 function genId(prefix) {
     return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 }
@@ -96,12 +92,7 @@ const API = {
             return "Đã cập nhật ảnh nền";
         }
     },
-    // Quản lý người dùng trong app. LƯU Ý QUAN TRỌNG: đây chỉ quản lý hồ sơ QUYỀN (bảng
-    // public.users: email/nickname/group_key), KHÔNG tạo/xóa được tài khoản đăng nhập Firebase Auth
-    // thật sự — việc đó cần Firebase Admin SDK ở backend mà app này (frontend tĩnh) không có, và
-    // không nên giả lập bằng cách nhúng service-account key vào JS phía client. Vì vậy "thêm người
-    // dùng" ở đây thực chất là "cấp quyền trước" — người được cấp vẫn phải tự đăng ký tài khoản
-    // Firebase Auth bằng đúng email đó thì mới đăng nhập được.
+
     user: {
         listAll: async () => {
             if (!sbClient) return [];
@@ -139,8 +130,7 @@ const API = {
         }
     },
     project: {
-        // includeArchived: 'active' (mặc định) chỉ lấy dự án đang chạy, 'archived' chỉ lấy đã lưu trữ,
-        // 'all' lấy cả hai. Mặc định phải là 'active' để dự án lưu trữ không lọt vào dropdown chọn dự án.
+
         list: async (groupKey, searchName = "", archiveScope = 'active') => {
             if (!sbClient) return [];
             let query = sbClient.from('projects').select('*, users!owner_id(nickname)').is('deleted_at', null).order('updated_at', { ascending: false }).limit(300);
@@ -233,8 +223,7 @@ const API = {
             if (error) throw error;
             return `Đã chia sẻ ${data.name} thành công!`;
         },
-        // Lưu trữ ≠ xóa: dự án xong việc được cất khỏi danh sách chính nhưng vẫn nguyên vẹn,
-        // không vào thùng rác, task bên trong không bị đụng tới.
+
         setArchived: async (projectId, archived) => {
             const { data, error } = await sbClient.from('projects')
                 .update({ archived_at: archived ? new Date().toISOString() : null })
@@ -243,9 +232,7 @@ const API = {
             return archived ? `Đã lưu trữ "${data.name}".` : `Đã đưa "${data.name}" trở lại danh sách đang chạy.`;
         },
         delete: async (projectId, groupKey) => {
-            // Chỉ cascade xóa những task CHƯA có trong thùng rác — giữ nguyên deleted_at gốc
-            // của task đã bị xóa riêng từ trước, và đánh dấu deleted_by_cascade để restore
-            // đúng phạm vi (không hồi sinh nhầm task vốn đã bị xóa độc lập).
+
             await sbClient.from('tasks')
                 .update({ deleted_at: new Date().toISOString(), deleted_by_cascade: true })
                 .eq('project_id', projectId)
@@ -258,15 +245,15 @@ const API = {
         listWithStats: async (groupKey, searchName = "", archiveScope = 'active') => {
             const projects = await API.project.list(groupKey, searchName, archiveScope);
             if (!projects || projects.length === 0) return [];
-            
+
             const projectIds = projects.map(p => p.id);
             const { data: tasks } = await sbClient.from('tasks').select('project_id, status, updated_at').is('deleted_at', null).in('project_id', projectIds);
-            
+
             for (let p of projects) {
                 p.taskStats = { done: 0, working: 0, stuck: 0, notStarted: 0 };
                 p.latestActivity = p.lastUpdated || new Date(0).toISOString();
                 const dbPercent = p.percent || 0;
-                
+
                 if (tasks) {
                     const pTasks = tasks.filter(t => t.project_id === p.id);
                     pTasks.forEach(t => {
@@ -275,12 +262,12 @@ const API = {
                         else if (st === 'working on it') p.taskStats.working++;
                         else if (st === 'stuck') p.taskStats.stuck++;
                         else p.taskStats.notStarted++;
-                        
+
                         if (t.updated_at && new Date(t.updated_at) > new Date(p.latestActivity)) {
                             p.latestActivity = t.updated_at;
                         }
                     });
-                    
+
                     if (pTasks.length > 0) {
                         p.percent = Math.round((p.taskStats.done / pTasks.length) * 100);
                     } else {
@@ -289,16 +276,16 @@ const API = {
                 } else {
                     p.percent = 0;
                 }
-                
+
                 if (p.percent !== dbPercent) {
                     sbClient.from('projects').update({ percent: p.percent }).eq('id', p.id).then(({error}) => {
                         if (error) console.error("Lỗi tự động cập nhật percent:", error);
                     });
                 }
             }
-            
+
             projects.sort((a, b) => new Date(b.latestActivity) - new Date(a.latestActivity));
-            
+
             return projects;
         },
         recalculate: async (projectId, groupKey) => {
@@ -344,8 +331,7 @@ const API = {
         }
     },
     task: {
-        // Đọc người thực hiện từ bảng quan hệ task_assignees (nguồn sự thật kể từ 2026-08-01).
-        // Trả về { taskId: [email,...] } cho danh sách id truyền vào.
+
         _fetchAssigneeMap: async (taskIds) => {
             const map = {};
             if (!sbClient || !Array.isArray(taskIds) || taskIds.length === 0) return map;
@@ -358,7 +344,7 @@ const API = {
             });
             return map;
         },
-        // Ghi lại toàn bộ người thực hiện của 1 task: xoá hết rồi chèn lại (ghi đè, không cộng dồn).
+
         _writeAssignees: async (taskId, emails) => {
             if (!sbClient || !taskId) return [];
             const clean = (Array.isArray(emails)
@@ -388,8 +374,7 @@ const API = {
                 data.forEach(task => {
                     task.dueDate = task.due_date ? task.due_date.slice(0, 10) : '';
                     const emails = assigneeMap[task.id] || [];
-                    // Giữ nguyên hợp đồng cũ với script.js: assignees vẫn là chuỗi CSV,
-                    // nhưng giờ được SUY RA từ bảng quan hệ chứ không còn là dữ liệu gốc.
+
                     task.assignees = emails.join(', ');
                     task.assigneeEmails = emails;
                     if (users && emails.length > 0) {
@@ -402,10 +387,7 @@ const API = {
             }
             return data;
         },
-        // Việc của tôi: gom task được giao cho 1 email, xuyên suốt mọi dự án trong nhóm.
-        // Từ 2026-08-01 lọc thẳng trên bảng quan hệ task_assignees (có index theo user_email)
-        // thay vì tải toàn bộ task về rồi lọc ở trình duyệt. Cũng loại bỏ hẳn lớp lỗi
-        // so-khớp-con-chuỗi mà cách cũ phải tự né.
+
         listMine: async (email, groupKey) => {
             if (!sbClient || !email) return [];
             const targetEmail = String(email).trim().toLowerCase();
@@ -451,8 +433,7 @@ const API = {
 
             return mine;
         },
-        // Khối lượng theo người: đếm việc đang mở của từng người trong nhóm.
-        // Một task giao cho nhiều người sẽ được tính cho tất cả những người đó.
+
         workload: async (groupKey) => {
             if (!sbClient) return [];
 
@@ -470,7 +451,6 @@ const API = {
                 .limit(2000);
             if (error) throw error;
 
-            // Người thực hiện lấy từ bảng quan hệ, gắn ngược lại vào từng task
             const wlAssigneeMap = await API.task._fetchAssigneeMap((tasks || []).map(t => t.id));
 
             const { data: users } = await sbClient.from('users').select('email, nickname');
@@ -502,8 +482,7 @@ const API = {
                     else b.notStarted++;
 
                     if (t.priority === 'Critical' || t.priority === 'High') b.highPriority++;
-                    // due_date là timestamptz nên phải cắt lấy phần ngày trước khi ghép giờ,
-                    // nối thẳng chuỗi gốc sẽ tạo ra Invalid Date và không bao giờ đếm được quá hạn.
+
                     if (t.due_date && new Date(t.due_date.slice(0, 10) + 'T00:00:00') < today) b.overdue++;
                 });
             });
@@ -511,7 +490,7 @@ const API = {
             return Object.values(buckets).sort((a, b) => b.total - a.total);
         },
         delete: async (taskId, projectId, groupKey) => {
-            // Tương tự project.delete: chỉ cascade xóa subtask CHƯA có trong thùng rác
+
             await sbClient.from('tasks')
                 .update({ deleted_at: new Date().toISOString(), deleted_by_cascade: true })
                 .eq('parent_task_id', taskId)
@@ -523,16 +502,16 @@ const API = {
         },
         deleteFile: async (taskId, fileId, groupKey) => {
             if (!sbClient) throw new Error("Chưa setup Supabase");
-            
+
             const { data: task, error: fetchError } = await sbClient.from('tasks').select('attachments').eq('id', taskId).maybeSingle();
             if (fetchError) throw fetchError;
-            
+
             let attachments = typeof task.attachments === 'string' ? JSON.parse(task.attachments || '[]') : task.attachments;
             if (!Array.isArray(attachments)) attachments = [];
-            
+
             const fileToDelete = attachments.find(f => f.id === fileId);
             if (!fileToDelete) throw new Error("Không tìm thấy file trong task này.");
-            
+
             if (fileToDelete.id.startsWith("TF_")) {
                 const urlParts = fileToDelete.url.split('/general_bucket/');
                 if (urlParts.length > 1) {
@@ -541,36 +520,30 @@ const API = {
                     if (deleteError) console.error("Lỗi xóa file storage:", deleteError);
                 }
             }
-            
+
             const newAttachments = attachments.filter(f => f.id !== fileId);
             const { error: updateError } = await sbClient.from('tasks').update({ attachments: newAttachments }).eq('id', taskId);
             if (updateError) throw updateError;
-            
+
             return newAttachments;
         },
         save: async (taskData, groupKey) => {
             const isNew = !taskData.id;
             taskData.id = taskData.id || genId("T");
 
-            // Chống ghi đè khi hai người sửa cùng lúc: client gửi kèm updated_at của bản nó
-            // đang xem; nếu bản trong DB đã mới hơn thì từ chối lưu thay vì đè âm thầm.
-            // (baseUpdatedAt rỗng = bỏ qua kiểm tra, để các luồng cũ không bị chặn oan.)
             if (!isNew && taskData.baseUpdatedAt) {
                 const { data: current } = await sbClient.from('tasks')
                     .select('updated_at').eq('id', taskData.id).maybeSingle();
                 if (current && current.updated_at) {
                     const dbTime = new Date(current.updated_at).getTime();
                     const seenTime = new Date(taskData.baseUpdatedAt).getTime();
-                    // Cho phép lệch 1 giây để tránh báo nhầm do làm tròn timestamp
+
                     if (dbTime - seenTime > 1000) {
                         throw new Error("Người khác vừa sửa công việc này. Hãy đóng cửa sổ, xem lại nội dung mới rồi sửa lại để không ghi đè lên thay đổi của họ.");
                     }
                 }
             }
 
-            // Chống phụ thuộc vòng: nếu A chặn B mà B lại chặn A thì không bên nào Done được nữa.
-            // Đi ngược đồ thị blocked_by từ các task vừa chọn; chạm lại chính task đang lưu là có vòng.
-            // Task mới thì bỏ qua: id vừa sinh ra, chưa có ai trỏ tới nên không thể tạo vòng.
             if (!isNew && taskData.blockedBy) {
                 const directIds = String(taskData.blockedBy).split(',').map(x => x.trim()).filter(Boolean);
                 if (directIds.includes(taskData.id)) {
@@ -579,7 +552,7 @@ const API = {
 
                 const visited = new Set(directIds);
                 let frontier = directIds;
-                // Chặn trên số vòng lặp để dữ liệu hỏng cũng không làm hàm chạy mãi
+
                 for (let depth = 0; depth < 50 && frontier.length > 0; depth++) {
                     const { data: rows } = await sbClient.from('tasks')
                         .select('id, name, blocked_by').in('id', frontier).is('deleted_at', null);
@@ -621,8 +594,7 @@ const API = {
                 due_date: taskData.dueDate,
                 description: taskData.description,
                 attachments: typeof taskData.attachments === 'string' ? JSON.parse(taskData.attachments || '[]') : taskData.attachments,
-                // Cột assignees vẫn được ghi kèm trong GIAI ĐOẠN CHUYỂN TIẾP để có thể quay lui
-                // an toàn. Nguồn sự thật đã là bảng task_assignees ngay bên dưới.
+
                 assignees: Array.isArray(taskData.assignees) ? taskData.assignees.join(', ') : taskData.assignees,
                 parent_task_id: taskData.parentTaskId || null,
                 blocked_by: taskData.blockedBy || null,
@@ -633,8 +605,7 @@ const API = {
             if (taskData.projectId) await API.project.recalculate(taskData.projectId, groupKey);
             return `Đã lưu task "${taskData.name}"!`;
         },
-        // Checklist nằm trong cột jsonb của chính task: [{id, text, done}].
-        // Đọc–sửa–ghi cả mảng vì danh sách luôn ngắn; không tách bảng riêng cho nhẹ.
+
         getChecklist: async (taskId) => {
             const { data, error } = await sbClient.from('tasks').select('checklist').eq('id', taskId).maybeSingle();
             if (error) throw error;
@@ -676,14 +647,14 @@ const API = {
             if (projectId) await API.project.recalculate(projectId, groupKey);
             return `Đã cập nhật trạng thái cho ${taskIds.length} công việc!`;
         },
-        // Gán lại người thực hiện cho nhiều task cùng lúc — GHI ĐÈ, không cộng dồn (khác bulkAddLabel).
+
         bulkAssign: async (taskIds, assignees, projectId, groupKey) => {
             if (!Array.isArray(taskIds) || taskIds.length === 0) return "Không có công việc nào được chọn.";
             const { error } = await sbClient.from('tasks')
                 .update({ assignees: assignees || null, updated_at: new Date().toISOString() })
                 .in('id', taskIds);
             if (error) throw error;
-            // Ghi đè người thực hiện trong bảng quan hệ cho từng task đã chọn
+
             await Promise.all(taskIds.map(id => API.task._writeAssignees(id, assignees)));
             if (projectId) await API.project.recalculate(projectId, groupKey);
             return `Đã gán người thực hiện cho ${taskIds.length} công việc!`;
@@ -699,8 +670,7 @@ const API = {
                 ? `Đã đặt hạn chót cho ${taskIds.length} công việc!`
                 : `Đã xóa hạn chót của ${taskIds.length} công việc!`;
         },
-        // Gắn nhãn: CỘNG DỒN vào nhãn sẵn có của từng task chứ không ghi đè — mỗi task có
-        // danh sách nhãn khác nhau nên phải đọc-sửa-ghi riêng từng dòng, không update() 1 lượt được.
+
         bulkAddLabel: async (taskIds, label, projectId, groupKey) => {
             if (!Array.isArray(taskIds) || taskIds.length === 0) return "Không có công việc nào được chọn.";
             const cleanLabel = String(label || '').trim();
@@ -868,8 +838,7 @@ const API = {
     },
     calendar: {
         getEvents: async (startDate, endDate, calendarType, groupKey, email) => {
-            // Không lọc theo start_time/end_time ở query: sự kiện lặp lại chỉ lưu 1 dòng gốc
-            // (mốc lần đầu), nên phải lấy hết rồi tự sinh các lần lặp rơi vào [startDate, endDate] ở dưới.
+
             let query = sbClient.from('events')
                 .select('*')
                 .is('deleted_at', null)
@@ -927,7 +896,6 @@ const API = {
                 if (recEnd && recEnd < rangeStart) return;
                 if (baseStart > rangeEnd) return;
 
-                // nhảy nhanh tới gần rangeStart thay vì lặp từng ngày/tuần/tháng từ mốc gốc
                 let cursor = new Date(baseStart);
                 if (cursor < rangeStart) {
                     const periodMs = recurrence === 'daily' ? 86400000 : recurrence === 'weekly' ? 7 * 86400000 : 30 * 86400000;
@@ -946,8 +914,6 @@ const API = {
                 }
             });
 
-            // Gộp task có due_date vào lịch nhóm — Lịch Cá Nhân giữ nguyên chỉ hiện sự kiện tự tạo,
-            // vì task luôn thuộc dự án của cả nhóm, không phải việc riêng của 1 người.
             if (calendarType !== 'personal') {
                 let projQuery = sbClient.from('projects').select('id, name').is('deleted_at', null);
                 projQuery = groupKey === 'all'
@@ -970,8 +936,7 @@ const API = {
 
                     (dueTasks || []).forEach(t => {
                         if (String(t.status).toLowerCase() === 'done') return;
-                        // due_date là timestamptz: phải cắt lấy phần ngày rồi mới ghép giờ,
-                        // nối thẳng chuỗi gốc cho ra Invalid Date và task biến mất khỏi lịch.
+
                         const dueDay = String(t.due_date).slice(0, 10);
                         results.push({
                             id: 'TASK_' + t.id,
@@ -1225,7 +1190,7 @@ const API = {
                 if (!projects || projects.length === 0) return [];
                 const projectIds = projects.map(p => p.id);
                 query = query.in('project_id', projectIds);
-                
+
                 const { data, error } = await query;
                 if (error) throw error;
                 if (data) {
@@ -1248,8 +1213,7 @@ const API = {
             if (!sbClient) return false;
 
             if (tableName === 'projects') {
-                // Chỉ khôi phục những task bị xóa THEO (cascade) khi dự án bị xóa —
-                // không đụng tới task vốn đã bị xóa riêng từ trước đó (deleted_by_cascade = false)
+
                 await sbClient.from('tasks')
                     .update({ deleted_at: null, deleted_by_cascade: false })
                     .eq('project_id', id)
@@ -1389,11 +1353,10 @@ const API = {
             return [...logItems, ...mentionItems].sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
         }
     },
-    lounge: { 
+    lounge: {
         sync: async (payload) => {
             if (!sbClient) return [];
-            
-            // Upsert current player (nếu có email hợp lệ)
+
             if (payload && payload.email) {
                 const { error } = await sbClient.from('lounge_players').upsert({
                     email: payload.email,
@@ -1405,16 +1368,15 @@ const API = {
                     y: payload.y || 0,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'email' });
-                
+
                 if (error) console.error("Lỗi upsert lounge_players:", error);
             }
 
-            // Lấy những người online trong 1 phút qua
             const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
             const { data, error: selectError } = await sbClient.from('lounge_players')
                 .select('*')
                 .gte('updated_at', oneMinuteAgo);
-                
+
             if (selectError) {
                 console.error("Lỗi lấy danh sách lounge:", selectError);
                 return [];
@@ -1429,10 +1391,9 @@ const API = {
                 x: p.x,
                 y: p.y
             }));
-        } 
+        }
     },
-    // Tìm kiếm toàn cục: gom dự án + công việc + tệp trong cùng một lượt, để người dùng
-    // không phải nhớ thứ mình cần đang nằm ở mục nào.
+
     search: {
         global: async (query, groupKey) => {
             const EMPTY = { projects: [], tasks: [], files: [], events: [], comments: [], milestones: [] };
@@ -1440,7 +1401,6 @@ const API = {
             const q = String(query || '').trim();
             if (q.length < 2) return EMPTY;
 
-            // Thoát ký tự có nghĩa đặc biệt trong toán tử ilike của PostgREST
             const safe = q.replace(/[%_,()]/g, ' ').trim();
             if (!safe) return EMPTY;
             const pattern = `%${safe}%`;
@@ -1493,8 +1453,6 @@ const API = {
                 type: 'file'
             }));
 
-            // Lịch: cùng cách lọc group_key mà API.calendar.getEvents đang dùng (không có
-            // biến thể "all"/is_shared cho events, khác với project/file).
             let eventQuery = sbClient.from('events').select('id, title, description, location, start_time').is('deleted_at', null);
             if (groupKey) eventQuery = eventQuery.eq('group_key', groupKey);
             const { data: eventRows } = await eventQuery
@@ -1508,8 +1466,6 @@ const API = {
                 type: 'event'
             }));
 
-            // Tra tên task + dự án trước để gắn cho bình luận/cột mốc — tra 1 lần dùng chung
-            // thay vì mỗi bình luận/mốc lại query riêng.
             let taskLookup = {};
             if (projectIds.length > 0) {
                 const { data: allTaskRows } = await sbClient.from('tasks')
@@ -1557,9 +1513,7 @@ const API = {
             return { projects, tasks, files, events, comments, milestones };
         }
     },
-    // Realtime: một kênh duy nhất nghe thay đổi trên các bảng lõi. Không tự vẽ lại gì —
-    // chỉ báo cho script.js biết bảng nào vừa đổi, việc quyết định tải lại phần nào là ở đó.
-    // Các bảng này đã được thêm vào publication `supabase_realtime` (migration 2026-07-29).
+
     realtime: {
         _channel: null,
         WATCHED_TABLES: ['tasks', 'projects', 'events', 'task_comments', 'project_milestones'],
@@ -1591,14 +1545,12 @@ const API = {
         },
         unsubscribe: function () {
             if (!sbClient || !API.realtime._channel) return;
-            try { sbClient.removeChannel(API.realtime._channel); } catch (err) { /* kênh đã đóng */ }
+            try { sbClient.removeChannel(API.realtime._channel); } catch (err) {  }
             API.realtime._channel = null;
         }
     }
 };
 
-// Các action GHI dữ liệu — dùng để đánh mốc "vừa tự thay đổi", giúp lớp realtime phân biệt
-// thay đổi của chính mình với thay đổi của người khác (tránh tải chồng + báo thừa).
 const MUTATING_ACTIONS = new Set([
     'saveTask', 'deleteTask', 'reorderTasks', 'bulkUpdateTaskStatus', 'bulkDeleteTasks',
     'bulkAssignTasks', 'bulkSetTaskDueDate', 'bulkAddTaskLabel',
@@ -1711,8 +1663,6 @@ window.callGAS = async function(action, params = {}) {
         let finalMessage = typeof result === 'string' ? result : 'OK';
         const entityId = params.taskId || params.id || params.eventId || params.projectId || null;
 
-        // Đặt lại mốc sau khi ghi xong: sự kiện realtime chỉ về tới sau thời điểm này,
-        // nên nếu chỉ đánh mốc lúc bắt đầu thì thao tác chậm sẽ bị hiểu nhầm là của người khác.
         if (MUTATING_ACTIONS.has(action)) window.lastLocalMutationAt = Date.now();
 
         if (action !== 'getNotifications' && action !== 'syncLounge' && !action.startsWith('get')) {
@@ -1727,7 +1677,7 @@ window.callGAS = async function(action, params = {}) {
         if (action !== 'getNotifications' && action !== 'syncLounge' && !action.startsWith('get')) {
             API.system.logAction(traceId, action, error.message || String(error), 'error', params.email, params.groupKey, entityId);
         }
-        
+
         return { status: 'error', data: null, message: error.message || String(error) };
     }
 };
@@ -1739,4 +1689,3 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.error('Lỗi kích hoạt:', err));
     });
 }
-

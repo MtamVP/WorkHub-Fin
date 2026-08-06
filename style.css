@@ -1,10 +1,6 @@
-/* ==========================================================================
-   WORKHUB FINANCE — ECONOMICS WORKSPACE PIPELINE DESIGN SYSTEM
-   Dark Luxury Gold Theme matching WorkHub design language
-   ========================================================================== */
 
 :root {
-  /* Dark Navy & Gold Base */
+
   --bg-color: #0A0A0F;
   --bg-color-2: #14141E;
   --card-bg: #111118;
@@ -16,7 +12,6 @@
   --border-light: rgba(255, 255, 255, 0.05);
   --hover-bg: #1D1D2B;
 
-  /* Gold & Finance Accents */
   --gold: #C9A84C;
   --gold-light: #E8C87A;
   --gold-glow: rgba(201, 168, 76, 0.25);
@@ -26,7 +21,6 @@
   --finance-accent: #E0A64C;
   --finance-accent-subtle: rgba(224, 166, 76, 0.12);
 
-  /* Pipeline Layer Accents */
   --bronze-color: #CD7F32;
   --bronze-bg: rgba(205, 127, 50, 0.15);
   --silver-color: #A8B2C1;
@@ -34,7 +28,6 @@
   --gold-layer-color: #FFD700;
   --gold-layer-bg: rgba(255, 215, 0, 0.15);
 
-  /* Semantic Status */
   --success-color: #3DBA87;
   --success-bg: rgba(61, 186, 135, 0.12);
   --danger-color: #E05C5C;
@@ -44,24 +37,20 @@
   --info-color: #5B8FF9;
   --info-bg: rgba(91, 143, 249, 0.12);
 
-  /* Shadows */
   --shadow-soft: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.5);
   --shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --shadow-gold: 0 8px 24px rgba(201, 168, 76, 0.25);
   --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.7);
 
-  /* Radii */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;
 
-  /* Typography */
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
-  /* Dimensions */
   --header-height: 66px;
 }
 
@@ -89,7 +78,6 @@
   --shadow-modal: 0 24px 50px rgba(15, 23, 42, 0.20);
 }
 
-/* Base Reset */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -108,13 +96,11 @@ body {
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; border: none; }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* Header */
 #app-header {
   height: var(--header-height);
   background: color-mix(in srgb, var(--card-bg) 90%, transparent);
@@ -238,7 +224,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   font-weight: 700;
 }
 
-/* App Main Container */
 .app-container {
   flex: 1;
   display: flex;
@@ -250,7 +235,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   gap: 24px;
 }
 
-/* Pipeline Overview Strip */
 .pipeline-overview-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -313,7 +297,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .stat-chip i { color: var(--gold); }
 .stat-chip strong { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); }
 
-/* Interactive Stepper */
 .pipeline-stepper-container {
   overflow-x: auto;
   padding: 10px 0;
@@ -430,7 +413,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .tag-silver { background: var(--silver-bg); color: var(--silver-color); }
 .tag-gold { background: var(--gold-layer-bg); color: var(--gold-layer-color); }
 
-/* Main Section Layout */
 .pipeline-section {
   display: none;
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -443,7 +425,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Cards & Panels */
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -491,7 +472,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   flex-wrap: wrap;
 }
 
-/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -560,7 +540,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   color: #FFF;
 }
 
-/* Grid Layouts */
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
@@ -579,7 +558,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   gap: 16px;
 }
 
-/* Metric Widget */
 .metric-box {
   background: var(--card-bg-elevated);
   border: 1px solid var(--border-color);
@@ -614,7 +592,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   margin-top: 4px;
 }
 
-/* Tables */
 .table-container {
   overflow-x: auto;
   border-radius: var(--radius-md);
@@ -652,7 +629,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   background: var(--hover-bg);
 }
 
-/* Badges & Status Pills */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -669,7 +645,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .pill-danger { background: var(--danger-bg); color: var(--danger-color); border: 1px solid color-mix(in srgb, var(--danger-color) 30%, transparent); }
 .pill-info { background: var(--info-bg); color: var(--info-color); border: 1px solid color-mix(in srgb, var(--info-color) 30%, transparent); }
 
-/* Score Gauge Bar */
 .score-gauge {
   height: 6px;
   background: var(--border-color);
@@ -683,7 +658,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border-radius: var(--radius-pill);
 }
 
-/* Form Controls */
 .form-group {
   margin-bottom: 16px;
 }
@@ -720,7 +694,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   color: var(--text-primary);
 }
 
-/* Ingest Dropzone */
 .dropzone {
   border: 2px dashed var(--border-color);
   border-radius: var(--radius-md);
@@ -745,7 +718,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   color: var(--gold);
 }
 
-/* Code & JSON Previewer */
 .code-block {
   background: #08080C;
   border: 1px solid var(--border-color);
@@ -758,7 +730,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   line-height: 1.5;
 }
 
-/* Observation Drawer (Right Side Panel) */
 #observation-drawer {
   position: fixed;
   top: 0;
@@ -824,7 +795,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   justify-content: space-between;
 }
 
-/* Custom Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -890,7 +860,6 @@ button { font-family: inherit; cursor: pointer; border: none; }
   background: var(--card-bg-elevated);
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .app-container { padding: 16px; }
   .grid-2 { grid-template-columns: 1fr; }

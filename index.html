@@ -5,25 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Economics & Finance Pipeline Workspace — Quy trình 7 giai đoạn thu thập, chuẩn hóa, phân tích và phát hành tri thức tài chính">
   <title>Economics Pipeline — WorkHub Finance</title>
-  
-  <!-- Google Fonts: DM Sans & DM Mono -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome & SweetAlert2 -->
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  
-  <!-- Supabase CDN (Cho xác thực và dữ liệu) -->
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <!-- Style CSS -->
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- App Header -->
   <header id="app-header">
     <div class="brand-section">
       <div class="brand-logo"><i class="fa-solid fa-coins"></i></div>
@@ -34,7 +29,7 @@
     </div>
 
     <div class="header-actions">
-      <!-- Quick Switch to Science Pipeline -->
+
       <a href="../workhub-sci/index.html" class="header-btn" title="Chuyển sang Science Pipeline" style="width: auto; padding: 0 14px; font-size: 13px; font-weight: 600; gap: 6px; color: var(--gold); border-color: rgba(201,168,76,0.3);">
         <i class="fa-solid fa-atom"></i>
         <span>Science Pipeline</span>
@@ -43,7 +38,7 @@
       <button class="header-btn" id="theme-toggle-btn" title="Dark/Light Mode">
         <i class="fa-solid fa-moon"></i>
       </button>
-      
+
       <button class="header-btn" id="observation-toggle-btn" title="Observatory">
         <i class="fa-solid fa-bell"></i>
         <span class="noti-badge" id="noti-unread-indicator"></span>
@@ -60,10 +55,8 @@
     </div>
   </header>
 
-  <!-- Main Container -->
   <main class="app-container">
-    
-    <!-- Top Pipeline Overview & Stepper Bar -->
+
     <section class="pipeline-overview-card">
       <div class="pipeline-header-row">
         <div class="pipeline-headline">
@@ -86,14 +79,12 @@
         </div>
       </div>
 
-      <!-- Interactive Stepper -->
       <div class="pipeline-stepper-container">
         <div class="pipeline-stepper">
           <div class="stepper-progress-line">
             <div class="stepper-progress-fill" id="stepper-progress-fill"></div>
           </div>
 
-          <!-- Step 1 -->
           <div class="step-item active" data-stage="e1" onclick="switchStage('e1')">
             <div class="step-circle"><i class="fa-solid fa-cloud-arrow-down"></i></div>
             <div class="step-text">
@@ -103,7 +94,6 @@
             </div>
           </div>
 
-          <!-- Step 2 -->
           <div class="step-item" data-stage="e2" onclick="switchStage('e2')">
             <div class="step-circle"><i class="fa-solid fa-shield-check"></i></div>
             <div class="step-text">
@@ -113,7 +103,6 @@
             </div>
           </div>
 
-          <!-- Step 3 -->
           <div class="step-item" data-stage="e3" onclick="switchStage('e3')">
             <div class="step-circle"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
             <div class="step-text">
@@ -123,7 +112,6 @@
             </div>
           </div>
 
-          <!-- Step 4 -->
           <div class="step-item" data-stage="e4" onclick="switchStage('e4')">
             <div class="step-circle"><i class="fa-solid fa-chart-line"></i></div>
             <div class="step-text">
@@ -133,7 +121,6 @@
             </div>
           </div>
 
-          <!-- Step 5 -->
           <div class="step-item" data-stage="e5" onclick="switchStage('e5')">
             <div class="step-circle"><i class="fa-solid fa-file-invoice-dollar"></i></div>
             <div class="step-text">
@@ -143,7 +130,6 @@
             </div>
           </div>
 
-          <!-- Step 6 -->
           <div class="step-item" data-stage="e6" onclick="switchStage('e6')">
             <div class="step-circle"><i class="fa-solid fa-user-check"></i></div>
             <div class="step-text">
@@ -153,7 +139,6 @@
             </div>
           </div>
 
-          <!-- Step 7 -->
           <div class="step-item" data-stage="e7" onclick="switchStage('e7')">
             <div class="step-circle"><i class="fa-solid fa-award"></i></div>
             <div class="step-text">
@@ -166,7 +151,6 @@
       </div>
     </section>
 
-    <!-- Stage Summary & Inspector Card -->
     <section class="card" id="stage-detail-card" style="margin-top: 24px; padding: 28px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
         <div>
@@ -178,7 +162,7 @@
             Thu thập dữ liệu từ Website, API hoặc upload file (như JSON) để đưa vào lớp Bronze (WorkHub Storage). Yêu cầu nguồn phải hợp lệ, file đọc được và có siêu dữ liệu (metadata) tối thiểu.
           </p>
         </div>
-        
+
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-outline" id="prev-stage-btn" onclick="navStage(-1)"><i class="fa-solid fa-arrow-left"></i> Giai đoạn trước</button>
           <button class="btn btn-primary" id="next-stage-btn" onclick="navStage(1)">Giai đoạn tiếp theo <i class="fa-solid fa-arrow-right"></i></button>
@@ -206,22 +190,18 @@
 
   </main>
 
-  <!-- =========================================================================
-       OBSERVATION DRAWER (FINANCE NOTIFICATION & AUDIT LOGS)
-       ========================================================================= -->
   <aside id="observation-drawer">
     <div class="drawer-header">
       <h4><i class="fa-solid fa-radar" style="color: var(--gold);"></i> Observation & Nhật Ký</h4>
       <button class="header-btn" id="drawer-close-btn" onclick="toggleObservationDrawer()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body" id="observation-logs-container">
-      <!-- Live Finance Event Logs via JS -->
+
     </div>
   </aside>
 
-  <!-- Shared WorkHub Supabase API & Auth -->
   <script src="api.js"></script>
-  <!-- Finance Pipeline Controller -->
+
   <script src="script.js"></script>
 </body>
 </html>

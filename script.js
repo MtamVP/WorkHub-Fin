@@ -1,6 +1,3 @@
-/* ==========================================================================
-   WORKHUB FINANCE — PIPELINE OVERVIEW & STAGE CONTROLLER
-   ========================================================================== */
 
 const STAGES_META = {
   e1: {
@@ -64,7 +61,6 @@ const STAGES_META = {
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
 
-// --- 1. AUTHENTICATION & ACCESS CONTROL (SHARED SUPABASE) ---
 const ALLOWED_GROUPS = ['finance', 'admin', 'all'];
 
 async function checkAccessGuard() {
@@ -118,7 +114,6 @@ async function checkAccessGuard() {
   return true;
 }
 
-// --- 2. STAGE SWITCHER & INSPECTOR ---
 function switchStage(stageKey) {
   const idx = STAGE_KEYS.indexOf(stageKey);
   if (idx === -1) return;
@@ -139,7 +134,6 @@ function updateStageUI(stageKey) {
   const meta = STAGES_META[stageKey];
   if (!meta) return;
 
-  // Stepper Visuals
   const stepItems = document.querySelectorAll('.step-item');
   stepItems.forEach((item, i) => {
     item.classList.remove('active');
@@ -152,7 +146,6 @@ function updateStageUI(stageKey) {
   const fillEl = document.getElementById('stepper-progress-fill');
   if (fillEl) fillEl.style.width = `${fillPercentage}%`;
 
-  // Detail Card
   const titleEl = document.getElementById('stage-title');
   const descEl = document.getElementById('stage-desc');
   const badgeEl = document.getElementById('stage-badge-layer');
@@ -166,11 +159,9 @@ function updateStageUI(stageKey) {
   }
   if (storageTierEl) storageTierEl.textContent = meta.storageTier;
 
-  // Log navigation to observation
   logPipelineEvent(`Xem tổng quan ${meta.title}`, 'info', `VIEW_${stageKey.toUpperCase()}`);
 }
 
-// --- 3. OBSERVATION LOGS (SYNCED TO WORKHUB SUPABASE SYSTEM_LOGS) ---
 let LOCAL_LOGS = [
   { time: '14:32:10', type: 'success', text: 'E7: Báo cáo Vĩ mô v2.4.0 đã ký duyệt và lưu trữ Gold Layer tại WorkHub-Tools.' },
   { time: '14:20:05', type: 'info', text: 'E6: Chuyên gia Trần Thị Thu Trang bắt đầu rà soát tài liệu Q2 Banking.' },
@@ -216,11 +207,10 @@ async function logPipelineEvent(text, type = 'info', action = 'PIPELINE_FIN_ACTI
   const timeStr = now.toTimeString().slice(0, 8);
   LOCAL_LOGS.unshift({ time: timeStr, type, text });
   renderObservationLogs();
-  
+
   const unreadIndicator = document.getElementById('noti-unread-indicator');
   if (unreadIndicator) unreadIndicator.style.display = 'block';
 
-  // Record to shared WorkHub Supabase system_logs
   const userEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || 'finance.lead@workhub.internal';
   const traceId = "TRC_FIN_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
   if (window.API && window.API.system && window.API.system.logAction) {
@@ -243,7 +233,6 @@ function toggleObservationDrawer() {
   }
 }
 
-// --- 4. THEME TOGGLE ---
 function setupThemeToggle() {
   const toggleBtn = document.getElementById('theme-toggle-btn');
   const currentTheme = localStorage.getItem('theme') || 'dark';
@@ -261,7 +250,6 @@ function setupThemeToggle() {
   }
 }
 
-// --- 5. INITIALIZATION ON DOM READY ---
 document.addEventListener('DOMContentLoaded', async () => {
   setupThemeToggle();
   const hasAccess = await checkAccessGuard();
