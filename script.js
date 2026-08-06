@@ -2781,9 +2781,10 @@ async function loadAdminUsers() {
     return;
   }
 
-  // Rộng hơn org một chút: fin công nhận cả 'admin' lẫn 'all' là quyền cao nhất (khớp
-  // ALLOWED_GROUPS của app này), thay vì chỉ 'all' như bản gốc.
-  if (CURRENT_USER.groupKey !== 'all' && CURRENT_USER.groupKey !== 'admin') {
+  // Khớp đúng như org: chỉ 'all' mới được vào trang này (RLS trên Supabase cũng chỉ
+  // cho phép đúng 'all' sửa/xóa users — nới thêm 'admin' ở đây trước đó gây lệch với
+  // org và với RLS thật, khiến sửa/xóa báo thành công nhưng không có tác dụng).
+  if (CURRENT_USER.groupKey !== 'all') {
     guard.innerHTML = '<div style="text-align:center; color:var(--danger-color); padding: 40px 0;"><i class="fa-solid fa-lock" style="font-size:1.6em; margin-bottom:8px; display:block;"></i>Bạn không có quyền truy cập trang này.</div>';
     return;
   }
