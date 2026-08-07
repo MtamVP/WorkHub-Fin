@@ -92,68 +92,127 @@ body { font-family: var(--font-body); background-color: var(--bg-color); margin:
 .text-bold { font-weight: 700 !important; color: var(--text-primary) !important; }
 .text-right { text-align: right; }
 
-/* ========================================= KPI cards ========================================= */
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 25px; }
-.kpi-card {
-    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    box-shadow: var(--shadow-soft); padding: 18px 22px; display: flex; flex-direction: column; gap: 8px;
-    border-left: 4px solid var(--finance-accent);
+/* ========================================= Categorical chart palette (allocation donut) =========================================
+   Validated via dataviz skill's validate_palette.js — 4 slots, both modes pass all hard gates
+   (light mode carries a contrast WARN, resolved via the always-on legend + tooltip labels below). */
+.asset-container {
+    --series-1: #2a78d6; --series-2: #eda100; --series-3: #1baf7a; --series-4: #4a3aa7; --series-other: #9a9a94;
 }
-.kpi-label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.03em; }
-.kpi-value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); }
+[data-theme="dark"] .asset-container, html:not([data-theme="light"]) .asset-container {
+    --series-1: #3987e5; --series-2: #c98500; --series-3: #199e70; --series-4: #9085e9; --series-other: #6b6b66;
+}
+
+/* ========================================= KPI cards ========================================= */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 25px; }
+.kpi-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft); padding: 20px 22px; display: flex; align-items: center; gap: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.kpi-icon {
+    width: 46px; height: 46px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; flex-shrink: 0; background: var(--finance-accent-subtle); color: var(--finance-accent);
+}
+.kpi-card.kpi-positive .kpi-icon { background: var(--success-bg); color: var(--success-color); }
+.kpi-card.kpi-negative .kpi-icon { background: var(--danger-bg); color: var(--danger-color); }
+.kpi-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi-label { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi-value.text-success { color: var(--success-color) !important; }
+.kpi-value.text-danger { color: var(--danger-color) !important; }
 
 /* ========================================= Tabs ========================================= */
 .asset-tab-toggle { margin-bottom: 20px; }
 .asset-tab-panel { animation: fadeInTab 0.25s ease; }
-@keyframes fadeInTab { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInTab { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========================================= Holdings layout: table + allocation donut ========================================= */
+.holdings-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+.allocation-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft); padding: 20px;
+}
+.allocation-card h3 { margin: 0 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.allocation-card h3 i { color: var(--finance-accent); }
+.allocation-chart-box { position: relative; height: 200px; margin-bottom: 14px; }
+.allocation-legend { display: flex; flex-direction: column; gap: 8px; }
+.allocation-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.allocation-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.allocation-legend-name { flex: 1; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.allocation-legend-pct { font-family: var(--font-mono); font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.allocation-empty { text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 30px 10px; }
 
 /* ========================================= Asset table (holdings/ledger) ========================================= */
 .asset-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); }
 .asset-table thead th {
     background-color: var(--finance-accent); color: #120F0A; font-weight: 700; text-transform: uppercase;
-    font-size: 0.85rem; padding: 12px 14px; text-align: left; letter-spacing: 0.03em;
+    font-size: 0.8rem; padding: 13px 14px; text-align: left; letter-spacing: 0.04em;
 }
 .asset-table thead th.text-right { text-align: right; }
-.asset-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; }
+.asset-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
 .asset-table tbody tr:nth-child(even) { background-color: var(--bg-color); }
 .asset-table tbody tr:hover { background-color: var(--hover-bg); }
-.asset-table .empty-state { text-align: center; padding: 30px; color: var(--text-secondary); }
+.asset-table .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); font-variant-numeric: normal; }
+.asset-table .empty-state i { display: block; font-size: 1.8rem; margin-bottom: 10px; color: var(--border-color); }
+
+.symbol-cell { display: flex; align-items: center; gap: 10px; }
+.symbol-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.symbol-name { font-weight: 800; color: var(--text-primary); letter-spacing: 0.02em; }
 
 .price-input {
-    width: 110px; text-align: right; padding: 6px 10px; border: 1px solid var(--border-color);
+    width: 110px; text-align: right; padding: 7px 10px; border: 1px solid var(--border-color);
     border-radius: var(--radius-sm); background: var(--hover-bg); color: var(--text-primary);
-    font-family: var(--font-mono); font-weight: 700;
+    font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.price-input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; }
+.price-input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
 
-.txn-type-badge { padding: 3px 10px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-.txn-type-badge.buy { background: color-mix(in srgb, var(--success-color) 16%, var(--card-bg)); color: var(--success-color); }
-.txn-type-badge.sell { background: color-mix(in srgb, var(--danger-color) 16%, var(--card-bg)); color: var(--danger-color); }
+.txn-type-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+.txn-type-badge.buy { background: var(--success-bg); color: var(--success-color); }
+.txn-type-badge.sell { background: var(--danger-bg); color: var(--danger-color); }
+
+.pnl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius-pill); font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.pnl-pill.pnl-up { background: var(--success-bg); color: var(--success-color); }
+.pnl-pill.pnl-down { background: var(--danger-bg); color: var(--danger-color); }
+.pnl-pill.pnl-flat { background: var(--hover-bg); color: var(--text-secondary); }
 
 /* ========================================= Transaction form ========================================= */
 .txn-form {
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--card-bg);
-    border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;
-    box-shadow: var(--shadow-soft);
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    padding: 20px 22px; margin-bottom: 20px; box-shadow: var(--shadow-soft);
 }
+.txn-form-title { margin: 0 0 16px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.txn-form-title i { color: var(--finance-accent); }
+.txn-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; align-items: end; }
+.txn-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.txn-field.txn-field-wide { grid-column: span 2; }
+.txn-field label { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
 .txn-form select, .txn-form input {
-    padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-    background: var(--hover-bg); color: var(--text-primary); font-size: 0.9rem; font-family: var(--font-body);
+    padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+    background: var(--hover-bg); color: var(--text-primary); font-size: 0.9rem; font-family: var(--font-body); width: 100%;
 }
-.txn-form select:focus, .txn-form input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; }
-.txn-form #txn-symbol { width: 110px; }
-.txn-form #txn-quantity, .txn-form #txn-price, .txn-form #txn-fee { width: 110px; }
-.txn-form #txn-note { flex: 1; min-width: 140px; }
-.btn-txn-save { padding: 9px 20px; font-size: 0.9rem; text-transform: none; }
+.txn-form input[type="number"], .txn-form input[type="date"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.txn-form select:focus, .txn-form input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
+.btn-txn-save { padding: 10px 22px; font-size: 0.85rem; text-transform: none; white-space: nowrap; }
 
-.perf-chart-wrapper { padding: 20px; }
+/* ========================================= Performance tab ========================================= */
+.perf-stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.perf-chart-wrapper { padding: 22px; }
 .perf-chart-title { margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
 .perf-chart-title i { color: var(--finance-accent); }
+.perf-chart-empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+.perf-chart-empty i { display: block; font-size: 2.2rem; margin-bottom: 12px; color: var(--border-color); }
 
+@media (max-width: 900px) {
+    .holdings-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .txn-form { flex-direction: column; align-items: stretch; }
-    .txn-form select, .txn-form input { width: 100% !important; }
+    .txn-form-grid { grid-template-columns: repeat(2, 1fr); }
+    .txn-field.txn-field-wide { grid-column: span 2; }
+}
+@media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr; }
 }
 
 .toast-notification {

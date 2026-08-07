@@ -7,7 +7,7 @@ body {
     margin: 0; padding: 0; color: var(--text-primary);
 }
 
-.asset-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+.asset-container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
 
 /* =========================================
    2. TOP BAR
@@ -85,62 +85,7 @@ body {
 .perf-chart-title { margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
 .perf-chart-title i { color: var(--finance-accent); }
 
-/* =========================================
-   4. TABLE STYLES
-   ========================================= */
-.sheet-wrapper {
-    background: var(--card-bg);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-soft);
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-}
-
-.excel-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); background: transparent; }
-
-.excel-table th, .header-row td {
-    background-color: var(--finance-accent);
-    color: #120F0A;
-    padding: 16px 20px;
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-    letter-spacing: 0.04em;
-    border: none;
-}
-
-.excel-table td {
-    background-color: transparent;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-primary);
-    font-size: 1rem;
-    vertical-align: middle;
-}
-
 .text-right { text-align: right; font-family: var(--font-mono); font-weight: 600; }
-
-.excel-table tbody tr:hover td { background-color: var(--hover-bg); }
-
-.stock-main-header td {
-    background: var(--finance-accent);
-    color: #120F0A !important;
-    font-size: 1.3rem !important;
-    padding: 20px !important;
-    border: none !important;
-}
-
-.target-header td {
-    background-color: var(--hover-bg) !important;
-    color: var(--text-primary) !important;
-    font-weight: 800 !important;
-    border-top: 2px solid var(--border-color) !important;
-    border-bottom: 2px solid var(--border-color) !important;
-    text-transform: uppercase;
-    font-size: 0.95rem !important;
-    padding: 15px 20px !important;
-}
-
 .text-bold { font-weight: 700; }
 .text-center { text-align: center; }
 
@@ -149,6 +94,58 @@ body {
 .text-primary { color: var(--info-color) !important; }
 
 #loading-spinner { padding: 60px; }
+
+/* =========================================
+   4. STOCK DETAIL — hero + stat-card layout (thay cho bảng hàng-cột cũ)
+   ========================================= */
+.stock-hero {
+    background: linear-gradient(135deg, var(--finance-accent-subtle), var(--card-bg));
+    border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft);
+    padding: 24px 28px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+}
+.stock-hero-id { display: flex; align-items: baseline; gap: 12px; }
+.stock-hero-symbol { font-size: 2rem; font-weight: 900; color: var(--finance-accent); letter-spacing: 0.02em; }
+.stock-hero-year { font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); background: var(--hover-bg); padding: 4px 12px; border-radius: var(--radius-pill); }
+.stock-hero-price { text-align: right; }
+.stock-hero-price-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+.stock-hero-price-value { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.stock-section-title { margin: 0 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.stock-section-title i { color: var(--finance-accent); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-tile {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); padding: 16px; display: flex; flex-direction: column; gap: 6px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.stat-tile-icon { color: var(--finance-accent); font-size: 1rem; }
+.stat-tile-label { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+.stat-tile-value { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 10px; }
+.target-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft); padding: 20px; text-align: center;
+}
+.target-card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
+.target-multiple { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
+.target-card-price { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-bottom: 10px; }
+
+.pnl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius-pill); font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.pnl-pill.pnl-up { background: var(--success-bg); color: var(--success-color); }
+.pnl-pill.pnl-down { background: var(--danger-bg); color: var(--danger-color); }
+.pnl-pill.pnl-flat { background: var(--hover-bg); color: var(--text-secondary); }
+
+.stock-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 70px 20px; color: var(--text-secondary); text-align: center; }
+.stock-empty-state i { font-size: 2.4rem; margin-bottom: 14px; color: var(--border-color); }
+.stock-empty-state p { margin: 0; font-size: 0.95rem; }
+
+@media (max-width: 640px) {
+    .stock-hero { flex-direction: column; align-items: flex-start; }
+    .stock-hero-price { text-align: left; }
+}
 
 /* =========================================
    5. TOAST NOTIFICATION

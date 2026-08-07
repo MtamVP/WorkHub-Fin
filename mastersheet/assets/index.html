@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=3.0">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=4.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -54,20 +54,32 @@
         <!-- KPI tổng quan -->
         <div class="kpi-row" id="kpi-row">
             <div class="kpi-card">
-                <span class="kpi-label"><i class="fa-solid fa-wallet"></i> NAV</span>
-                <span class="kpi-value" id="kpi-nav">--</span>
+                <span class="kpi-icon"><i class="fa-solid fa-wallet"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">NAV</span>
+                    <span class="kpi-value" id="kpi-nav">--</span>
+                </span>
+            </div>
+            <div class="kpi-card" id="kpi-card-unrealized">
+                <span class="kpi-icon"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Lãi/lỗ chưa chốt</span>
+                    <span class="kpi-value" id="kpi-unrealized">--</span>
+                </span>
+            </div>
+            <div class="kpi-card" id="kpi-card-realized">
+                <span class="kpi-icon"><i class="fa-solid fa-circle-check"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Lãi/lỗ đã chốt</span>
+                    <span class="kpi-value" id="kpi-realized">--</span>
+                </span>
             </div>
             <div class="kpi-card">
-                <span class="kpi-label"><i class="fa-solid fa-chart-line"></i> Lãi/lỗ chưa chốt</span>
-                <span class="kpi-value" id="kpi-unrealized">--</span>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label"><i class="fa-solid fa-circle-check"></i> Lãi/lỗ đã chốt</span>
-                <span class="kpi-value" id="kpi-realized">--</span>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label"><i class="fa-solid fa-coins"></i> Giá trị thị trường</span>
-                <span class="kpi-value" id="kpi-market-value">--</span>
+                <span class="kpi-icon"><i class="fa-solid fa-coins"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Giá trị thị trường</span>
+                    <span class="kpi-value" id="kpi-market-value">--</span>
+                </span>
             </div>
         </div>
 
@@ -92,36 +104,72 @@
 
         <!-- Tab: Danh Mục -->
         <section id="tab-holdings" class="asset-tab-panel">
-            <div class="spreadsheet-wrapper">
-                <table class="excel-table asset-table" id="holdings-table">
-                    <thead>
-                        <tr>
-                            <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
-                            <th class="text-right">Giá TT (nhập tay)</th><th class="text-right">GT vốn</th>
-                            <th class="text-right">GTTT</th><th class="text-right">Lãi/lỗ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="holdings-body">
-                        <tr><td colspan="7" class="empty-state">Đang tải...</td></tr>
-                    </tbody>
-                </table>
+            <div class="holdings-layout">
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="holdings-table">
+                        <thead>
+                            <tr>
+                                <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
+                                <th class="text-right">Giá TT (nhập tay)</th><th class="text-right">GT vốn</th>
+                                <th class="text-right">GTTT</th><th class="text-right">Lãi/lỗ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdings-body">
+                            <tr><td colspan="7" class="empty-state">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="allocation-card">
+                    <h3><i class="fa-solid fa-chart-pie"></i> Cơ Cấu Danh Mục</h3>
+                    <div class="allocation-chart-box">
+                        <canvas id="allocationChart"></canvas>
+                    </div>
+                    <div class="allocation-legend" id="allocation-legend"></div>
+                </div>
             </div>
         </section>
 
         <!-- Tab: Sổ Lệnh -->
         <section id="tab-ledger" class="asset-tab-panel" style="display:none;">
             <form id="txn-form" class="txn-form">
-                <select id="txn-type" required>
-                    <option value="buy">Mua</option>
-                    <option value="sell">Bán</option>
-                </select>
-                <input type="text" id="txn-symbol" placeholder="Mã (vd: SSI)" required style="text-transform:uppercase;">
-                <input type="number" id="txn-quantity" placeholder="Khối lượng" min="0" step="any" required>
-                <input type="number" id="txn-price" placeholder="Giá" min="0" step="any" required>
-                <input type="number" id="txn-fee" placeholder="Phí (tùy chọn)" min="0" step="any">
-                <input type="date" id="txn-date">
-                <input type="text" id="txn-note" placeholder="Ghi chú (tùy chọn)">
-                <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
+                <h3 class="txn-form-title"><i class="fa-solid fa-plus-circle"></i> Thêm Lệnh Giao Dịch</h3>
+                <div class="txn-form-grid">
+                    <div class="txn-field">
+                        <label for="txn-type">Loại lệnh</label>
+                        <select id="txn-type" required>
+                            <option value="buy">Mua</option>
+                            <option value="sell">Bán</option>
+                        </select>
+                    </div>
+                    <div class="txn-field">
+                        <label for="txn-symbol">Mã</label>
+                        <input type="text" id="txn-symbol" placeholder="VD: SSI" required style="text-transform:uppercase;">
+                    </div>
+                    <div class="txn-field">
+                        <label for="txn-quantity">Khối lượng</label>
+                        <input type="number" id="txn-quantity" placeholder="0" min="0" step="any" required>
+                    </div>
+                    <div class="txn-field">
+                        <label for="txn-price">Giá</label>
+                        <input type="number" id="txn-price" placeholder="0" min="0" step="any" required>
+                    </div>
+                    <div class="txn-field">
+                        <label for="txn-fee">Phí (tùy chọn)</label>
+                        <input type="number" id="txn-fee" placeholder="0" min="0" step="any">
+                    </div>
+                    <div class="txn-field">
+                        <label for="txn-date">Ngày</label>
+                        <input type="date" id="txn-date">
+                    </div>
+                    <div class="txn-field txn-field-wide">
+                        <label for="txn-note">Ghi chú (tùy chọn)</label>
+                        <input type="text" id="txn-note" placeholder="Ghi chú...">
+                    </div>
+                    <div class="txn-field">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
+                    </div>
+                </div>
             </form>
             <div class="spreadsheet-wrapper">
                 <table class="excel-table asset-table" id="ledger-table">
@@ -141,9 +189,25 @@
 
         <!-- Tab: Hiệu Suất -->
         <section id="tab-performance" class="asset-tab-panel" style="display:none;">
+            <div class="perf-stats-row">
+                <div class="kpi-card">
+                    <span class="kpi-icon"><i class="fa-solid fa-arrow-trend-up"></i></span>
+                    <span class="kpi-body">
+                        <span class="kpi-label">Lợi nhuận từ đầu</span>
+                        <span class="kpi-value" id="perf-total-return">--</span>
+                    </span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-icon"><i class="fa-solid fa-percent"></i></span>
+                    <span class="kpi-body">
+                        <span class="kpi-label">% Tăng trưởng</span>
+                        <span class="kpi-value" id="perf-total-return-pct">--</span>
+                    </span>
+                </div>
+            </div>
             <div class="spreadsheet-wrapper perf-chart-wrapper">
                 <h3 class="perf-chart-title"><i class="fa-solid fa-chart-area"></i> NAV theo thời gian</h3>
-                <div style="position:relative; height:340px;">
+                <div style="position:relative; height:340px;" id="nav-chart-box">
                     <canvas id="navChart"></canvas>
                 </div>
             </div>
@@ -156,7 +220,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=6"></script>
-    <script src="script.js?v=1"></script>
+    <script src="script.js?v=2"></script>
 
 </body>
 </html>

@@ -23,7 +23,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/style.css?v=2.2">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=3.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -63,16 +63,38 @@
             <select id="stock-year-select" style="display:none;" onchange="loadStockDetail()"></select>
         </div>
 
-        <div id="sheet-display" class="sheet-wrapper" style="display: none;">
-            <table id="stock-table" class="excel-table">
-                </table>
+        <div id="sheet-display" style="display: none;">
+            <!-- Hero: Mã + Năm + Giá hiện tại -->
+            <div class="stock-hero">
+                <div class="stock-hero-id">
+                    <span class="stock-hero-symbol" id="hero-symbol">--</span>
+                    <span class="stock-hero-year" id="hero-year">--</span>
+                </div>
+                <div class="stock-hero-price">
+                    <span class="stock-hero-price-label">Giá hiện tại</span>
+                    <span class="stock-hero-price-value" id="hero-price">--</span>
+                </div>
+            </div>
+
+            <!-- Chỉ số cơ bản -->
+            <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉ Số Cơ Bản</h3>
+            <div class="stat-grid" id="fundamentals-grid"></div>
+
+            <!-- Định giá mục tiêu -->
+            <h3 class="stock-section-title"><i class="fa-solid fa-bullseye"></i> Định Giá Mục Tiêu</h3>
+            <div class="target-grid" id="target-grid"></div>
         </div>
 
         <div id="trend-chart-wrapper" class="trend-chart-wrapper" style="display: none;">
             <h3 class="perf-chart-title"><i class="fa-solid fa-chart-line"></i> Xu hướng định giá theo năm</h3>
-            <div style="position:relative; height:300px;">
+            <div style="position:relative; height:300px;" id="trend-chart-box">
                 <canvas id="valuationTrendChart"></canvas>
             </div>
+        </div>
+
+        <div id="stock-empty-state" class="stock-empty-state">
+            <i class="fa-solid fa-chart-column"></i>
+            <p>Chọn một mã cổ phiếu ở trên để xem chi tiết định giá.</p>
         </div>
 
         <div id="loading-spinner" style="display:none; text-align:center; padding: 50px;">
@@ -83,7 +105,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=6"></script>
-    <script src="script.js?v=2"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>
 

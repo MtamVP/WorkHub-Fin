@@ -36,14 +36,18 @@ async function loadStockDetail() {
     const yearSelect = document.getElementById('stock-year-select');
     const trendWrapper = document.getElementById('trend-chart-wrapper');
 
+    const emptyState = document.getElementById('stock-empty-state');
+
     if (!symbol) {
         displayDiv.style.display = 'none';
         yearLabel.style.display = 'none';
         yearSelect.style.display = 'none';
         trendWrapper.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'flex';
         return;
     }
 
+    if (emptyState) emptyState.style.display = 'none';
     displayDiv.style.display = 'none';
     spinner.style.display = 'block';
 
@@ -64,11 +68,11 @@ async function loadStockDetail() {
         spinner.style.display = 'none';
         displayDiv.style.display = 'block';
 
-        if (response.status === 'success') {
-            renderTable(buildTableRows(response.data));
+        if (response.status === 'success' && response.data && response.data.symbol) {
+            renderStockDetail(response.data);
             showToast("Đã tải dữ liệu mã " + symbol, "success");
         } else {
-            displayDiv.innerHTML = `<p style="color:var(--danger-color); text-align:center;">Lỗi: ${response.message}</p>`;
+            displayDiv.innerHTML = `<p style="color:var(--danger-color); text-align:center; padding:30px;">Chưa có dữ liệu định giá cho mã này.</p>`;
         }
 
         await loadTrendChart(symbol);
@@ -78,29 +82,49 @@ async function loadStockDetail() {
     }
 }
 
-// Chuyển object định giá (đã lưu trong finance_stock_valuations.data) thành mảng 16 dòng
-// đúng thứ tự mà renderTable() (được viết cho định dạng bảng cũ) đang mong đợi.
-function buildTableRows(d) {
+// --- 3. VẼ GIAO DIỆN CHI TIẾT ĐỊNH GIÁ (stat card, không dùng bảng hàng-cột nữa) ---
+function renderStockDetail(d) {
     d = d || {};
-    const num = (v) => (v === undefined || v === null || v === '') ? '' : Number(v).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
-    return [
-        [d.symbol || '', d.symbol || '', d.year || ''],
-        [1, 'Vốn điều lệ', num(d.charter_capital)],
-        [2, 'Vốn chủ sở hữu', num(d.equity)],
-        [3, 'Lợi nhuận sau thuế', num(d.lnst)],
-        [4, 'Giá trị sổ sách', num(d.book_value)],
-        [5, 'EPS', num(d.eps)],
-        [6, 'Giá cổ phiếu hiện tại', num(d.price)],
-        [7, 'P/E', num(d.pe)],
-        [8, 'P/B', num(d.pb)],
-        [9, 'Target', ''],
-        [10, 'Target P/E', num(d.target_pe)],
-        [11, 'Target P/B', num(d.target_pb)],
-        [12, 'Price Target (P/E)', num(d.price_per_pe)],
-        [13, 'Price Target (P/B)', num(d.price_per_pb)],
-        [14, 'Return theo P/E', num(d.return_pe) + '%'],
-        [15, 'Return theo P/B', num(d.return_pb) + '%']
+    const num = (v, digits) => (v === undefined || v === null || v === '') ? '--' : Number(v).toLocaleString('vi-VN', { maximumFractionDigits: digits !== undefined ? digits : 2 });
+
+    document.getElementById('hero-symbol').textContent = d.symbol || '--';
+    document.getElementById('hero-year').textContent = d.year ? `Năm ${d.year}` : '';
+    document.getElementById('hero-price').textContent = num(d.price, 0);
+
+    const fundamentals = [
+        { icon: 'fa-building-columns', label: 'Vốn điều lệ', value: num(d.charter_capital, 0) },
+        { icon: 'fa-scale-balanced', label: 'Vốn chủ sở hữu', value: num(d.equity, 0) },
+        { icon: 'fa-sack-dollar', label: 'Lợi nhuận sau thuế', value: num(d.lnst, 0) },
+        { icon: 'fa-book', label: 'Giá trị sổ sách', value: num(d.book_value) },
+        { icon: 'fa-chart-line', label: 'EPS', value: num(d.eps) },
+        { icon: 'fa-divide', label: 'P/E', value: num(d.pe) },
+        { icon: 'fa-percent', label: 'P/B', value: num(d.pb) }
     ];
+    document.getElementById('fundamentals-grid').innerHTML = fundamentals.map(f => `
+        <div class="stat-tile">
+            <span class="stat-tile-icon"><i class="fa-solid ${f.icon}"></i></span>
+            <span class="stat-tile-label">${f.label}</span>
+            <span class="stat-tile-value">${f.value}</span>
+        </div>`).join('');
+
+    const returnPe = Number(d.return_pe);
+    const returnPb = Number(d.return_pb);
+    document.getElementById('target-grid').innerHTML = `
+        ${renderTargetCard('Theo P/E', d.target_pe, d.price_per_pe, returnPe, num)}
+        ${renderTargetCard('Theo P/B', d.target_pb, d.price_per_pb, returnPb, num)}
+    `;
+}
+
+function renderTargetCard(title, targetMultiple, priceTarget, returnPct, num) {
+    const hasReturn = !isNaN(returnPct);
+    const cls = !hasReturn ? '' : (returnPct > 0 ? 'pnl-up' : (returnPct < 0 ? 'pnl-down' : 'pnl-flat'));
+    const icon = !hasReturn ? 'fa-minus' : (returnPct > 0 ? 'fa-arrow-up' : (returnPct < 0 ? 'fa-arrow-down' : 'fa-minus'));
+    return `
+        <div class="target-card">
+            <div class="target-card-title">${title} <span class="target-multiple">(x${num(targetMultiple, 1)})</span></div>
+            <div class="target-card-price">${num(priceTarget, 0)}</div>
+            <div class="target-card-return"><span class="pnl-pill ${cls}"><i class="fa-solid ${icon}"></i>${hasReturn ? (returnPct > 0 ? '+' : '') + returnPct.toFixed(1) + '%' : '--'}</span></div>
+        </div>`;
 }
 
 // 2b. BIỂU ĐỒ XU HƯỚNG ĐỊNH GIÁ QUA CÁC NĂM
@@ -151,79 +175,6 @@ async function loadTrendChart(symbol) {
 
 function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-// 3. HÀM VẼ BẢNG HTML (GIAO DIỆN HIỆN ĐẠI - MODERN UI)
-function renderTable(data) {
-    const table = document.getElementById('stock-table');
-    let html = '';
-
-    // --- Dòng 1: Header Chính [Mã CP, TÊN CỔ PHIẾU, Năm] ---
-    // Sử dụng class 'stock-main-header' thay vì style inline màu vàng
-    html += `
-        <tr class="stock-main-header">
-            <td class="text-center text-bold">${data[0][0]}</td>
-            <td class="text-bold" style="text-transform: uppercase;">${data[0][1]}</td>
-            <td class="text-right text-bold">${data[0][2]}</td>
-        </tr>
-    `;
-
-    // --- Dòng 2 -> 9: Các chỉ số (Vốn, LNST, Giá...) ---
-    for (let i = 1; i <= 8; i++) {
-        let row = data[i];
-        
-        // Cột A: STT (nhỏ, màu nhạt), Cột C: Giá trị (căn phải)
-        html += `
-            <tr>
-                <td class="text-center" style="width: 50px; color: var(--text-secondary);">${row[0]}</td>
-                <td style="font-weight: 500;">${row[1]}</td>
-                <td class="text-right">${row[2]}</td>
-            </tr>
-        `;
-    }
-
-    // --- Dòng 10: Header Target (Phân cách) ---
-    // Sử dụng class 'target-header' để tạo dải màu xám ngăn cách
-    let rowTargetHeader = data[9];
-    html += `
-        <tr class="target-header">
-            <td></td>
-            <td colspan="2"> ${rowTargetHeader[1]}</td>
-        </tr>
-    `;
-
-    // --- Dòng 11 -> 15: Phần Target Data ---
-    for (let i = 10; i < 16; i++) {
-        let row = data[i];
-        let label = row[1] || "";
-        let value = row[2] || "";
-        let valClass = 'text-right'; // Mặc định căn phải
-
-        // Xử lý tô màu cho dòng "Return (%)"
-        if (label.includes("Return")) {
-            valClass += ' text-bold';
-            // Xóa ký tự % và dấu phẩy để check số (Hỗ trợ format Việt Nam 10,5%)
-            let numVal = parseFloat(value.toString().replace('%','').replace(',','.'));
-            
-            if (!isNaN(numVal)) {
-                if (numVal > 0) valClass += ' text-success'; // Xanh
-                else if (numVal < 0) valClass += ' text-danger'; // Đỏ
-            }
-        } else {
-             // Các dòng Price target, PE, PB cho đậm chữ lên một chút
-             valClass += ' text-bold';
-        }
-
-        html += `
-            <tr>
-                <td></td>
-                <td style="color: var(--text-secondary);">${label}</td>
-                <td class="${valClass}">${value}</td>
-            </tr>
-        `;
-    }
-
-    table.innerHTML = html;
 }
 
 // --- 4. HÀM HIỂN THỊ THÔNG BÁO (TOAST) ---
