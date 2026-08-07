@@ -1,6 +1,16 @@
 /* =========================================
    1. GLOBAL & LAYOUT — Soft Minimalism
    ========================================= */
+/* Công cụ tài chính này luôn dùng giao diện sáng, bất kể site đang ở chế độ tối mặc định — nền đen làm khó đọc số liệu. */
+body {
+    --bg-color: #ECEEF2; --bg-color-2: #F3F4F7; --card-bg: #FFFFFF; --card-bg-elevated: #F8F9FB;
+    --text-primary: #15181E; --text-secondary: #575A60; --text-muted: #696B6F;
+    --border-color: rgba(20, 24, 33, 0.10); --border-light: rgba(20, 24, 33, 0.06); --hover-bg: #E8EAEF;
+    --gold: #B0892A; --gold-light: #8A6A17; --gold-glow: rgba(176, 137, 42, 0.18);
+    --finance-accent: #9A6B0D; --finance-accent-subtle: rgba(154, 107, 13, 0.10);
+    --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.08); --shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.14);
+    --shadow-gold: 0 8px 20px rgba(176, 137, 42, 0.18); --shadow-modal: 0 24px 50px rgba(15, 23, 42, 0.20);
+}
 body {
     font-family: var(--font-body);
     background-color: var(--bg-color);
