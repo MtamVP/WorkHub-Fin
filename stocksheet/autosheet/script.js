@@ -14,7 +14,42 @@ document.addEventListener('DOMContentLoaded', function() {
             calculate();
         });
     });
+
+    // Gõ xong mã + năm thì tự dò xem đã có định giá lưu sẵn chưa, có thì tải lên để sửa
+    // thay vì lưu đè mù (mỗi (mã, năm) là 1 bản ghi riêng, không còn overwrite theo mã như trước)
+    ['stock-symbol', 'stock-year'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('blur', tryPrefillExisting);
+    });
 });
+
+async function tryPrefillExisting() {
+    const symbol = document.getElementById('stock-symbol').value.trim();
+    const year = document.getElementById('stock-year').value.trim();
+    if (!symbol || !year) return;
+
+    try {
+        const response = await callGAS('getStockDetail', { symbol, year });
+        const d = response.data;
+        if (!d || !d.symbol) return; // chưa có dữ liệu cho (mã, năm) này -> giữ nguyên form trống để nhập mới
+
+        document.getElementById('val-1').value = formatOnly(d.charter_capital);
+        document.getElementById('val-2').value = formatOnly(d.equity);
+        document.getElementById('val-3').value = formatOnly(d.lnst);
+        document.getElementById('val-6').value = formatOnly(d.price);
+        document.getElementById('target-pe').value = formatOnly(d.target_pe);
+        document.getElementById('target-pb').value = formatOnly(d.target_pb);
+        calculate();
+        showToast(`Đã tải định giá có sẵn của ${symbol} (${year}) để sửa`, "success");
+    } catch (e) {
+        console.error('Lỗi tryPrefillExisting:', e);
+    }
+}
+
+function formatOnly(num) {
+    if (num === undefined || num === null || num === '') return '';
+    return Number(num).toLocaleString('en-US');
+}
 
 // --- 1. CÁC HÀM XỬ LÝ FORMAT SỐ ---
 

@@ -6,6 +6,7 @@
     <title>Tổng hợp Cổ Phiếu | WorkHub Finance</title>
     <link rel="icon" type="image/png" href="../logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -22,7 +23,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/style.css?v=2.1">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=2.2">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -58,11 +59,20 @@
             <select id="stock-select" onchange="loadStockDetail()">
                 <option value="">-- Đang tải danh sách... --</option>
             </select>
+            <label id="stock-year-label" style="display:none;"><i class="fa-solid fa-calendar"></i> Năm:</label>
+            <select id="stock-year-select" style="display:none;" onchange="loadStockDetail()"></select>
         </div>
 
         <div id="sheet-display" class="sheet-wrapper" style="display: none;">
             <table id="stock-table" class="excel-table">
                 </table>
+        </div>
+
+        <div id="trend-chart-wrapper" class="trend-chart-wrapper" style="display: none;">
+            <h3 class="perf-chart-title"><i class="fa-solid fa-chart-line"></i> Xu hướng định giá theo năm</h3>
+            <div style="position:relative; height:300px;">
+                <canvas id="valuationTrendChart"></canvas>
+            </div>
         </div>
 
         <div id="loading-spinner" style="display:none; text-align:center; padding: 50px;">
@@ -72,8 +82,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../api.js"></script>
-    <script src="script.js"></script>
+    <script src="../api.js?v=6"></script>
+    <script src="script.js?v=2"></script>
 </body>
 </html>
 

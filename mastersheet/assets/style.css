@@ -59,39 +59,8 @@ body { font-family: var(--font-body); background-color: var(--bg-color); margin:
 }
 .money-input:focus { background-color: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
 
-.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); }
-
-#my-spreadsheet { display: flex; justify-content: center; width: 100%; background-color: transparent; overflow-x: auto; }
-
-.jexcel_content { box-shadow: none !important; width: auto !important; }
-
-.jexcel > thead > tr > td {
-    background-color: var(--finance-accent) !important; color: #120F0A !important;
-    font-weight: 700 !important; text-transform: uppercase; font-size: 0.9rem !important;
-    border: 1px solid rgba(0, 0, 0, 0.1) !important; padding: 14px 10px !important;
-    position: sticky; top: 0; z-index: 100; letter-spacing: 0.04em;
-}
-
-.jexcel_row { background-color: var(--hover-bg) !important; color: var(--text-secondary) !important; font-weight: 700 !important; border-bottom: 1px solid var(--border-color) !important; border-right: 2px solid var(--border-color) !important; }
-
-.jexcel > tbody > tr > td { background-color: var(--card-bg) !important; color: var(--text-primary) !important; font-size: 1rem !important; font-weight: 500; border: 1px solid var(--border-color) !important; padding: 10px 12px !important; vertical-align: middle !important; font-family: var(--font-body) !important; }
-
-.jexcel > tbody > tr:nth-child(even) > td { background-color: var(--bg-color) !important; }
-
-.jexcel > tbody > tr:hover > td { background-color: var(--hover-bg) !important; cursor: pointer; }
-
-.jexcel .highlight { background-color: color-mix(in srgb, var(--finance-accent) 15%, transparent) !important; border: 2px solid var(--finance-accent) !important; font-weight: 700 !important; }
-
-.jexcel > tbody > tr > td.readonly { background-color: var(--hover-bg) !important; color: var(--text-muted) !important; font-style: italic; }
-
-/* Cột Lãi/Lỗ: script.js gắn class text-success/text-danger, cần đặc hiệu hơn rule nền để thắng !important ở trên */
-.jexcel > tbody > tr > td.text-success { color: var(--success-color) !important; }
-.jexcel > tbody > tr > td.text-danger { color: var(--danger-color) !important; }
-
-.jexcel_content::-webkit-scrollbar { width: 12px; height: 12px; }
-.jexcel_content::-webkit-scrollbar-track { background: var(--bg-color); }
-.jexcel_content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; }
-.jexcel_content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 20px; }
+.spreadsheet-wrapper:last-child { margin-bottom: 0; }
 
 .nav-table-wrapper { background: var(--card-bg); padding: 0 20px 20px 20px; border-radius: 0 0 var(--radius-md) var(--radius-md); border: 1px solid var(--border-color); border-top: none; margin-top: -1px; }
 
@@ -121,6 +90,71 @@ body { font-family: var(--font-body); background-color: var(--bg-color); margin:
 .text-success { color: var(--success-color) !important; font-weight: 700 !important; }
 .text-danger { color: var(--danger-color) !important; font-weight: 700 !important; }
 .text-bold { font-weight: 700 !important; color: var(--text-primary) !important; }
+.text-right { text-align: right; }
+
+/* ========================================= KPI cards ========================================= */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 25px; }
+.kpi-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); padding: 18px 22px; display: flex; flex-direction: column; gap: 8px;
+    border-left: 4px solid var(--finance-accent);
+}
+.kpi-label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+.kpi-value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); }
+
+/* ========================================= Tabs ========================================= */
+.asset-tab-toggle { margin-bottom: 20px; }
+.asset-tab-panel { animation: fadeInTab 0.25s ease; }
+@keyframes fadeInTab { from { opacity: 0; } to { opacity: 1; } }
+
+/* ========================================= Asset table (holdings/ledger) ========================================= */
+.asset-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); }
+.asset-table thead th {
+    background-color: var(--finance-accent); color: #120F0A; font-weight: 700; text-transform: uppercase;
+    font-size: 0.85rem; padding: 12px 14px; text-align: left; letter-spacing: 0.03em;
+}
+.asset-table thead th.text-right { text-align: right; }
+.asset-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; }
+.asset-table tbody tr:nth-child(even) { background-color: var(--bg-color); }
+.asset-table tbody tr:hover { background-color: var(--hover-bg); }
+.asset-table .empty-state { text-align: center; padding: 30px; color: var(--text-secondary); }
+
+.price-input {
+    width: 110px; text-align: right; padding: 6px 10px; border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); background: var(--hover-bg); color: var(--text-primary);
+    font-family: var(--font-mono); font-weight: 700;
+}
+.price-input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; }
+
+.txn-type-badge { padding: 3px 10px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.txn-type-badge.buy { background: color-mix(in srgb, var(--success-color) 16%, var(--card-bg)); color: var(--success-color); }
+.txn-type-badge.sell { background: color-mix(in srgb, var(--danger-color) 16%, var(--card-bg)); color: var(--danger-color); }
+
+/* ========================================= Transaction form ========================================= */
+.txn-form {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--card-bg);
+    border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;
+    box-shadow: var(--shadow-soft);
+}
+.txn-form select, .txn-form input {
+    padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+    background: var(--hover-bg); color: var(--text-primary); font-size: 0.9rem; font-family: var(--font-body);
+}
+.txn-form select:focus, .txn-form input:focus { background: var(--card-bg); border-color: var(--finance-accent); outline: none; }
+.txn-form #txn-symbol { width: 110px; }
+.txn-form #txn-quantity, .txn-form #txn-price, .txn-form #txn-fee { width: 110px; }
+.txn-form #txn-note { flex: 1; min-width: 140px; }
+.btn-txn-save { padding: 9px 20px; font-size: 0.9rem; text-transform: none; }
+
+.perf-chart-wrapper { padding: 20px; }
+.perf-chart-title { margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+.perf-chart-title i { color: var(--finance-accent); }
+
+@media (max-width: 768px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .txn-form { flex-direction: column; align-items: stretch; }
+    .txn-form select, .txn-form input { width: 100% !important; }
+}
 
 .toast-notification {
     position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: var(--radius-md);

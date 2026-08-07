@@ -65,6 +65,26 @@ body {
 }
 #stock-select:focus { background-color: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
 
+#stock-year-label { display: inline-flex; align-items: center; gap: 6px; }
+#stock-year-select {
+    padding: 12px 16px; font-size: 1rem; font-weight: 700;
+    border-radius: var(--radius-sm); width: 110px;
+    outline: none; cursor: pointer; color: var(--text-primary);
+    background-color: var(--hover-bg); border: 1px solid var(--border-color);
+    transition: var(--transition-fast);
+}
+#stock-year-select:focus { background-color: var(--card-bg); border-color: var(--finance-accent); }
+
+/* =========================================
+   4b. TREND CHART
+   ========================================= */
+.trend-chart-wrapper {
+    background: var(--card-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft);
+    border: 1px solid var(--border-color); padding: 20px; margin-top: 20px;
+}
+.perf-chart-title { margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+.perf-chart-title i { color: var(--finance-accent); }
+
 /* =========================================
    4. TABLE STYLES
    ========================================= */

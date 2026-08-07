@@ -142,7 +142,15 @@ async function loadTeamSummary() {
                 return;
             }
 
-            // A. VẼ BẢNG
+            // A. CẬP NHẬT KPI TEAM
+            const kpiCount = document.getElementById('team-kpi-count');
+            const kpiNav = document.getElementById('team-kpi-nav');
+            const memberRows = data.filter(item => !(item.name || '').toUpperCase().includes('TỔNG'));
+            const totalRow = data.find(item => (item.name || '').toUpperCase().includes('TỔNG'));
+            if (kpiCount) kpiCount.textContent = memberRows.length;
+            if (kpiNav) kpiNav.textContent = (totalRow ? totalRow.nav : '0') + ' ₫';
+
+            // B. VẼ BẢNG
             let html = '';
             let chartLabels = [];
             let chartValues = [];
@@ -179,7 +187,7 @@ async function loadTeamSummary() {
             });
             tbody.innerHTML = html;
 
-            // B. VẼ BIỂU ĐỒ TRÒN
+            // C. VẼ BIỂU ĐỒ TRÒN
             if(chartValues.length > 0) {
                 renderChart(chartLabels, chartValues, colors);
             } else {

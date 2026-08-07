@@ -1,371 +1,312 @@
 /* --- FILE: /mastersheet/assets/script.js --- */
 
-let myTable = null; 
+let userEmail = 'Khách';
+let navChartInstance = null;
+const TAB_LOADED = { holdings: false, ledger: false, performance: false };
 
-document.addEventListener('DOMContentLoaded', async function() {
-    const userEmail = localStorage.getItem('userEmail') || 'Khách';
+document.addEventListener('DOMContentLoaded', async function () {
+    userEmail = localStorage.getItem('userEmail') || 'Khách';
     const userDisplay = document.getElementById('user-display');
     if (userDisplay) userDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${userEmail}`;
 
-    // Kích hoạt lắng nghe nhập liệu (Có tính năng Lưu vào LocalStorage)
-    setupInputListeners(userEmail); 
+    setupCashDebtListeners();
+    await loadCashDebt();
+    await loadKpis();
+    await loadHoldings();
 
-    const columnsConfig = [
-        { type: 'text', title: 'STT', width: 40, readOnly: true, align: 'center' },
-        { type: 'text', title: 'Danh mục', width: 80, align: 'center' },
-        { type: 'numeric', title: 'Vol', width: 90, mask: '#,##0' },
-        { type: 'numeric', title: 'CK giao dịch', width: 100, mask: '#,##0', readOnly: true },
-        { type: 'numeric', title: 'CK HCCN', width: 90, mask: '#,##0' },
-        { type: 'numeric', title: 'Giá vốn', width: 90, mask: '#,##0.00' },
-        { type: 'numeric', title: 'Giá TT', width: 90, mask: '#,##0.00' }, 
-        { type: 'numeric', title: 'GT vốn', width: 120, mask: '#,##0', readOnly: true },
-        { type: 'numeric', title: 'GTTT', width: 120, mask: '#,##0', readOnly: true },
-        { type: 'numeric', title: 'Lãi/lỗ', width: 110, mask: '#,##0', readOnly: true }
-    ];
+    const txnForm = document.getElementById('txn-form');
+    if (txnForm) txnForm.addEventListener('submit', handleTxnSubmit);
 
-    await loadData(userEmail, columnsConfig);
-
-    const saveBtn = document.getElementById('save-btn');
-    if (saveBtn) saveBtn.addEventListener('click', () => saveData(userEmail, columnsConfig));
+    const dateInput = document.getElementById('txn-date');
+    if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
 });
 
-// --- CÁC KHÓA LƯU TRỮ LOCALSTORAGE ---
-function getCacheKey(email, type) {
-    return `finance_${type}_${email}`; 
+// --- TAB SWITCHING ---
+function switchAssetTab(tab) {
+    ['holdings', 'ledger', 'performance'].forEach(t => {
+        const panel = document.getElementById('tab-' + t);
+        const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
+        if (panel) panel.style.display = t === tab ? 'block' : 'none';
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+
+    if (tab === 'ledger' && !TAB_LOADED.ledger) { loadLedger(); TAB_LOADED.ledger = true; }
+    if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); TAB_LOADED.performance = true; }
 }
 
-// --- HÀM TẢI DỮ LIỆU ---
-async function loadData(email, columns) {
-    const spreadsheetDiv = document.getElementById('my-spreadsheet');
-    if (myTable) { myTable.destroy(); myTable = null; }
-
-    spreadsheetDiv.innerHTML = '<div style="padding:40px; text-align:center;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br>Đang đồng bộ dữ liệu...</div>';
-
+// --- TIỀN MẶT / DƯ NỢ ---
+async function loadCashDebt() {
     try {
-        const response = await callGAS('getAssetData', { email: email });
-        spreadsheetDiv.innerHTML = '';
-
-        // 1. Lấy dữ liệu từ Server
-        let serverCash = parseFloat(response.cash) || 0;
-        let serverDebt = parseFloat(response.debt) || 0;
-
-        // 2. Lấy dữ liệu từ LocalStorage
-        const localCash = localStorage.getItem(getCacheKey(email, 'cash'));
-        const localDebt = localStorage.getItem(getCacheKey(email, 'debt'));
-
-        // 3. Logic ưu tiên dữ liệu
-        let displayCash = serverCash;
-        let displayDebt = serverDebt;
-
-        if (serverCash === 0 && localCash && parseMoney(localCash) > 0) {
-            displayCash = parseMoney(localCash);
-        } else {
-            if(serverCash > 0) localStorage.setItem(getCacheKey(email, 'cash'), serverCash);
-        }
-
-        if (serverDebt === 0 && localDebt && parseMoney(localDebt) > 0) {
-            displayDebt = parseMoney(localDebt);
-        } else {
-            if(serverDebt > 0) localStorage.setItem(getCacheKey(email, 'debt'), serverDebt);
-        }
-
-        // 4. Cập nhật 2 ô INPUT
+        const response = await callGAS('getCashDebt', { email: userEmail });
+        const cd = response.data || { cash: 0, debt: 0 };
         const inpCash = document.getElementById('inp-cash');
         const inpDebt = document.getElementById('inp-debt');
-        if (inpCash) inpCash.value = displayCash.toLocaleString('en-US');
-        if (inpDebt) inpDebt.value = displayDebt.toLocaleString('en-US');
-
-        let tableData = [];
-        if (response.status === 'success') {
-            if (response.data && response.data.length > 0) {
-                tableData = response.data.map((row, index) => {
-                    const i = index + 1;
-                    // Formula cho Jspreadsheet: Lãi lỗ = GTTT - GTVon
-                    return [
-                        index + 1, row[1], row[2], row[3] || row[2], row[4] || 0, row[5], row[6],
-                        `=C${i}*F${i}*1000`, `=C${i}*G${i}*1000`, `=I${i}-H${i}`
-                    ];
-                });
-            }
-        }
-
-        const minStockRows = 5;
-        if (tableData.length < minStockRows) {
-            for(let i = tableData.length + 1; i <= minStockRows; i++) {
-                tableData.push([i, "", "", "", "", "", "", `=C${i}*F${i}*1000`, `=C${i}*G${i}*1000`, `=I${i}-H${i}`]);
-            }
-        }
-
-        // --- TẠO FOOTER ---
-        tableData.push(["TỔNG DANH MỤC", "", "", "", "", "", "", 0, 0, 0]); 
-        tableData.push(["Tiền mặt", "", "", "", "", "", "", displayCash, "", ""]); 
-        tableData.push(["Dư nợ", "", "", "", "", "", "", displayDebt, "", ""]); 
-        tableData.push(["NAV", "", "", "", "", "", "", 0, "", ""]); 
-
-        const totalRowIdx = tableData.length - 4; 
-        const idxTotal = totalRowIdx + 1; 
-        const idxCash = idxTotal + 1;
-        const idxDebt = idxTotal + 2;
-        const idxNav = idxTotal + 3;
-
-        myTable = jspreadsheet(spreadsheetDiv, {
-            data: tableData,
-            columns: columns,
-            minDimensions: [10, tableData.length],
-            defaultColAlign: 'center',
-            license: '39130-64ebc-bd98e-26bc4',
-            
-            // Merge Cells
-            mergeCells: {
-                [`A${idxTotal}`]: [7, 1], 
-                [`A${idxCash}`]: [7, 1], 
-                [`A${idxDebt}`]: [7, 1], 
-                [`A${idxNav}`]: [7, 1], 
-                [`H${idxNav}`]: [3, 1], 
-                [`H${idxCash}`]: [3, 1], 
-                [`H${idxDebt}`]: [3, 1] 
-            },
-
-            // Unlock Cells
-            cells: {
-                [`H${idxCash}`]: { readOnly: false }, 
-                [`H${idxDebt}`]: { readOnly: false }  
-            },
-            
-            // --- [UPDATE] STYLE CƠ BẢN ---
-            // Lưu ý: background-color/color ở đây chỉ set font-weight/text-align đáng tin cậy qua config này;
-            // .jexcel td có rule "!important" cho background-color/color nên set màu tô đậm thật sự
-            // được thực hiện ở applyHighlightColors() ngay sau khi bảng render xong (dùng setProperty(...,'important')).
-            style: {
-                [`A${idxTotal}`]: 'font-weight:bold; text-align:center; padding-right:10px;',
-                [`H${idxTotal}`]: 'font-weight:bold;',
-                [`I${idxTotal}`]: 'font-weight:bold;',
-                [`J${idxTotal}`]: 'font-weight:bold;', // Ô Tổng Lãi Lỗ
-
-                [`A${idxCash}`]: 'font-weight:bold; text-align:center; padding-right:10px;',
-                [`A${idxDebt}`]: 'font-weight:bold; text-align:center; padding-right:10px;',
-                [`A${idxNav}`]: 'font-weight:bold; text-align:center; padding-right:10px;',
-
-                [`H${idxCash}`]: 'font-weight:bold; text-align: center;',
-                [`H${idxDebt}`]: 'font-weight:bold; text-align: center;',
-                [`H${idxNav}`]: 'font-weight:bold; font-size:1.1em; text-align: center;',
-            },
-
-            // --- [SỬA LỖI] LOGIC TÔ MÀU CHÍNH XÁC ---
-            updateTable: function(instance, cell, col, row, val, label, cellName) {
-                // Kiểm tra cột Lãi/Lỗ (Cột J - index 9)
-                if (col === 9) {
-                    // QUAN TRỌNG: Dùng 'label' (giá trị hiển thị) thay vì 'val' (công thức)
-                    // label sẽ là chuỗi "10,000" hoặc "-5,000"
-                    let valueToCheck = label || val; 
-                    let numVal = parseMoney(valueToCheck);
-                    
-                    // Reset class cũ
-                    cell.classList.remove('text-success', 'text-danger');
-                    cell.style.color = ''; 
-                    cell.style.fontWeight = 'bold'; // Mặc định đậm cho cột này
-
-                    if (numVal > 0) {
-                        cell.classList.add('text-success'); // Xanh
-                    } else if (numVal < 0) {
-                        cell.classList.add('text-danger'); // Đỏ
-                    }
-                    // == 0: giữ màu chữ mặc định (var(--text-primary) từ rule chung .jexcel td)
-                }
-            },
-
-            onchange: function(instance, cell, x, y, value) {
-                const currentTotalRowIdx = findTotalRowIndex();
-                if (currentTotalRowIdx === -1) return;
-                const rowIndex = parseInt(y);
-                if (rowIndex >= currentTotalRowIdx) return;
-                if (parseInt(x) === 2) myTable.setValueFromCoords(3, y, value, true); 
-                calculateFooterValues();
-            },
-            
-            oninsertrow: function() { updateSTT(); calculateFooterValues(); },
-            ondeleterow: function() { updateSTT(); calculateFooterValues(); }
-        });
-
-        applyHighlightColors(totalRowIdx, totalRowIdx + 1, totalRowIdx + 2, totalRowIdx + 3);
-        calculateFooterValues();
-
+        if (inpCash) inpCash.value = Number(cd.cash || 0).toLocaleString('en-US');
+        if (inpDebt) inpDebt.value = Number(cd.debt || 0).toLocaleString('en-US');
     } catch (e) {
-        spreadsheetDiv.innerHTML = `<p style="color:var(--danger-color); text-align:center;">Lỗi: ${e.message}</p>`;
+        console.error('Lỗi loadCashDebt:', e);
     }
 }
 
-// --- TÔ MÀU CÁC DÒNG TỔNG/NAV (setProperty + 'important' để thắng rule !important chung của .jexcel td) ---
-function tintCell(col, row, bg, color) {
-    if (!myTable) return;
-    const cell = myTable.getCellFromCoords(col, row);
-    if (!cell) return;
-    if (bg) cell.style.setProperty('background-color', bg, 'important');
-    if (color) cell.style.setProperty('color', color, 'important');
-}
-
-function applyHighlightColors(idxTotal, idxCash, idxDebt, idxNav) {
-    const totalTint = 'color-mix(in srgb, var(--border-color) 60%, var(--card-bg))';
-    const navTint = 'color-mix(in srgb, var(--gold) 14%, var(--card-bg))';
-    [0, 7, 8, 9].forEach(col => tintCell(col, idxTotal, totalTint, null));
-    [0, 7, 8, 9].forEach(col => tintCell(col, idxNav, navTint, 'var(--gold)'));
-    tintCell(7, idxCash, null, 'var(--success-color)');
-    tintCell(7, idxDebt, null, 'var(--danger-color)');
-}
-
-// --- HÀM TÍNH TOÁN REAL-TIME ---
-function calculateFooterValues() {
-    if (!myTable) return;
-    const totalRowIdx = findTotalRowIndex();
-    if (totalRowIdx === -1) return;
-
-    const data = myTable.getData();
-    let sumGTVon = 0, sumGTTT = 0, sumLaiLo = 0;
-
-    for (let i = 0; i < totalRowIdx; i++) {
-        if (data[i][1] || data[i][2]) { 
-            const vol = parseMoney(data[i][2]);
-            const giaVon = parseMoney(data[i][5]);
-            const giaTT = parseMoney(data[i][6]);
-            const valGTVon = vol * giaVon * 1000;
-            const valGTTT = vol * giaTT * 1000;
-            sumGTVon += valGTVon;
-            sumGTTT += valGTTT;
-            sumLaiLo += (valGTTT - valGTVon);
-        }
-    }
-
-    myTable.setValueFromCoords(7, totalRowIdx, sumGTVon, true); 
-    myTable.setValueFromCoords(8, totalRowIdx, sumGTTT, true); 
-    
-    // Cập nhật giá trị Tổng Lãi Lỗ
-    myTable.setValueFromCoords(9, totalRowIdx, sumLaiLo, true); 
-    
-    // [NEW] Cập nhật màu sắc cho ô Tổng Lãi Lỗ (J_Total) ngay lập tức
-    // Jspreadsheet có hàm getCell để lấy DOM element
-    // Cột J là index 9
-    let cellTotalLaiLo = myTable.getCellFromCoords(9, totalRowIdx);
-    if (cellTotalLaiLo) {
-        if (sumLaiLo > 0) {
-            cellTotalLaiLo.style.setProperty('color', 'var(--success-color)', 'important');
-            cellTotalLaiLo.style.fontWeight = 'bold';
-        } else if (sumLaiLo < 0) {
-            cellTotalLaiLo.style.setProperty('color', 'var(--danger-color)', 'important');
-            cellTotalLaiLo.style.fontWeight = 'bold';
-        } else {
-            cellTotalLaiLo.style.removeProperty('color');
-        }
-    }
-
-    // Lấy giá trị từ Input
-    const inpCash = document.getElementById('inp-cash');
-    const inpDebt = document.getElementById('inp-debt');
-    const cash = inpCash ? parseMoney(inpCash.value) : 0;
-    const debt = inpDebt ? parseMoney(inpDebt.value) : 0;
-
-    // Cập nhật ngược vào bảng
-    myTable.setValueFromCoords(7, totalRowIdx + 1, cash, true);
-    myTable.setValueFromCoords(7, totalRowIdx + 2, debt, true);
-
-    const nav = sumGTTT + cash - debt;
-    myTable.setValueFromCoords(7, totalRowIdx + 3, nav, true);
-}
-
-// --- HÀM LƯU DỮ LIỆU ---
-async function saveData(email, columnsConfig) {
-    if (!myTable) return;
-    const btn = document.getElementById('save-btn');
-    const originalText = btn.innerHTML;
-    const rawData = myTable.getData();
-    const totalRowIdx = findTotalRowIndex();
-
-    // 1. Lấy Tiền/Nợ từ Input
-    const cash = parseMoney(document.getElementById('inp-cash').value);
-    const debt = parseMoney(document.getElementById('inp-debt').value);
-
-    localStorage.setItem(getCacheKey(email, 'cash'), cash);
-    localStorage.setItem(getCacheKey(email, 'debt'), debt);
-
-    const stockRows = rawData.slice(0, totalRowIdx);
-    const cleanStocks = stockRows.filter(row => row[1] && row[1].toString().trim() !== "");
-
-    const dataToSend = cleanStocks.map((row, index) => {
-        const vol = parseMoney(row[2]);
-        const giaVon = parseMoney(row[5]);
-        const giaTT = parseMoney(row[6]);
-        const ckGD = parseMoney(row[3]) || vol;
-        const ckHCCN = parseMoney(row[4]) || 0;
-        const gtVon = Math.round(vol * giaVon * 1000);
-        const gttt = Math.round(vol * giaTT * 1000);
-        const laiLo = gttt - gtVon;
-        return [index + 1, row[1].toUpperCase(), vol, ckGD, ckHCCN, giaVon, giaTT, gtVon, gttt, laiLo];
-    });
-
-    try {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...'; 
-        btn.disabled = true;
-        
-        const result = await callGAS('saveAssetData', {
-            email: email,
-            data: JSON.stringify({ items: dataToSend, cash: cash, debt: debt })
-        });
-        
-        if (result.status === 'success' || typeof result === 'string') {
-             const msg = result.message || result;
-             showToast(msg, 'success'); 
-             // await loadData(email, columnsConfig); // Tùy chọn: Load lại hoặc giữ nguyên
-        } else {
-             showToast("Có lỗi: " + JSON.stringify(result), 'error');
-        }
-    } catch (e) {
-        showToast("Lỗi kết nối: " + e.message, 'error');
-    } finally {
-        btn.innerHTML = originalText; 
-        btn.disabled = false;
-    }
-}
-
-// --- HÀM SETUP SỰ KIỆN NHẬP LIỆU (Có lưu cache) ---
-function setupInputListeners(email) {
+function setupCashDebtListeners() {
     ['inp-cash', 'inp-debt'].forEach(id => {
         const el = document.getElementById(id);
-        if(el) {
-            el.addEventListener('input', function(e) {
-                let val = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
-                let numVal = 0;
-                
-                if(val) {
-                    numVal = parseFloat(val);
-                    e.target.value = numVal.toLocaleString('en-US');
-                } else {
-                    e.target.value = 0;
-                }
-                
-                const type = id === 'inp-cash' ? 'cash' : 'debt';
-                localStorage.setItem(getCacheKey(email, type), numVal);
-                
-                // Cập nhật vào bảng khi gõ input
-                if(myTable) {
-                    const totalRowIdx = findTotalRowIndex();
-                    if(totalRowIdx !== -1) {
-                         const cellY = type === 'cash' ? totalRowIdx + 1 : totalRowIdx + 2;
-                         myTable.setValueFromCoords(7, cellY, numVal, true);
+        if (!el) return;
+        el.addEventListener('input', function (e) {
+            let val = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
+            e.target.value = val ? parseFloat(val).toLocaleString('en-US') : '';
+        });
+        el.addEventListener('change', async function () {
+            const cash = parseMoney(document.getElementById('inp-cash').value);
+            const debt = parseMoney(document.getElementById('inp-debt').value);
+            try {
+                await callGAS('setCashDebt', { email: userEmail, cash, debt });
+                showToast('Đã cập nhật tiền mặt/dư nợ', 'success');
+                await loadKpis();
+                if (TAB_LOADED.performance) loadPerformanceChart();
+            } catch (err) {
+                showToast('Lỗi: ' + err.message, 'error');
+            }
+        });
+    });
+}
+
+// --- KPI ---
+async function loadKpis() {
+    try {
+        const response = await callGAS('getAssetSummaryKpis', { email: userEmail });
+        const k = response.data || {};
+        setKpi('kpi-nav', k.nav, true);
+        setKpi('kpi-unrealized', k.unrealizedPnl, true, true);
+        setKpi('kpi-realized', k.realizedPnl, true, true);
+        setKpi('kpi-market-value', k.marketValue, true);
+    } catch (e) {
+        console.error('Lỗi loadKpis:', e);
+    }
+}
+
+function setKpi(id, value, isMoney, colorByValue) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const num = Number(value) || 0;
+    el.textContent = (isMoney ? formatVnd(num) : num);
+    el.classList.remove('text-success', 'text-danger');
+    if (colorByValue) {
+        if (num > 0) el.classList.add('text-success');
+        else if (num < 0) el.classList.add('text-danger');
+    }
+}
+
+// --- DANH MỤC (holdings, computed từ sổ lệnh) ---
+async function loadHoldings() {
+    const tbody = document.getElementById('holdings-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+
+    try {
+        const response = await callGAS('getHoldingsView', { email: userEmail });
+        const holdings = response.data || [];
+
+        if (holdings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = holdings.map(h => {
+            const pnlClass = h.unrealizedPnl > 0 ? 'text-success' : (h.unrealizedPnl < 0 ? 'text-danger' : '');
+            return `
+                <tr>
+                    <td class="text-bold">${escapeAssetHtml(h.symbol)}</td>
+                    <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
+                    <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
+                    <td class="text-right">
+                        <input type="text" class="price-input" data-symbol="${escapeAssetHtml(h.symbol)}"
+                            value="${Number(h.marketPrice).toLocaleString('en-US')}"
+                            onchange="handleMarketPriceChange(this)">
+                    </td>
+                    <td class="text-right">${Number(h.costValue).toLocaleString('en-US')}</td>
+                    <td class="text-right">${Number(h.marketValue).toLocaleString('en-US')}</td>
+                    <td class="text-right ${pnlClass}">${Number(h.unrealizedPnl).toLocaleString('en-US')} (${h.unrealizedPct.toFixed(1)}%)</td>
+                </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+    }
+}
+
+async function handleMarketPriceChange(input) {
+    const symbol = input.dataset.symbol;
+    const price = parseMoney(input.value);
+    input.value = price.toLocaleString('en-US');
+    try {
+        await callGAS('setMarketPrice', { email: userEmail, symbol, price });
+        showToast(`Đã cập nhật giá TT của ${symbol}`, 'success');
+        await loadHoldings();
+        await loadKpis();
+        if (TAB_LOADED.performance) loadPerformanceChart();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+// --- SỔ LỆNH ---
+async function loadLedger() {
+    const tbody = document.getElementById('ledger-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+
+    try {
+        const response = await callGAS('listAssetTransactions', { email: userEmail });
+        const txns = response.data || [];
+
+        if (txns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Chưa có lệnh giao dịch nào.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = txns.map(t => {
+            const typeLabel = t.type === 'buy' ? '<span class="txn-type-badge buy">Mua</span>' : '<span class="txn-type-badge sell">Bán</span>';
+            const pnlCell = t.realized_pnl === null || t.realized_pnl === undefined
+                ? ''
+                : `<span class="${t.realized_pnl > 0 ? 'text-success' : (t.realized_pnl < 0 ? 'text-danger' : '')}">${Number(t.realized_pnl).toLocaleString('en-US')}</span>`;
+            return `
+                <tr>
+                    <td>${t.trade_date}</td>
+                    <td>${typeLabel}</td>
+                    <td class="text-bold">${escapeAssetHtml(t.symbol)}</td>
+                    <td class="text-right">${Number(t.quantity).toLocaleString('en-US')}</td>
+                    <td class="text-right">${Number(t.price).toLocaleString('en-US')}</td>
+                    <td class="text-right">${Number(t.fee || 0).toLocaleString('en-US')}</td>
+                    <td class="text-right">${pnlCell}</td>
+                    <td>${escapeAssetHtml(t.note || '')}</td>
+                    <td><button class="icon-btn danger" title="Xóa" onclick="deleteTxn('${t.id}')"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+    }
+}
+
+async function handleTxnSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalHtml = btn.innerHTML;
+
+    const txn = {
+        type: document.getElementById('txn-type').value,
+        symbol: document.getElementById('txn-symbol').value,
+        quantity: document.getElementById('txn-quantity').value,
+        price: document.getElementById('txn-price').value,
+        fee: document.getElementById('txn-fee').value || 0,
+        tradeDate: document.getElementById('txn-date').value,
+        note: document.getElementById('txn-note').value
+    };
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+
+    try {
+        const response = await callGAS('addAssetTransaction', { email: userEmail, txn });
+        if (response.status === 'success') {
+            showToast(response.message, 'success');
+            e.target.reset();
+            document.getElementById('txn-date').value = new Date().toISOString().slice(0, 10);
+            await loadLedger();
+            await loadHoldings();
+            await loadKpis();
+            if (TAB_LOADED.performance) loadPerformanceChart();
+        } else {
+            showToast('Lỗi: ' + response.message, 'error');
+        }
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+async function deleteTxn(id) {
+    if (!confirm('Xóa lệnh giao dịch này? Khối lượng/giá vốn của danh mục sẽ được tính lại.')) return;
+    try {
+        const response = await callGAS('deleteAssetTransaction', { email: userEmail, id });
+        showToast(response.message, 'success');
+        await loadLedger();
+        await loadHoldings();
+        await loadKpis();
+        if (TAB_LOADED.performance) loadPerformanceChart();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+// --- HIỆU SUẤT (NAV chart) ---
+async function loadPerformanceChart() {
+    try {
+        const response = await callGAS('getNavHistory', { email: userEmail });
+        const history = response.data || [];
+        renderNavChart(history);
+    } catch (e) {
+        console.error('Lỗi loadPerformanceChart:', e);
+    }
+}
+
+function renderNavChart(history) {
+    const canvas = document.getElementById('navChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (navChartInstance) navChartInstance.destroy();
+
+    if (!history || history.length === 0) {
+        return;
+    }
+
+    navChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: history.map(h => h.snapshot_date),
+            datasets: [{
+                label: 'NAV',
+                data: history.map(h => Number(h.nav) || 0),
+                borderColor: cssVar('--finance-accent'),
+                backgroundColor: 'color-mix(in srgb, var(--finance-accent) 18%, transparent)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: history.length > 30 ? 0 : 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ' ' + ctx.raw.toLocaleString('vi-VN') + ' VND'
                     }
                 }
-                
-                calculateFooterValues();
-            });
+            },
+            scales: {
+                x: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--border-color') } },
+                y: {
+                    ticks: {
+                        color: cssVar('--text-secondary'),
+                        callback: (val) => Number(val).toLocaleString('vi-VN')
+                    },
+                    grid: { color: cssVar('--border-color') }
+                }
+            }
         }
     });
 }
 
-function findTotalRowIndex() {
-    if (!myTable) return -1;
-    const data = myTable.getData();
-    for (let i = data.length - 1; i >= 0; i--) {
-        if (data[i][0] === "TỔNG DANH MỤC") return i;
-    }
-    return -1;
+// --- UTILS ---
+function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function formatVnd(num) {
+    return Number(num).toLocaleString('vi-VN') + ' ₫';
 }
 
 function parseMoney(value) {
@@ -374,13 +315,14 @@ function parseMoney(value) {
     return parseFloat(value.toString().replace(/,/g, '')) || 0;
 }
 
-function updateSTT() {
-    if (!myTable) return;
-    const totalIdx = findTotalRowIndex();
-    for(let i = 0; i < totalIdx; i++) myTable.setValueFromCoords(0, i, i + 1, true); 
+function escapeAssetHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
 function showToast(message, type = 'success') {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     const icon = type === 'success' ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-exclamation"></i>';

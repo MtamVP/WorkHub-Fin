@@ -1153,35 +1153,178 @@ const API = {
         }
     },
     asset: {
-        getAssetData: async (email) => {
-            if (!sbClient) return { status: 'success', cash: 0, debt: 0, data: [] };
+        // --- Sổ lệnh (transaction ledger) — nguồn sự thật duy nhất cho khối lượng/giá vốn ---
+        listTransactions: async (email) => {
             const userId = await getUserId(email);
-            const { data, error } = await sbClient.from('finance_assets').select('*').eq('user_id', userId).maybeSingle();
-            if (error || !data) return { status: 'success', cash: 0, debt: 0, data: [] };
-            return { status: 'success', cash: data.cash, debt: data.debt, data: data.data };
+            const { data, error } = await sbClient.from('finance_transactions')
+                .select('*').eq('user_id', userId).is('deleted_at', null)
+                .order('trade_date', { ascending: false }).order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
         },
-        saveAssetData: async (email, rawData) => {
-            const parsed = JSON.parse(rawData);
-            const cash = parsed.cash || 0;
-            const debt = parsed.debt || 0;
-            const items = parsed.items || [];
+        // Tính khối lượng + giá vốn bình quân gia quyền (weighted-average) từ toàn bộ lịch sử lệnh
+        computeHoldings: async (userId) => {
+            const { data: txns, error } = await sbClient.from('finance_transactions')
+                .select('*').eq('user_id', userId).is('deleted_at', null)
+                .order('trade_date', { ascending: true }).order('created_at', { ascending: true });
+            if (error) throw error;
 
-            let nav = cash - debt;
-            items.forEach(item => { nav += (item[8] || 0); });
-
+            const bySymbol = {};
+            (txns || []).forEach(t => {
+                if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { symbol: t.symbol, quantity: 0, avgCost: 0 };
+                const pos = bySymbol[t.symbol];
+                const qty = Number(t.quantity) || 0;
+                if (t.type === 'buy') {
+                    const totalCost = pos.avgCost * pos.quantity + Number(t.price) * qty;
+                    pos.quantity += qty;
+                    pos.avgCost = pos.quantity > 0 ? totalCost / pos.quantity : 0;
+                } else {
+                    pos.quantity -= qty;
+                    if (pos.quantity <= 0) { pos.quantity = 0; pos.avgCost = 0; }
+                }
+            });
+            return Object.values(bySymbol).filter(p => p.quantity > 0);
+        },
+        addTransaction: async (email, txn) => {
             const userId = await getUserId(email);
             if (!userId) throw new Error("User không tồn tại");
+            const symbol = String(txn.symbol || '').trim().toUpperCase();
+            if (!symbol) throw new Error("Thiếu mã danh mục");
+            const quantity = Number(txn.quantity) || 0;
+            const price = Number(txn.price) || 0;
+            if (quantity <= 0) throw new Error("Khối lượng phải lớn hơn 0");
 
+            let realizedPnl = null;
+            if (txn.type === 'sell') {
+                const holdings = await API.asset.computeHoldings(userId);
+                const pos = holdings.find(h => h.symbol === symbol);
+                if (!pos || pos.quantity < quantity) throw new Error(`Không đủ khối lượng "${symbol}" để bán (đang có ${pos ? pos.quantity : 0})`);
+                realizedPnl = (price - pos.avgCost) * quantity;
+            }
+
+            const { error } = await sbClient.from('finance_transactions').insert({
+                user_id: userId, symbol, type: txn.type === 'sell' ? 'sell' : 'buy', quantity, price,
+                fee: Number(txn.fee) || 0,
+                trade_date: txn.tradeDate || new Date().toISOString().slice(0, 10),
+                note: txn.note || null, realized_pnl: realizedPnl, created_by: email
+            });
+            if (error) throw error;
+            await API.asset.recomputeAndSnapshot(email);
+            return "Đã lưu lệnh giao dịch!";
+        },
+        deleteTransaction: async (email, id) => {
+            const userId = await getUserId(email);
+            const { error } = await sbClient.from('finance_transactions')
+                .update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
+            if (error) throw error;
+            await API.asset.recomputeAndSnapshot(email);
+            return "Đã xóa lệnh giao dịch!";
+        },
+
+        // --- Giá thị trường hiện tại (nhập tay, tách khỏi sổ lệnh vì đây không phải giao dịch) ---
+        setMarketPrice: async (email, symbol, price) => {
+            const userId = await getUserId(email);
+            const cleanSymbol = String(symbol || '').trim().toUpperCase();
+            if (!cleanSymbol) throw new Error("Thiếu mã danh mục");
+            const { error } = await sbClient.from('finance_holdings_price').upsert({
+                user_id: userId, symbol: cleanSymbol, market_price: Number(price) || 0, updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,symbol' });
+            if (error) throw error;
+            await API.asset.recomputeAndSnapshot(email);
+            return "Đã cập nhật giá thị trường!";
+        },
+
+        // --- Danh mục hiện tại: khối lượng + giá vốn (từ sổ lệnh) ghép với giá TT (nhập tay) ---
+        getHoldingsView: async (email) => {
+            const userId = await getUserId(email);
+            const holdings = await API.asset.computeHoldings(userId);
+            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price').eq('user_id', userId);
+            const priceMap = {};
+            (prices || []).forEach(p => { priceMap[p.symbol] = Number(p.market_price) || 0; });
+
+            return holdings.map(h => {
+                const marketPrice = priceMap[h.symbol] || 0;
+                const costValue = h.avgCost * h.quantity;
+                const marketValue = marketPrice * h.quantity;
+                return {
+                    symbol: h.symbol, quantity: h.quantity, avgCost: h.avgCost, marketPrice,
+                    costValue, marketValue,
+                    unrealizedPnl: marketValue - costValue,
+                    unrealizedPct: costValue > 0 ? ((marketValue - costValue) / costValue) * 100 : 0
+                };
+            });
+        },
+
+        // --- Tiền mặt / dư nợ (vẫn dùng bảng finance_assets, chỉ 2 cột này còn "thủ công") ---
+        getCashDebt: async (email) => {
+            const userId = await getUserId(email);
+            const { data } = await sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle();
+            return { cash: data ? Number(data.cash) || 0 : 0, debt: data ? Number(data.debt) || 0 : 0 };
+        },
+        setCashDebt: async (email, cash, debt) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
             const { error } = await sbClient.from('finance_assets').upsert({
-                user_id: userId,
-                cash: cash,
-                debt: debt,
-                nav: nav,
-                data: items
+                user_id: userId, cash: Number(cash) || 0, debt: Number(debt) || 0
             }, { onConflict: 'user_id' });
             if (error) throw error;
-            return "Đã lưu danh mục đầu tư!";
+            await API.asset.recomputeAndSnapshot(email);
+            return "Đã cập nhật tiền mặt/dư nợ!";
         },
+
+        // --- Tính lại NAV hiện tại (lưu vào finance_assets) + chốt 1 điểm snapshot/ngày (finance_nav_history) ---
+        recomputeAndSnapshot: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) return 0;
+            const holdings = await API.asset.getHoldingsView(email);
+            const marketValue = holdings.reduce((s, h) => s + h.marketValue, 0);
+            const { data: cd } = await sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle();
+            const cash = cd ? Number(cd.cash) || 0 : 0;
+            const debt = cd ? Number(cd.debt) || 0 : 0;
+            const nav = marketValue + cash - debt;
+
+            await sbClient.from('finance_assets').upsert({ user_id: userId, cash, debt, nav }, { onConflict: 'user_id' });
+
+            const today = new Date().toISOString().slice(0, 10);
+            await sbClient.from('finance_nav_history').upsert({
+                user_id: userId, snapshot_date: today, nav, cash, debt, market_value: marketValue
+            }, { onConflict: 'user_id,snapshot_date' });
+
+            return nav;
+        },
+
+        // --- Lịch sử NAV cho biểu đồ hiệu suất ---
+        getNavHistory: async (email, days) => {
+            const userId = await getUserId(email);
+            let query = sbClient.from('finance_nav_history').select('*').eq('user_id', userId).order('snapshot_date', { ascending: true });
+            if (days) {
+                const from = new Date(); from.setDate(from.getDate() - Number(days));
+                query = query.gte('snapshot_date', from.toISOString().slice(0, 10));
+            }
+            const { data, error } = await query;
+            if (error) throw error;
+            return data || [];
+        },
+
+        // --- KPI tổng hợp cho tab Hiệu Suất ---
+        getSummaryKpis: async (email) => {
+            const userId = await getUserId(email);
+            const holdings = await API.asset.getHoldingsView(email);
+            const unrealizedPnl = holdings.reduce((s, h) => s + h.unrealizedPnl, 0);
+            const { data: sells } = await sbClient.from('finance_transactions')
+                .select('realized_pnl').eq('user_id', userId).eq('type', 'sell').is('deleted_at', null);
+            const realizedPnl = (sells || []).reduce((s, t) => s + (Number(t.realized_pnl) || 0), 0);
+            const marketValue = holdings.reduce((s, h) => s + h.marketValue, 0);
+            const { data: cd } = await sbClient.from('finance_assets').select('cash, debt, nav').eq('user_id', userId).maybeSingle();
+            return {
+                nav: cd ? Number(cd.nav) || 0 : marketValue,
+                cash: cd ? Number(cd.cash) || 0 : 0,
+                debt: cd ? Number(cd.debt) || 0 : 0,
+                marketValue, unrealizedPnl, realizedPnl
+            };
+        },
+
+        // --- Trang "Tổng hợp" của cả team ---
         getTeamSummary: async () => {
             const { data, error } = await sbClient.from('finance_assets').select('*, users!inner(nickname, email)');
             if (error) throw error;
@@ -1207,22 +1350,36 @@ const API = {
         },
         getMemberDetail: async (email) => {
             const userId = await getUserId(email);
-            const { data, error } = await sbClient.from('finance_assets').select('*').eq('user_id', userId).maybeSingle();
-            if (error || !data) return [];
+            const holdings = await API.asset.computeHoldings(userId);
+            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price').eq('user_id', userId);
+            const priceMap = {};
+            (prices || []).forEach(p => { priceMap[p.symbol] = Number(p.market_price) || 0; });
+            const { data: cd } = await sbClient.from('finance_assets').select('cash, debt, nav').eq('user_id', userId).maybeSingle();
 
             let table = [];
             table.push([email, "", "", "", "", "", "", "", "", ""]);
-            table.push(["STT", "Danh mục", "Vol", "CK giao dịch", "CK HCCN", "Giá vốn", "Giá TT", "GT vốn", "GTTT", "Lãi/lỗ"]);
+            table.push(["STT", "Danh mục", "Vol", "Giá vốn", "", "", "Giá TT", "GT vốn", "GTTT", "Lãi/lỗ"]);
 
-            const items = data.data || [];
-            items.forEach((item) => {
-                table.push(item.map(val => typeof val === 'number' ? val.toLocaleString('en-US') : val));
+            let totalGtVon = 0, totalGtTT = 0;
+            holdings.forEach((h, idx) => {
+                const marketPrice = priceMap[h.symbol] || 0;
+                const gtVon = h.avgCost * h.quantity;
+                const gtTT = marketPrice * h.quantity;
+                totalGtVon += gtVon; totalGtTT += gtTT;
+                table.push([
+                    idx + 1, h.symbol, h.quantity.toLocaleString('en-US'),
+                    h.avgCost.toLocaleString('en-US'), "", "", marketPrice.toLocaleString('en-US'),
+                    gtVon.toLocaleString('en-US'), gtTT.toLocaleString('en-US'), (gtTT - gtVon).toLocaleString('en-US')
+                ]);
             });
 
-            table.push(["TỔNG DANH MỤC", "", "", "", "", "", "", 0, 0, 0]);
-            table.push(["Tiền mặt", "", "", "", "", "", "", Number(data.cash).toLocaleString('en-US'), "", ""]);
-            table.push(["Dư nợ", "", "", "", "", "", "", Number(data.debt).toLocaleString('en-US'), "", ""]);
-            table.push(["NAV", "", "", "", "", "", "", Number(data.nav).toLocaleString('en-US'), "", ""]);
+            const cash = cd ? Number(cd.cash) || 0 : 0;
+            const debt = cd ? Number(cd.debt) || 0 : 0;
+            const nav = cd ? Number(cd.nav) || 0 : (totalGtTT + cash - debt);
+            table.push(["TỔNG DANH MỤC", "", "", "", "", "", "", totalGtVon.toLocaleString('en-US'), totalGtTT.toLocaleString('en-US'), (totalGtTT - totalGtVon).toLocaleString('en-US')]);
+            table.push(["Tiền mặt", "", "", "", "", "", "", cash.toLocaleString('en-US'), "", ""]);
+            table.push(["Dư nợ", "", "", "", "", "", "", debt.toLocaleString('en-US'), "", ""]);
+            table.push(["NAV", "", "", "", "", "", "", nav.toLocaleString('en-US'), "", ""]);
             return table;
         }
     },
@@ -1268,20 +1425,38 @@ const API = {
     },
     stock: {
         getStockList: async () => {
-            const { data } = await sbClient.from('finance_stocks').select('symbol');
-            return data ? data.map(d => d.symbol) : [];
+            const { data } = await sbClient.from('finance_stock_valuations').select('symbol').order('symbol');
+            const seen = new Set(); const list = [];
+            (data || []).forEach(d => { if (!seen.has(d.symbol)) { seen.add(d.symbol); list.push(d.symbol); } });
+            return list;
         },
-        getStockDetail: async (symbol) => {
-            const { data } = await sbClient.from('finance_stocks').select('data').eq('symbol', symbol).maybeSingle();
+        getStockYears: async (symbol) => {
+            const { data } = await sbClient.from('finance_stock_valuations').select('year').eq('symbol', symbol).order('year', { ascending: false });
+            return data ? data.map(d => d.year) : [];
+        },
+        // Không truyền year -> lấy năm mới nhất
+        getStockDetail: async (symbol, year) => {
+            let query = sbClient.from('finance_stock_valuations').select('*').eq('symbol', symbol);
+            query = year ? query.eq('year', Number(year)) : query.order('year', { ascending: false }).limit(1);
+            const { data, error } = await query.maybeSingle();
+            if (error) throw error;
             return data ? data.data : {};
         },
-        saveStockValuation: async (payload) => {
-            const { error } = await sbClient.from('finance_stocks').upsert({
-                symbol: payload.symbol,
-                data: payload
-            });
+        // Toàn bộ lịch sử định giá theo năm, dùng để vẽ biểu đồ xu hướng
+        getStockHistory: async (symbol) => {
+            const { data, error } = await sbClient.from('finance_stock_valuations').select('year, data').eq('symbol', symbol).order('year', { ascending: true });
             if (error) throw error;
-            return `Lưu định giá "${payload.symbol}" thành công!`;
+            return data || [];
+        },
+        saveStockValuation: async (payload, email) => {
+            const symbol = String(payload.symbol || '').trim().toUpperCase();
+            const year = Number(payload.year) || new Date().getFullYear();
+            if (!symbol) throw new Error("Thiếu mã cổ phiếu");
+            const { error } = await sbClient.from('finance_stock_valuations').upsert({
+                symbol, year, data: { ...payload, symbol, year }, updated_by: email || null, updated_at: new Date().toISOString()
+            }, { onConflict: 'symbol,year' });
+            if (error) throw error;
+            return `Lưu định giá "${symbol}" (${year}) thành công!`;
         }
     },
     settings: {
@@ -1696,7 +1871,8 @@ const MUTATING_ACTIONS = new Set([
     'createEvent', 'updateEvent', 'deleteEvent', 'toggleImportant',
     'uploadFile', 'deleteFile', 'shareFile',
     'restoreItem', 'hardDeleteItem',
-    'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname'
+    'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
+    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation'
 ]);
 
 window.callGAS = async function(action, params = {}) {
@@ -1768,12 +1944,18 @@ window.callGAS = async function(action, params = {}) {
             case 'bulkDeleteTasks': result = await API.task.bulkDelete(params.taskIds, params.projectId, params.groupKey); break;
             case 'getTaskHistory': result = await API.task.getHistory(params.taskId); break;
 
-            case 'getAssetData':
-                return await API.asset.getAssetData(params.email);
-            case 'saveAssetData': result = await API.asset.saveAssetData(params.email, params.data); break;
             case 'getTeamSummary': result = await API.asset.getTeamSummary(); break;
             case 'getMemberList': result = await API.asset.getMemberList(); break;
             case 'getMemberDetail': result = await API.asset.getMemberDetail(params.email); break;
+            case 'listAssetTransactions': result = await API.asset.listTransactions(params.email); break;
+            case 'addAssetTransaction': result = await API.asset.addTransaction(params.email, params.txn); break;
+            case 'deleteAssetTransaction': result = await API.asset.deleteTransaction(params.email, params.id); break;
+            case 'getHoldingsView': result = await API.asset.getHoldingsView(params.email); break;
+            case 'setMarketPrice': result = await API.asset.setMarketPrice(params.email, params.symbol, params.price); break;
+            case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
+            case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
+            case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
+            case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;
 
             case 'getFinanceUsers': result = await API.note.getFinanceUsers(); break;
             case 'getFinanceNotes': result = await API.note.getFinanceNotes(); break;
@@ -1781,8 +1963,10 @@ window.callGAS = async function(action, params = {}) {
             case 'deleteFinanceNote': result = await API.note.deleteFinanceNote(params.id); break;
 
             case 'getStockList': result = await API.stock.getStockList(); break;
-            case 'getStockDetail': result = await API.stock.getStockDetail(params.symbol); break;
-            case 'saveStockValuation': result = await API.stock.saveStockValuation(params); break;
+            case 'getStockYears': result = await API.stock.getStockYears(params.symbol); break;
+            case 'getStockDetail': result = await API.stock.getStockDetail(params.symbol, params.year); break;
+            case 'getStockHistory': result = await API.stock.getStockHistory(params.symbol); break;
+            case 'saveStockValuation': result = await API.stock.saveStockValuation(params, params.email); break;
 
             case 'getDeletedItems': result = await API.system.getDeletedItems(params.tableName, params.groupKey); break;
             case 'restoreItem': result = await API.system.restoreItem(params.tableName, params.id); break;
