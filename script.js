@@ -101,7 +101,7 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'tools', 'ai'];
+const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
 let currentSectionKey = 'pipeline';
 const SECTION_LOADED = { projects: false, calendar: false, drive: false, mytasks: false };
 

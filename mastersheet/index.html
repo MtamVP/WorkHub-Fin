@@ -1,0 +1,116 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chi Tiết Tài Sản Thành Viên | WorkHub Finance</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi script.js: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=3.1.0">
+    <link rel="stylesheet" href="/mastersheet/style.css?v=2.1">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+    </head>
+<body>
+
+    <div class="asset-container">
+        
+        <div class="top-bar">
+            <div class="left-section">
+                <a href="/mastersheet/assets/" class="back-link">
+                    <i class="fa-solid fa-chevron-left"></i>  <span>Nhập liệu</span>
+                </a>
+
+                <a href="../" class="back-link">
+                    <i class="fa-solid fa-house"></i> <span>Finance</span>
+                </a>
+
+                <h1> Tài Sản </h1>
+            </div>
+            
+            <div class="right-section">
+                <button onclick="loadMemberList()" class="btn-refresh">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới
+                </button>
+                </div>
+        </div>
+
+        <div class="control-panel" style="background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 25px; box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
+            <label style="font-weight: 700; color: var(--finance-accent);"><i class="fa-solid fa-user-tag"></i> Chọn thành viên:</label>
+            <select id="member-select" onchange="loadMemberDetail()" style="padding: 10px; font-size: 1.1rem; font-weight: 700; border: 2px solid var(--finance-accent); border-radius: 6px; min-width: 250px; outline: none; cursor: pointer; background: var(--hover-bg); color: var(--text-primary);">
+                <option value="">-- Đang tải danh sách... --</option>
+            </select>
+        </div>
+
+        <div id="sheet-display" class="sheet-wrapper" style="display: none; background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); overflow-x: auto;">
+            <table id="member-table" class="excel-table" style="width: 100%; border-collapse: collapse; font-family: var(--font-body);">
+                </table>
+        </div>
+
+
+        <div id="loading-spinner" style="display:none; text-align:center; padding: 50px;">
+            <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--finance-accent);"></i>
+            <p style="margin-top: 10px; color: var(--text-secondary);">Đang tải dữ liệu...</p>
+        </div>
+
+
+        <div class="team-summary-section" style="display:flex; gap:30px; margin-top:40px; flex-wrap:wrap;">
+
+            <div style="flex: 1; min-width: 300px; background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); border: 1px solid var(--border-color);">
+                <h3 style="color: var(--finance-accent); margin-bottom:15px; border-bottom:2px solid var(--border-color); padding-bottom:10px;">
+                    <i class="fa-solid fa-list-ol"></i> Bảng Tổng Hợp NAV Team
+                </h3>
+                <table id="team-table" class="excel-table" style="width:100%;">
+                    <thead>
+                        <tr style="background: var(--finance-accent); color:#120F0A;">
+                            <th style="padding:10px;">Thành viên</th>
+                            <th style="padding:10px; text-align:right;">Tổng NAV</th>
+                            <th style="padding:10px; text-align:center;">Tỉ trọng</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-table-body">
+                        </tbody>
+                </table>
+            </div>
+
+            <div style="flex: 1; min-width: 300px; background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); display:flex; flex-direction:column; align-items:center;">
+                <h3 style="color: var(--finance-accent); margin-bottom:15px; width:100%; border-bottom:2px solid var(--border-color); padding-bottom:10px;">
+                    <i class="fa-solid fa-chart-pie"></i> Cơ Cấu Tài Sản
+                </h3>
+                <div style="width: 100%; max-width: 350px;">
+                    <canvas id="teamChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
+

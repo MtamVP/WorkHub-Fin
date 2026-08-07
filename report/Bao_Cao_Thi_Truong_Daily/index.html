@@ -1,0 +1,4911 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>OnyxLine&amp;Co — Daily Market Report System V3.4.1 Final Consistency Master</title>
+  <style>
+    :root {
+      --serif: "Cambria", "Times New Roman", "Noto Serif", "DejaVu Serif", Georgia, serif;
+      --sans: "Segoe UI", "Noto Sans", Arial, sans-serif;
+      --bg: #f7f6f1;
+      --paper: #fffdfa;
+      --ink: #282723;
+      --muted: #77736b;
+      --line: #dedbd2;
+      --navy: #20343a;
+      --teal: #6da99c;
+      --teal-dark: #2f756e;
+      --mint: #e9f2e2;
+      --mint2: #f3f8ed;
+      --beige: #f2efe5;
+      --beige2: #fbf8f0;
+      --gold: #a18438;
+      --rose: #ba656c;
+      --red: #a85a5e;
+      --blue: #5f91a5;
+      --purple: #8d7aa8;
+      --shadow: 0 18px 40px rgba(42, 39, 33, .08);
+      --shadow-soft: 0 8px 20px rgba(42, 39, 33, .06);
+      --radius: 22px;
+      --radius-sm: 14px;
+      --content: 980px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 24px
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #fbfaf6 28rem, #f5f4ee);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.68;
+      font-size: 16px
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 12% 8%, rgba(109, 169, 156, .16), transparent 28rem), radial-gradient(circle at 90% 10%, rgba(161, 132, 56, .10), transparent 32rem);
+      pointer-events: none;
+      z-index: -1
+    }
+
+    .cover {
+      max-width: 1180px;
+      margin: 36px auto 34px;
+      padding: 46px 54px 48px;
+      background: rgba(255, 253, 250, .78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(222, 219, 210, .9);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden
+    }
+
+    .cover::after {
+      content: "ONYXLINE";
+      position: absolute;
+      right: -32px;
+      bottom: 18px;
+      font-family: var(--serif);
+      font-size: 86px;
+      letter-spacing: .11em;
+      color: rgba(32, 52, 58, .035);
+      font-weight: 600;
+      z-index: 0
+    }
+
+    .decor {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 22px;
+      align-items: center;
+      margin-bottom: 42px;
+      color: #363a36;
+      position: relative;
+      z-index: 1
+    }
+
+    .decor span {
+      height: 1px;
+      background: #a9a8a1
+    }
+
+    .diamond {
+      width: 10px;
+      height: 10px;
+      transform: rotate(45deg);
+      background: #343834;
+      display: block
+    }
+
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 46px;
+      align-items: start;
+      position: relative;
+      z-index: 1
+    }
+
+    .brand {
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 1;
+      color: #111;
+      margin: 0 0 10px
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 16px;
+      letter-spacing: .01em
+    }
+
+    .doc-title {
+      font-size: 34px;
+      line-height: 1.13;
+      margin: 42px 0 12px;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: var(--navy);
+      max-width: 820px
+    }
+
+    .doc-subtitle {
+      font-size: 18px;
+      color: #5f5b54;
+      max-width: 760px;
+      margin: 0
+    }
+
+    .meta-panel {
+      text-align: right;
+      color: #77736b;
+      font-size: 15px;
+      line-height: 1.9
+    }
+
+    .meta-panel b {
+      color: #3a3934
+    }
+
+    .version-box {
+      margin-top: 18px;
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff
+    }
+
+    .rating-row {
+      margin-top: 42px;
+      position: relative;
+      z-index: 1
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: #77736b;
+      margin-bottom: 14px
+    }
+
+    .rating-pills {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px
+    }
+
+    .rating-card {
+      border: 1px solid #d8d5cc;
+      border-radius: 14px;
+      background: #fff;
+      padding: 13px 16px;
+      min-height: 70px;
+      box-shadow: 0 4px 9px rgba(42, 39, 33, .04);
+      position: relative;
+      overflow: hidden
+    }
+
+    .rating-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 3px
+    }
+
+    .rating-card.buy::before {
+      background: #45a895
+    }
+
+    .rating-card.outperform::before {
+      background: #5f91a5
+    }
+
+    .rating-card.hold::before {
+      background: #909088
+    }
+
+    .rating-card.underperform::before {
+      background: #a18438
+    }
+
+    .rating-card.sell::before {
+      background: #ba656c
+    }
+
+    .rating-name {
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #466
+    }
+
+    .rating-range {
+      font-family: var(--serif);
+      font-size: 21px;
+      color: #222
+    }
+
+    .quick-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-top: 42px;
+      position: relative;
+      z-index: 1
+    }
+
+    .quick-card {
+      background: var(--beige2);
+      border: 1px solid #eee9dc;
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: var(--shadow-soft)
+    }
+
+    .quick-card h3 {
+      margin: 0 0 8px !important;
+      font-size: 13px !important;
+      letter-spacing: .14em !important;
+      text-transform: uppercase !important;
+      color: #77736b !important;
+      border: 0 !important;
+      padding: 0 !important
+    }
+
+    .quick-card p {
+      margin: 0;
+      color: #36342e;
+      font-size: 15px
+    }
+
+    .cover-image {
+      max-width: 1180px;
+      margin: -8px auto 34px;
+      background: #fffdf9;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden
+    }
+
+    .cover-image img {
+      width: 100%;
+      display: block
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 28px;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 26px 48px
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      background: rgba(255, 253, 250, .78);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(222, 219, 210, .9);
+      border-radius: 24px;
+      box-shadow: var(--shadow-soft);
+      padding: 18px 16px;
+      overflow: hidden
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px 14px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px
+    }
+
+    .sidebar-title {
+      font-family: var(--serif);
+      font-size: 18px
+    }
+
+    .sidebar-badge {
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      background: var(--mint);
+      color: #4b7c67;
+      border-radius: 999px;
+      padding: 5px 9px
+    }
+
+    .toc-search {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 10px 12px;
+      margin: 6px 0 12px;
+      font-size: 13px;
+      color: #333
+    }
+
+    .toc {
+      overflow: auto;
+      max-height: calc(100vh - 150px);
+      padding-right: 4px
+    }
+
+    .nav-link {
+      display: block;
+      border-radius: 12px;
+      color: #69665e;
+      font-size: 13px;
+      line-height: 1.35;
+      margin: 2px 0;
+      padding: 8px 10px;
+      transition: .18s ease
+    }
+
+    .nav-link:hover {
+      background: var(--beige);
+      color: var(--navy)
+    }
+
+    .nav-link.active {
+      background: var(--mint);
+      color: var(--teal-dark);
+      font-weight: 650
+    }
+
+    .level-2 {
+      padding-left: 22px;
+      font-size: 12.5px
+    }
+
+    .content {
+      min-width: 0
+    }
+
+    .section-card {
+      background: rgba(255, 253, 250, .86);
+      border: 1px solid rgba(222, 219, 210, .95);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft);
+      padding: 42px 48px;
+      margin: 0 0 24px;
+      overflow: hidden
+    }
+
+    .section-card:hover {
+      box-shadow: 0 12px 30px rgba(42, 39, 33, .08)
+    }
+
+    .section-card h1 {
+      font-family: var(--serif);
+      font-size: 34px;
+      line-height: 1.2;
+      color: var(--navy);
+      font-weight: 500;
+      margin: 0 0 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      letter-spacing: 0 !important
+    }
+
+    .section-card h2 {
+      font-size: 22px;
+      line-height: 1.3;
+      color: var(--teal-dark);
+      font-weight: 700;
+      margin: 34px 0 14px
+    }
+
+    .section-card h3 {
+      font-size: 13px;
+      color: #6f6b62;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+      margin: 28px 0 12px
+    }
+
+    .section-card p {
+      margin: 0 0 14px
+    }
+
+    .section-card>p:first-of-type {
+      font-size: 17px;
+      color: #44413a
+    }
+
+    .table-card {
+      margin: 22px 0 28px;
+      border-radius: 18px;
+      border: 1px solid #e3dfd4;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(42, 39, 33, .05);
+      overflow: hidden
+    }
+
+    .table-scroll {
+      overflow-x: auto
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 14px;
+      line-height: 1.48;
+      min-width: 640px
+    }
+
+    .data-table th {
+      background: #f1eadb;
+      color: #605744;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      font-weight: 700;
+      padding: 13px 16px;
+      border-bottom: 1px solid #dfd8ca;
+      vertical-align: top
+    }
+
+    .data-table td {
+      padding: 13px 16px;
+      border-bottom: 1px solid #eeebe3;
+      vertical-align: top
+    }
+
+    .data-table tr:nth-child(even) td {
+      background: #fcfaf4
+    }
+
+    .data-table tr:hover td {
+      background: #f3f8ed
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: 0
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin: 1px 3px 1px 0;
+      font-size: .82em;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      border: 1px solid transparent
+    }
+
+    .buy,
+    .status-good,
+    .star {
+      background: #e4f2ed;
+      color: #2f756e;
+      border-color: #d0e7df
+    }
+
+    .outperform,
+    .case-base {
+      background: #e6eef2;
+      color: #47778b;
+      border-color: #d1e0e7
+    }
+
+    .hold,
+    .status {
+      background: #efeee8;
+      color: #77736b;
+      border-color: #dfddd5
+    }
+
+    .underperform,
+    .cashcow,
+    .case-bull {
+      background: #f7eed7;
+      color: #8a6b20;
+      border-color: #e8dcbf
+    }
+
+    .sell,
+    .risk-high,
+    .status-bad,
+    .case-bear {
+      background: #f6e5e6;
+      color: #9a4d54;
+      border-color: #ebcfd2
+    }
+
+    .risk-medium,
+    .question,
+    .status-warn {
+      background: #f8f0dc;
+      color: #93712c;
+      border-color: #eadfc3
+    }
+
+    .risk-low,
+    .dog {
+      background: #edf4e8;
+      color: #607c4c;
+      border-color: #dce9d2
+    }
+
+    .watermark-text {
+      position: fixed;
+      right: 2vw;
+      bottom: 2vh;
+      font-family: var(--serif);
+      font-size: 52px;
+      color: rgba(32, 52, 58, .035);
+      z-index: -1;
+      pointer-events: none
+    }
+
+    .floating-top {
+      position: fixed;
+      right: 26px;
+      bottom: 26px;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      place-items: center;
+      color: var(--navy);
+      font-weight: 700;
+      z-index: 5
+    }
+
+    .end-report {
+      max-width: 1180px;
+      margin: 28px auto 60px;
+      padding: 38px 54px;
+      background: #fffdf9;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft)
+    }
+
+    .end-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: end;
+      border-top: 1px solid var(--line);
+      padding-top: 22px
+    }
+
+    .end-script {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      color: #54514b
+    }
+
+    .footer-small {
+      color: #77736b;
+      font-size: 13px
+    }
+
+    @media(max-width:980px) {
+
+      .cover,
+      .cover-image {
+        margin: 16px;
+        padding: 28px 24px
+      }
+
+      .cover-grid,
+      .quick-cards,
+      .rating-pills {
+        grid-template-columns: 1fr
+      }
+
+      .meta-panel {
+        text-align: left
+      }
+
+      .doc-title {
+        font-size: 28px
+      }
+
+      .brand {
+        font-size: 36px
+      }
+
+      .app-shell {
+        grid-template-columns: 1fr;
+        padding: 0 14px 36px
+      }
+
+      .sidebar {
+        position: relative;
+        top: 0;
+        max-height: none
+      }
+
+      .toc {
+        max-height: 320px
+      }
+
+      .section-card {
+        padding: 30px 22px;
+        border-radius: 22px
+      }
+
+      .section-card h1 {
+        font-size: 28px
+      }
+
+      .data-table {
+        font-size: 13px
+      }
+
+      .cover::after {
+        display: none
+      }
+    }
+
+    @media print {
+      body {
+        background: white
+      }
+
+      .sidebar,
+      .floating-top {
+        display: none
+      }
+
+      .app-shell {
+        display: block;
+        max-width: none
+      }
+
+      .section-card,
+      .cover,
+      .cover-image,
+      .end-report {
+        box-shadow: none;
+        break-inside: avoid
+      }
+
+      .section-card {
+        border: 1px solid #ddd
+      }
+
+      .table-card {
+        break-inside: auto
+      }
+
+      .data-table tr {
+        break-inside: avoid
+      }
+    }
+
+    /* --- V3.4.1 polish patch: CSS-only cover, no raster duplicate, refined spacing --- */
+    body {
+      overflow-x: hidden;
+    }
+
+    .cover-image {
+      display: none !important;
+    }
+
+    .polished-cover {
+      max-width: 1180px;
+      min-height: 640px;
+      margin: 34px auto 34px;
+      padding: 48px 58px 50px;
+      background:
+        radial-gradient(circle at 88% 16%, rgba(109, 169, 156, .13), transparent 21rem),
+        linear-gradient(135deg, rgba(255, 253, 250, .94), rgba(250, 247, 239, .90));
+      border: 1px solid rgba(222, 219, 210, .95);
+      border-radius: 28px;
+      box-shadow: 0 22px 52px rgba(42, 39, 33, .10);
+    }
+
+    .polished-cover::after {
+      content: "ONYXLINE";
+      right: -24px;
+      bottom: 12px;
+      font-size: 92px;
+      letter-spacing: .12em;
+      color: rgba(32, 52, 58, .032);
+    }
+
+    .polished-cover .decor {
+      margin-bottom: 40px;
+      gap: 26px;
+    }
+
+    .polished-cover .decor span {
+      background: linear-gradient(90deg, transparent, #b9b7ae 18%, #b9b7ae 82%, transparent);
+    }
+
+    .polished-cover .diamond {
+      background: #20343a;
+      width: 9px;
+      height: 9px;
+    }
+
+    .polished-cover .cover-grid {
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 46px;
+      align-items: start;
+    }
+
+    .cover-kicker {
+      font-size: 12px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: #77736b;
+      margin: 0 0 14px;
+      font-weight: 700;
+    }
+
+    .polished-cover .brand {
+      font-size: 45px;
+      line-height: .95;
+      margin: 0 0 10px;
+      color: #111;
+      font-weight: 700;
+      letter-spacing: -.015em;
+    }
+
+    .polished-cover .doc-title {
+      font-size: 38px;
+      line-height: 1.14;
+      margin: 54px 0 14px;
+      color: #20343a;
+      letter-spacing: .015em;
+      max-width: 820px;
+    }
+
+    .polished-cover .doc-subtitle {
+      max-width: 760px;
+      font-size: 17px;
+      line-height: 1.68;
+      color: #5f5b54;
+      margin: 0;
+    }
+
+    .cover-meta {
+      background: rgba(255, 253, 250, .82);
+      border: 1px solid rgba(222, 219, 210, .95);
+      border-radius: 18px;
+      padding: 20px 22px;
+      text-align: left;
+      box-shadow: 0 10px 28px rgba(42, 39, 33, .065);
+      line-height: 1.35;
+    }
+
+    .cover-meta .meta-label {
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #8a867d;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .cover-meta .meta-name {
+      font-weight: 800;
+      color: #20343a;
+      font-size: 16px;
+      letter-spacing: .01em;
+      margin-bottom: 12px;
+    }
+
+    .meta-divider {
+      height: 1px;
+      background: var(--line);
+      margin: 14px 0;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 0 0 12px;
+      font-size: 12px;
+      color: #77736b;
+    }
+
+    .meta-row span {
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #8a867d;
+      font-weight: 700;
+    }
+
+    .meta-row b {
+      font-size: 13.5px;
+      color: #2f756e;
+      font-weight: 800;
+    }
+
+    .operating-ribbon {
+      position: relative;
+      z-index: 1;
+      margin: 46px 0 28px;
+      padding: 14px 18px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #e9f2e2, #eef5f2);
+      border: 1px solid #dcebd2;
+      color: #2f756e;
+      font-weight: 800;
+      letter-spacing: .015em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 18px rgba(42, 39, 33, .04);
+    }
+
+    .operating-ribbon span {
+      white-space: nowrap;
+    }
+
+    .operating-ribbon i {
+      font-style: normal;
+      color: #7ba99a;
+    }
+
+    .cover-modules {
+      margin-top: 28px;
+    }
+
+    .cover-modules .rating-pills {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .cover-modules .rating-card {
+      min-height: 76px;
+      padding: 15px 16px;
+      background: rgba(255, 255, 255, .83);
+    }
+
+    .cover-modules .rating-range {
+      font-size: 22px;
+    }
+
+    .cover-quick-cards {
+      margin-top: 26px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .cover-quick-cards .quick-card {
+      background: rgba(251, 248, 240, .72);
+      border-color: #ece6d7;
+      min-height: 122px;
+    }
+
+    .section-card {
+      scroll-margin-top: 24px;
+    }
+
+    .section-card h1 {
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .data-table th,
+    .data-table td {
+      word-break: normal;
+      overflow-wrap: break-word;
+    }
+
+    .nav-link {
+      overflow-wrap: anywhere;
+    }
+
+    @media(max-width:980px) {
+      .cover-quick-cards {
+        grid-template-columns: 1fr;
+      }
+
+      .polished-cover {
+        margin: 16px;
+        padding: 28px 24px 32px;
+        min-height: auto;
+      }
+
+      .polished-cover .cover-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .cover-meta {
+        max-width: 100%;
+      }
+
+      .polished-cover .doc-title {
+        font-size: 31px;
+        margin: 38px 0 12px;
+      }
+
+      .polished-cover .brand {
+        font-size: 38px;
+      }
+
+      .operating-ribbon {
+        border-radius: 22px;
+        justify-content: flex-start;
+        padding: 14px 16px;
+      }
+
+      .cover-modules .rating-pills {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media(max-width:520px) {
+      .polished-cover {
+        border-radius: 22px;
+        padding: 24px 18px 26px;
+      }
+
+      .polished-cover .decor {
+        margin-bottom: 30px;
+        gap: 16px;
+      }
+
+      .polished-cover .brand {
+        font-size: 33px;
+        letter-spacing: -.03em;
+      }
+
+      .cover-kicker {
+        font-size: 10.5px;
+        letter-spacing: .16em;
+      }
+
+      .polished-cover .doc-title {
+        font-size: 27px;
+        line-height: 1.18;
+      }
+
+      .polished-cover .doc-subtitle {
+        font-size: 15px;
+      }
+
+      .operating-ribbon {
+        font-size: 13px;
+        gap: 7px;
+      }
+    }
+
+    @media print {
+      .polished-cover {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+
+      .operating-ribbon {
+        break-inside: avoid;
+      }
+    }
+
+
+    /* V3.4.1 operating layer polish */
+    .section-card h2 {
+      scroll-margin-top: 24px;
+    }
+
+    .table-card .data-table td strong {
+      color: var(--navy)
+    }
+
+    @media print {
+      .operating-ribbon {
+        border: 1px solid #ddd
+      }
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      color: var(--navy);
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 24px;
+      text-decoration: none !important;
+    }
+
+    .back-link:hover {
+      background: var(--beige);
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(42, 39, 33, 0.1);
+    }
+
+    .back-link i {
+      font-size: 16px;
+      color: var(--teal-dark);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="watermark-text">OnyxLine&amp;Co</div>
+  <header class="cover polished-cover" id="top">
+    <div aria-hidden="true" class="decor"><span></span><i class="diamond"></i><span></span><i
+        class="diamond"></i><span></span></div>
+    <div class="cover-grid">
+      <div class="cover-main">
+        <a href="/report/" class="back-link">
+          <i class="fa-regular fa-house"></i> <span>Trở về mục lục</span>
+        </a>
+        <div class="cover-kicker">Equity Research — Daily Market Intelligence</div>
+        <h1 class="brand">OnyxLine&amp;Co</h1>
+        <h2 class="doc-title">Format Báo cáo<br />Thị trường Hằng ngày</h2>
+        <p class="doc-subtitle">Final institutional-grade daily market research operating system — scoring-complete,
+          workflow-consistent, Lite-ready and analyst-onboarding ready.</p>
+      </div>
+      <aside aria-label="Document metadata" class="meta-panel cover-meta">
+        <div class="meta-label">Prepared by</div>
+        <div class="meta-name">Nguyen Kim Phuc Bui</div>
+        <div class="meta-divider"></div>
+        <div class="meta-row"><span>Version</span><b>V3.4.1 · Final Consistency Master</b></div>
+        <div class="meta-row"><span>Company</span><b>OnyxLine&amp;Co</b></div>
+        <div class="meta-row"><span>Format</span><b>Online-first · Institutional-grade</b></div>
+      </aside>
+    </div>
+    <div aria-label="Core operating logic" class="operating-ribbon">
+      <span>Data</span><i>→</i><span>Score</span><i>→</i><span>Confidence</span><i>→</i><span>Action</span><i>→</i><span>Portfolio</span><i>→</i><span>Backtest</span>
+    </div>
+    <div class="rating-row cover-modules">
+      <div class="eyebrow">Operating System Layers</div>
+      <div class="rating-pills">
+        <div class="rating-card buy">
+          <div class="rating-name">MARKET</div>
+          <div class="rating-range">Direction</div>
+        </div>
+        <div class="rating-card outperform">
+          <div class="rating-name">SIGNAL</div>
+          <div class="rating-range">Confidence</div>
+        </div>
+        <div class="rating-card hold">
+          <div class="rating-name">ACTION</div>
+          <div class="rating-range">Score</div>
+        </div>
+        <div class="rating-card underperform">
+          <div class="rating-name">RACI</div>
+          <div class="rating-range">Workflow</div>
+        </div>
+        <div class="rating-card sell">
+          <div class="rating-name">RISK</div>
+          <div class="rating-range">Cascade</div>
+        </div>
+      </div>
+    </div>
+    <div class="quick-cards cover-quick-cards">
+      <div class="quick-card">
+        <h3>Workflow-consistent</h3>
+        <p>Module 27 được xác nhận là workflow chính thức; Module 19 chỉ giữ vai trò tham chiếu tổng thể.</p>
+      </div>
+      <div class="quick-card">
+        <h3>Lite-ready Action Score</h3>
+        <p>Action Score có rule riêng khi Lite Report không chạy đủ Sector Rotation và Technical Structure.</p>
+      </div>
+      <div class="quick-card">
+        <h3>Onboarding-complete</h3>
+        <p>Bổ sung ví dụ điền mẫu cho Signal Confidence Score và Action Score để analyst mới vận hành độc lập.</p>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Contents</div>
+        <div class="sidebar-badge">Sticky</div>
+      </div>
+      <input class="toc-search" id="tocSearch" placeholder="Search section…" />
+      <nav class="toc"><a class="nav-link level-1" data-target="huong-dan-su-dung-tai-lieu"
+          href="#huong-dan-su-dung-tai-lieu">HƯỚNG DẪN SỬ DỤNG TÀI LIỆU</a><a class="nav-link level-1"
+          data-target="1-dinh-nghia-chuan-institutional-grade-100" href="#1-dinh-nghia-chuan-institutional-grade-100">1.
+          Định nghĩa chuẩn institutional-grade 100%</a><a class="nav-link level-1"
+          data-target="2-kien-truc-tong-the-cua-daily-market-report-os"
+          href="#2-kien-truc-tong-the-cua-daily-market-report-os">2. Kiến trúc tổng thể của Daily Market Report OS</a><a
+          class="nav-link level-1" data-target="3-data-standard-timestamp-va-validation-rules"
+          href="#3-data-standard-timestamp-va-validation-rules">3. Data Standard, Timestamp và Validation Rules</a><a
+          class="nav-link level-1" data-target="4-evidence-standard-va-analyst-writing-rulebook"
+          href="#4-evidence-standard-va-analyst-writing-rulebook">4. Evidence Standard và Analyst Writing Rulebook</a><a
+          class="nav-link level-1" data-target="5-market-score-system-v3-4" href="#5-market-score-system-v3-4">5. Market
+          Score System V3.4.1</a><a class="nav-link level-1" data-target="6-signal-hierarchy-va-signal-priority-matrix"
+          href="#6-signal-hierarchy-va-signal-priority-matrix">6. Signal Hierarchy và Signal Priority Matrix</a><a
+          class="nav-link level-1" data-target="7-distortion-control-system" href="#7-distortion-control-system">7.
+          Distortion Control System</a><a class="nav-link level-1" data-target="8-quick-market-highlights"
+          href="#8-quick-market-highlights">8. Quick Market Highlights</a><a class="nav-link level-1"
+          data-target="9-market-microstructure-dashboard" href="#9-market-microstructure-dashboard">9. Market
+          Microstructure Dashboard</a><a class="nav-link level-1" data-target="10-sector-rotation-engine"
+          href="#10-sector-rotation-engine">10. Sector Rotation Engine</a><a class="nav-link level-1"
+          data-target="11-stock-intelligence-research-update-bridge"
+          href="#11-stock-intelligence-research-update-bridge">11. Stock Intelligence &amp; Research Update Bridge</a><a
+          class="nav-link level-1" data-target="12-model-portfolio-tracker" href="#12-model-portfolio-tracker">12. Model
+          Portfolio Tracker</a><a class="nav-link level-1" data-target="13-earnings-momentum-engine"
+          href="#13-earnings-momentum-engine">13. Earnings Momentum Engine</a><a class="nav-link level-1"
+          data-target="14-forward-valuation-macro-dashboard" href="#14-forward-valuation-macro-dashboard">14. Forward
+          Valuation &amp; Macro Dashboard</a><a class="nav-link level-1"
+          data-target="15-foreign-flow-etf-flow-derivatives-sentiment"
+          href="#15-foreign-flow-etf-flow-derivatives-sentiment">15. Foreign Flow, ETF Flow, Derivatives &amp;
+          Sentiment</a><a class="nav-link level-1" data-target="16-technical-structure-engine"
+          href="#16-technical-structure-engine">16. Technical Structure Engine</a><a class="nav-link level-1"
+          data-target="17-scenario-matrix-portfolio-action-engine"
+          href="#17-scenario-matrix-portfolio-action-engine">17. Scenario Matrix &amp; Portfolio Action Engine</a><a
+          class="nav-link level-1" data-target="18-backtest-calibration-engine"
+          href="#18-backtest-calibration-engine">18. Backtest &amp; Calibration Engine</a><a class="nav-link level-1"
+          data-target="19-daily-production-workflow-responsibility-matrix"
+          href="#19-daily-production-workflow-responsibility-matrix">19. Daily Production Workflow &amp; Responsibility
+          Matrix</a><a class="nav-link level-1" data-target="20-page-architecture-final-v3-4"
+          href="#20-page-architecture-final-v3-4">20. Page Architecture Final V3.4.1</a><a class="nav-link level-1"
+          data-target="21-final-quality-gate-khong-duoc-thieu" href="#21-final-quality-gate-khong-duoc-thieu">21. Final
+          Quality Gate — Không được thiếu</a><a class="nav-link level-1" data-target="22-final-operating-template"
+          href="#22-final-operating-template">22. Final Operating Template</a><a class="nav-link level-1"
+          data-target="v34-overview" href="#v34-overview">23. V3.4.1 Institutional Operating Layer — Tổng quan nâng
+          cấp</a><a class="nav-link level-1" data-target="v34-scoring" href="#v34-scoring">24. Scoring Completeness —
+          Signal Confidence Score và Action Score</a><a class="nav-link level-1" data-target="v34-distortion"
+          href="#v34-distortion">25. Quantitative Distortion Thresholds — Ngưỡng định lượng chống méo tín hiệu</a><a
+          class="nav-link level-1" data-target="v34-valuation-baseline" href="#v34-valuation-baseline">26. Valuation
+          Baseline Protocol — Chuẩn hóa giai đoạn so sánh định giá</a><a class="nav-link level-1"
+          data-target="v34-fasttrack-workflow" href="#v34-fasttrack-workflow">27. Fast-Track Format và Production
+          Workflow — Lite / Standard / Full</a><a class="nav-link level-2" data-target="26-1-workflow-song-song"
+          href="#26-1-workflow-song-song">26.1 Workflow song song</a><a class="nav-link level-2"
+          data-target="27-4-lite-format-scoring-adjustment-rule" href="#27-4-lite-format-scoring-adjustment-rule">27.4
+          Lite Format Scoring Adjustment Rule</a><a class="nav-link level-1" data-target="v34-raci" href="#v34-raci">28.
+          RACI Matrix — Ma trận trách nhiệm vận hành</a><a class="nav-link level-1"
+          data-target="v34-dependency-conflict" href="#v34-dependency-conflict">29. Inter-Module Dependency Map và
+          Signal Conflict Protocol</a><a class="nav-link level-1" data-target="v34-earnings-integration"
+          href="#v34-earnings-integration">30. Earnings Score Integration — Quy đổi KQKD vào Market Direction
+          Score</a><a class="nav-link level-1" data-target="v34-cascade" href="#v34-cascade">31. Invalidation Cascade
+          Rules — Khi kịch bản sai thì hệ thống tự hạ rủi ro</a><a class="nav-link level-1" data-target="v34-glossary"
+          href="#v34-glossary">32. Glossary và Rating Dictionary — Chuẩn hóa thuật ngữ cho analyst mới</a><a
+          class="nav-link level-1" data-target="v34-examples" href="#v34-examples">33. Ví dụ điền mẫu — Market Score,
+          Sector Rotation và Scenario Matrix</a><a class="nav-link level-2"
+          data-target="32-1-vi-du-market-direction-score" href="#32-1-vi-du-market-direction-score">32.1 Ví dụ Market
+          Direction Score</a><a class="nav-link level-2" data-target="32-2-vi-du-sector-rotation-engine"
+          href="#32-2-vi-du-sector-rotation-engine">32.2 Ví dụ Sector Rotation Engine</a><a class="nav-link level-2"
+          data-target="32-3-vi-du-scenario-matrix" href="#32-3-vi-du-scenario-matrix">32.3 Ví dụ Scenario Matrix</a><a
+          class="nav-link level-2" data-target="33-4-vi-du-dien-mau-signal-confidence-score"
+          href="#33-4-vi-du-dien-mau-signal-confidence-score">33.4 Ví dụ điền mẫu — Signal Confidence Score</a><a
+          class="nav-link level-2" data-target="33-5-vi-du-dien-mau-action-score"
+          href="#33-5-vi-du-dien-mau-action-score">33.5 Ví dụ điền mẫu — Action Score</a><a class="nav-link level-2"
+          data-target="33-6-vi-du-action-score-trong-lite-format" href="#33-6-vi-du-action-score-trong-lite-format">33.6
+          Ví dụ Action Score trong Lite Format</a><a class="nav-link level-1" data-target="v34-changelog"
+          href="#v34-changelog">34. Version Control và Change Log — Traceability cho chính framework</a><a
+          class="nav-link level-1" data-target="v341-final-consistency-note" href="#v341-final-consistency-note">35.
+          V3.4.1 Final Consistency Patch — Ghi chú chốt phiên bản</a></nav>
+    </aside>
+    <main class="content">
+      <section class="section-card" id="overview">
+        <h1 id="huong-dan-su-dung-tai-lieu">HƯỚNG DẪN SỬ DỤNG TÀI LIỆU</h1>
+        <p>Tài liệu này là bản V3.4.1 của hệ thống format báo cáo thị trường hằng ngày, được thiết kế lại hoàn toàn theo
+          style OnyxLine&amp;Co của file Format_BaoCao_online.html: cover thanh lịch, nền beige, card bo góc, sticky
+          navigation, bảng dễ đọc và các pill trạng thái. Nội dung giữ đầy đủ lõi institutional-grade của V3.0/V3.1 và
+          bổ sung lớp SSI như model portfolio, earnings momentum, research update bridge, market microstructure
+          dashboard và forward valuation dashboard.</p>
+        <p>Cách sử dụng đúng không phải là điền cho đủ mục, mà là chạy toàn bộ hệ thống: dữ liệu được kiểm tra, tín hiệu
+          được chấm điểm, mâu thuẫn được xử lý, kịch bản được gắn xác suất, hành động danh mục có điều kiện, và kết quả
+          được hậu kiểm bằng danh mục mẫu.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Bước</th>
+                <th>Việc cần làm</th>
+                <th>Output bắt buộc</th>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>Cập nhật dữ liệu giao dịch, khối ngoại, phái sinh, ngành, tin tức, vĩ mô</td>
+                <td>Data log + timestamp</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Tính Market Direction, Signal Confidence, Action và Earnings Score</td>
+                <td>Scorecard</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Kiểm tra distortion: kéo trụ, thỏa thuận, ETF, phái sinh, tin đồn</td>
+                <td>Distortion label</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Viết quick highlights và diễn biến thị trường theo cơ chế tác động</td>
+                <td>Market narrative</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Cập nhật sector rotation, stock intelligence, research bridge và earnings momentum</td>
+                <td>Sector/stock modules</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Chuyển tín hiệu thành portfolio action, scenario, risk budget và model portfolio tracker</td>
+                <td>Action note</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td>Chạy quality gate, kiểm tra ngôn ngữ, dữ liệu, kịch bản và disclaimer</td>
+                <td>Final release pack</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="definition">
+        <h1 id="1-dinh-nghia-chuan-institutional-grade-100">1. Định nghĩa chuẩn institutional-grade 100%</h1>
+        <p>Chuẩn 100% trong hệ thống này không có nghĩa là dự báo thị trường luôn đúng. Chuẩn 100% được hiểu là không bỏ
+          sót nhóm thông tin trọng yếu, mọi nhận định có bằng chứng, mọi tín hiệu có quy tắc xử lý, mọi hành động có
+          điều kiện sai, và mọi kết quả có thể hậu kiểm.</p>
+        <p>Một bản tin thị trường hằng ngày đạt chuẩn phải biến dữ liệu giao dịch thành hiểu biết, biến hiểu biết thành
+          kịch bản, biến kịch bản thành hành động danh mục, và biến hành động thành thứ có thể đo lại sau này.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Tiêu chuẩn</th>
+                <th>Ý nghĩa vận hành</th>
+                <th>Dấu hiệu đạt chuẩn</th>
+              </tr>
+              <tr>
+                <td>Completeness</td>
+                <td>Không bỏ sót chỉ số, thanh khoản, độ rộng, ngành, cổ phiếu, phái sinh, vĩ mô, định giá, tin tức,
+                  danh mục</td>
+                <td>Có đầy đủ page architecture và checklist</td>
+              </tr>
+              <tr>
+                <td>Traceability</td>
+                <td>Mọi số liệu chính truy được nguồn, thời điểm cập nhật và phép tính</td>
+                <td>Có data source map và timestamp box</td>
+              </tr>
+              <tr>
+                <td>Causality</td>
+                <td>Không mô tả rời rạc; phải giải thích cơ chế tác động</td>
+                <td>Data → Mechanism → Impact → Action</td>
+              </tr>
+              <tr>
+                <td>Defendability</td>
+                <td>Có thể bảo vệ trước phản biện của team hoặc investment committee</td>
+                <td>Có signal hierarchy, risk matrix và invalidation</td>
+              </tr>
+              <tr>
+                <td>Actionability</td>
+                <td>Người đọc biết phải làm gì với danh mục</td>
+                <td>Có portfolio stance, sector allocation, action score</td>
+              </tr>
+              <tr>
+                <td>Backtestability</td>
+                <td>Hệ thống có thể kiểm chứng qua dữ liệu quá khứ và danh mục mẫu</td>
+                <td>Có backtest engine và model portfolio tracker</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="architecture">
+        <h1 id="2-kien-truc-tong-the-cua-daily-market-report-os">2. Kiến trúc tổng thể của Daily Market Report OS</h1>
+        <p>Hệ thống được chia thành 6 lớp. Mỗi lớp tạo một nhóm output riêng và tất cả phải nối với nhau để tránh báo
+          cáo chỉ là tập hợp dữ liệu không có hành động.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Lớp</th>
+                <th>Tên lớp</th>
+                <th>Mục tiêu</th>
+                <th>Output</th>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>Market Snapshot</td>
+                <td>Cho biết thị trường hôm nay diễn biến thế nào</td>
+                <td>Market dashboard, quick highlights</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Market Quality</td>
+                <td>Đánh giá tăng/giảm có chất lượng hay không</td>
+                <td>Liquidity, breadth, attribution, sector quality</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Market Mechanism</td>
+                <td>Giải thích vì sao thị trường vận động như vậy</td>
+                <td>Macro/news/sector/flow mechanism map</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Market Scenario</td>
+                <td>Xây bull/base/bear case có xác suất và trigger</td>
+                <td>Scenario matrix</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Portfolio Action</td>
+                <td>Chuyển nhận định thành tỷ trọng, ngành, mã, stop condition</td>
+                <td>Portfolio playbook</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Feedback &amp; Calibration</td>
+                <td>Hậu kiểm bằng dữ liệu và danh mục mẫu</td>
+                <td>Backtest log, model portfolio alpha, calibration note</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="data">
+        <h1 id="3-data-standard-timestamp-va-validation-rules">3. Data Standard, Timestamp và Validation Rules</h1>
+        <p>Không có dữ liệu sạch thì không có báo cáo chuyên nghiệp. Mỗi chỉ tiêu phải có nguồn chính, nguồn đối chiếu,
+          thời điểm cập nhật, đơn vị và sai số cho phép.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Nhóm dữ liệu</th>
+                <th>Nguồn ưu tiên</th>
+                <th>Nguồn kiểm tra chéo</th>
+                <th>Thời điểm cập nhật</th>
+                <th>Sai số cho phép</th>
+              </tr>
+              <tr>
+                <td>Chỉ số/giá/GTGD</td>
+                <td>HOSE/HNX/FiinPro</td>
+                <td>FireAnt/Vietstock</td>
+                <td>16:00</td>
+                <td>0.01% với chỉ số; 1-2% với GTGD</td>
+              </tr>
+              <tr>
+                <td>Độ rộng thị trường</td>
+                <td>FiinPro/FireAnt</td>
+                <td>Vietstock</td>
+                <td>16:00</td>
+                <td>Sai lệch nhỏ do phân loại mã</td>
+              </tr>
+              <tr>
+                <td>Khối ngoại</td>
+                <td>HOSE/HNX/FiinPro</td>
+                <td>Vietstock</td>
+                <td>16:30</td>
+                <td>1-3%</td>
+              </tr>
+              <tr>
+                <td>Phái sinh</td>
+                <td>HNX/VSD/FiinPro</td>
+                <td>FireAnt</td>
+                <td>16:30</td>
+                <td>0.1 điểm basis</td>
+              </tr>
+              <tr>
+                <td>Định giá</td>
+                <td>Bloomberg/FiinPro</td>
+                <td>SSI/Mirae/Vietstock</td>
+                <td>Cuối ngày</td>
+                <td>0.1x P/E</td>
+              </tr>
+              <tr>
+                <td>Vĩ mô</td>
+                <td>SBV/GSO/Bloomberg</td>
+                <td>Investing/Reuters</td>
+                <td>Theo công bố</td>
+                <td>Kiểm tra kỳ dữ liệu</td>
+              </tr>
+              <tr>
+                <td>KQKD</td>
+                <td>BCTC/HOSE/HNX</td>
+                <td>FiinPro/Vietstock</td>
+                <td>19:00 hoặc T+1</td>
+                <td>Ưu tiên filing chính thức</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Nếu phát hiện</th>
+                <th>Cách xử lý</th>
+              </tr>
+              <tr>
+                <td>Nguồn mâu thuẫn</td>
+                <td>Ưu tiên nguồn chính thức, ghi Data discrepancy</td>
+              </tr>
+              <tr>
+                <td>Thiếu dữ liệu quan trọng</td>
+                <td>Không đưa vào kết luận chính hoặc hạ Confidence Score</td>
+              </tr>
+              <tr>
+                <td>Tin chưa xác nhận</td>
+                <td>Đưa vào monitoring, không đưa vào base case</td>
+              </tr>
+              <tr>
+                <td>Dữ liệu forward/TTM không rõ</td>
+                <td>Bắt buộc ghi rõ định nghĩa trước khi dùng</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="evidence">
+        <h1 id="4-evidence-standard-va-analyst-writing-rulebook">4. Evidence Standard và Analyst Writing Rulebook</h1>
+        <p>Mỗi đoạn phân tích phải đi qua chuỗi Data → Interpretation → Mechanism → Financial/Market Impact → Portfolio
+          Action → Invalidation. Nếu thiếu cơ chế hoặc thiếu hành động, đoạn đó mới chỉ là mô tả.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Cấp nhận định</th>
+                <th>Yêu cầu bằng chứng</th>
+                <th>Ví dụ</th>
+              </tr>
+              <tr>
+                <td>Fact</td>
+                <td>Có số liệu trực tiếp</td>
+                <td>VN-Index tăng x%, GTGD đạt y tỷ đồng</td>
+              </tr>
+              <tr>
+                <td>Interpretation</td>
+                <td>Có dữ liệu + logic giải thích</td>
+                <td>Thanh khoản tăng cùng độ rộng tốt cho thấy cầu xác nhận</td>
+              </tr>
+              <tr>
+                <td>Scenario</td>
+                <td>Có trigger và invalidation</td>
+                <td>Nếu vượt kháng cự với GTGD &gt; MA20 thì xác suất bull case tăng</td>
+              </tr>
+              <tr>
+                <td>Opinion</td>
+                <td>Phải ghi rõ là đánh giá chủ quan</td>
+                <td>Analyst đánh giá rủi ro mua đuổi đang tăng</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Không nên viết</th>
+                <th>Nên viết</th>
+              </tr>
+              <tr>
+                <td>Thị trường chắc chắn sẽ tăng</td>
+                <td>Xác suất kiểm định kháng cự tăng nếu chỉ số giữ trên hỗ trợ và thanh khoản xác nhận</td>
+              </tr>
+              <tr>
+                <td>Dòng tiền rất tốt</td>
+                <td>GTGD cao hơn MA20 và A/D Ratio &gt; 1.5 cho thấy dòng tiền cải thiện có xác nhận</td>
+              </tr>
+              <tr>
+                <td>Nên mua mạnh</td>
+                <td>Có thể tăng tỷ trọng có chọn lọc tại nhịp điều chỉnh, với stop condition rõ ràng</td>
+              </tr>
+              <tr>
+                <td>Rủi ro không đáng kể</td>
+                <td>Rủi ro chính là mất hỗ trợ với thanh khoản cao hoặc khối ngoại bán tập trung ở nhóm dẫn dắt</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="scores">
+        <h1 id="5-market-score-system-v3-4">5. Market Score System V3.4.1</h1>
+        <p>V3.4.1 sử dụng bốn điểm: Market Direction Score, Signal Confidence Score, Action Score và Earnings Score.
+          Cách này tránh lỗi thị trường tích cực nhưng không còn điểm mua đẹp, hoặc thị trường tăng nhưng tín hiệu không
+          đáng tin do kéo trụ.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Thành phần Market Direction Score</th>
+                <th>Trọng số</th>
+                <th>Ý nghĩa</th>
+              </tr>
+              <tr>
+                <td>Price Trend</td>
+                <td>13</td>
+                <td>Hướng chỉ số, vị trí đóng cửa, VN30 vs VN-Index</td>
+              </tr>
+              <tr>
+                <td>Liquidity</td>
+                <td>13</td>
+                <td>GTGD/KLGD so với MA5/MA20/MA60, cấu trúc dòng tiền</td>
+              </tr>
+              <tr>
+                <td>Breadth</td>
+                <td>11</td>
+                <td>A/D Ratio, số ngành tăng, mã trần/sàn</td>
+              </tr>
+              <tr>
+                <td>Sector Rotation</td>
+                <td>12</td>
+                <td>Ngành dẫn dắt, độ rộng ngành, RS vs VN-Index</td>
+              </tr>
+              <tr>
+                <td>Index Attribution</td>
+                <td>8</td>
+                <td>Top contributor concentration, kéo trụ hay lan tỏa</td>
+              </tr>
+              <tr>
+                <td>Foreign/Institutional Flow</td>
+                <td>9</td>
+                <td>Khối ngoại, tự doanh, ETF, hấp thụ cung</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>7</td>
+                <td>Basis, OI, phái sinh có đồng thuận không</td>
+              </tr>
+              <tr>
+                <td>Technical Structure</td>
+                <td>9</td>
+                <td>MA20/50/200, RSI, MACD, hỗ trợ/kháng cự</td>
+              </tr>
+              <tr>
+                <td>Valuation &amp; Macro</td>
+                <td>5</td>
+                <td>P/E, P/B, ROE, tỷ giá, lãi suất, hàng hóa</td>
+              </tr>
+              <tr>
+                <td>News/Catalyst</td>
+                <td>3</td>
+                <td>Tin thị trường, chính sách, ngành, doanh nghiệp</td>
+              </tr>
+              <tr>
+                <td>Earnings Momentum</td>
+                <td>10</td>
+                <td>KQKD thị trường/ngành xác nhận hay phủ định dòng tiền</td>
+              </tr>
+              <tr>
+                <td>Tổng</td>
+                <td>100</td>
+                <td>Chuyển thành Market Regime</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Điểm</th>
+                <th>Cách đọc</th>
+                <th>Hành động tổng</th>
+              </tr>
+              <tr>
+                <td>80-100</td>
+                <td>Strong Risk-on</td>
+                <td>Nắm giữ leader, tăng chọn lọc</td>
+              </tr>
+              <tr>
+                <td>65-79</td>
+                <td>Risk-on</td>
+                <td>Giữ/tăng ở nhịp điều chỉnh</td>
+              </tr>
+              <tr>
+                <td>50-64</td>
+                <td>Positive Neutral</td>
+                <td>Nắm giữ, không mua đuổi</td>
+              </tr>
+              <tr>
+                <td>40-49</td>
+                <td>Neutral</td>
+                <td>Chờ xác nhận, cơ cấu danh mục</td>
+              </tr>
+              <tr>
+                <td>25-39</td>
+                <td>Cautious</td>
+                <td>Giảm mã yếu, hạ beta</td>
+              </tr>
+              <tr>
+                <td>10-24</td>
+                <td>Risk-off</td>
+                <td>Ưu tiên phòng thủ</td>
+              </tr>
+              <tr>
+                <td>&lt;10</td>
+                <td>High Risk</td>
+                <td>Bảo vệ vốn, tránh bắt đáy</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="signal">
+        <h1 id="6-signal-hierarchy-va-signal-priority-matrix">6. Signal Hierarchy và Signal Priority Matrix</h1>
+        <p>Khi tín hiệu mâu thuẫn, không được kết luận bằng cảm tính. Hệ thống ưu tiên risk event, price-volume,
+          breadth, sector rotation rồi mới đến phái sinh, technical indicator và narrative.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Thứ tự ưu tiên</th>
+                <th>Tín hiệu</th>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>Risk event / chính sách lớn / sự kiện hệ thống</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Price + volume</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Market breadth</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Sector rotation</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Index attribution</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Foreign/institutional flow</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td>Derivatives</td>
+              </tr>
+              <tr>
+                <td>8</td>
+                <td>Technical indicators</td>
+              </tr>
+              <tr>
+                <td>9</td>
+                <td>News sentiment</td>
+              </tr>
+              <tr>
+                <td>10</td>
+                <td>Narrative/opinion</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Tình huống mâu thuẫn</th>
+                <th>Cách xử lý chuẩn</th>
+              </tr>
+              <tr>
+                <td>Index tăng nhưng breadth xấu</td>
+                <td>Gọi là kéo trụ/narrow rally, không nâng score quá mạnh</td>
+              </tr>
+              <tr>
+                <td>Index tăng nhưng thanh khoản thấp</td>
+                <td>Gọi là hồi thiếu xác nhận</td>
+              </tr>
+              <tr>
+                <td>Index giảm nhưng thanh khoản thấp</td>
+                <td>Gọi là điều chỉnh cung thấp, chưa phải bán tháo</td>
+              </tr>
+              <tr>
+                <td>Khối ngoại bán mạnh nhưng giá không giảm</td>
+                <td>Ghi nhận cầu nội hấp thụ</td>
+              </tr>
+              <tr>
+                <td>Basis dương nhưng OI giảm</td>
+                <td>Có thể là short cover, không xem là long mới mạnh</td>
+              </tr>
+              <tr>
+                <td>Breakout nhưng volume thấp</td>
+                <td>Chờ xác nhận thêm, không gọi breakout thành công</td>
+              </tr>
+              <tr>
+                <td>Tin tốt nhưng giá giảm</td>
+                <td>Có thể tin đã phản ánh hoặc dòng tiền yếu</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="distortion">
+        <h1 id="7-distortion-control-system">7. Distortion Control System</h1>
+        <p>Distortion Control là phần chống đọc sai thị trường. Một phiên tăng có thể bị kéo bởi vài trụ, một phiên
+          thanh khoản cao có thể do thỏa thuận, và một phiên bán ròng ngoại có thể chỉ là ETF rebalance.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Loại méo</th>
+                <th>Câu hỏi kiểm tra</th>
+                <th>Nhãn kết luận</th>
+              </tr>
+              <tr>
+                <td>Index distortion</td>
+                <td>Top 3/5 mã kéo chiếm bao nhiêu % biến động? VN30/equal-weight có xác nhận không?</td>
+                <td>Clean advance / Large-cap driven / Narrow rally / Hidden weakness</td>
+              </tr>
+              <tr>
+                <td>Liquidity distortion</td>
+                <td>GTGD tăng do khớp lệnh hay thỏa thuận? Tập trung ở top 10 mã không?</td>
+                <td>Healthy liquidity / Speculative spike / Distribution / Block-trade distorted</td>
+              </tr>
+              <tr>
+                <td>Foreign flow distortion</td>
+                <td>Bán ròng là ETF, thỏa thuận hay khớp lệnh? Giá có hấp thụ không?</td>
+                <td>True outflow / ETF rebalance / Absorbed selling / Noise</td>
+              </tr>
+              <tr>
+                <td>Derivatives distortion</td>
+                <td>Có gần đáo hạn không? OI/basis bất thường không?</td>
+                <td>Clean signal / Short-covering / Hedging pressure / Expiry distortion</td>
+              </tr>
+              <tr>
+                <td>News distortion</td>
+                <td>Tin đã xác nhận chưa? Giá phản ứng thuận hay ngược?</td>
+                <td>Confirmed catalyst / Sentiment only / Rumor / Already priced-in</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="quick">
+        <h1 id="8-quick-market-highlights">8. Quick Market Highlights</h1>
+        <p>Module này đặt ngay sau Market Command Center để người đọc nắm phiên trong 2 phút. Cấu trúc học từ SSI nhưng
+          viết lại theo chuẩn OnyxLine&amp;Co: ngắn, có số, có cơ chế và có hành động.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Block</th>
+                <th>Nội dung bắt buộc</th>
+                <th>Kết luận cần có</th>
+              </tr>
+              <tr>
+                <td>Tổng quan</td>
+                <td>VN-Index, VN30, HNX, UPCoM, độ rộng, thanh khoản</td>
+                <td>Tăng/giảm có đồng đều không</td>
+              </tr>
+              <tr>
+                <td>Nhóm ngành</td>
+                <td>Ngành dẫn dắt, ngành suy yếu, nhóm phân hóa</td>
+                <td>Dòng tiền đang chọn nhóm nào</td>
+              </tr>
+              <tr>
+                <td>Dòng tiền</td>
+                <td>GTGD khớp lệnh, top thanh khoản, khối ngoại, tự doanh</td>
+                <td>Dòng tiền thật hay nhiễu</td>
+              </tr>
+              <tr>
+                <td>Quan điểm kỹ thuật</td>
+                <td>Vùng hỗ trợ, kháng cự, breakout/breakdown condition</td>
+                <td>Mốc nào quyết định phiên tới</td>
+              </tr>
+              <tr>
+                <td>Portfolio action</td>
+                <td>Tỷ trọng, ngành ưu tiên, điều kiện giảm/tăng</td>
+                <td>Danh mục nên làm gì ngay</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="microstructure">
+        <h1 id="9-market-microstructure-dashboard">9. Market Microstructure Dashboard</h1>
+        <p>Dashboard microstructure gom các bảng mà SSI làm rất tốt: top tác động VN-Index, top KLGD đột phá, top
+          mua/bán ròng khối ngoại và top giao dịch thỏa thuận. Module này đặc biệt quan trọng vì nó kiểm tra chất lượng
+          dòng tiền trước khi đưa ra kết luận.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Ô dashboard</th>
+                <th>Dữ liệu</th>
+                <th>Mục đích</th>
+              </tr>
+              <tr>
+                <td>Top impact VN-Index</td>
+                <td>Top 10 kéo/đè điểm + % giá 1D</td>
+                <td>Biết chỉ số tăng/giảm do mã nào</td>
+              </tr>
+              <tr>
+                <td>Top volume breakout</td>
+                <td>KLGD hôm nay / KLGD MA20 + % giá 1D</td>
+                <td>Biết dòng tiền đột biến ở đâu</td>
+              </tr>
+              <tr>
+                <td>Top foreign net flow</td>
+                <td>GTGD ròng NĐTNN + % giá 1D</td>
+                <td>Biết khối ngoại tạo áp lực hay được hấp thụ</td>
+              </tr>
+              <tr>
+                <td>Top negotiated transactions</td>
+                <td>GTGD thỏa thuận + % giá 1D</td>
+                <td>Biết GTGD có bị méo bởi thỏa thuận không</td>
+              </tr>
+              <tr>
+                <td>Top liquidity by market cap</td>
+                <td>Large/mid/small/micro cap flow</td>
+                <td>Biết dòng tiền vào nhóm vốn hóa nào</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="sector">
+        <h1 id="10-sector-rotation-engine">10. Sector Rotation Engine</h1>
+        <p>Sector Rotation Engine xác định ngành nào thật sự dẫn dắt, ngành nào chỉ hồi kỹ thuật, ngành nào đang bị phân
+          phối và ngành nào nên overweight/neutral/underweight trong danh mục.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Ngành</th>
+                <th>1D</th>
+                <th>1W</th>
+                <th>1M</th>
+                <th>GTGD</th>
+                <th>RS vs VN-Index</th>
+                <th>Breadth</th>
+                <th>Catalyst</th>
+                <th>Sector Score</th>
+                <th>Allocation</th>
+              </tr>
+              <tr>
+                <td>Ngân hàng</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Chứng khoán</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Bất động sản</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Thép</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Dầu khí</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Bán lẻ</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Công nghệ</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Điện/tiện ích</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Sector Score</th>
+                <th>Nhãn</th>
+                <th>Hành động</th>
+              </tr>
+              <tr>
+                <td>80-100</td>
+                <td>Leadership</td>
+                <td>Overweight</td>
+              </tr>
+              <tr>
+                <td>65-79</td>
+                <td>Strong</td>
+                <td>Hold/Add on pullback</td>
+              </tr>
+              <tr>
+                <td>50-64</td>
+                <td>Improving</td>
+                <td>Watchlist</td>
+              </tr>
+              <tr>
+                <td>35-49</td>
+                <td>Neutral</td>
+                <td>Hold only</td>
+              </tr>
+              <tr>
+                <td>20-34</td>
+                <td>Weakening</td>
+                <td>Reduce</td>
+              </tr>
+              <tr>
+                <td>&lt;20</td>
+                <td>Avoid</td>
+                <td>Underweight/Avoid</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="stock">
+        <h1 id="11-stock-intelligence-research-update-bridge">11. Stock Intelligence &amp; Research Update Bridge</h1>
+        <p>Daily report không thay thế báo cáo doanh nghiệp đầy đủ, nhưng phải có stock intelligence đủ sâu để phục vụ
+          danh mục. Research Update Bridge giúp nhúng các báo cáo cổ phiếu mới, thay đổi target price, rating change
+          hoặc earnings review vào bản tin ngày.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Nhóm cổ phiếu</th>
+                <th>Điều kiện đưa vào báo cáo</th>
+                <th>Hành động</th>
+              </tr>
+              <tr>
+                <td>Leader</td>
+                <td>Mạnh hơn thị trường, volume tốt, ngành mạnh</td>
+                <td>Nắm giữ/mua khi điều chỉnh</td>
+              </tr>
+              <tr>
+                <td>Breakout candidate</td>
+                <td>Gần/vượt kháng cự, volume xác nhận</td>
+                <td>Theo dõi điểm mua có kỷ luật</td>
+              </tr>
+              <tr>
+                <td>Accumulation</td>
+                <td>Nền giá tốt, dòng tiền tích lũy, cơ bản ổn</td>
+                <td>Tích lũy từng phần</td>
+              </tr>
+              <tr>
+                <td>Weak bounce</td>
+                <td>Hồi yếu, volume thấp, ngành chưa xác nhận</td>
+                <td>Không mua đuổi</td>
+              </tr>
+              <tr>
+                <td>Distribution risk</td>
+                <td>Giảm volume cao, mất hỗ trợ, tổ chức bán</td>
+                <td>Giảm tỷ trọng</td>
+              </tr>
+              <tr>
+                <td>Event-driven</td>
+                <td>Có catalyst riêng, report mới, KQKD mới</td>
+                <td>Đánh giá theo impact map</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Mã</th>
+                <th>Loại cập nhật</th>
+                <th>Khuyến nghị</th>
+                <th>Giá mục tiêu</th>
+                <th>Upside</th>
+                <th>Luận điểm chính</th>
+                <th>Tác động danh mục</th>
+              </tr>
+              <tr>
+                <td>Ticker A</td>
+                <td>New report / Rating change / Earnings review</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Ticker B</td>
+                <td>Target price change / Event update</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="portfolio">
+        <h1 id="12-model-portfolio-tracker">12. Model Portfolio Tracker</h1>
+        <p>Model Portfolio Tracker là nâng cấp quan trọng để kiểm chứng chiến lược. Báo cáo không chỉ nói nên làm gì, mà
+          còn theo dõi danh mục mẫu để biết hệ thống có tạo alpha so với VN30/VN-Index hay không.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Trường</th>
+                <th>Ý nghĩa</th>
+              </tr>
+              <tr>
+                <td>Mã CP</td>
+                <td>Cổ phiếu trong danh mục mẫu</td>
+              </tr>
+              <tr>
+                <td>Tỷ trọng</td>
+                <td>Trọng số trong model portfolio</td>
+              </tr>
+              <tr>
+                <td>Hiệu quả MTD/YTD</td>
+                <td>Đo hiệu quả tháng và từ đầu năm</td>
+              </tr>
+              <tr>
+                <td>Giá hiện tại</td>
+                <td>Giá đóng cửa mới nhất</td>
+              </tr>
+              <tr>
+                <td>Giá mục tiêu PTCB/PTKT</td>
+                <td>Target cơ bản và vùng kỹ thuật</td>
+              </tr>
+              <tr>
+                <td>Giá cắt lỗ</td>
+                <td>Mốc invalidation cho vị thế</td>
+              </tr>
+              <tr>
+                <td>Vốn hóa/GTGD TB</td>
+                <td>Đo quy mô và thanh khoản</td>
+              </tr>
+              <tr>
+                <td>Room ngoại còn lại</td>
+                <td>Quan trọng với mã gần hết room</td>
+              </tr>
+              <tr>
+                <td>Điểm PTKT/Earnings Score</td>
+                <td>Xác nhận kỹ thuật và lợi nhuận</td>
+              </tr>
+              <tr>
+                <td>Thesis chính</td>
+                <td>Lý do nắm giữ</td>
+              </tr>
+              <tr>
+                <td>Action</td>
+                <td>Giữ/Tăng/Giảm/Chốt lời/Loại khỏi danh mục</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Danh mục</th>
+                <th>MTD</th>
+                <th>YTD</th>
+                <th>So với VN30</th>
+                <th>Ghi chú</th>
+              </tr>
+              <tr>
+                <td>Model Portfolio</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>VN30</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>VN-Index</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Alpha</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>Nguồn alpha đến từ allocation, selection hay timing</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="earnings">
+        <h1 id="13-earnings-momentum-engine">13. Earnings Momentum Engine</h1>
+        <p>Trong mùa KQKD, báo cáo phải kiểm tra liệu lợi nhuận doanh nghiệp có xác nhận định giá và dòng tiền hay
+          không. Engine này học từ bảng cập nhật KQKD của SSI và biến thành một module cố định.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Ngành</th>
+                <th>Vốn hóa ngành</th>
+                <th>% vốn hóa đã công bố</th>
+                <th>DTT</th>
+                <th>LNG</th>
+                <th>NPATMI</th>
+                <th>DT YoY</th>
+                <th>NPATMI YoY</th>
+                <th>Biên LNG</th>
+                <th>Biên LNST</th>
+                <th>Earnings Score</th>
+              </tr>
+              <tr>
+                <td>Ngân hàng</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Bất động sản</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Thực phẩm &amp; đồ uống</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Tài nguyên cơ bản</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Dầu khí</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Bán lẻ</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Tổng thị trường</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Thành phần Earnings Score</th>
+                <th>Trọng số</th>
+              </tr>
+              <tr>
+                <td>NPATMI growth YoY</td>
+                <td>30</td>
+              </tr>
+              <tr>
+                <td>Revenue growth YoY</td>
+                <td>15</td>
+              </tr>
+              <tr>
+                <td>Margin expansion</td>
+                <td>20</td>
+              </tr>
+              <tr>
+                <td>% market cap reported</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <td>QoQ earnings trend</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <td>Earnings surprise vs forecast</td>
+                <td>15</td>
+              </tr>
+              <tr>
+                <td>Tổng</td>
+                <td>100</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="valuation">
+        <h1 id="14-forward-valuation-macro-dashboard">14. Forward Valuation &amp; Macro Dashboard</h1>
+        <p>Định giá phải đọc cùng earnings momentum. FW P/E tăng không xấu nếu lợi nhuận đang tăng tốc; nhưng FW P/E
+          tăng trong khi earnings suy yếu là rủi ro. Macro dashboard giúp nối tỷ giá, lãi suất, dầu, hàng hóa và thị
+          trường quốc tế vào sector action.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Chỉ tiêu</th>
+                <th>Hiện tại</th>
+                <th>Trung bình</th>
+                <th>-1SD</th>
+                <th>+1SD</th>
+                <th>-2SD</th>
+                <th>+2SD</th>
+                <th>Đánh giá</th>
+              </tr>
+              <tr>
+                <td>1Y FW P/E</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>TTM P/E</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>P/B</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>ROE</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Earnings Yield</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Equity Risk Premium</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Biến macro</th>
+                <th>Tác động thị trường</th>
+                <th>Ngành hưởng lợi</th>
+                <th>Ngành chịu áp lực</th>
+              </tr>
+              <tr>
+                <td>USD/VND</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>DXY</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Lãi suất/TPCP</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Dầu Brent/WTI</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Thị trường Mỹ/Châu Á</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>Chính sách trong nước</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="derivatives">
+        <h1 id="15-foreign-flow-etf-flow-derivatives-sentiment">15. Foreign Flow, ETF Flow, Derivatives &amp; Sentiment
+        </h1>
+        <p>Khối ngoại, ETF và phái sinh là các lớp tâm lý/dòng tiền quan trọng nhưng phải đọc kèm distortion. Bán ròng
+          không luôn xấu nếu cầu nội hấp thụ; basis dương không luôn tốt nếu OI giảm do short cover.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Nhóm</th>
+                <th>Dữ liệu bắt buộc</th>
+                <th>Cách kết luận</th>
+              </tr>
+              <tr>
+                <td>Khối ngoại</td>
+                <td>Mua/bán ròng theo sàn, mã, ngành, tỷ lệ so với GTGD</td>
+                <td>True outflow hay absorbed selling</td>
+              </tr>
+              <tr>
+                <td>Tự doanh</td>
+                <td>Mua/bán ròng, nhóm ngành, mã chính</td>
+                <td>Đồng thuận hay ngược chiều thị trường</td>
+              </tr>
+              <tr>
+                <td>ETF</td>
+                <td>Flow, review, ATC bất thường</td>
+                <td>Cơ cấu kỹ thuật hay quan điểm đầu tư</td>
+              </tr>
+              <tr>
+                <td>Phái sinh</td>
+                <td>VN30F1M, basis, OI, volume, expiry check</td>
+                <td>Bullish, short-covering, hedging hay nhiễu</td>
+              </tr>
+              <tr>
+                <td>Sentiment</td>
+                <td>Basis intraday, leader/laggard, volatility</td>
+                <td>Risk-on/risk-off ngắn hạn</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Basis</th>
+                <th>OI</th>
+                <th>Cơ sở</th>
+                <th>Kết luận</th>
+              </tr>
+              <tr>
+                <td>Dương</td>
+                <td>Tăng</td>
+                <td>Tăng</td>
+                <td>Bullish xác nhận</td>
+              </tr>
+              <tr>
+                <td>Dương</td>
+                <td>Giảm</td>
+                <td>Tăng</td>
+                <td>Short cover, chưa chắc bền</td>
+              </tr>
+              <tr>
+                <td>Âm</td>
+                <td>Tăng</td>
+                <td>Giảm</td>
+                <td>Bearish/Hedging xác nhận</td>
+              </tr>
+              <tr>
+                <td>Âm</td>
+                <td>Giảm</td>
+                <td>Giảm</td>
+                <td>Đóng vị thế, tín hiệu yếu</td>
+              </tr>
+              <tr>
+                <td>Lệch pha</td>
+                <td>Bất thường</td>
+                <td>Không đồng thuận</td>
+                <td>Cần kiểm tra đáo hạn/kéo trụ</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="technical">
+        <h1 id="16-technical-structure-engine">16. Technical Structure Engine</h1>
+        <p>Technical analysis không được tách khỏi thanh khoản, độ rộng và ngành. Một breakout chỉ được xem là đáng tin
+          khi có volume, breadth và leadership xác nhận.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Yếu tố</th>
+                <th>Cần ghi</th>
+                <th>Ý nghĩa</th>
+              </tr>
+              <tr>
+                <td>Trend 1-5 phiên</td>
+                <td>Higher high/low, candle, intraday</td>
+                <td>Tâm lý ngắn hạn</td>
+              </tr>
+              <tr>
+                <td>Trend 1-4 tuần</td>
+                <td>MA10/20, swing structure</td>
+                <td>Xu hướng trading</td>
+              </tr>
+              <tr>
+                <td>Trend 3-6 tháng</td>
+                <td>MA50/100</td>
+                <td>Xu hướng trung hạn</td>
+              </tr>
+              <tr>
+                <td>MA200</td>
+                <td>Trên/dưới và độ dốc</td>
+                <td>Cấu trúc dài hạn</td>
+              </tr>
+              <tr>
+                <td>RSI/MACD</td>
+                <td>Trạng thái momentum</td>
+                <td>Quá mua/quá bán/xác nhận xu hướng</td>
+              </tr>
+              <tr>
+                <td>Volume</td>
+                <td>So với MA20</td>
+                <td>Xác nhận breakout/breakdown</td>
+              </tr>
+              <tr>
+                <td>Support/Resistance</td>
+                <td>Mốc gần và mốc mạnh</td>
+                <td>Điểm hành động và invalidation</td>
+              </tr>
+              <tr>
+                <td>Invalidation</td>
+                <td>Mốc làm sai kịch bản</td>
+                <td>Điều kiện giảm tỷ trọng</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="scenario">
+        <h1 id="17-scenario-matrix-portfolio-action-engine">17. Scenario Matrix &amp; Portfolio Action Engine</h1>
+        <p>Mỗi báo cáo bắt buộc có bull/base/bear case. Không được dự báo một chiều. Mỗi kịch bản phải có xác suất,
+          trigger, invalidation, vùng điểm và hành động danh mục.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Kịch bản</th>
+                <th>Xác suất</th>
+                <th>Trigger</th>
+                <th>Invalidation</th>
+                <th>Vùng VN-Index</th>
+                <th>Portfolio action</th>
+              </tr>
+              <tr>
+                <td>Bull</td>
+                <td></td>
+                <td>Vượt kháng cự + volume &gt; MA20 + breadth tốt</td>
+                <td>Mất lại vùng breakout</td>
+                <td></td>
+                <td>Tăng chọn lọc leader</td>
+              </tr>
+              <tr>
+                <td>Base</td>
+                <td></td>
+                <td>Dao động trong biên hỗ trợ/kháng cự</td>
+                <td>Break khỏi biên với volume cao</td>
+                <td></td>
+                <td>Giữ/cơ cấu danh mục</td>
+              </tr>
+              <tr>
+                <td>Bear</td>
+                <td></td>
+                <td>Mất hỗ trợ + thanh khoản bán tăng</td>
+                <td>Hồi phục lại hỗ trợ với breadth tốt</td>
+                <td></td>
+                <td>Giảm tỷ trọng/hạ beta</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Regime</th>
+                <th>Cổ phiếu</th>
+                <th>Tiền mặt</th>
+                <th>Margin</th>
+                <th>Chiến lược</th>
+              </tr>
+              <tr>
+                <td>Strong Risk-on</td>
+                <td>75-90%</td>
+                <td>10-25%</td>
+                <td>Có kiểm soát</td>
+                <td>Nắm giữ leader</td>
+              </tr>
+              <tr>
+                <td>Risk-on</td>
+                <td>65-80%</td>
+                <td>20-35%</td>
+                <td>Hạn chế</td>
+                <td>Add on pullback</td>
+              </tr>
+              <tr>
+                <td>Neutral</td>
+                <td>40-60%</td>
+                <td>40-60%</td>
+                <td>Không dùng</td>
+                <td>Chờ xác nhận</td>
+              </tr>
+              <tr>
+                <td>Cautious</td>
+                <td>30-50%</td>
+                <td>50-70%</td>
+                <td>Không dùng</td>
+                <td>Giảm mã yếu</td>
+              </tr>
+              <tr>
+                <td>Risk-off</td>
+                <td>10-30%</td>
+                <td>70-90%</td>
+                <td>Không dùng</td>
+                <td>Phòng thủ</td>
+              </tr>
+              <tr>
+                <td>High Risk</td>
+                <td>0-20%</td>
+                <td>80-100%</td>
+                <td>Không dùng</td>
+                <td>Bảo vệ vốn</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="backtest">
+        <h1 id="18-backtest-calibration-engine">18. Backtest &amp; Calibration Engine</h1>
+        <p>Một hệ thống institutional-grade phải có cơ chế kiểm chứng sau này. Market Score, Sector Score, Earnings
+          Score và Model Portfolio cần được hậu kiểm theo T+1, T+3, T+5, T+20 và theo tháng.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Tín hiệu</th>
+                <th>Horizon cần kiểm tra</th>
+                <th>Metric bắt buộc</th>
+              </tr>
+              <tr>
+                <td>Market Direction Score</td>
+                <td>T+1, T+3, T+5, T+20</td>
+                <td>Hit rate, average return, max drawdown</td>
+              </tr>
+              <tr>
+                <td>Breadth/Liquidity Score</td>
+                <td>T+1, T+5</td>
+                <td>False positive/negative</td>
+              </tr>
+              <tr>
+                <td>Sector Score</td>
+                <td>T+5, T+20</td>
+                <td>Outperformance vs VN-Index</td>
+              </tr>
+              <tr>
+                <td>Earnings Score</td>
+                <td>T+20, T+60</td>
+                <td>Forward return và valuation re-rating</td>
+              </tr>
+              <tr>
+                <td>Derivatives Score</td>
+                <td>T+1, T+3</td>
+                <td>Tín hiệu có predictive value không</td>
+              </tr>
+              <tr>
+                <td>Model Portfolio</td>
+                <td>MTD, YTD, quarterly</td>
+                <td>Alpha, contribution, turnover, drawdown</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Calibration rule</th>
+                <th>Cách xử lý</th>
+              </tr>
+              <tr>
+                <td>Tín hiệu dự báo tốt</td>
+                <td>Tăng trọng số hoặc dùng làm core signal</td>
+              </tr>
+              <tr>
+                <td>Tín hiệu nhiễu</td>
+                <td>Giảm trọng số hoặc chỉ dùng làm context</td>
+              </tr>
+              <tr>
+                <td>False positive cao</td>
+                <td>Thêm điều kiện xác nhận</td>
+              </tr>
+              <tr>
+                <td>Drawdown sau tín hiệu cao</td>
+                <td>Thêm risk budget hoặc stop condition</td>
+              </tr>
+              <tr>
+                <td>Ngành đặc thù hoạt động khác thị trường</td>
+                <td>Tạo sector-specific calibration</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="workflow">
+        <h1 id="19-daily-production-workflow-responsibility-matrix">19. Daily Production Workflow &amp; Responsibility
+          Matrix</h1>
+        <p class="callout callout-output"><strong>V3.4.1 Workflow Note:</strong> Từ phiên bản V3.4.1 trở đi,
+          <strong>Module 27 — Parallel Production Workflow</strong> là workflow vận hành chính thức. Module 19 được giữ
+          lại như một khung tham chiếu tổng thể về trình tự sản xuất báo cáo trong ngày, nhưng không còn là lịch vận
+          hành chi tiết bắt buộc. Khi có khác biệt giữa Module 19 và Module 27, ưu tiên áp dụng Module 27.
+        </p>
+        <p>Workflow giúp báo cáo vận hành đúng giờ, không thiếu dữ liệu và không lệ thuộc vào một người.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Thời gian</th>
+                <th>Công việc</th>
+              </tr>
+              <tr>
+                <td>14:45-15:00</td>
+                <td>Ghi nhận ATC, đóng cửa, high/low trong ngày</td>
+              </tr>
+              <tr>
+                <td>15:00-15:30</td>
+                <td>Cập nhật chỉ số, thanh khoản, độ rộng, ngành</td>
+              </tr>
+              <tr>
+                <td>15:30-16:00</td>
+                <td>Cập nhật khối ngoại, tự doanh, thỏa thuận, phái sinh</td>
+              </tr>
+              <tr>
+                <td>16:00-16:30</td>
+                <td>Tính score, distortion labels và market regime</td>
+              </tr>
+              <tr>
+                <td>16:30-17:00</td>
+                <td>Viết quick highlights, market command, technical view</td>
+              </tr>
+              <tr>
+                <td>17:00-17:30</td>
+                <td>Cập nhật research bridge, model portfolio, earnings nếu có</td>
+              </tr>
+              <tr>
+                <td>17:30-18:00</td>
+                <td>QC, editor review, xuất bản</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Vai trò</th>
+                <th>Nhiệm vụ</th>
+                <th>Output</th>
+              </tr>
+              <tr>
+                <td>Market Strategy</td>
+                <td>Nhận định, kịch bản, kỹ thuật</td>
+                <td>Market call, scenario matrix</td>
+              </tr>
+              <tr>
+                <td>Equity Research</td>
+                <td>Cổ phiếu/ngành/research bridge</td>
+                <td>Stock intelligence, research note</td>
+              </tr>
+              <tr>
+                <td>Data</td>
+                <td>Kiểm tra số liệu, timestamp, discrepancy</td>
+                <td>Data log, QC flag</td>
+              </tr>
+              <tr>
+                <td>Portfolio Strategy</td>
+                <td>Model portfolio, allocation, action score</td>
+                <td>Portfolio tracker, action note</td>
+              </tr>
+              <tr>
+                <td>Editor</td>
+                <td>Chuẩn hóa câu chữ và thiết kế</td>
+                <td>Final report</td>
+              </tr>
+              <tr>
+                <td>Reviewer</td>
+                <td>Rủi ro, disclaimer, compliance</td>
+                <td>Approval note</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="pages">
+        <h1 id="20-page-architecture-final-v3-4">20. Page Architecture Final V3.4.1</h1>
+        <p>Đây là cấu trúc cuối cùng để dùng. Ngày bình thường có thể rút gọn, nhưng các module bên dưới là universe đầy
+          đủ và không nên xóa khỏi master format.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Trang</th>
+                <th>Module</th>
+                <th>Mục tiêu</th>
+              </tr>
+              <tr>
+                <td>Cover</td>
+                <td>OnyxLine&amp;Co opening cover</td>
+                <td>Nhận diện chuyên nghiệp, metadata, author</td>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>Market Command Center</td>
+                <td>Score, regime, portfolio stance, main risk</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Quick Market Highlights</td>
+                <td>Tổng quan, ngành, dòng tiền, kỹ thuật</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Intraday Market Map</td>
+                <td>Diễn biến sáng/chiều/ATC</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Market Quality Dashboard</td>
+                <td>Price, liquidity, breadth, sector, attribution</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>Breadth &amp; Liquidity</td>
+                <td>A/D, MA20 liquidity, cap group, sector flow</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Market Microstructure Dashboard</td>
+                <td>Top impact, volume breakout, foreign flow, thỏa thuận</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td>Sector Rotation</td>
+                <td>Sector score, RS, allocation</td>
+              </tr>
+              <tr>
+                <td>8</td>
+                <td>Stock Intelligence</td>
+                <td>Leader, laggard, breakout, breakdown, watchlist</td>
+              </tr>
+              <tr>
+                <td>9</td>
+                <td>Research Update Bridge</td>
+                <td>Báo cáo cổ phiếu mới, rating/target/KQKD</td>
+              </tr>
+              <tr>
+                <td>10</td>
+                <td>Model Portfolio Tracker</td>
+                <td>Hiệu quả danh mục mẫu và alpha</td>
+              </tr>
+              <tr>
+                <td>11</td>
+                <td>Foreign/ETF/Derivatives</td>
+                <td>Dòng tiền tổ chức và tâm lý phái sinh</td>
+              </tr>
+              <tr>
+                <td>12</td>
+                <td>Technical Structure</td>
+                <td>Trend, MA, RSI, MACD, support/resistance</td>
+              </tr>
+              <tr>
+                <td>13</td>
+                <td>Valuation &amp; Macro</td>
+                <td>FW P/E, P/B, ROE, tỷ giá, lãi suất</td>
+              </tr>
+              <tr>
+                <td>14</td>
+                <td>Earnings Momentum</td>
+                <td>KQKD theo ngành và toàn thị trường</td>
+              </tr>
+              <tr>
+                <td>15</td>
+                <td>Scenario Matrix</td>
+                <td>Bull/base/bear, trigger, invalidation</td>
+              </tr>
+              <tr>
+                <td>16</td>
+                <td>Portfolio Playbook</td>
+                <td>Tỷ trọng, sector allocation, trader/swing/long-term</td>
+              </tr>
+              <tr>
+                <td>17</td>
+                <td>Distortion &amp; Risk Control</td>
+                <td>Kéo trụ, thỏa thuận, ETF, expiry, risk warning</td>
+              </tr>
+              <tr>
+                <td>18</td>
+                <td>Appendix &amp; Disclaimer</td>
+                <td>Data timestamp, rating dictionary, sources, responsibility</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="qc">
+        <h1 id="21-final-quality-gate-khong-duoc-thieu">21. Final Quality Gate — Không được thiếu</h1>
+        <p>Trước khi xuất bản, phải kiểm tra đầy đủ. Nếu một mục trọng yếu không có dữ liệu, phải ghi rõ là chưa cập
+          nhật và giảm Confidence Score thay vì bỏ qua âm thầm.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Check</th>
+                <th>Điều kiện đạt chuẩn</th>
+              </tr>
+              <tr>
+                <td>Data source</td>
+                <td>Mỗi số liệu chính có nguồn và timestamp</td>
+              </tr>
+              <tr>
+                <td>Market score</td>
+                <td>Đã tính Direction, Confidence, Action, Earnings Score</td>
+              </tr>
+              <tr>
+                <td>Distortion</td>
+                <td>Đã kiểm tra kéo trụ, thỏa thuận, ETF, đáo hạn phái sinh</td>
+              </tr>
+              <tr>
+                <td>Earnings</td>
+                <td>Nếu trong mùa KQKD, đã cập nhật % vốn hóa công bố và earnings score</td>
+              </tr>
+              <tr>
+                <td>Portfolio</td>
+                <td>Model portfolio có hiệu quả MTD/YTD và action mới nhất</td>
+              </tr>
+              <tr>
+                <td>Research bridge</td>
+                <td>Báo cáo cổ phiếu mới được đưa vào hoặc xác nhận không có cập nhật</td>
+              </tr>
+              <tr>
+                <td>Scenario</td>
+                <td>Bull/base/bear có trigger và invalidation</td>
+              </tr>
+              <tr>
+                <td>Action</td>
+                <td>Hành động danh mục có tỷ trọng, ngành ưu tiên và điều kiện giảm rủi ro</td>
+              </tr>
+              <tr>
+                <td>Writing</td>
+                <td>Mỗi đoạn quan trọng theo Data → Mechanism → Impact → Action</td>
+              </tr>
+              <tr>
+                <td>Disclaimer</td>
+                <td>Có rating dictionary, responsibility, limitation và nguồn dữ liệu</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card" id="final">
+        <h1 id="22-final-operating-template">22. Final Operating Template</h1>
+        <p>Template cuối cùng cho mỗi ngày gồm: Market Command, Executive Summary, Dashboard, Intraday Narrative, Market
+          Quality, Sector Rotation, Microstructure, Stock Intelligence, Research Bridge, Model Portfolio,
+          Foreign/ETF/Derivatives, Technicals, Valuation/Macro, Earnings, Scenario, Portfolio Action, Risk Control và
+          Appendix.</p>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table class="data-table">
+              <tr>
+                <th>Khối cuối cùng</th>
+                <th>Nội dung bắt buộc</th>
+              </tr>
+              <tr>
+                <td>Market Command</td>
+                <td>Title, regime, Direction/Confidence/Action/Earnings Score, portfolio stance, invalidation level</td>
+              </tr>
+              <tr>
+                <td>Executive Summary</td>
+                <td>Index → liquidity → breadth → leadership → risk → scenario → action</td>
+              </tr>
+              <tr>
+                <td>Dashboard</td>
+                <td>Chỉ số, GTGD, A/D, top contribution, khối ngoại, basis, valuation, macro</td>
+              </tr>
+              <tr>
+                <td>Action Note</td>
+                <td>Tỷ trọng cổ phiếu/tiền mặt, ngành overweight/neutral/underweight, điều kiện tăng/giảm</td>
+              </tr>
+              <tr>
+                <td>Final line</td>
+                <td>Một câu kết luận rõ: giữ, tăng, giảm, chờ hay phòng thủ, và vì sao</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-overview">23. V3.4.1 Institutional Operating Layer — Tổng quan nâng cấp</h1>
+        <p class="callout callout-principle">V3.4.1 bổ sung lớp vận hành cuối cùng cho bản V3.3: không thay đổi “khung
+          xương” của hệ thống, mà hoàn thiện các điểm còn thiếu để team có thể chạy báo cáo độc lập, nhất quán và có thể
+          hậu kiểm.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nhóm nâng cấp</th>
+                <th>Mục tiêu</th>
+                <th>Output mới</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Scoring completeness</td>
+                <td>Định nghĩa đầy đủ Signal Confidence Score và Action Score</td>
+                <td>Bảng trọng số, ngưỡng đọc, rule hành động</td>
+              </tr>
+              <tr>
+                <td>Quantitative control</td>
+                <td>Biến nhãn định tính thành ngưỡng số có thể kiểm tra</td>
+                <td>Distortion thresholds cho index, liquidity, foreign flow, derivatives</td>
+              </tr>
+              <tr>
+                <td>Operating discipline</td>
+                <td>Tách Lite / Standard / Full, workflow song song và RACI</td>
+                <td>Fast-track format, production workflow, responsibility matrix</td>
+              </tr>
+              <tr>
+                <td>System consistency</td>
+                <td>Làm rõ dữ liệu chạy giữa các module như thế nào</td>
+                <td>Dependency map, conflict protocol, cascade rules</td>
+              </tr>
+              <tr>
+                <td>Onboarding readiness</td>
+                <td>Giúp analyst mới hiểu và chạy hệ thống nhanh hơn</td>
+                <td>Glossary, rating dictionary, ví dụ điền mẫu, change log</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Nguyên tắc V3.4.1: mọi điểm số phải có công thức, mọi nhãn phải có ngưỡng,
+          mọi hành động phải có trigger và invalidation, mọi module phải có người chịu trách nhiệm.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-scoring">24. Scoring Completeness — Signal Confidence Score và Action Score</h1>
+        <p class="callout callout-principle">Market Direction Score cho biết thị trường nghiêng về hướng nào. Signal
+          Confidence Score cho biết tín hiệu đó có sạch và đáng tin không. Action Score cho biết có nên hành động ở vùng
+          giá hiện tại không.</p>
+        <h2 id="23-1-signal-confidence-score">23.1 Signal Confidence Score</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Trọng số</th>
+                <th>Cách chấm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Data Quality</td>
+                <td>15</td>
+                <td>Dữ liệu có nguồn chính/phụ, timestamp rõ, không lệch vượt ngưỡng sai số</td>
+              </tr>
+              <tr>
+                <td>Price–Volume Confirmation</td>
+                <td>15</td>
+                <td>Giá và thanh khoản cùng xác nhận xu hướng</td>
+              </tr>
+              <tr>
+                <td>Breadth Confirmation</td>
+                <td>15</td>
+                <td>A/D Ratio, số ngành tăng và % cổ phiếu trên MA xác nhận hướng đi của chỉ số</td>
+              </tr>
+              <tr>
+                <td>Sector Confirmation</td>
+                <td>12</td>
+                <td>Có ngành dẫn dắt rõ, không chỉ một vài mã riêng lẻ</td>
+              </tr>
+              <tr>
+                <td>Attribution Cleanliness</td>
+                <td>10</td>
+                <td>Top trụ không làm méo biến động chỉ số</td>
+              </tr>
+              <tr>
+                <td>Foreign/Institutional Consistency</td>
+                <td>8</td>
+                <td>Khối ngoại, tự doanh, ETF không mâu thuẫn quá mạnh với thị trường</td>
+              </tr>
+              <tr>
+                <td>Derivatives Confirmation</td>
+                <td>7</td>
+                <td>Basis, OI và VN30F1M đồng thuận với thị trường cơ sở</td>
+              </tr>
+              <tr>
+                <td>Distortion Risk</td>
+                <td>10</td>
+                <td>Không có ETF review, block trade, đáo hạn phái sinh hoặc kéo trụ bất thường</td>
+              </tr>
+              <tr>
+                <td>Scenario Clarity</td>
+                <td>8</td>
+                <td>Bull/base/bear có trigger và invalidation rõ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Điểm</th>
+                <th>Mức tin cậy</th>
+                <th>Cách đọc</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>85–100</td>
+                <td>Very High Confidence</td>
+                <td>Tín hiệu sạch, có thể hành động theo kịch bản chính</td>
+              </tr>
+              <tr>
+                <td>70–84</td>
+                <td>High Confidence</td>
+                <td>Tín hiệu đáng tin, nhưng vẫn quản trị vị thế</td>
+              </tr>
+              <tr>
+                <td>55–69</td>
+                <td>Moderate Confidence</td>
+                <td>Hành động chọn lọc, không dùng margin cao</td>
+              </tr>
+              <tr>
+                <td>40–54</td>
+                <td>Low Confidence</td>
+                <td>Tín hiệu nhiễu, ưu tiên quan sát</td>
+              </tr>
+              <tr>
+                <td>&lt;40</td>
+                <td>Very Low Confidence</td>
+                <td>Không ra quyết định lớn dựa trên phiên này</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="23-2-action-score">23.2 Action Score</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Trọng số</th>
+                <th>Cách chấm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction</td>
+                <td>20</td>
+                <td>Regime thị trường có ủng hộ hành động không</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence</td>
+                <td>15</td>
+                <td>Tín hiệu có sạch và không bị distortion không</td>
+              </tr>
+              <tr>
+                <td>Entry Quality</td>
+                <td>20</td>
+                <td>Điểm vào gần hỗ trợ/pullback/nền tích lũy hay đang mua đuổi</td>
+              </tr>
+              <tr>
+                <td>Risk/Reward</td>
+                <td>15</td>
+                <td>Upside/downside tối thiểu đạt 1:2</td>
+              </tr>
+              <tr>
+                <td>Sector Alignment</td>
+                <td>10</td>
+                <td>Cổ phiếu/ngành đồng thuận với Sector Score</td>
+              </tr>
+              <tr>
+                <td>Liquidity Suitability</td>
+                <td>7</td>
+                <td>Thanh khoản đủ để vào/ra vị thế</td>
+              </tr>
+              <tr>
+                <td>Portfolio Fit</td>
+                <td>7</td>
+                <td>Phù hợp với tỷ trọng/risk budget hiện tại</td>
+              </tr>
+              <tr>
+                <td>Invalidation Clarity</td>
+                <td>6</td>
+                <td>Có stop-loss/invalidation rõ ràng</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Action Score</th>
+                <th>Hành động chuẩn</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>85–100</td>
+                <td>Có thể hành động mạnh nhưng vẫn theo sizing rule</td>
+              </tr>
+              <tr>
+                <td>70–84</td>
+                <td>Tăng tỷ trọng chọn lọc</td>
+              </tr>
+              <tr>
+                <td>55–69</td>
+                <td>Mua từng phần hoặc chờ pullback</td>
+              </tr>
+              <tr>
+                <td>40–54</td>
+                <td>Giữ/chờ xác nhận</td>
+              </tr>
+              <tr>
+                <td>25–39</td>
+                <td>Giảm rủi ro, không mở vị thế mới</td>
+              </tr>
+              <tr>
+                <td>&lt;25</td>
+                <td>Phòng thủ, ưu tiên tiền mặt</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-output">Nếu Market Direction cao nhưng Action Score thấp: kết luận chuẩn là “thị
+          trường tích cực nhưng điểm mua không còn tối ưu; ưu tiên nắm giữ, không mua đuổi”.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-distortion">25. Quantitative Distortion Thresholds — Ngưỡng định lượng chống méo tín hiệu</h1>
+        <p class="callout callout-principle">V3.4.1 biến Distortion Control từ checklist định tính thành hệ thống nhãn
+          có ngưỡng định lượng. Mục tiêu là để hai analyst nhìn cùng một phiên phải ra nhãn tương đối giống nhau.</p>
+        <h2 id="24-1-index-distortion">24.1 Index Distortion</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nhãn</th>
+                <th>Điều kiện định lượng</th>
+                <th>Ý nghĩa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Clean Advance</td>
+                <td>VN-Index tăng, A/D &gt;1.5, top 5 đóng góp &lt;45% mức tăng</td>
+                <td>Tăng lan tỏa</td>
+              </tr>
+              <tr>
+                <td>Large-cap Driven</td>
+                <td>Top 3 đóng góp &gt;45% hoặc top 5 &gt;65% mức tăng</td>
+                <td>Tăng phụ thuộc trụ</td>
+              </tr>
+              <tr>
+                <td>Narrow Rally</td>
+                <td>VN-Index tăng nhưng A/D &lt;1.0 hoặc số ngành tăng &lt;40%</td>
+                <td>Chỉ số xanh nhưng bên trong yếu</td>
+              </tr>
+              <tr>
+                <td>Hidden Weakness</td>
+                <td>VN-Index/VN30 tăng nhưng mid/smallcap giảm</td>
+                <td>Dòng tiền chỉ tập trung bluechip</td>
+              </tr>
+              <tr>
+                <td>False Weakness</td>
+                <td>VN-Index giảm nhưng A/D &gt;1.2 và top 3 mã đè &gt;50% mức giảm</td>
+                <td>Chỉ số bị vài mã lớn kéo xuống</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="24-2-liquidity-distortion">24.2 Liquidity Distortion</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nhãn</th>
+                <th>Điều kiện định lượng</th>
+                <th>Ý nghĩa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Healthy Liquidity Expansion</td>
+                <td>GTGD khớp lệnh &gt;120% MA20, index tăng, A/D &gt;1.3</td>
+                <td>Dòng tiền xác nhận</td>
+              </tr>
+              <tr>
+                <td>Distribution Liquidity</td>
+                <td>GTGD khớp lệnh &gt;120% MA20, index giảm hoặc đóng gần thấp nhất ngày</td>
+                <td>Bán chủ động/phân phối</td>
+              </tr>
+              <tr>
+                <td>Speculative Liquidity Spike</td>
+                <td>Top 10 mã thanh khoản &gt;35% GTGD và tập trung nhóm đầu cơ</td>
+                <td>Dòng tiền lệch</td>
+              </tr>
+              <tr>
+                <td>Block-trade Distortion</td>
+                <td>Giao dịch thỏa thuận &gt;25% tổng GTGD</td>
+                <td>GTGD tổng bị méo</td>
+              </tr>
+              <tr>
+                <td>Illiquid Rebound</td>
+                <td>Index tăng nhưng GTGD &lt;80% MA20</td>
+                <td>Hồi thiếu xác nhận</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="24-3-foreign-flow-va-derivatives-distortion">24.3 Foreign Flow và Derivatives Distortion</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nhãn</th>
+                <th>Điều kiện định lượng</th>
+                <th>Ý nghĩa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>True Foreign Outflow</td>
+                <td>Bán ròng &gt;1.000 tỷ, tập trung bluechip, giá giảm theo</td>
+                <td>Áp lực ngoại thật</td>
+              </tr>
+              <tr>
+                <td>Absorbed Selling</td>
+                <td>Bán ròng &gt;500 tỷ nhưng nhóm bị bán giảm &lt;0.3% hoặc vẫn tăng</td>
+                <td>Cầu nội hấp thụ tốt</td>
+              </tr>
+              <tr>
+                <td>Stock-specific Selling</td>
+                <td>&gt;60% bán ròng tập trung ở 1–3 mã</td>
+                <td>Rủi ro riêng lẻ</td>
+              </tr>
+              <tr>
+                <td>Clean Bullish Derivatives</td>
+                <td>Basis dương &gt;3 điểm, OI tăng, VN30 tăng</td>
+                <td>Tâm lý tích cực rõ</td>
+              </tr>
+              <tr>
+                <td>Short Covering</td>
+                <td>Basis tăng nhưng OI giảm</td>
+                <td>Đóng short, không phải long mới</td>
+              </tr>
+              <tr>
+                <td>Expiry Distortion</td>
+                <td>Tuần đáo hạn, basis/OI biến động &gt;2SD</td>
+                <td>Tín hiệu phái sinh kém tin cậy</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Nếu Distortion Control gắn nhãn High Distortion, Signal Confidence Score
+          không được vượt 70; nếu distortion rất nặng, không được dùng phiên đó làm tín hiệu core cho hành động lớn.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-valuation-baseline">26. Valuation Baseline Protocol — Chuẩn hóa giai đoạn so sánh định giá</h1>
+        <p class="callout callout-principle">Valuation Dashboard phải quy định rõ baseline period. Nếu mỗi người dùng
+          một giai đoạn tính SD khác nhau, cùng một P/E có thể bị gọi là rẻ hoặc đắt khác nhau.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Chỉ tiêu</th>
+                <th>Baseline chính</th>
+                <th>Baseline phụ</th>
+                <th>Lý do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1Y Forward P/E VN-Index</td>
+                <td>5 năm rolling</td>
+                <td>3 năm rolling</td>
+                <td>Forward P/E phản ánh kỳ vọng, ưu tiên chu kỳ gần</td>
+              </tr>
+              <tr>
+                <td>TTM P/E VN-Index</td>
+                <td>10 năm</td>
+                <td>5 năm</td>
+                <td>Bao phủ đủ chu kỳ lợi nhuận</td>
+              </tr>
+              <tr>
+                <td>P/B VN-Index</td>
+                <td>10 năm</td>
+                <td>5 năm</td>
+                <td>P/B ổn định hơn P/E</td>
+              </tr>
+              <tr>
+                <td>ROE thị trường</td>
+                <td>10 năm</td>
+                <td>5 năm</td>
+                <td>Đọc cùng P/B để tránh sai lệch định giá</td>
+              </tr>
+              <tr>
+                <td>Earnings Yield Spread</td>
+                <td>5 năm</td>
+                <td>3 năm</td>
+                <td>Phụ thuộc môi trường lãi suất</td>
+              </tr>
+              <tr>
+                <td>Sector P/E/P/B</td>
+                <td>5 năm</td>
+                <td>3 năm</td>
+                <td>Tránh ngành đổi cấu trúc quá lâu</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Điều kiện</th>
+                <th>Nhãn valuation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>P/E &lt; -1SD và Earnings Score &gt;60</td>
+                <td>Attractive valuation</td>
+              </tr>
+              <tr>
+                <td>P/E gần trung bình và Earnings Score &gt;65</td>
+                <td>Fair valuation with earnings support</td>
+              </tr>
+              <tr>
+                <td>P/E &gt; +1SD nhưng Earnings Score &gt;80</td>
+                <td>Premium justified by earnings acceleration</td>
+              </tr>
+              <tr>
+                <td>P/E &gt; +1SD và Earnings Score &lt;50</td>
+                <td>Valuation risk</td>
+              </tr>
+              <tr>
+                <td>P/E &gt; +2SD</td>
+                <td>Stretched valuation</td>
+              </tr>
+              <tr>
+                <td>P/E thấp nhưng Earnings Score &lt;35</td>
+                <td>Value trap risk</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-output">Mỗi valuation chart phải ghi rõ: TTM/forward, rolling period, nguồn dữ liệu,
+          ngày định giá, có loại bỏ outlier hay không, và sector có thay đổi cấu phần lớn hay không.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-fasttrack-workflow">27. Fast-Track Format và Production Workflow — Lite / Standard / Full</h1>
+        <p class="callout callout-principle">Không phải ngày nào cũng cần Full Report. V3.4.1 chuẩn hóa ba mức báo cáo
+          để team không rút gọn tùy tiện.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tier</th>
+                <th>Khi dùng</th>
+                <th>Module bắt buộc</th>
+                <th>Độ dài gợi ý</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Lite</td>
+                <td>Thị trường ít biến động, thanh khoản thấp, không có tin lớn</td>
+                <td>Market Command, Quick Highlights, 3 Scores, Breadth/Liquidity Snapshot, Scenario, Portfolio Action
+                </td>
+                <td>4–6 trang</td>
+              </tr>
+              <tr>
+                <td>Standard</td>
+                <td>Ngày bình thường</td>
+                <td>Lite + Market Quality, Microstructure, Sector Rotation, Foreign/Derivatives, Technical, Model
+                  Portfolio</td>
+                <td>8–12 trang</td>
+              </tr>
+              <tr>
+                <td>Full</td>
+                <td>Breakout/breakdown, risk-off, ETF review, đáo hạn, mùa KQKD, tin vĩ mô lớn</td>
+                <td>Standard + Earnings Momentum, Research Bridge, Distortion Deep Dive, Stock Intelligence, Cascade
+                  Rules</td>
+                <td>14–22 trang</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="26-1-workflow-song-song">26.1 Workflow song song</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Nhóm phụ trách</th>
+                <th>Công việc</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Trước 9:00</td>
+                <td>Equity Research</td>
+                <td>Cập nhật report mới, rating change, target price change</td>
+              </tr>
+              <tr>
+                <td>9:00–14:45</td>
+                <td>Market Strategy</td>
+                <td>Theo dõi intraday, điểm đảo chiều, ngành dẫn dắt</td>
+              </tr>
+              <tr>
+                <td>14:45–15:15</td>
+                <td>Data</td>
+                <td>Chốt index, thanh khoản, độ rộng, top kéo/đè</td>
+              </tr>
+              <tr>
+                <td>15:15–15:45</td>
+                <td>Data + Strategy</td>
+                <td>Microstructure dashboard, distortion preliminary labels</td>
+              </tr>
+              <tr>
+                <td>15:30–16:15</td>
+                <td>Flow/Derivatives</td>
+                <td>Basis, OI, khối ngoại, tự doanh, ETF</td>
+              </tr>
+              <tr>
+                <td>16:00–17:00</td>
+                <td>Earnings Analyst</td>
+                <td>KQKD, Earnings Score, sector earnings table</td>
+              </tr>
+              <tr>
+                <td>16:15–17:00</td>
+                <td>Market Strategy</td>
+                <td>Market Direction, Confidence, Action Score</td>
+              </tr>
+              <tr>
+                <td>17:00–17:30</td>
+                <td>Portfolio Strategy</td>
+                <td>Portfolio stance, sector allocation, model portfolio</td>
+              </tr>
+              <tr>
+                <td>17:30–18:00</td>
+                <td>Editor</td>
+                <td>Logic check, wording, chart/table polish</td>
+              </tr>
+              <tr>
+                <td>18:00–18:15</td>
+                <td>Reviewer</td>
+                <td>Final QA, publish approval</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-output">Trong mùa KQKD, Earnings Update chạy song song từ 16:00; nếu có trên 5 doanh
+          nghiệp lớn công bố cùng ngày, chỉ đưa vào daily các doanh nghiệp ảnh hưởng &gt;3% vốn hóa ngành, phần còn lại
+          cập nhật T+1.</p>
+        <h2 id="27-4-lite-format-scoring-adjustment-rule">27.4 Lite Format Scoring Adjustment Rule</h2>
+        <p class="callout callout-principle">Khi báo cáo chạy theo <strong>Lite Format</strong>, Action Score vẫn được
+          tính nhưng phải gắn nhãn <strong>Action Score — Provisional Lite Estimate</strong>, vì một số input chưa được
+          cập nhật đầy đủ như trong Standard hoặc Full Report.</p>
+        <h3>Entry Quality trong Lite Format</h3>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Trường hợp</th>
+                <th>Cách chấm Entry Quality</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Có cập nhật hỗ trợ/kháng cự T+0</td>
+                <td>Chấm bình thường tối đa 20/20</td>
+                <td>Dữ liệu kỹ thuật đủ dùng</td>
+              </tr>
+              <tr>
+                <td>Không có full Technical Structure nhưng có giá đóng cửa, high/low, vùng hỗ trợ cũ</td>
+                <td>Tối đa 14/20</td>
+                <td>Dùng technical proxy</td>
+              </tr>
+              <tr>
+                <td>Chỉ có dữ liệu điểm số, không có vùng hỗ trợ/kháng cự mới</td>
+                <td>Mặc định 10/20</td>
+                <td>Neutral score</td>
+              </tr>
+              <tr>
+                <td>Giá gần kháng cự/mua đuổi nhưng chưa có phân tích kỹ thuật đầy đủ</td>
+                <td>Tối đa 8/20</td>
+                <td>Không nâng Action Score quá cao</td>
+              </tr>
+              <tr>
+                <td>Không xác định được stop-loss/invalidation</td>
+                <td>Tối đa 8/20</td>
+                <td>Không khuyến nghị mua mới</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Technical Proxy cho Lite Format</h3>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Proxy</th>
+                <th>Cách đọc</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Close Location Value</td>
+                <td>Đóng cửa gần cao nhất ngày là tích cực, gần thấp nhất ngày là tiêu cực</td>
+              </tr>
+              <tr>
+                <td>Distance to nearest support</td>
+                <td>Càng gần hỗ trợ đáng tin thì Entry Quality càng tốt</td>
+              </tr>
+              <tr>
+                <td>Distance to nearest resistance</td>
+                <td>Càng gần kháng cự thì giảm điểm mua mới</td>
+              </tr>
+              <tr>
+                <td>Volume confirmation</td>
+                <td>Giá tăng kèm volume cao tốt hơn giá tăng volume thấp</td>
+              </tr>
+              <tr>
+                <td>Previous full-report support/resistance</td>
+                <td>Được dùng tối đa 3 phiên nếu chưa bị invalidate</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Sector Alignment trong Lite Format</h3>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Trường hợp</th>
+                <th>Cách chấm Sector Alignment</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Có Sector Snapshot T+0</td>
+                <td>Chấm bình thường tối đa 10/10</td>
+                <td>Dùng biến động ngành trong ngày</td>
+              </tr>
+              <tr>
+                <td>Không có full Sector Rotation nhưng có ngành dẫn dắt/suy yếu</td>
+                <td>Tối đa 7/10</td>
+                <td>Dùng snapshot rút gọn</td>
+              </tr>
+              <tr>
+                <td>Không cập nhật sector trong ngày</td>
+                <td>Mặc định 5/10</td>
+                <td>Neutral score</td>
+              </tr>
+              <tr>
+                <td>Dữ liệu ngành cũ quá 3 phiên</td>
+                <td>Tối đa 5/10</td>
+                <td>Không dùng làm tín hiệu mạnh</td>
+              </tr>
+              <tr>
+                <td>Ngành của cổ phiếu trái chiều thị trường hoặc suy yếu rõ</td>
+                <td>Tối đa 4/10</td>
+                <td>Không khuyến nghị tăng tỷ trọng mạnh</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Action Score cap trong Lite Format</h3>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Điều kiện</th>
+                <th>Giới hạn Action Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Lite Format có technical proxy và sector snapshot</td>
+                <td>Tối đa 75</td>
+              </tr>
+              <tr>
+                <td>Lite Format thiếu Technical Structure đầy đủ</td>
+                <td>Tối đa 70</td>
+              </tr>
+              <tr>
+                <td>Lite Format thiếu cả Sector Snapshot và Technical Proxy</td>
+                <td>Tối đa 60</td>
+              </tr>
+              <tr>
+                <td>Không có invalidation level rõ</td>
+                <td>Tối đa 55</td>
+              </tr>
+              <tr>
+                <td>Có distortion risk cao</td>
+                <td>Tối đa 50</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Trong Lite Format, không được dùng kết luận “tăng tỷ trọng mạnh” nếu
+          Action Score là Provisional. Nếu Action Score &gt;70 nhưng là Lite Estimate, phải ghi: “Tín hiệu tích cực
+          nhưng cần xác nhận thêm bằng Standard/Full Technical và Sector Review.”</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-raci">28. RACI Matrix — Ma trận trách nhiệm vận hành</h1>
+        <p class="callout callout-principle">RACI giúp trả lời rõ ai làm, ai chịu trách nhiệm cuối, ai cần tham vấn và
+          ai chỉ cần được thông báo. Đây là điều kiện để hệ thống chạy độc lập bởi nhiều analyst.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Module</th>
+                <th>Responsible</th>
+                <th>Accountable</th>
+                <th>Consulted</th>
+                <th>Informed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Command Center</td>
+                <td>Market Strategy</td>
+                <td>Head of Research</td>
+                <td>Data, Portfolio</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Market Score</td>
+                <td>Market Strategy</td>
+                <td>Head of Research</td>
+                <td>Data</td>
+                <td>Portfolio</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence Score</td>
+                <td>Market Strategy</td>
+                <td>Head of Research</td>
+                <td>Data, Derivatives</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Action Score</td>
+                <td>Portfolio Strategy</td>
+                <td>CIO/Portfolio Lead</td>
+                <td>Market Strategy</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Distortion Labels</td>
+                <td>Data + Market Strategy</td>
+                <td>Head of Research</td>
+                <td>Derivatives, Flow Analyst</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Sector Rotation</td>
+                <td>Sector Analyst</td>
+                <td>Head of Research</td>
+                <td>Market Strategy</td>
+                <td>Portfolio</td>
+              </tr>
+              <tr>
+                <td>Earnings Momentum</td>
+                <td>Earnings Analyst</td>
+                <td>Head of Equity Research</td>
+                <td>Sector Analyst</td>
+                <td>Portfolio</td>
+              </tr>
+              <tr>
+                <td>Research Update Bridge</td>
+                <td>Equity Analyst</td>
+                <td>Head of Equity Research</td>
+                <td>Editor</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Model Portfolio Tracker</td>
+                <td>Portfolio Strategy</td>
+                <td>CIO/Portfolio Lead</td>
+                <td>Market Strategy</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Scenario Matrix</td>
+                <td>Market Strategy</td>
+                <td>Head of Research</td>
+                <td>Portfolio Strategy</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Final Wording</td>
+                <td>Editor</td>
+                <td>Head of Research</td>
+                <td>Analyst owner</td>
+                <td>Team</td>
+              </tr>
+              <tr>
+                <td>Publish Approval</td>
+                <td>Reviewer</td>
+                <td>Head of Research</td>
+                <td>Editor</td>
+                <td>All users</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Conflict rule: nếu hai người không thống nhất về Distortion Label, Data
+          Analyst trình số liệu, Market Strategy đề xuất nhãn, Head of Research quyết định cuối. Nếu chưa đủ dữ liệu,
+          dùng nhãn “Unconfirmed Distortion Risk”.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-dependency-conflict">29. Inter-Module Dependency Map và Signal Conflict Protocol</h1>
+        <p class="callout callout-principle">Dependency Map cho thấy dữ liệu chạy từ module nào sang module nào. Nếu
+          không có map này, người mới sẽ không biết một điểm số hoặc nhãn rủi ro ảnh hưởng đến phần nào của báo cáo.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Module nguồn</th>
+                <th>Module nhận</th>
+                <th>Cơ chế truyền dữ liệu</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Data Validation</td>
+                <td>Signal Confidence Score</td>
+                <td>Dữ liệu lỗi làm giảm confidence</td>
+              </tr>
+              <tr>
+                <td>Distortion Control</td>
+                <td>Signal Confidence Score</td>
+                <td>Distortion nặng tự động trừ điểm</td>
+              </tr>
+              <tr>
+                <td>Earnings Momentum</td>
+                <td>Market Direction Score</td>
+                <td>Earnings Score quy đổi thành 10 điểm</td>
+              </tr>
+              <tr>
+                <td>Sector Rotation</td>
+                <td>Scenario Matrix</td>
+                <td>Ngành dẫn dắt quyết định sector preference trong bull/base</td>
+              </tr>
+              <tr>
+                <td>Foreign Flow</td>
+                <td>Market Quality + Scenario</td>
+                <td>Flow ảnh hưởng confidence và risk</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>Market Quality</td>
+                <td>Basis/OI xác nhận hoặc phủ định tâm lý ngắn hạn</td>
+              </tr>
+              <tr>
+                <td>Valuation Dashboard</td>
+                <td>Action Score</td>
+                <td>Định giá căng làm giảm khả năng mua mới</td>
+              </tr>
+              <tr>
+                <td>Technical Structure</td>
+                <td>Scenario Matrix</td>
+                <td>Hỗ trợ/kháng cự là trigger/invalidation</td>
+              </tr>
+              <tr>
+                <td>Model Portfolio Tracker</td>
+                <td>Portfolio Playbook</td>
+                <td>Hiệu quả danh mục quyết định tái cơ cấu</td>
+              </tr>
+              <tr>
+                <td>Backtest Engine</td>
+                <td>Market Score Calibration</td>
+                <td>Dùng để chỉnh trọng số định kỳ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="28-1-conflict-resolution-protocol">28.1 Conflict Resolution Protocol</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tổ hợp tín hiệu</th>
+                <th>Kết luận chuẩn</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Index tăng + volume tăng + breadth tốt</td>
+                <td>Risk-on xác nhận</td>
+                <td>Giữ/tăng chọn lọc</td>
+              </tr>
+              <tr>
+                <td>Index tăng + volume thấp + breadth xấu</td>
+                <td>Hồi yếu/kéo trụ</td>
+                <td>Không mua đuổi</td>
+              </tr>
+              <tr>
+                <td>Index tăng + khối ngoại bán mạnh + giá hấp thụ tốt</td>
+                <td>Nội hấp thụ tốt</td>
+                <td>Theo dõi tiếp, không quá tiêu cực</td>
+              </tr>
+              <tr>
+                <td>Index tăng + basis âm + OI tăng</td>
+                <td>Có hedging, cẩn trọng</td>
+                <td>Không tăng margin</td>
+              </tr>
+              <tr>
+                <td>Index giảm + volume thấp + breadth không quá xấu</td>
+                <td>Điều chỉnh kỹ thuật</td>
+                <td>Canh hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Index giảm + volume cao + breadth xấu</td>
+                <td>Risk-off</td>
+                <td>Giảm beta</td>
+              </tr>
+              <tr>
+                <td>Sector tăng mạnh nhưng earnings yếu</td>
+                <td>Momentum ngắn hạn</td>
+                <td>Chỉ trading, không overweight dài hạn</td>
+              </tr>
+              <tr>
+                <td>Tin tốt + giá giảm + volume cao</td>
+                <td>Tin đã phản ánh hoặc bị bán vào tin</td>
+                <td>Không nâng rating</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-earnings-integration">30. Earnings Score Integration — Quy đổi KQKD vào Market Direction Score</h1>
+        <p class="callout callout-principle">Earnings Score là một module độc lập nhưng phải được ánh xạ rõ vào Market
+          Direction Score. V3.4.1 định nghĩa cách quy đổi để tránh việc mỗi analyst tự cộng điểm khác nhau.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Earnings Score M13</th>
+                <th>Điểm quy đổi vào Market Direction Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>85–100</td>
+                <td>10/10</td>
+              </tr>
+              <tr>
+                <td>70–84</td>
+                <td>8/10</td>
+              </tr>
+              <tr>
+                <td>55–69</td>
+                <td>6/10</td>
+              </tr>
+              <tr>
+                <td>40–54</td>
+                <td>4/10</td>
+              </tr>
+              <tr>
+                <td>25–39</td>
+                <td>2/10</td>
+              </tr>
+              <tr>
+                <td>&lt;25</td>
+                <td>0/10</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Giai đoạn</th>
+                <th>Cách dùng Earnings Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Ngoài mùa KQKD</td>
+                <td>Giữ neutral 5/10, trừ khi có profit warning/guidance</td>
+              </tr>
+              <tr>
+                <td>Đầu mùa KQKD, &lt;40% vốn hóa đã công bố</td>
+                <td>Chỉ dùng như preliminary signal</td>
+              </tr>
+              <tr>
+                <td>40–70% vốn hóa đã công bố</td>
+                <td>Dùng 50% trọng số</td>
+              </tr>
+              <tr>
+                <td>&gt;70% vốn hóa đã công bố</td>
+                <td>Dùng đầy đủ 10 điểm</td>
+              </tr>
+              <tr>
+                <td>Ngành trọng yếu công bố kết quả bất thường</td>
+                <td>Cho phép sector-specific override</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-output">Override rule: nếu Sector Price Score cao nhưng Earnings Score &lt;35, không
+          được xếp Overweight dài hạn; chỉ được ghi là trading momentum hoặc short-term flow opportunity.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-cascade">31. Invalidation Cascade Rules — Khi kịch bản sai thì hệ thống tự hạ rủi ro</h1>
+        <p class="callout callout-principle">Khi kịch bản bị vô hiệu, hệ thống phải tự động kéo theo thay đổi ở
+          Portfolio Action và risk budget. Đây là cascade rule để tránh xử lý ad-hoc.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Sự kiện</th>
+                <th>Tác động tự động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Bull case bị invalidate</td>
+                <td>Hạ Action Score tối thiểu 15 điểm</td>
+              </tr>
+              <tr>
+                <td>Base case bị invalidate xuống Bear</td>
+                <td>Tỷ trọng cổ phiếu đề xuất giảm một bậc</td>
+              </tr>
+              <tr>
+                <td>VN-Index mất hỗ trợ chính với volume &gt;120% MA20</td>
+                <td>Margin về 0</td>
+              </tr>
+              <tr>
+                <td>Breadth chuyển xấu mạnh, A/D &lt;0.5</td>
+                <td>Không mở vị thế mới</td>
+              </tr>
+              <tr>
+                <td>Sector leader mất hỗ trợ</td>
+                <td>Hạ sector allocation từ Overweight xuống Neutral</td>
+              </tr>
+              <tr>
+                <td>Model portfolio underperform benchmark &gt;3% MTD</td>
+                <td>Bắt buộc review tỷ trọng</td>
+              </tr>
+              <tr>
+                <td>Khối ngoại bán ròng &gt;1.000 tỷ trong 3 phiên liên tiếp</td>
+                <td>Tăng risk flag lên một cấp</td>
+              </tr>
+              <tr>
+                <td>Distortion High Risk</td>
+                <td>Confidence Score không vượt 60</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mức cascade</th>
+                <th>Điều kiện</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Level 1 — Watch</td>
+                <td>Một tín hiệu yếu đi</td>
+                <td>Ghi chú theo dõi</td>
+              </tr>
+              <tr>
+                <td>Level 2 — Reduce Risk</td>
+                <td>Hai tín hiệu chính mâu thuẫn</td>
+                <td>Không mua mới, giảm mã yếu</td>
+              </tr>
+              <tr>
+                <td>Level 3 — De-risk</td>
+                <td>Mất hỗ trợ hoặc breadth xấu</td>
+                <td>Giảm tỷ trọng beta cao</td>
+              </tr>
+              <tr>
+                <td>Level 4 — Defensive</td>
+                <td>Breakdown + volume cao + breadth xấu</td>
+                <td>Tiền mặt ưu tiên, margin 0</td>
+              </tr>
+              <tr>
+                <td>Level 5 — Emergency</td>
+                <td>Risk event hệ thống</td>
+                <td>Dừng khuyến nghị trading, chờ dữ liệu mới</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-glossary">32. Glossary và Rating Dictionary — Chuẩn hóa thuật ngữ cho analyst mới</h1>
+        <h2 id="31-1-market-glossary">31.1 Market Glossary</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thuật ngữ</th>
+                <th>Định nghĩa chuẩn</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>GTGD</td>
+                <td>Giá trị giao dịch, thường tính bằng tỷ đồng</td>
+              </tr>
+              <tr>
+                <td>KLGD</td>
+                <td>Khối lượng giao dịch, thường tính bằng cổ phiếu</td>
+              </tr>
+              <tr>
+                <td>GTGD khớp lệnh</td>
+                <td>Giá trị giao dịch qua khớp lệnh, không gồm thỏa thuận</td>
+              </tr>
+              <tr>
+                <td>Giao dịch thỏa thuận</td>
+                <td>Giao dịch được thỏa thuận riêng, có thể làm méo GTGD tổng</td>
+              </tr>
+              <tr>
+                <td>A/D Ratio</td>
+                <td>Số mã tăng chia cho số mã giảm</td>
+              </tr>
+              <tr>
+                <td>Basis</td>
+                <td>Giá hợp đồng tương lai trừ chỉ số cơ sở</td>
+              </tr>
+              <tr>
+                <td>OI</td>
+                <td>Open Interest, số lượng hợp đồng phái sinh còn mở</td>
+              </tr>
+              <tr>
+                <td>Room ngoại</td>
+                <td>Tỷ lệ sở hữu còn lại cho nhà đầu tư nước ngoài</td>
+              </tr>
+              <tr>
+                <td>TTM</td>
+                <td>Trailing Twelve Months, 12 tháng gần nhất</td>
+              </tr>
+              <tr>
+                <td>Forward P/E</td>
+                <td>P/E dựa trên EPS dự phóng 12 tháng tới</td>
+              </tr>
+              <tr>
+                <td>NPATMI</td>
+                <td>Lợi nhuận sau thuế thuộc cổ đông công ty mẹ</td>
+              </tr>
+              <tr>
+                <td>Risk budget</td>
+                <td>Mức rủi ro tối đa danh mục được phép chịu</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="31-2-rating-dictionary">31.2 Rating Dictionary</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Rating</th>
+                <th>Định nghĩa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Overweight</td>
+                <td>Tỷ trọng cao hơn benchmark/neutral weight</td>
+              </tr>
+              <tr>
+                <td>Neutral</td>
+                <td>Tỷ trọng tương đương benchmark</td>
+              </tr>
+              <tr>
+                <td>Underweight</td>
+                <td>Tỷ trọng thấp hơn benchmark</td>
+              </tr>
+              <tr>
+                <td>Avoid</td>
+                <td>Không mở vị thế mới do risk/reward kém</td>
+              </tr>
+              <tr>
+                <td>Add on Pullback</td>
+                <td>Chỉ tăng tỷ trọng khi giá điều chỉnh về hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Hold</td>
+                <td>Giữ vị thế hiện tại, chưa mua thêm</td>
+              </tr>
+              <tr>
+                <td>Take Profit Partial</td>
+                <td>Chốt lời một phần khi đạt target hoặc quá mua</td>
+              </tr>
+              <tr>
+                <td>Reduce</td>
+                <td>Giảm tỷ trọng do tín hiệu yếu hoặc mất hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Stop-loss</td>
+                <td>Bán/giảm khi điều kiện sai xảy ra</td>
+              </tr>
+              <tr>
+                <td>Watchlist</td>
+                <td>Theo dõi, chưa đủ điều kiện hành động</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-examples">33. Ví dụ điền mẫu — Market Score, Sector Rotation và Scenario Matrix</h1>
+        <h2 id="32-1-vi-du-market-direction-score">32.1 Ví dụ Market Direction Score</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Điểm tối đa</th>
+                <th>Điểm mẫu</th>
+                <th>Lý do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Price Trend</td>
+                <td>13</td>
+                <td>10</td>
+                <td>VN-Index tăng 0.9%, đóng gần cao nhất ngày</td>
+              </tr>
+              <tr>
+                <td>Liquidity</td>
+                <td>13</td>
+                <td>11</td>
+                <td>GTGD &gt;120% MA20</td>
+              </tr>
+              <tr>
+                <td>Breadth</td>
+                <td>11</td>
+                <td>8</td>
+                <td>A/D = 1.8, độ rộng tích cực</td>
+              </tr>
+              <tr>
+                <td>Sector Rotation</td>
+                <td>12</td>
+                <td>9</td>
+                <td>Chứng khoán, ngân hàng, tiện ích dẫn dắt</td>
+              </tr>
+              <tr>
+                <td>Index Attribution</td>
+                <td>8</td>
+                <td>5</td>
+                <td>Top trụ đóng góp hơi cao</td>
+              </tr>
+              <tr>
+                <td>Foreign Flow</td>
+                <td>9</td>
+                <td>3</td>
+                <td>Khối ngoại bán ròng mạnh</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>7</td>
+                <td>5</td>
+                <td>Basis dương nhẹ, OI tăng</td>
+              </tr>
+              <tr>
+                <td>Technical</td>
+                <td>9</td>
+                <td>8</td>
+                <td>Vượt kháng cự gần với volume</td>
+              </tr>
+              <tr>
+                <td>Valuation &amp; Macro</td>
+                <td>5</td>
+                <td>3</td>
+                <td>Định giá không rẻ nhưng chưa quá căng</td>
+              </tr>
+              <tr>
+                <td>News/Catalyst</td>
+                <td>3</td>
+                <td>2</td>
+                <td>Tin hỗ trợ ngành chọn lọc</td>
+              </tr>
+              <tr>
+                <td>Earnings Momentum</td>
+                <td>10</td>
+                <td>6</td>
+                <td>KQKD tích cực nhưng chưa toàn diện</td>
+              </tr>
+              <tr>
+                <td>Tổng</td>
+                <td>100</td>
+                <td>70</td>
+                <td>Risk-on nhưng cần theo dõi khối ngoại</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="32-2-vi-du-sector-rotation-engine">32.2 Ví dụ Sector Rotation Engine</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ngành</th>
+                <th>1D</th>
+                <th>GTGD vs MA20</th>
+                <th>Breadth</th>
+                <th>RS vs VN-Index</th>
+                <th>Earnings Score</th>
+                <th>Sector Score</th>
+                <th>Allocation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chứng khoán</td>
+                <td>+3.8%</td>
+                <td>160%</td>
+                <td>85% mã tăng</td>
+                <td>Mạnh</td>
+                <td>62</td>
+                <td>78</td>
+                <td>Overweight ngắn hạn</td>
+              </tr>
+              <tr>
+                <td>Ngân hàng</td>
+                <td>+1.4%</td>
+                <td>115%</td>
+                <td>70% mã tăng</td>
+                <td>Mạnh vừa</td>
+                <td>68</td>
+                <td>72</td>
+                <td>Overweight chọn lọc</td>
+              </tr>
+              <tr>
+                <td>Dầu khí</td>
+                <td>-0.8%</td>
+                <td>90%</td>
+                <td>35% mã tăng</td>
+                <td>Yếu</td>
+                <td>55</td>
+                <td>38</td>
+                <td>Underweight</td>
+              </tr>
+              <tr>
+                <td>Công nghệ</td>
+                <td>-1.2%</td>
+                <td>105%</td>
+                <td>30% mã tăng</td>
+                <td>Yếu</td>
+                <td>80</td>
+                <td>45</td>
+                <td>Neutral, chờ ổn định giá</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="32-3-vi-du-scenario-matrix">32.3 Ví dụ Scenario Matrix</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Kịch bản</th>
+                <th>Xác suất</th>
+                <th>Trigger</th>
+                <th>Invalidation</th>
+                <th>Vùng VN-Index</th>
+                <th>Portfolio Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Bull</td>
+                <td>45%</td>
+                <td>Vượt 1.920 với GTGD &gt; MA20 và A/D &gt;1.5</td>
+                <td>Rơi lại dưới 1.880</td>
+                <td>1.920–1.950</td>
+                <td>Tăng tỷ trọng chọn lọc nhóm dẫn dắt</td>
+              </tr>
+              <tr>
+                <td>Base</td>
+                <td>40%</td>
+                <td>Dao động 1.850–1.920, thanh khoản ổn định</td>
+                <td>Mất 1.850 với volume cao</td>
+                <td>1.850–1.920</td>
+                <td>Giữ tỷ trọng, add on pullback</td>
+              </tr>
+              <tr>
+                <td>Bear</td>
+                <td>15%</td>
+                <td>Mất 1.850, A/D &lt;0.7, khối ngoại bán mạnh</td>
+                <td>Lấy lại 1.880</td>
+                <td>1.800–1.850</td>
+                <td>Giảm beta, margin 0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-implementation">Các ví dụ này không phải khuyến nghị thật; mục tiêu là minh họa cách
+          điền bảng để analyst mới hiểu logic vận hành.</p>
+        <h2 id="33-4-vi-du-dien-mau-signal-confidence-score">33.4 Ví dụ điền mẫu — Signal Confidence Score</h2>
+        <p class="callout callout-principle">Giả định phiên mẫu: VN-Index tăng, thanh khoản cao hơn MA20, độ rộng tích
+          cực, chứng khoán và ngân hàng dẫn dắt, khối ngoại bán ròng mạnh, basis dương nhẹ và không có ETF/expiry
+          distortion lớn.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Điểm tối đa</th>
+                <th>Điểm mẫu</th>
+                <th>Lý do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Data Quality</td>
+                <td>15</td>
+                <td>14</td>
+                <td>Dữ liệu cuối ngày đầy đủ, timestamp rõ</td>
+              </tr>
+              <tr>
+                <td>Price–Volume Confirmation</td>
+                <td>15</td>
+                <td>13</td>
+                <td>Index tăng kèm thanh khoản cao hơn MA20</td>
+              </tr>
+              <tr>
+                <td>Breadth Confirmation</td>
+                <td>15</td>
+                <td>12</td>
+                <td>A/D tích cực, số mã tăng vượt số mã giảm</td>
+              </tr>
+              <tr>
+                <td>Sector Confirmation</td>
+                <td>12</td>
+                <td>10</td>
+                <td>Nhiều ngành dẫn dắt, nổi bật chứng khoán/ngân hàng</td>
+              </tr>
+              <tr>
+                <td>Attribution Cleanliness</td>
+                <td>10</td>
+                <td>6</td>
+                <td>Một phần điểm số vẫn phụ thuộc nhóm vốn hóa lớn</td>
+              </tr>
+              <tr>
+                <td>Foreign/Institutional Consistency</td>
+                <td>8</td>
+                <td>3</td>
+                <td>Khối ngoại bán ròng mạnh, làm giảm độ tin cậy</td>
+              </tr>
+              <tr>
+                <td>Derivatives Confirmation</td>
+                <td>7</td>
+                <td>5</td>
+                <td>Basis dương nhẹ, OI tăng, tâm lý phái sinh ủng hộ</td>
+              </tr>
+              <tr>
+                <td>Distortion Risk</td>
+                <td>10</td>
+                <td>8</td>
+                <td>Không có ETF/expiry distortion lớn</td>
+              </tr>
+              <tr>
+                <td>Scenario Clarity</td>
+                <td>8</td>
+                <td>7</td>
+                <td>Hỗ trợ/kháng cự và trigger tương đối rõ</td>
+              </tr>
+              <tr>
+                <td>Tổng</td>
+                <td>100</td>
+                <td>78</td>
+                <td>High Confidence</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-template">Kết luận mẫu: Signal Confidence Score đạt 78/100, cho thấy tín hiệu tăng
+          điểm có độ tin cậy cao nhưng chưa tuyệt đối. Điểm tích cực đến từ sự đồng thuận giữa giá, thanh khoản, độ rộng
+          và ngành dẫn dắt; tuy nhiên khối ngoại bán ròng mạnh và mức đóng góp của nhóm trụ khiến báo cáo không nên nâng
+          trạng thái lên Very High Confidence.</p>
+        <h2 id="33-5-vi-du-dien-mau-action-score">33.5 Ví dụ điền mẫu — Action Score</h2>
+        <p class="callout callout-principle">Giả định nhà đầu tư đang xem xét tăng tỷ trọng nhóm chứng khoán sau một
+          phiên tăng mạnh.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Điểm tối đa</th>
+                <th>Điểm mẫu</th>
+                <th>Lý do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction</td>
+                <td>20</td>
+                <td>16</td>
+                <td>Market Direction Score ở vùng risk-on</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence</td>
+                <td>15</td>
+                <td>12</td>
+                <td>Confidence cao nhưng bị trừ do khối ngoại bán</td>
+              </tr>
+              <tr>
+                <td>Entry Quality</td>
+                <td>20</td>
+                <td>11</td>
+                <td>Nhóm chứng khoán tăng mạnh, điểm mua không còn quá đẹp</td>
+              </tr>
+              <tr>
+                <td>Risk/Reward</td>
+                <td>15</td>
+                <td>9</td>
+                <td>Upside còn nhưng downside tăng do giá đã chạy</td>
+              </tr>
+              <tr>
+                <td>Sector Alignment</td>
+                <td>10</td>
+                <td>9</td>
+                <td>Ngành chứng khoán đang dẫn dắt rõ</td>
+              </tr>
+              <tr>
+                <td>Liquidity Suitability</td>
+                <td>7</td>
+                <td>7</td>
+                <td>Thanh khoản tốt, dễ giao dịch</td>
+              </tr>
+              <tr>
+                <td>Portfolio Fit</td>
+                <td>7</td>
+                <td>5</td>
+                <td>Phù hợp nếu danh mục chưa quá nhiều beta cao</td>
+              </tr>
+              <tr>
+                <td>Invalidation Clarity</td>
+                <td>6</td>
+                <td>5</td>
+                <td>Có thể đặt stop-loss theo vùng hỗ trợ gần</td>
+              </tr>
+              <tr>
+                <td>Tổng</td>
+                <td>100</td>
+                <td>74</td>
+                <td>Có thể hành động chọn lọc</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-template">Kết luận mẫu: Action Score đạt 74/100, cho thấy có thể tăng tỷ trọng chọn
+          lọc nhưng không phù hợp để mua đuổi mạnh. Dù thị trường và sector đều ủng hộ, Entry Quality chỉ đạt 11/20 vì
+          nhiều mã trong nhóm đã tăng nhanh. Chiến lược phù hợp là giữ vị thế sẵn có và chỉ mua thêm khi giá điều chỉnh
+          về hỗ trợ.</p>
+        <h2 id="33-6-vi-du-action-score-trong-lite-format">33.6 Ví dụ Action Score trong Lite Format</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Điểm tối đa</th>
+                <th>Điểm mẫu</th>
+                <th>Cách xử lý Lite</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction</td>
+                <td>20</td>
+                <td>14</td>
+                <td>Dùng Market Command Center</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence</td>
+                <td>15</td>
+                <td>10</td>
+                <td>Dữ liệu đủ nhưng thiếu module sâu</td>
+              </tr>
+              <tr>
+                <td>Entry Quality</td>
+                <td>20</td>
+                <td>10</td>
+                <td>Neutral vì không có full technical</td>
+              </tr>
+              <tr>
+                <td>Risk/Reward</td>
+                <td>15</td>
+                <td>8</td>
+                <td>Ước tính sơ bộ</td>
+              </tr>
+              <tr>
+                <td>Sector Alignment</td>
+                <td>10</td>
+                <td>5</td>
+                <td>Neutral vì không có sector update đầy đủ</td>
+              </tr>
+              <tr>
+                <td>Liquidity Suitability</td>
+                <td>7</td>
+                <td>6</td>
+                <td>Dựa trên thanh khoản ngày</td>
+              </tr>
+              <tr>
+                <td>Portfolio Fit</td>
+                <td>7</td>
+                <td>5</td>
+                <td>Dựa trên risk budget hiện tại</td>
+              </tr>
+              <tr>
+                <td>Invalidation Clarity</td>
+                <td>6</td>
+                <td>3</td>
+                <td>Chưa có invalidation kỹ thuật mới</td>
+              </tr>
+              <tr>
+                <td>Tổng trước cap</td>
+                <td>100</td>
+                <td>61</td>
+                <td>Provisional</td>
+              </tr>
+              <tr>
+                <td>Action Score sau cap Lite</td>
+                <td>—</td>
+                <td>60</td>
+                <td>Do thiếu full sector + technical</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Kết luận mẫu: Action Score Lite Estimate đạt 60/100. Do báo cáo Lite không
+          cập nhật đầy đủ Sector Rotation và Technical Structure, điểm này chỉ dùng như tín hiệu hành động sơ bộ. Chiến
+          lược phù hợp là giữ danh mục và chờ Standard/Full Review trước khi tăng tỷ trọng đáng kể.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v34-changelog">34. Version Control và Change Log — Traceability cho chính framework</h1>
+        <p class="callout callout-principle">V3.4.1 bổ sung version control để chính tài liệu framework cũng có
+          traceability. Mỗi thay đổi phải ghi rõ lý do, module bị ảnh hưởng và trạng thái validate.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Trường</th>
+                <th>Nội dung</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Version</td>
+                <td>V3.4.1</td>
+              </tr>
+              <tr>
+                <td>Owner</td>
+                <td>Nguyen Kim Phuc Bui</td>
+              </tr>
+              <tr>
+                <td>Change type</td>
+                <td>Structural / Scoring / Workflow / Design / Data</td>
+              </tr>
+              <tr>
+                <td>Reason</td>
+                <td>Vì sao thay đổi</td>
+              </tr>
+              <tr>
+                <td>Affected modules</td>
+                <td>Module nào bị ảnh hưởng</td>
+              </tr>
+              <tr>
+                <td>Validation status</td>
+                <td>Draft / Reviewed / Backtested / Live-tested</td>
+              </tr>
+              <tr>
+                <td>Next review date</td>
+                <td>Ngày cần kiểm tra lại</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Thay đổi chính</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>V3.0</td>
+                <td>Institutional-grade architecture: score, data, workflow, portfolio action</td>
+                <td>Structural master</td>
+              </tr>
+              <tr>
+                <td>V3.1</td>
+                <td>SSI-inspired modules: model portfolio, earnings momentum, research update, microstructure</td>
+                <td>Enhanced</td>
+              </tr>
+              <tr>
+                <td>V3.2</td>
+                <td>Style OnyxLine&amp;Co, cover, online layout, print direction</td>
+                <td>Design refined</td>
+              </tr>
+              <tr>
+                <td>V3.3</td>
+                <td>Polish online final và Word print-ready</td>
+                <td>Presentation final</td>
+              </tr>
+              <tr>
+                <td>V3.4.1</td>
+                <td>Confidence Score, Action Score, thresholds, fast-track tiers, RACI, dependency map, conflict
+                  protocol, cascade rules, glossary, examples, change log</td>
+                <td>Operating layer final</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-conclusion">Kết luận: sau V3.4.1, hệ thống có thể onboard analyst mới, vận hành độc
+          lập, hậu kiểm và tự cải thiện qua backtest. Đây là định nghĩa thực tế của một institutional-grade operating
+          system.</p>
+      </section>
+      <section class="section-card">
+        <h1 id="v341-final-consistency-note">35. V3.4.1 Final Consistency Patch — Ghi chú chốt phiên bản</h1>
+        <p class="callout callout-conclusion">Sau bản V3.4.1, hệ thống xử lý ba điểm nhất quán còn lại: workflow song
+          song của Module 27 được xác nhận là workflow chính thức; Lite Format đã có rule riêng để tính Action Score khi
+          thiếu Sector Rotation và Technical Structure; Signal Confidence Score và Action Score đã có ví dụ điền mẫu để
+          analyst mới vận hành độc lập.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Patch</th>
+                <th>Vấn đề xử lý</th>
+                <th>Kết quả</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Patch 1</td>
+                <td>Module 19 và Module 27 có nguy cơ mâu thuẫn workflow</td>
+                <td>Module 27 supersedes Module 19; Module 19 chỉ còn vai trò tham chiếu</td>
+              </tr>
+              <tr>
+                <td>Patch 2</td>
+                <td>Lite Format thiếu input cho Entry Quality và Sector Alignment</td>
+                <td>Thêm Provisional Lite Estimate, proxy, neutral score và cap rule</td>
+              </tr>
+              <tr>
+                <td>Patch 3</td>
+                <td>Thiếu ví dụ cho hai score mới trong V3.4.1</td>
+                <td>Thêm filled example cho Signal Confidence Score, Action Score và Lite Action Score</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout callout-principle">V3.4.1 là bản final consistency master: đủ để onboard analyst mới, chạy
+          Lite/Standard/Full report, xử lý workflow song song, bảo vệ score logic và duy trì traceability cho các lần
+          nâng cấp sau.</p>
+      </section>
+    </main>
+  </div>
+  <section class="end-report">
+    <h2 style="font-family:var(--serif);color:var(--navy);margin-top:0">Kết luận vận hành</h2>
+    <p>V3.4.1 là bản master format hoàn chỉnh theo style OnyxLine&amp;Co: đầy đủ dữ liệu, logic, score, earnings, danh
+      mục, kịch bản, risk control, timestamp và hậu kiểm.</p>
+    <div class="end-grid">
+      <div class="end-script">“Data → Mechanism → Earnings → Valuation → Portfolio Action → Backtest.”</div>
+      <div class="footer-small">OnyxLine&amp;Co · Prepared by Nguyen Kim Phuc Bui</div>
+    </div>
+  </section>
+  <a class="floating-top" href="#top">↑</a>
+  <script>
+    const links = [...document.querySelectorAll('.nav-link')]; const sections = [...document.querySelectorAll('.section-card[id]')];
+    const obs = new IntersectionObserver(entries => { entries.forEach(e => { if (e.isIntersecting) { links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id)); } }) }, { rootMargin: '-30% 0px -65% 0px' }); sections.forEach(s => obs.observe(s));
+    document.getElementById('tocSearch').addEventListener('input', e => { const q = e.target.value.toLowerCase(); links.forEach(l => { l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none'; }) });
+  </script>
+</body>
+
+</html>

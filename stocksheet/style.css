@@ -1,0 +1,149 @@
+/* =========================================
+   1. GLOBAL & LAYOUT — Soft Minimalism
+   ========================================= */
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    margin: 0; padding: 0; color: var(--text-primary);
+}
+
+.asset-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+
+/* =========================================
+   2. TOP BAR
+   ========================================= */
+.top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card-bg);
+    padding: 18px 30px; border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 30px;
+    border-left: 5px solid var(--finance-accent);
+}
+
+.left-section h1 {
+    margin: 0; font-size: 1.6rem; color: var(--text-primary);
+    font-weight: 800; display:flex; gap:12px; align-items:center;
+    letter-spacing: -0.02em;
+}
+
+.back-link {
+    text-decoration: none; color: var(--text-secondary); font-weight: 600;
+    display: flex; align-items: center; gap: 8px; margin-right: 20px;
+    padding: 8px 12px; border-radius: var(--radius-sm); transition: var(--transition-fast);
+}
+.back-link:hover { background-color: var(--hover-bg); color: var(--text-primary); }
+
+.btn-refresh {
+    background: var(--finance-accent);
+    color: #120F0A; border: none; padding: 10px 20px;
+    border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
+    transition: var(--transition-fast);
+    display: flex; align-items: center; gap: 8px;
+}
+.btn-refresh:hover { transform: translateY(-1px); filter: brightness(0.92); }
+
+/* =========================================
+   3. CONTROL PANEL
+   ========================================= */
+.control-panel {
+    background: var(--card-bg);
+    padding: 25px; border-radius: var(--radius-lg); margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+    display: flex; align-items: center; gap: 20px;
+}
+.control-panel label { font-weight: 700; color: var(--text-secondary); font-size: 1rem; }
+
+#stock-select {
+    padding: 12px 16px; font-size: 1.1rem; font-weight: 700;
+    border-radius: var(--radius-sm); width: 250px;
+    outline: none; cursor: pointer; color: var(--text-primary);
+    background-color: var(--hover-bg);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-fast);
+}
+#stock-select:focus { background-color: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
+
+/* =========================================
+   4. TABLE STYLES
+   ========================================= */
+.sheet-wrapper {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.excel-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); background: transparent; }
+
+.excel-table th, .header-row td {
+    background-color: var(--finance-accent);
+    color: #120F0A;
+    padding: 16px 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+    border: none;
+}
+
+.excel-table td {
+    background-color: transparent;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+.text-right { text-align: right; font-family: var(--font-mono); font-weight: 600; }
+
+.excel-table tbody tr:hover td { background-color: var(--hover-bg); }
+
+.stock-main-header td {
+    background: var(--finance-accent);
+    color: #120F0A !important;
+    font-size: 1.3rem !important;
+    padding: 20px !important;
+    border: none !important;
+}
+
+.target-header td {
+    background-color: var(--hover-bg) !important;
+    color: var(--text-primary) !important;
+    font-weight: 800 !important;
+    border-top: 2px solid var(--border-color) !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    text-transform: uppercase;
+    font-size: 0.95rem !important;
+    padding: 15px 20px !important;
+}
+
+.text-bold { font-weight: 700; }
+.text-center { text-align: center; }
+
+.text-success { color: var(--success-color) !important; font-weight: 700; }
+.text-danger { color: var(--danger-color) !important; font-weight: 700; }
+.text-primary { color: var(--info-color) !important; }
+
+#loading-spinner { padding: 60px; }
+
+/* =========================================
+   5. TOAST NOTIFICATION
+   ========================================= */
+.toast-notification {
+    position: fixed; top: 20px; right: 20px;
+    padding: 16px 24px; border-radius: var(--radius-md);
+    color: #120F0A; font-weight: 600;
+    box-shadow: var(--shadow-modal);
+    z-index: 10000; display: flex; align-items: center; gap: 12px;
+    animation: slideInRight 0.35s ease, fadeOut 0.4s 2.5s forwards;
+}
+
+.toast-success { background-color: var(--success-color); }
+.toast-error { background-color: var(--danger-color); }
+
+@keyframes slideInRight { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; visibility: hidden; } }

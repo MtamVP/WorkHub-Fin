@@ -1,0 +1,266 @@
+/* =========================================
+   1. GLOBAL & LAYOUT — Soft Minimalism (dùng chung token gốc /style.css)
+   ========================================= */
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+}
+
+.asset-container {
+    max-width: 1600px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+/* =========================================
+   2. TOP BAR
+   ========================================= */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg);
+    padding: 12px 25px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 20px;
+    border-bottom: 3px solid var(--finance-accent);
+}
+
+.left-section h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: -0.02em;
+}
+
+.back-link {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+}
+
+.back-link:hover {
+    color: var(--text-primary);
+    background-color: var(--hover-bg);
+}
+
+.right-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-badge {
+    background: var(--hover-bg);
+    padding: 6px 15px;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.btn-refresh {
+    background-color: var(--finance-accent);
+    color: #120F0A;
+    border: none;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.btn-refresh:hover {
+    filter: brightness(0.92);
+    transform: translateY(-1px);
+}
+
+/* =========================================
+   3. FINANCE WRAPPER (Khung chứa bảng)
+   ========================================= */
+.finance-wrapper {
+    background: var(--card-bg);
+    padding: 0;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.finance-header {
+    padding: 15px 25px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--card-bg);
+}
+
+.finance-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.finance-header p {
+    margin: 2px 0 0 0;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.status-badge {
+    background-color: color-mix(in srgb, var(--success-color) 14%, var(--card-bg));
+    color: var(--success-color);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
+    text-transform: uppercase;
+}
+
+.status-badge i { font-size: 0.6rem; animation: pulse 2s infinite; }
+@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.7; } 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.7; } }
+
+/* =========================================
+   4. JSPREADSHEET CUSTOMIZATION
+   ========================================= */
+.spreadsheet-area { width: 100%; overflow-x: auto; min-height: 400px; background: transparent; }
+
+.jexcel_content { box-shadow: none !important; width: 100% !important; padding: 0 !important; border: none !important; }
+
+.jexcel > thead > tr > td {
+    background-color: var(--finance-accent) !important;
+    color: #120F0A !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    text-transform: uppercase;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    padding: 12px 8px !important;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    letter-spacing: 0.04em;
+}
+
+.jexcel_row {
+    background-color: var(--hover-bg) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 600;
+    border-right: 2px solid var(--border-color) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.jexcel > tbody > tr > td {
+    background-color: var(--card-bg) !important;
+    padding: 10px 12px !important;
+    font-size: 1rem !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    vertical-align: middle !important;
+    font-family: var(--font-body) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jexcel > tbody > tr:nth-child(even) > td { background-color: var(--bg-color) !important; }
+
+.jexcel > tbody > tr:hover > td {
+    background-color: var(--hover-bg) !important;
+    color: var(--finance-accent) !important;
+    cursor: default;
+}
+
+.jexcel .highlight { background-color: color-mix(in srgb, var(--finance-accent) 15%, transparent) !important; }
+.jexcel .selection { border: 2px solid var(--finance-accent) !important; }
+
+.jexcel_content::-webkit-scrollbar { width: 12px; height: 12px; }
+.jexcel_content::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 0 0 8px 8px; }
+.jexcel_content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; border: 2px solid var(--bg-color); }
+.jexcel_content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* =========================================
+   5. FOOTER / GUIDE
+   ========================================= */
+.guide-text {
+    margin-top: 15px;
+    padding: 12px 20px;
+    background: color-mix(in srgb, var(--warning-color) 10%, var(--card-bg));
+    color: var(--text-secondary);
+    border: 1px solid color-mix(in srgb, var(--warning-color) 25%, transparent);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* =========================================
+   6. RESPONSIVE
+   ========================================= */
+@media (max-width: 768px) {
+    .asset-container { padding: 0 10px; margin: 10px auto; }
+    .top-bar { flex-direction: column; align-items: flex-start; gap: 15px; }
+    .right-section { width: 100%; justify-content: space-between; }
+}
+
+/* =========================================
+   7. TOAST NOTIFICATION
+   ========================================= */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: var(--radius-md);
+    color: #120F0A;
+    font-weight: 700;
+    box-shadow: var(--shadow-modal);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1rem;
+    animation: slideInRight 0.35s cubic-bezier(0.4, 0, 0.2, 1), fadeOut 0.4s 2.5s forwards;
+    min-width: 320px;
+}
+
+.toast-success { background-color: var(--success-color); }
+.toast-error { background-color: var(--danger-color); }
+.toast-notification i { font-size: 1.4rem; }
+
+@keyframes slideInRight { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; visibility: hidden; } }

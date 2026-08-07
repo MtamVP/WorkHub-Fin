@@ -1,0 +1,2766 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onyxline &amp; Co — Daily Market Report Online Full Content</title>
+  <style>
+    :root {
+      --serif: "Cambria", "Times New Roman", "Noto Serif", "DejaVu Serif", Georgia, serif;
+      --sans: "Segoe UI", "Noto Sans", Arial, sans-serif;
+      --bg: #f7f6f1;
+      --paper: #fffdfa;
+      --ink: #282723;
+      --muted: #77736b;
+      --line: #dedbd2;
+      --navy: #20343a;
+      --teal: #6da99c;
+      --teal-dark: #2f756e;
+      --mint: #e9f2e2;
+      --mint2: #f3f8ed;
+      --beige: #f2efe5;
+      --beige2: #fbf8f0;
+      --gold: #a18438;
+      --rose: #ba656c;
+      --red: #a85a5e;
+      --blue: #5f91a5;
+      --purple: #8d7aa8;
+      --shadow: 0 18px 40px rgba(42, 39, 33, .08);
+      --shadow-soft: 0 8px 20px rgba(42, 39, 33, .06);
+      --radius: 22px;
+      --radius-sm: 14px;
+      --content: 980px
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 24px
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #fbfaf6 28rem, #f5f4ee);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.68;
+      font-size: 16px
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 12% 8%, rgba(109, 169, 156, .16), transparent 28rem), radial-gradient(circle at 90% 10%, rgba(161, 132, 56, .10), transparent 32rem);
+      pointer-events: none;
+      z-index: -1
+    }
+
+    .cover {
+      max-width: 1180px;
+      margin: 36px auto 34px;
+      padding: 46px 54px 48px;
+      background: rgba(255, 253, 250, .78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(222, 219, 210, .9);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden
+    }
+
+    .cover::after {
+      content: "ONYXLINE";
+      position: absolute;
+      right: -32px;
+      bottom: 18px;
+      font-family: var(--serif);
+      font-size: 86px;
+      letter-spacing: .11em;
+      color: rgba(32, 52, 58, .035);
+      font-weight: 600;
+      z-index: 0
+    }
+
+    .decor {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 22px;
+      align-items: center;
+      margin-bottom: 42px;
+      color: #363a36;
+      position: relative;
+      z-index: 1
+    }
+
+    .decor span {
+      height: 1px;
+      background: #a9a8a1
+    }
+
+    .diamond {
+      width: 10px;
+      height: 10px;
+      transform: rotate(45deg);
+      background: #343834;
+      display: block
+    }
+
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 46px;
+      align-items: start;
+      position: relative;
+      z-index: 1
+    }
+
+    .brand {
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 1;
+      color: #111;
+      margin: 0 0 10px
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 16px;
+      letter-spacing: .01em
+    }
+
+    .doc-title {
+      font-size: 34px;
+      line-height: 1.13;
+      margin: 42px 0 12px;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: var(--navy);
+      max-width: 820px
+    }
+
+    .doc-subtitle {
+      font-size: 18px;
+      color: #5f5b54;
+      max-width: 760px;
+      margin: 0
+    }
+
+    .meta-panel {
+      text-align: right;
+      color: #77736b;
+      font-size: 15px;
+      line-height: 1.9
+    }
+
+    .meta-panel b {
+      color: #3a3934
+    }
+
+    .version-box {
+      margin-top: 18px;
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff
+    }
+
+    .rating-row {
+      margin-top: 42px
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: #77736b;
+      margin-bottom: 14px
+    }
+
+    .rating-pills {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px
+    }
+
+    .rating-card {
+      border: 1px solid #d8d5cc;
+      border-radius: 14px;
+      background: #fff;
+      padding: 13px 16px;
+      min-height: 70px;
+      box-shadow: 0 4px 9px rgba(42, 39, 33, .04);
+      position: relative;
+      overflow: hidden
+    }
+
+    .rating-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 3px
+    }
+
+    .rating-card.buy::before {
+      background: #45a895
+    }
+
+    .rating-card.outperform::before {
+      background: #5f91a5
+    }
+
+    .rating-card.hold::before {
+      background: #909088
+    }
+
+    .rating-card.underperform::before {
+      background: #a18438
+    }
+
+    .rating-card.sell::before {
+      background: #ba656c
+    }
+
+    .rating-name {
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #466
+    }
+
+    .rating-range {
+      font-family: var(--serif);
+      font-size: 21px;
+      color: #222
+    }
+
+    .quick-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 42px
+    }
+
+    .quick-card {
+      background: var(--beige2);
+      border: 1px solid #eee9dc;
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: var(--shadow-soft)
+    }
+
+    .quick-card h3 {
+      margin: 0 0 8px !important;
+      font-size: 13px !important;
+      letter-spacing: .14em !important;
+      text-transform: uppercase !important;
+      color: #77736b !important;
+      border: 0 !important;
+      padding: 0 !important
+    }
+
+    .quick-card p {
+      margin: 0;
+      color: #36342e;
+      font-size: 15px
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 28px;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 26px 48px
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      background: rgba(255, 253, 250, .78);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(222, 219, 210, .9);
+      border-radius: 24px;
+      box-shadow: var(--shadow-soft);
+      padding: 18px 16px;
+      overflow: hidden
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px 14px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px
+    }
+
+    .sidebar-title {
+      font-family: var(--serif);
+      font-size: 18px
+    }
+
+    .sidebar-badge {
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      background: var(--mint);
+      color: #4b7c67;
+      border-radius: 999px;
+      padding: 5px 9px
+    }
+
+    .toc-search {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 10px 12px;
+      margin: 6px 0 12px;
+      font-size: 13px;
+      color: #333
+    }
+
+    .toc {
+      overflow: auto;
+      max-height: calc(100vh - 150px);
+      padding-right: 4px
+    }
+
+    .nav-link {
+      display: block;
+      border-radius: 12px;
+      color: #69665e;
+      font-size: 13px;
+      line-height: 1.35;
+      margin: 2px 0;
+      padding: 8px 10px;
+      transition: .18s ease
+    }
+
+    .nav-link:hover {
+      background: var(--beige);
+      color: var(--navy)
+    }
+
+    .nav-link.active {
+      background: var(--mint);
+      color: var(--teal-dark);
+      font-weight: 650
+    }
+
+    .level-2 {
+      padding-left: 22px;
+      font-size: 12.5px
+    }
+
+    .content {
+      min-width: 0
+    }
+
+    .section-card {
+      background: rgba(255, 253, 250, .86);
+      border: 1px solid rgba(222, 219, 210, .95);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft);
+      padding: 42px 48px;
+      margin: 0 0 24px;
+      overflow: hidden
+    }
+
+    .section-card:hover {
+      box-shadow: 0 12px 30px rgba(42, 39, 33, .08)
+    }
+
+    .section-card h1 {
+      font-family: var(--serif);
+      font-size: 34px;
+      line-height: 1.2;
+      color: var(--navy);
+      font-weight: 500;
+      margin: 0 0 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line)
+    }
+
+    .section-card h2 {
+      font-size: 22px;
+      line-height: 1.3;
+      color: var(--teal-dark);
+      font-weight: 700;
+      margin: 34px 0 14px
+    }
+
+    .section-card h3 {
+      font-size: 13px;
+      color: #6f6b62;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+      margin: 18px 0 10px
+    }
+
+    .section-card p {
+      margin: 0 0 14px
+    }
+
+    .section-card>p:first-of-type:not(.callout):not(.formula-chip) {
+      font-size: 17px;
+      color: #44413a
+    }
+
+    .bullet {
+      padding-left: 1.2rem
+    }
+
+    .table-card {
+      margin: 22px 0 28px;
+      border-radius: 18px;
+      border: 1px solid #e3dfd4;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(42, 39, 33, .05);
+      overflow: hidden
+    }
+
+    .table-scroll {
+      overflow-x: auto
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 14px;
+      line-height: 1.48;
+      min-width: 560px
+    }
+
+    .data-table th {
+      background: #f1eadb;
+      color: #605744;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      font-weight: 700;
+      padding: 13px 16px;
+      border-bottom: 1px solid #dfd8ca;
+      vertical-align: top
+    }
+
+    .data-table td {
+      padding: 13px 16px;
+      border-bottom: 1px solid #eeebe3;
+      vertical-align: top
+    }
+
+    .data-table tbody tr:nth-child(even) td {
+      background: #fcfaf4
+    }
+
+    .data-table tbody tr:hover td {
+      background: #f3f8ed
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: 0
+    }
+
+    .callout {
+      border-radius: 18px;
+      padding: 18px 20px !important;
+      margin: 20px 0 !important;
+      border: 1px solid transparent;
+      box-shadow: 0 8px 18px rgba(42, 39, 33, .05)
+    }
+
+    .callout-principle {
+      background: var(--mint2);
+      border-color: #dcebd2;
+      color: #253d35
+    }
+
+    .callout-output {
+      background: #f8f2e5;
+      border-color: #eadfc9;
+      color: #4b402f
+    }
+
+    .callout-conclusion {
+      background: #eef5f2;
+      border-color: #d7e8e3;
+      color: #293c39
+    }
+
+    .callout-implementation {
+      background: #f6f2eb;
+      border-color: #e6e0d5;
+      color: #6d6254
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin: 1px 3px 1px 0;
+      font-size: .82em;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      border: 1px solid transparent
+    }
+
+    .buy,
+    .status-good,
+    .star {
+      background: #e4f2ed;
+      color: #2f756e;
+      border-color: #d0e7df
+    }
+
+    .outperform,
+    .case-base {
+      background: #e6eef2;
+      color: #47778b;
+      border-color: #d1e0e7
+    }
+
+    .hold,
+    .status {
+      background: #efeee8;
+      color: #77736b;
+      border-color: #dfddd5
+    }
+
+    .underperform,
+    .cashcow,
+    .case-bull {
+      background: #f7eed7;
+      color: #8a6b20;
+      border-color: #e8dcbf
+    }
+
+    .sell,
+    .risk-high,
+    .status-bad,
+    .case-bear {
+      background: #f6e5e6;
+      color: #9a4d54;
+      border-color: #ebcfd2
+    }
+
+    .risk-medium,
+    .question,
+    .status-warn {
+      background: #f8f0dc;
+      color: #93712c;
+      border-color: #eadfc3
+    }
+
+    .risk-low,
+    .dog {
+      background: #edf4e8;
+      color: #607c4c;
+      border-color: #dce9d2
+    }
+
+    .watermark-text {
+      position: fixed;
+      right: 2vw;
+      bottom: 2vh;
+      font-family: var(--serif);
+      font-size: 52px;
+      color: rgba(32, 52, 58, .035);
+      z-index: -1;
+      pointer-events: none
+    }
+
+    .floating-top {
+      position: fixed;
+      right: 26px;
+      bottom: 26px;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      place-items: center;
+      color: var(--navy);
+      font-weight: 700;
+      z-index: 5
+    }
+
+    .end-report {
+      max-width: 1180px;
+      margin: 28px auto 60px;
+      padding: 38px 54px;
+      background: #fffdf9;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft)
+    }
+
+    .end-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: end;
+      border-top: 1px solid var(--line);
+      padding-top: 22px
+    }
+
+    .end-script {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      color: #54514b
+    }
+
+    .footer-small {
+      color: #77736b;
+      font-size: 13px
+    }
+
+    h1,
+    h2,
+    h3,
+    .brand,
+    .doc-title,
+    .sidebar-title,
+    .rating-range,
+    .end-script {
+      font-synthesis-weight: none;
+      font-kerning: normal;
+      text-rendering: geometricPrecision;
+      word-break: normal;
+      overflow-wrap: normal;
+      hyphens: none
+    }
+
+    .section-card h1 {
+      letter-spacing: 0 !important
+    }
+
+    .section-card h2 {
+      letter-spacing: 0
+    }
+
+    @media(max-width:980px) {
+      .cover {
+        margin: 16px;
+        padding: 28px 24px
+      }
+
+      .cover-grid,
+      .quick-cards,
+      .rating-pills {
+        grid-template-columns: 1fr
+      }
+
+      .meta-panel {
+        text-align: left
+      }
+
+      .doc-title {
+        font-size: 28px
+      }
+
+      .brand {
+        font-size: 36px
+      }
+
+      .app-shell {
+        grid-template-columns: 1fr;
+        padding: 0 14px 36px
+      }
+
+      .sidebar {
+        position: relative;
+        top: 0;
+        max-height: none
+      }
+
+      .toc {
+        max-height: 320px
+      }
+
+      .section-card {
+        padding: 30px 22px;
+        border-radius: 22px
+      }
+
+      .section-card h1 {
+        font-size: 28px
+      }
+
+      .data-table {
+        font-size: 13px
+      }
+
+      .cover::after {
+        display: none
+      }
+    }
+
+    @media print {
+      body {
+        background: white
+      }
+
+      .sidebar,
+      .floating-top {
+        display: none
+      }
+
+      .app-shell {
+        display: block;
+        max-width: none
+      }
+
+      .section-card,
+      .cover,
+      .end-report {
+        box-shadow: none;
+        break-inside: avoid
+      }
+
+      .section-card {
+        border: 1px solid #ddd
+      }
+
+      .table-card {
+        break-inside: auto
+      }
+
+      .data-table tr {
+        break-inside: avoid
+      }
+    }
+        .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      color: var(--navy);
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 24px;
+      text-decoration: none !important;
+    }
+
+    .back-link:hover {
+      background: var(--beige);
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(42, 39, 33, 0.1);
+    }
+
+    .back-link i {
+      font-size: 16px;
+      color: var(--teal-dark);
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="watermark-text">Onyxline &amp; Co</div>
+  <header class="cover" id="top">
+    <div class="decor"><span></span><i class="diamond"></i><span></span><i class="diamond"></i><span></span></div>
+    <div class="cover-grid">
+      <div>
+        <a href="/report/" class="back-link">
+          <i class="fa-regular fa-house"></i> <span>Trở về mục lục</span>
+        </a>
+        <h1 class="brand">Onyxline &amp; Co</h1>
+        <div class="brand-sub">Equity Research — Daily Market Intelligence</div>
+        <h2 class="doc-title">Báo cáo thị trường hằng ngày</h2>
+        <p class="doc-subtitle">PerfectPack 100/100 Remediation Edition · Phiên 11/05/2026. Bản online report-style giữ
+          đầy đủ nội dung từ bản Word PerfectPack và trình bày theo phong cách đọc dài giống mẫu OnyxLine online.</p>
+      </div>
+      <div class="meta-panel">
+        <div><b>Valuation / Report date:</b> 11/05/2026</div>
+        <div><b>Report type:</b> Daily Market Intelligence</div>
+        <div><b>Analyst:</b> Nguyen Kim Phuc Bui</div>
+        <div><b>Assisted by:</b> Nguyen Huy Long</div>
+        <div class="version-box">V3.4.1 PerfectPack · Online Full Content</div>
+      </div>
+    </div>
+    <div class="rating-row">
+      <div class="eyebrow">Market Command Snapshot</div>
+      <div class="rating-pills">
+        <div class="rating-card hold">
+          <div class="rating-name">Direction</div>
+          <div class="rating-range">46/100</div>
+        </div>
+        <div class="rating-card outperform">
+          <div class="rating-name">Confidence</div>
+          <div class="rating-range">63/100</div>
+        </div>
+        <div class="rating-card hold">
+          <div class="rating-name">Action</div>
+          <div class="rating-range">52/100</div>
+        </div>
+        <div class="rating-card underperform">
+          <div class="rating-name">Stance</div>
+          <div class="rating-range">Cautious</div>
+        </div>
+        <div class="rating-card buy">
+          <div class="rating-name">Portfolio</div>
+          <div class="rating-range">PET PNJ SSI VIX HPG</div>
+        </div>
+      </div>
+    </div>
+    <div class="quick-cards">
+      <div class="quick-card">
+        <h3>Full Word Content</h3>
+        <p>35 non-empty paragraphs and 43 tables extracted from the Word PerfectPack. Cover content is represented in
+          this page header.</p>
+      </div>
+      <div class="quick-card">
+        <h3>Design Style</h3>
+        <p>Cover, sticky sidebar, section-card, table-card and muted beige palette modeled after the uploaded online
+          report style.</p>
+      </div>
+      <div class="quick-card">
+        <h3>Credit Update</h3>
+        <p>Prepared by Nguyen Kim Phuc Bui · Assisted by Nguyen Huy Long.</p>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Contents</div>
+        <div class="sidebar-badge">Sticky</div>
+      </div>
+      <input id="tocSearch" class="toc-search" placeholder="Search section…" />
+      <nav class="toc"><a href="#executive-upgrade-report-integrity" class="nav-link level-1"
+          data-target="executive-upgrade-report-integrity">Executive Upgrade &amp; Report Integrity</a>
+        <a href="#0-perfectpack-remediation-log" class="nav-link level-1" data-target="0-perfectpack-remediation-log">0.
+          PERFECTPACK REMEDIATION LOG</a>
+        <a href="#1-data-log-validation" class="nav-link level-1" data-target="1-data-log-validation">1. DATA LOG &amp;
+          VALIDATION</a>
+        <a href="#2-market-command-center" class="nav-link level-1" data-target="2-market-command-center">2. MARKET
+          COMMAND CENTER</a>
+        <a href="#3-score-engine-full-component-breakdown" class="nav-link level-1"
+          data-target="3-score-engine-full-component-breakdown">3. SCORE ENGINE - FULL COMPONENT BREAKDOWN</a>
+        <a href="#4-executive-summary-intraday-market-map" class="nav-link level-1"
+          data-target="4-executive-summary-intraday-market-map">4. EXECUTIVE SUMMARY &amp; INTRADAY MARKET MAP</a>
+        <a href="#5-market-quality-distortion-control" class="nav-link level-1"
+          data-target="5-market-quality-distortion-control">5. MARKET QUALITY &amp; DISTORTION CONTROL</a>
+        <a href="#6-sector-rotation-engine" class="nav-link level-1" data-target="6-sector-rotation-engine">6. SECTOR
+          ROTATION ENGINE</a>
+        <a href="#7-market-microstructure-smart-money-proxy" class="nav-link level-1"
+          data-target="7-market-microstructure-smart-money-proxy">7. MARKET MICROSTRUCTURE &amp; SMART MONEY PROXY</a>
+        <a href="#8-personalized-live-portfolio-overlay-pet-pnj-ssi-vix-hpg" class="nav-link level-1"
+          data-target="8-personalized-live-portfolio-overlay-pet-pnj-ssi-vix-hpg">8. PERSONALIZED LIVE PORTFOLIO OVERLAY
+          - PET · PNJ · SSI · VIX · HPG</a>
+        <a href="#9-personalized-invalidation-alert-engine" class="nav-link level-1"
+          data-target="9-personalized-invalidation-alert-engine">9. PERSONALIZED INVALIDATION &amp; ALERT ENGINE</a>
+        <a href="#10-technical-structure-engine" class="nav-link level-1"
+          data-target="10-technical-structure-engine">10. TECHNICAL STRUCTURE ENGINE</a>
+        <a href="#11-foreign-flow-etf-flow-derivatives-sentiment" class="nav-link level-1"
+          data-target="11-foreign-flow-etf-flow-derivatives-sentiment">11. FOREIGN FLOW, ETF FLOW, DERIVATIVES &amp;
+          SENTIMENT</a>
+        <a href="#12-valuation-macro-earnings-momentum" class="nav-link level-1"
+          data-target="12-valuation-macro-earnings-momentum">12. VALUATION, MACRO &amp; EARNINGS MOMENTUM</a>
+        <a href="#13-scenario-matrix-black-swan-portfolio-action" class="nav-link level-1"
+          data-target="13-scenario-matrix-black-swan-portfolio-action">13. SCENARIO MATRIX, BLACK SWAN &amp; PORTFOLIO
+          ACTION</a>
+        <a href="#14-institutional-infrastructure-layer" class="nav-link level-1"
+          data-target="14-institutional-infrastructure-layer">14. INSTITUTIONAL INFRASTRUCTURE LAYER</a>
+        <a href="#15-action-backtest-log-source-map-quality-gate" class="nav-link level-1"
+          data-target="15-action-backtest-log-source-map-quality-gate">15. ACTION BACKTEST LOG, SOURCE MAP &amp; QUALITY
+          GATE</a>
+      </nav>
+    </aside>
+    <main class="content">
+      <section class="section-card">
+        <h1 id="executive-upgrade-report-integrity">Executive Upgrade &amp; Report Integrity</h1>
+        <div class="callout callout-output">
+          <h3>Executive upgrade statement 100/100 REMEDIATION</h3>
+          <p>Bản này đã sửa toàn bộ điểm yếu bạn liệt kê: thêm breakdown đầy đủ cho Signal Confidence Score, Action
+            Score, Sector Score; gắn nhãn Technical - Qualitative proxy only; đổi người chịu trách nhiệm báo cáo; thêm
+            portfolio overlay cho PET/PNJ/SSI/VIX/HPG; thêm blueprint API T+0, Earnings Scanner, Sentiment Engine, Smart
+            Money Flow, Intermarket Correlation, Alert Engine và Black Swan Matrix. Những phần cần dữ liệu/API trả phí
+            được thiết kế ở cấp vận hành nhưng không giả lập dữ liệu không có quyền truy cập.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Yêu cầu khắc phục</th>
+                <th>Trạng thái</th>
+                <th>Vị trí trong báo cáo</th>
+                <th>Ghi chú kiểm soát chất lượng</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Signal Confidence component breakdown 9 thành phần</td>
+                <td>Completed</td>
+                <td>Mục 3.2</td>
+                <td>Có điểm, trọng số, lý do chấm, backtest-ready</td>
+              </tr>
+              <tr>
+                <td>Action Score component breakdown 8 thành phần</td>
+                <td>Completed</td>
+                <td>Mục 3.3</td>
+                <td>Có entry quality, risk/reward, portfolio fit, invalidation clarity</td>
+              </tr>
+              <tr>
+                <td>Sector Score methodology breakdown</td>
+                <td>Completed</td>
+                <td>Mục 6.2</td>
+                <td>Có 1D, RS, breadth, liquidity, catalyst, earnings signal</td>
+              </tr>
+              <tr>
+                <td>Technical - Qualitative proxy only label</td>
+                <td>Completed</td>
+                <td>Mục 10</td>
+                <td>Data Quality Note đặt ngay đầu module</td>
+              </tr>
+              <tr>
+                <td>Prepared by human analyst owner; assisted by Nguyen Huy Long</td>
+                <td>Completed</td>
+                <td>Cover + footer + metadata</td>
+                <td>Credit line updated: Assisted by Nguyen Huy Long</td>
+              </tr>
+              <tr>
+                <td>Real-time API integration blueprint</td>
+                <td>Completed</td>
+                <td>Mục 14.1</td>
+                <td>FiinPro/Bloomberg/Refinitiv schema; không claim đã kết nối</td>
+              </tr>
+              <tr>
+                <td>Live Model Portfolio với PET/PNJ/SSI/VIX/HPG</td>
+                <td>Completed with assumption</td>
+                <td>Mục 8</td>
+                <td>Dùng equal-weight provisional do chưa có giá vốn/tỷ trọng</td>
+              </tr>
+              <tr>
+                <td>Backtest action log</td>
+                <td>Initialized</td>
+                <td>Mục 15</td>
+                <td>Có schema T+1/T+3/T+5/T+20 để hậu kiểm</td>
+              </tr>
+              <tr>
+                <td>Advanced Sentiment Engine</td>
+                <td>Designed</td>
+                <td>Mục 14.3</td>
+                <td>Có score model; social scan chờ connector</td>
+              </tr>
+              <tr>
+                <td>Smart Money Flow + Intermarket</td>
+                <td>Designed + proxy applied</td>
+                <td>Mục 14.4</td>
+                <td>Public data proxy + required order-flow feed</td>
+              </tr>
+              <tr>
+                <td>Personalized alert / invalidation trigger</td>
+                <td>Completed as rule matrix</td>
+                <td>Mục 9</td>
+                <td>Không push notification thật trong môi trường này; có alert payload</td>
+              </tr>
+              <tr>
+                <td>Black Swan scenario matrix</td>
+                <td>Completed</td>
+                <td>Mục 13</td>
+                <td>Có trigger/action cho tail-risk</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="0-perfectpack-remediation-log">0. PERFECTPACK REMEDIATION LOG</h1>
+      </section>
+      <section class="section-card">
+        <h1 id="1-data-log-validation">1. DATA LOG &amp; VALIDATION</h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nhóm dữ liệu</th>
+                <th>Nguồn ưu tiên trong bản này</th>
+                <th>Timestamp</th>
+                <th>QC status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chỉ số/giá/GTGD</td>
+                <td>Vietstock + cross-check public market summaries</td>
+                <td>After close 11/05/2026</td>
+                <td>Usable for report; official HOSE/HNX feed preferred for production</td>
+              </tr>
+              <tr>
+                <td>Độ rộng thị trường</td>
+                <td>Vietstock summary</td>
+                <td>After close</td>
+                <td>Usable</td>
+              </tr>
+              <tr>
+                <td>Khối ngoại</td>
+                <td>Vietstock + CafeF/market summaries</td>
+                <td>After close</td>
+                <td>Usable, but cần HOSE/HNX raw file để audit absolute precision</td>
+              </tr>
+              <tr>
+                <td>Phái sinh</td>
+                <td>Public derivatives summaries</td>
+                <td>After close</td>
+                <td>Usable for direction, not for full OI analytics</td>
+              </tr>
+              <tr>
+                <td>Valuation</td>
+                <td>SHS Research / market commentary baseline</td>
+                <td>Early May 2026</td>
+                <td>Provisional, not T+0 full dataset</td>
+              </tr>
+              <tr>
+                <td>Earnings</td>
+                <td>Public disclosures not scanned automatically</td>
+                <td>N/A</td>
+                <td>Not computed; architecture-ready</td>
+              </tr>
+              <tr>
+                <td>Order flow / smart money</td>
+                <td>No raw order book access</td>
+                <td>N/A</td>
+                <td>Proxy only</td>
+              </tr>
+              <tr>
+                <td>Sentiment/social</td>
+                <td>No social connector access</td>
+                <td>N/A</td>
+                <td>Architecture-ready only</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout-implementation">
+          <h3>Non-fabrication rule DATA INTEGRITY</h3>
+          <p>Bất kỳ module nào chưa có dữ liệu gốc hoặc API được ghi nhãn rõ: Provisional, Qualitative proxy only, Not
+            computed hoặc Architecture-ready. Không tạo số P/E/P/B/EPS T+0, earnings surprise, order-flow imbalance,
+            sentiment score xã hội hoặc hiệu quả danh mục nếu thiếu dữ liệu đầu vào.</p>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="2-market-command-center">2. MARKET COMMAND CENTER</h1>
+        <div class="callout callout-conclusion">
+          <h3>Final market call COMMAND</h3>
+          <p>Phiên 11/05 là một phiên đảo chiều phân phối ngắn hạn tại vùng đỉnh lịch sử, không phải breakdown trung
+            hạn. Áp lực bán được xác nhận bởi độ rộng xấu, VN30 suy yếu, khối ngoại bán ròng mạnh và phái sinh âm basis;
+            tuy vậy, xu hướng chưa gãy khi VN-Index vẫn giữ trên vùng hỗ trợ 1.880-1.890 và hỗ trợ sâu 1.840-1.850.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Score</th>
+                <th>Điểm</th>
+                <th>Nhãn</th>
+                <th>Diễn giải có thể backtest</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction Score</td>
+                <td>46/100</td>
+                <td>Neutral / Cautious</td>
+                <td>Giá giảm, breadth xấu, foreign flow âm và derivatives yếu kéo điểm về dưới vùng risk-on</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence Score</td>
+                <td>63/100</td>
+                <td>Moderate Confidence</td>
+                <td>Dữ liệu đủ cho market call, nhưng technical/valuation/earnings thiếu API gốc nên không nâng
+                  confidence</td>
+              </tr>
+              <tr>
+                <td>Action Score</td>
+                <td>52/100</td>
+                <td>Hold / Wait</td>
+                <td>Entry quality kém sau thất bại vùng 1.900-1.930; ưu tiên giữ và giảm beta nếu mất hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Earnings Score</td>
+                <td>50/100</td>
+                <td>Neutral provisional</td>
+                <td>Không có earnings scanner T+0; giữ neutral để không bóp méo Market Direction Score</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Portfolio stance</th>
+                <th>Tỷ trọng đề xuất</th>
+                <th>Điều kiện tăng</th>
+                <th>Điều kiện giảm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Cổ phiếu</td>
+                <td>50-60%</td>
+                <td>VN-Index lấy lại 1.900 và vượt 1.920-1.930 với A/D &gt;1.2-1.5</td>
+                <td>Mất 1.880 với thanh khoản cao và breadth xấu</td>
+              </tr>
+              <tr>
+                <td>Tiền mặt</td>
+                <td>40-50%</td>
+                <td>Giảm khi có xác nhận risk-on</td>
+                <td>Tăng khi foreign selling tiếp diễn hoặc VIX/SSI mất hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Margin</td>
+                <td>0%</td>
+                <td>Chỉ xem xét sau khi close &gt;1.930, breadth và basis xác nhận</td>
+                <td>Không sử dụng trong base/bear case</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="3-score-engine-full-component-breakdown">3. SCORE ENGINE - FULL COMPONENT BREAKDOWN</h1>
+        <h2 id="3-1-market-direction-score">3.1 Market Direction Score</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Max</th>
+                <th>Điểm</th>
+                <th>Cơ sở chấm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Price Trend</td>
+                <td>13</td>
+                <td>5</td>
+                <td>VN-Index -1,04%, mất mốc 1.900, VN30 yếu hơn thị trường</td>
+              </tr>
+              <tr>
+                <td>Liquidity</td>
+                <td>13</td>
+                <td>6</td>
+                <td>GTGD cao nhưng đi cùng phiên giảm, nghiêng về phân phối hơn là xác nhận mua</td>
+              </tr>
+              <tr>
+                <td>Breadth</td>
+                <td>11</td>
+                <td>3</td>
+                <td>284 mã tăng / 455 mã giảm; VN30 có 27 mã giảm</td>
+              </tr>
+              <tr>
+                <td>Sector Rotation</td>
+                <td>12</td>
+                <td>7</td>
+                <td>Chứng khoán/thép còn giữ RS tương đối nhưng không đủ lan tỏa toàn thị trường</td>
+              </tr>
+              <tr>
+                <td>Index Attribution</td>
+                <td>8</td>
+                <td>4</td>
+                <td>Một số trụ như VIC/VHM/BID/MCH gây áp lực; cần top contribution raw feed để xác nhận distortion</td>
+              </tr>
+              <tr>
+                <td>Foreign/Institutional Flow</td>
+                <td>9</td>
+                <td>2</td>
+                <td>Khối ngoại bán ròng &gt;1.000 tỷ, tập trung bluechip</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>7</td>
+                <td>3</td>
+                <td>VN30F1M giảm mạnh, basis âm -1,51 điểm</td>
+              </tr>
+              <tr>
+                <td>Technical Structure</td>
+                <td>9</td>
+                <td>4</td>
+                <td>Đóng dưới 1.900 nhưng vẫn trên hỗ trợ 1.880-1.890; qualitative proxy only</td>
+              </tr>
+              <tr>
+                <td>Valuation &amp; Macro</td>
+                <td>5</td>
+                <td>3</td>
+                <td>Valuation không còn rẻ tuyệt đối; dữ liệu T+0 chưa đầy đủ</td>
+              </tr>
+              <tr>
+                <td>News/Catalyst</td>
+                <td>3</td>
+                <td>1</td>
+                <td>Không có catalyst đủ mạnh để đảo chiều tiêu cực trong phiên</td>
+              </tr>
+              <tr>
+                <td>Earnings Momentum</td>
+                <td>10</td>
+                <td>5</td>
+                <td>Neutral provisional do chưa có scanner earnings T+0</td>
+              </tr>
+              <tr>
+                <td>Total</td>
+                <td>100</td>
+                <td>46</td>
+                <td>Neutral / Cautious</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="3-2-signal-confidence-score-9-component-breakdown">3.2 Signal Confidence Score - 9-component breakdown
+        </h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần V3.4.1</th>
+                <th>Max</th>
+                <th>Điểm</th>
+                <th>Lý do chấm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Data Quality</td>
+                <td>15</td>
+                <td>12</td>
+                <td>Số liệu chỉ số, breadth, khối ngoại, phái sinh và giá cổ phiếu có nguồn công khai đối chiếu được;
+                  trừ điểm vì thiếu API gốc/valuation T+0</td>
+              </tr>
+              <tr>
+                <td>Price-Volume Confirmation</td>
+                <td>15</td>
+                <td>9</td>
+                <td>Giá giảm đi kèm thanh khoản cao xác nhận áp lực cung; tín hiệu rõ nhưng tiêu cực</td>
+              </tr>
+              <tr>
+                <td>Breadth Confirmation</td>
+                <td>15</td>
+                <td>7</td>
+                <td>Breadth xấu xác nhận nhịp giảm; tuy nhiên chưa có breakdown số mã theo ngành đầy đủ</td>
+              </tr>
+              <tr>
+                <td>Sector Confirmation</td>
+                <td>12</td>
+                <td>8</td>
+                <td>Chứng khoán và thép còn tương đối tốt, nhưng leadership không lan tỏa</td>
+              </tr>
+              <tr>
+                <td>Attribution Cleanliness</td>
+                <td>10</td>
+                <td>7</td>
+                <td>Áp lực giảm không chỉ từ một mã, nhưng thiếu contribution raw feed để tính top 3/top 5 chính xác
+                </td>
+              </tr>
+              <tr>
+                <td>Foreign/Institutional Consistency</td>
+                <td>8</td>
+                <td>3</td>
+                <td>Khối ngoại bán ròng &gt;1.000 tỷ và tập trung bluechip; tự doanh thận trọng làm giảm confidence cho
+                  rebound</td>
+              </tr>
+              <tr>
+                <td>Derivatives Confirmation</td>
+                <td>7</td>
+                <td>4</td>
+                <td>Basis âm và VN30F1M giảm xác nhận tâm lý hedging/risk-off ngắn hạn</td>
+              </tr>
+              <tr>
+                <td>Distortion Risk</td>
+                <td>10</td>
+                <td>8</td>
+                <td>Chưa thấy ETF/expiry/block-trade distortion cực đoan; vẫn cần raw negotiated data</td>
+              </tr>
+              <tr>
+                <td>Scenario Clarity</td>
+                <td>8</td>
+                <td>5</td>
+                <td>Trigger 1.880, 1.900 và 1.920-1.930 rõ; nhưng thiếu MA/RSI/MACD số</td>
+              </tr>
+              <tr>
+                <td>Total</td>
+                <td>100</td>
+                <td>63</td>
+                <td>Moderate Confidence - đủ dùng để quản trị danh mục, chưa đủ để hành động mạnh</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="3-3-action-score-8-component-breakdown">3.3 Action Score - 8-component breakdown</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thành phần V3.4.1</th>
+                <th>Max</th>
+                <th>Điểm</th>
+                <th>Lý do chấm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction</td>
+                <td>20</td>
+                <td>10</td>
+                <td>Direction Score 46/100, chưa đủ risk-on</td>
+              </tr>
+              <tr>
+                <td>Signal Confidence</td>
+                <td>15</td>
+                <td>9</td>
+                <td>Confidence 63/100, moderate; dữ liệu đủ nhưng thiếu API sâu</td>
+              </tr>
+              <tr>
+                <td>Entry Quality</td>
+                <td>20</td>
+                <td>8</td>
+                <td>Entry quality thấp do breakout attempt thất bại gần vùng đỉnh; mua mới sau phiên phân phối có
+                  risk/reward kém</td>
+              </tr>
+              <tr>
+                <td>Risk/Reward</td>
+                <td>15</td>
+                <td>6</td>
+                <td>Upside bị chặn bởi 1.920-1.930; downside về 1.880/1.850 rộng hơn</td>
+              </tr>
+              <tr>
+                <td>Sector Alignment</td>
+                <td>10</td>
+                <td>6</td>
+                <td>Danh mục có SSI/VIX/HPG thuộc nhóm RS tốt, nhưng PET/PNJ thiên retail/distribution chưa dẫn dắt</td>
+              </tr>
+              <tr>
+                <td>Liquidity Suitability</td>
+                <td>7</td>
+                <td>5</td>
+                <td>SSI/VIX/HPG thanh khoản tốt; PET nhỏ hơn cần sizing thấp</td>
+              </tr>
+              <tr>
+                <td>Portfolio Fit</td>
+                <td>7</td>
+                <td>5</td>
+                <td>Danh mục tập trung vào chứng khoán + tiêu dùng/retail + thép; thiếu cash/defensive/leader oil-gas
+                </td>
+              </tr>
+              <tr>
+                <td>Invalidation Clarity</td>
+                <td>6</td>
+                <td>3</td>
+                <td>Có trigger theo VN-Index, nhưng chưa có giá vốn/tỷ trọng thực tế để đặt stop riêng từng mã</td>
+              </tr>
+              <tr>
+                <td>Total</td>
+                <td>100</td>
+                <td>52</td>
+                <td>Hold / Wait - giữ có kỷ luật, không mua đuổi, chỉ cơ cấu khi trigger xảy ra</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="4-executive-summary-intraday-market-map">4. EXECUTIVE SUMMARY &amp; INTRADAY MARKET MAP</h1>
+        <p class="bullet">• VN-Index đóng cửa 1.895,50 điểm, giảm 19,87 điểm (-1,04%), đánh mất mốc 1.900 sau khi có
+          thời điểm lập đỉnh intraday quanh 1.913 điểm.</p>
+        <p class="bullet">• Độ rộng thị trường nghiêng mạnh về bên bán: toàn thị trường 284 mã tăng/455 mã giảm; VN30 có
+          27 mã giảm, 2 mã tăng, 1 mã tham chiếu.</p>
+        <p class="bullet">• Thanh khoản tăng trong phiên giảm tạo nhãn Distribution Liquidity Risk: không phải hồi yếu
+          do thiếu tiền, mà là cung chủ động xuất hiện tại vùng cao.</p>
+        <p class="bullet">• Khối ngoại bán ròng hơn 1.000 tỷ, trọng tâm VHM, FPT, DGC, ACB; HPG cũng nằm trong nhóm bán
+          ròng theo một số nguồn.</p>
+        <p class="bullet">• Phái sinh xác nhận tâm lý thận trọng: VN30F1M giảm mạnh, basis âm -1,51 điểm và xu hướng
+          short chiếm ưu thế.</p>
+        <p class="bullet">• Hành động: giữ danh mục với trailing stop, không dùng margin; nâng tỷ trọng chỉ khi VN-Index
+          đóng trên 1.920-1.930 kèm breadth cải thiện.</p>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thời điểm</th>
+                <th>Dữ liệu</th>
+                <th>Cơ chế</th>
+                <th>Kết luận</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Sáng</td>
+                <td>VN-Index mở cửa tích cực, có lúc chạm vùng cao lịch sử</td>
+                <td>Cầu đuổi giá đầu phiên còn hiện diện</td>
+                <td>Chưa đủ xác nhận nếu không giữ được vùng cao</td>
+              </tr>
+              <tr>
+                <td>Chiều</td>
+                <td>Áp lực bán gia tăng, VN30 suy yếu</td>
+                <td>Large-cap pressure kích hoạt giảm beta</td>
+                <td>Risk appetite suy yếu</td>
+              </tr>
+              <tr>
+                <td>ATC/Close</td>
+                <td>Đóng dưới 1.900</td>
+                <td>Mốc tâm lý chuyển thành kháng cự gần</td>
+                <td>Base case chuyển sang dao động/kiểm định hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Phiên tới</td>
+                <td>1.880-1.890 là vùng kiểm định đầu tiên</td>
+                <td>Nếu giữ được với volume giảm, rủi ro hạ nhiệt</td>
+                <td>Chờ xác nhận, không mua đuổi</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="5-market-quality-distortion-control">5. MARKET QUALITY &amp; DISTORTION CONTROL</h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Block</th>
+                <th>Dữ liệu chính</th>
+                <th>Nhãn V3.4.1</th>
+                <th>Portfolio implication</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Price</td>
+                <td>VN-Index -1,04%, VN30 -1,62%</td>
+                <td>Risk-off large-cap pressure</td>
+                <td>Không tăng beta</td>
+              </tr>
+              <tr>
+                <td>Liquidity</td>
+                <td>GTGD HOSE &gt;25 nghìn tỷ</td>
+                <td>Distribution Liquidity</td>
+                <td>Giữ cash buffer</td>
+              </tr>
+              <tr>
+                <td>Breadth</td>
+                <td>284 tăng / 455 giảm</td>
+                <td>Weak breadth</td>
+                <td>Không mở vị thế mới diện rộng</td>
+              </tr>
+              <tr>
+                <td>Attribution</td>
+                <td>VIC/VHM/BID/MCH gây áp lực</td>
+                <td>Large-cap downside contribution</td>
+                <td>Kiểm tra VN30 trước khi nâng score</td>
+              </tr>
+              <tr>
+                <td>Foreign flow</td>
+                <td>Bán ròng &gt;1.000 tỷ</td>
+                <td>True Foreign Outflow</td>
+                <td>Hạ confidence</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>Basis âm -1,51</td>
+                <td>Hedging pressure</td>
+                <td>Margin = 0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Loại distortion</th>
+                <th>Điều kiện/quan sát</th>
+                <th>Nhãn</th>
+                <th>Action impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Index distortion</td>
+                <td>Áp lực từ nhóm trụ nhưng breadth cũng xấu</td>
+                <td>Not false weakness</td>
+                <td>Không xem phiên giảm là nhiễu đơn thuần</td>
+              </tr>
+              <tr>
+                <td>Liquidity distortion</td>
+                <td>Thanh khoản cao trong phiên giảm</td>
+                <td>Distribution Liquidity</td>
+                <td>Không bắt đáy sớm</td>
+              </tr>
+              <tr>
+                <td>Foreign flow distortion</td>
+                <td>Bán ròng &gt;1.000 tỷ, tập trung bluechip</td>
+                <td>True Foreign Outflow</td>
+                <td>Giảm Confidence/Action</td>
+              </tr>
+              <tr>
+                <td>Derivatives distortion</td>
+                <td>Basis âm, short sentiment rõ</td>
+                <td>Hedging Pressure</td>
+                <td>Không dùng margin</td>
+              </tr>
+              <tr>
+                <td>News distortion</td>
+                <td>Không có catalyst xác nhận đảo chiều</td>
+                <td>Neutral</td>
+                <td>Không nâng bull case</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="6-sector-rotation-engine">6. SECTOR ROTATION ENGINE</h1>
+        <h2 id="6-1-sector-allocation-output">6.1 Sector allocation output</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ngành/nhóm</th>
+                <th>1D/tín hiệu chính</th>
+                <th>RS vs VN-Index</th>
+                <th>Sector Score</th>
+                <th>Allocation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chứng khoán</td>
+                <td>SSI/VIX giữ thanh khoản và beta</td>
+                <td>Relative strength tốt hơn thị trường</td>
+                <td>72</td>
+                <td>Tactical Overweight nhưng không mua đuổi</td>
+              </tr>
+              <tr>
+                <td>Thép</td>
+                <td>HPG giảm nhẹ hơn thị trường</td>
+                <td>RS tích cực tương đối</td>
+                <td>70</td>
+                <td>Hold/Add on pullback</td>
+              </tr>
+              <tr>
+                <td>Bán lẻ/Trang sức</td>
+                <td>PNJ giảm, nhưng chất lượng cơ bản tốt</td>
+                <td>Trung tính</td>
+                <td>65</td>
+                <td>Neutral Positive / Core hold</td>
+              </tr>
+              <tr>
+                <td>Dầu khí/Phân phối</td>
+                <td>PET giảm mạnh hơn, catalyst chưa rõ</td>
+                <td>Yếu</td>
+                <td>48</td>
+                <td>Hold only / Reduce nếu mất hỗ trợ</td>
+              </tr>
+              <tr>
+                <td>Bất động sản</td>
+                <td>Áp lực từ VIC/VHM</td>
+                <td>Yếu</td>
+                <td>32</td>
+                <td>Underweight</td>
+              </tr>
+              <tr>
+                <td>Ngân hàng</td>
+                <td>BID gây áp lực, nhóm phân hóa</td>
+                <td>Yếu đến trung tính</td>
+                <td>45</td>
+                <td>Neutral/Underweight ngắn hạn</td>
+              </tr>
+              <tr>
+                <td>Dầu khí upstream</td>
+                <td>PLX/PVD/PVS tích cực theo một số nguồn</td>
+                <td>Improving</td>
+                <td>62</td>
+                <td>Watchlist</td>
+              </tr>
+              <tr>
+                <td>Điện/tiện ích</td>
+                <td>Phòng thủ tương đối</td>
+                <td>Neutral</td>
+                <td>58</td>
+                <td>Neutral</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="6-2-sector-score-methodology-breakdown">6.2 Sector Score methodology breakdown</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ngành</th>
+                <th>1D Perf (20)</th>
+                <th>RS vs VN-Index (20)</th>
+                <th>Breadth (15)</th>
+                <th>GTGD vs MA20 (15)</th>
+                <th>Catalyst (15)</th>
+                <th>Earnings signal (15)</th>
+                <th>Total</th>
+                <th>Calibration note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chứng khoán</td>
+                <td>15</td>
+                <td>17</td>
+                <td>12</td>
+                <td>13</td>
+                <td>8</td>
+                <td>7</td>
+                <td>72</td>
+                <td>Giá và thanh khoản tương đối tốt, nhưng earnings chưa cập nhật T+0</td>
+              </tr>
+              <tr>
+                <td>Thép</td>
+                <td>14</td>
+                <td>16</td>
+                <td>11</td>
+                <td>12</td>
+                <td>8</td>
+                <td>9</td>
+                <td>70</td>
+                <td>HPG giữ RS, catalyst thép cần xác nhận tiếp</td>
+              </tr>
+              <tr>
+                <td>Bán lẻ/Trang sức</td>
+                <td>11</td>
+                <td>12</td>
+                <td>10</td>
+                <td>10</td>
+                <td>12</td>
+                <td>10</td>
+                <td>65</td>
+                <td>PNJ chất lượng nhưng phiên giảm không phải điểm mua tối ưu</td>
+              </tr>
+              <tr>
+                <td>Dầu khí/Phân phối</td>
+                <td>7</td>
+                <td>8</td>
+                <td>8</td>
+                <td>8</td>
+                <td>10</td>
+                <td>7</td>
+                <td>48</td>
+                <td>PET cần catalyst/volume xác nhận</td>
+              </tr>
+              <tr>
+                <td>Bất động sản</td>
+                <td>4</td>
+                <td>5</td>
+                <td>5</td>
+                <td>6</td>
+                <td>7</td>
+                <td>5</td>
+                <td>32</td>
+                <td>Áp lực nhóm trụ; underweight</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout-principle">
+          <h3>Sector methodology note CALIBRATION READY</h3>
+          <p>Điểm ngành được thiết kế để calibrate/backtest: 1D performance và RS chấm theo mức vượt/kém VN-Index;
+            breadth dựa trên tỷ lệ mã tăng trong nhóm; GTGD vs MA20 dùng proxy công khai khi chưa có FiinPro; catalyst
+            và earnings signal chỉ được nâng khi có tin xác nhận hoặc bảng KQKD ngành. Vì chưa có dữ liệu full ngành
+            T+0, điểm này là semi-quantitative, không phải black-box opinion.</p>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="7-market-microstructure-smart-money-proxy">7. MARKET MICROSTRUCTURE &amp; SMART MONEY PROXY</h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ô dashboard</th>
+                <th>Mã/nhóm chính</th>
+                <th>Số liệu/diễn biến</th>
+                <th>Kết luận</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Top đè VN-Index</td>
+                <td>VIC, VHM, BID, MCH</td>
+                <td>Gây áp lực chính lên chỉ số</td>
+                <td>Large-cap downside pressure</td>
+              </tr>
+              <tr>
+                <td>Top hỗ trợ</td>
+                <td>BSR, LPB, GEL, GEE</td>
+                <td>Hỗ trợ điểm số nhưng không đủ lan tỏa</td>
+                <td>Leadership chưa đủ rộng</td>
+              </tr>
+              <tr>
+                <td>Top foreign sell</td>
+                <td>VHM, FPT, DGC, ACB; có HPG theo một số nguồn</td>
+                <td>Bán ròng &gt;1.000 tỷ</td>
+                <td>True outflow</td>
+              </tr>
+              <tr>
+                <td>Top foreign buy</td>
+                <td>Một số mã riêng lẻ, không đủ offset</td>
+                <td>Không đảo chiều tổng flow</td>
+                <td>Không nâng confidence</td>
+              </tr>
+              <tr>
+                <td>Volume breakout proxy</td>
+                <td>SSI/VIX/HPG/PET/PNJ theo danh mục</td>
+                <td>Không có VWAP intraday chính thức trong nguồn công khai</td>
+                <td>Smart Money proxy only</td>
+              </tr>
+              <tr>
+                <td>Negotiated transactions</td>
+                <td>VPB, STB, HDB, NVL, VIC theo market summary</td>
+                <td>Có giao dịch lớn nhưng chưa đủ raw ratio so tổng GTGD</td>
+                <td>Need HOSE raw feed</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Smart Money Layer</th>
+                <th>Current public-data proxy</th>
+                <th>Required 100% feed</th>
+                <th>Output khi kết nối</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Order-flow imbalance</td>
+                <td>Không có</td>
+                <td>Level-2 order book / broker feed</td>
+                <td>Buy/sell pressure by price level</td>
+              </tr>
+              <tr>
+                <td>VWAP participation</td>
+                <td>Giá/volume cuối ngày</td>
+                <td>Intraday ticks</td>
+                <td>Accumulation vs distribution</td>
+              </tr>
+              <tr>
+                <td>Block trade filter</td>
+                <td>Danh sách thỏa thuận công khai</td>
+                <td>Negotiated transaction raw file</td>
+                <td>Block-trade distortion ratio</td>
+              </tr>
+              <tr>
+                <td>Institutional footprint</td>
+                <td>Foreign/self-trading net flow</td>
+                <td>Participant-level flow</td>
+                <td>True smart money map</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="8-personalized-live-portfolio-overlay-pet-pnj-ssi-vix-hpg">8. PERSONALIZED LIVE PORTFOLIO OVERLAY - PET
+          · PNJ · SSI · VIX · HPG</h1>
+        <div class="callout callout-principle">
+          <h3>Portfolio assumption register ASSUMPTION</h3>
+          <p>Bạn cung cấp danh mục đang nắm gồm PET, PNJ, SSI, VIX, HPG nhưng chưa cung cấp giá vốn và tỷ trọng. Bản này
+            dùng equal-weight provisional để đo hiệu quả phiên và rủi ro cấu trúc; khi có giá vốn/tỷ trọng thật, chỉ cần
+            thay input để Portfolio Tracker tính P/L, drawdown, risk budget và stop theo từng vị thế.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Close 11/05</th>
+                <th>1D</th>
+                <th>Volume / Liquidity</th>
+                <th>Sector read</th>
+                <th>Position diagnosis</th>
+                <th>Action base case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PET</td>
+                <td>28.0</td>
+                <td>-2.44%</td>
+                <td>~1.11m</td>
+                <td>Retail/consumer-distribution yếu</td>
+                <td>Beta vừa, đang chịu áp lực</td>
+                <td>Hold only; reduce if mất 27.0-27.2</td>
+              </tr>
+              <tr>
+                <td>PNJ</td>
+                <td>79.0</td>
+                <td>-0.63%</td>
+                <td>~1.43m</td>
+                <td>Quality consumer</td>
+                <td>Core quality, giảm nhẹ hơn market</td>
+                <td>Core hold; add only on pullback with VNI stable</td>
+              </tr>
+              <tr>
+                <td>SSI</td>
+                <td>40.0</td>
+                <td>-0.74%</td>
+                <td>~60.0m</td>
+                <td>Chứng khoán leadership</td>
+                <td>Liquid leader but high beta</td>
+                <td>Hold; add only after reclaim 41-42 with market confirmation</td>
+              </tr>
+              <tr>
+                <td>VIX</td>
+                <td>41.4</td>
+                <td>+6.98%</td>
+                <td>~53.7m</td>
+                <td>High-beta securities</td>
+                <td>Strong momentum but elevated reversal risk</td>
+                <td>Take partial risk if VNI mất 1.880; no chase</td>
+              </tr>
+              <tr>
+                <td>HPG</td>
+                <td>27.3</td>
+                <td>-0.18%</td>
+                <td>~110m</td>
+                <td>Thép relative strength</td>
+                <td>Core cyclical, RS tốt</td>
+                <td>Hold; add only after reclaim 27.8-28.0 và thép phục hồi breadth</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="8-1-portfolio-concentration-target-risk-budget">8.1 Portfolio concentration &amp; target risk budget
+        </h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Bucket</th>
+                <th>Current equal-weight proxy</th>
+                <th>Risk diagnosis</th>
+                <th>Tactical target until VN-Index reclaims 1.920-1.930</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Securities beta: SSI + VIX</td>
+                <td>40%</td>
+                <td>High beta, high liquidity</td>
+                <td>30-35%; trim VIX first if bear trigger</td>
+              </tr>
+              <tr>
+                <td>Consumer/retail-distribution: PET + PNJ</td>
+                <td>40%</td>
+                <td>Mixed quality; PNJ defensive hơn PET</td>
+                <td>35-40%; PNJ core, PET smaller tactical</td>
+              </tr>
+              <tr>
+                <td>Steel: HPG</td>
+                <td>20%</td>
+                <td>Cyclical core with RS</td>
+                <td>20-25% if HPG giữ RS</td>
+              </tr>
+              <tr>
+                <td>Cash buffer</td>
+                <td>0% if fully invested</td>
+                <td>Low flexibility if index breaks 1.880</td>
+                <td>10-25% depending on actual risk appetite</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Base action</th>
+                <th>Add trigger</th>
+                <th>Reduce / Stop trigger</th>
+                <th>Take-profit / Review trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PET</td>
+                <td>Hold small</td>
+                <td>Reclaim 28.8-29.0 with volume</td>
+                <td>Close below 27.0-27.2</td>
+                <td>Approach 30.0 without volume confirmation</td>
+              </tr>
+              <tr>
+                <td>PNJ</td>
+                <td>Core hold</td>
+                <td>Pullback stable above support while VNI holds 1.880</td>
+                <td>Break below recent support with volume spike</td>
+                <td>Quality rerating without earnings confirmation</td>
+              </tr>
+              <tr>
+                <td>SSI</td>
+                <td>Hold with trailing stop</td>
+                <td>Close above 41-42 and sector breadth improves</td>
+                <td>Break below short-term support and VNI loses 1.880</td>
+                <td>RS weakens vs VIX/market</td>
+              </tr>
+              <tr>
+                <td>VIX</td>
+                <td>Trading hold only</td>
+                <td>No chase; add only after pullback holds</td>
+                <td>First reduce if bear scenario triggers</td>
+                <td>Strong gap-up or parabolic move</td>
+              </tr>
+              <tr>
+                <td>HPG</td>
+                <td>Core hold</td>
+                <td>Reclaim 27.8-28.0 with steel leadership</td>
+                <td>Lose 26.8-27.0 with volume</td>
+                <td>Sector RS fades</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="9-personalized-invalidation-alert-engine">9. PERSONALIZED INVALIDATION &amp; ALERT ENGINE</h1>
+        <div class="callout callout-principle">
+          <h3>Alert implementation note ALERT READY</h3>
+          <p>Trong môi trường này mình không thể gắn push notification real-time trực tiếp vào app/broker. Tuy nhiên báo
+            cáo đã chuyển Invalidation Cascade thành alert rules có thể đưa vào Google Sheet, TradingView, broker API,
+            Telegram bot hoặc automation nội bộ. Khi kết nối feed giá intraday, các rules bên dưới chạy được ngay.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Alert ID</th>
+                <th>Scope</th>
+                <th>Trigger</th>
+                <th>Severity</th>
+                <th>Action payload</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>A1</td>
+                <td>VN-Index</td>
+                <td>Close &lt; 1.880 and value traded &gt; MA20</td>
+                <td>High</td>
+                <td>Reduce portfolio beta; margin = 0</td>
+              </tr>
+              <tr>
+                <td>A2</td>
+                <td>VN-Index</td>
+                <td>Intraday break 1.850 with A/D &lt; 0.5</td>
+                <td>Critical</td>
+                <td>De-risk to defensive/cash</td>
+              </tr>
+              <tr>
+                <td>A3</td>
+                <td>Foreign flow</td>
+                <td>Net sell &gt;1.000 tỷ for 3 consecutive sessions</td>
+                <td>High</td>
+                <td>Raise risk flag by one level; reduce bluechip exposure</td>
+              </tr>
+              <tr>
+                <td>A4</td>
+                <td>SSI/VIX</td>
+                <td>Both underperform VN-Index with volume spike</td>
+                <td>Medium</td>
+                <td>Reduce securities beta</td>
+              </tr>
+              <tr>
+                <td>A5</td>
+                <td>VIX</td>
+                <td>Gap-up/parabolic move without market breadth confirmation</td>
+                <td>Medium</td>
+                <td>Take partial profit / do not chase</td>
+              </tr>
+              <tr>
+                <td>A6</td>
+                <td>HPG</td>
+                <td>Lose 26.8-27.0 with steel sector RS turning negative</td>
+                <td>Medium</td>
+                <td>Cut/add freeze</td>
+              </tr>
+              <tr>
+                <td>A7</td>
+                <td>PET</td>
+                <td>Close below 27.0-27.2</td>
+                <td>Medium</td>
+                <td>Reduce tactical exposure</td>
+              </tr>
+              <tr>
+                <td>A8</td>
+                <td>PNJ</td>
+                <td>Break support while market weakens</td>
+                <td>Medium</td>
+                <td>Review core quality exposure</td>
+              </tr>
+              <tr>
+                <td>A9</td>
+                <td>Risk-on recovery</td>
+                <td>VN-Index closes &gt;1.930, A/D &gt;1.5, basis positive</td>
+                <td>Positive</td>
+                <td>Allow add-on-pullback list</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Pseudo-code field</th>
+                <th>Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Alert channel</td>
+                <td>TradingView webhook → Telegram/Slack; Broker API → push; Google Sheet Apps Script → email/push</td>
+              </tr>
+              <tr>
+                <td>Rule format</td>
+                <td>IF trigger AND volume/breadth confirmation THEN action_payload + timestamp + required review</td>
+              </tr>
+              <tr>
+                <td>Audit trail</td>
+                <td>Every alert stored with price, volume, breadth, portfolio weight and action taken</td>
+              </tr>
+              <tr>
+                <td>Human override</td>
+                <td>Allowed only with reason note and review horizon</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="10-technical-structure-engine">10. TECHNICAL STRUCTURE ENGINE</h1>
+        <div class="callout callout-implementation">
+          <h3>Technical data - Qualitative proxy only DATA QUALITY NOTE</h3>
+          <p>Không có giá trị MA20/50/200, RSI, MACD T+0 dạng dữ liệu gốc trong tập nguồn công khai. Kết luận kỹ thuật
+            dưới đây dựa trên tổng hợp định tính từ các CTCK và dữ liệu giá/độ rộng công khai. Khi chạy với
+            FiinPro/Bloomberg/Refinitiv, cần điền giá trị số thực tế cho MA20/50/200, RSI, MACD, MFI, ATR và
+            support/resistance theo rolling window.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Yếu tố kỹ thuật</th>
+                <th>Quan sát</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Close location</td>
+                <td>Đóng dưới 1.900 sau khi lập đỉnh intraday</td>
+                <td>Không mua đuổi, đợi reclaim</td>
+              </tr>
+              <tr>
+                <td>Support 1</td>
+                <td>1.880-1.890</td>
+                <td>Giữ nếu kiểm định thành công với volume giảm</td>
+              </tr>
+              <tr>
+                <td>Support 2</td>
+                <td>1.840-1.850</td>
+                <td>Vùng de-risk nếu bị xuyên thủng với breadth xấu</td>
+              </tr>
+              <tr>
+                <td>Resistance 1</td>
+                <td>1.900</td>
+                <td>Cần lấy lại trước khi nâng base case</td>
+              </tr>
+              <tr>
+                <td>Resistance 2</td>
+                <td>1.920-1.930</td>
+                <td>Điều kiện risk-on xác nhận</td>
+              </tr>
+              <tr>
+                <td>Momentum</td>
+                <td>RSI/MACD được nhiều CTCK mô tả suy yếu nhưng chưa có số</td>
+                <td>Qualitative only</td>
+              </tr>
+              <tr>
+                <td>Volume</td>
+                <td>Tăng trong phiên giảm</td>
+                <td>Ưu tiên pullback, trailing stop</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="11-foreign-flow-etf-flow-derivatives-sentiment">11. FOREIGN FLOW, ETF FLOW, DERIVATIVES &amp; SENTIMENT
+        </h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tín hiệu</th>
+                <th>Dữ liệu</th>
+                <th>Nhãn</th>
+                <th>Portfolio implication</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Foreign flow HOSE</td>
+                <td>Bán ròng &gt;1.000 tỷ, top bán gồm VHM/FPT/DGC/ACB</td>
+                <td>True Foreign Outflow</td>
+                <td>Hạ confidence; tránh tăng bluechip beta</td>
+              </tr>
+              <tr>
+                <td>Foreign flow HNX</td>
+                <td>Mua ròng nhỏ</td>
+                <td>Noise / minor offset</td>
+                <td>Không đủ đảo kết luận</td>
+              </tr>
+              <tr>
+                <td>ETF flow</td>
+                <td>Không có dữ liệu review/flow T+0 đầy đủ</td>
+                <td>Not computed</td>
+                <td>Không đưa vào base case</td>
+              </tr>
+              <tr>
+                <td>Derivatives</td>
+                <td>VN30F1M giảm, basis âm -1,51</td>
+                <td>Hedging pressure</td>
+                <td>Margin = 0</td>
+              </tr>
+              <tr>
+                <td>OI</td>
+                <td>Không có đầy đủ raw OI trend</td>
+                <td>Partial data</td>
+                <td>Không kết luận long/short buildup tuyệt đối</td>
+              </tr>
+              <tr>
+                <td>Retail sentiment</td>
+                <td>Chưa có social scan</td>
+                <td>Architecture-ready</td>
+                <td>Không định lượng hưng phấn/hoảng loạn</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="advanced-sentiment-engine-architecture">Advanced Sentiment Engine - architecture</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Input</th>
+                <th>Method</th>
+                <th>Score output</th>
+                <th>Current status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>News headlines</td>
+                <td>NLP classification: positive/negative/neutral + magnitude</td>
+                <td>News Impact Score</td>
+                <td>Designed</td>
+              </tr>
+              <tr>
+                <td>Social/forum posts</td>
+                <td>Entity recognition + retail excitement/fear/rumor detection</td>
+                <td>Retail Sentiment Score</td>
+                <td>Requires connector</td>
+              </tr>
+              <tr>
+                <td>Broker commentary</td>
+                <td>Consensus tone and risk language scoring</td>
+                <td>Institutional Sentiment Score</td>
+                <td>Can be semi-manual</td>
+              </tr>
+              <tr>
+                <td>Derivatives tone</td>
+                <td>Basis/OI/volume stress score</td>
+                <td>Trading Sentiment Score</td>
+                <td>Partially applied</td>
+              </tr>
+              <tr>
+                <td>Final sentiment</td>
+                <td>Weighted average with confidence cap</td>
+                <td>Market Sentiment Score</td>
+                <td>Architecture-ready</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="12-valuation-macro-earnings-momentum">12. VALUATION, MACRO &amp; EARNINGS MOMENTUM</h1>
+        <div class="callout callout-implementation">
+          <h3>Valuation baseline warning PROVISIONAL</h3>
+          <p>Dữ liệu định giá T+0 sau phiên 11/05 không có đầy đủ trong nguồn công khai. Báo cáo sử dụng baseline gần
+            nhất: SHS Research cho rằng nếu bóc tách nhóm Vingroup, phần còn lại của thị trường có P/E khoảng 12,96 và
+            P/B khoảng 1,8 vào đầu tháng 05/2026. Đây là dữ liệu nền cho valuation context, không phải valuation T+0 đầy
+            đủ.</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Chỉ tiêu</th>
+                <th>Giá trị dùng trong bản này</th>
+                <th>Baseline</th>
+                <th>Đánh giá</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market P/E ex-Vingroup</td>
+                <td>~12,96</td>
+                <td>SHS Research early May</td>
+                <td>Fair valuation</td>
+              </tr>
+              <tr>
+                <td>Market P/B ex-Vingroup</td>
+                <td>~1,8</td>
+                <td>SHS Research early May</td>
+                <td>Fair with dispersion</td>
+              </tr>
+              <tr>
+                <td>T+0 P/E/P/B full market</td>
+                <td>Not computed</td>
+                <td>Requires FiinPro/Bloomberg</td>
+                <td>Cannot use for precise valuation score</td>
+              </tr>
+              <tr>
+                <td>Macro intermarket</td>
+                <td>Not fully computed</td>
+                <td>Requires DXY, UST yield, regional index feed</td>
+                <td>Architecture-ready</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Earnings module</th>
+                <th>Trạng thái</th>
+                <th>Score</th>
+                <th>Required connector để đạt 100%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>% market cap reported</td>
+                <td>Not computed</td>
+                <td>Neutral</td>
+                <td>HOSE/HNX disclosures + FiinPro market cap</td>
+              </tr>
+              <tr>
+                <td>Revenue/NPATMI YoY by sector</td>
+                <td>Not computed</td>
+                <td>Neutral</td>
+                <td>Financial statement parser</td>
+              </tr>
+              <tr>
+                <td>Earnings surprise vs forecast</td>
+                <td>Not computed</td>
+                <td>Neutral</td>
+                <td>Consensus database</td>
+              </tr>
+              <tr>
+                <td>Margin expansion</td>
+                <td>Not computed</td>
+                <td>Neutral</td>
+                <td>Sector financial data</td>
+              </tr>
+              <tr>
+                <td>Final Earnings Score</td>
+                <td>Provisional</td>
+                <td>50/100</td>
+                <td>Scanner required</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="13-scenario-matrix-black-swan-portfolio-action">13. SCENARIO MATRIX, BLACK SWAN &amp; PORTFOLIO ACTION
+        </h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Kịch bản</th>
+                <th>Xác suất</th>
+                <th>Trigger</th>
+                <th>Invalidation</th>
+                <th>Vùng VN-Index</th>
+                <th>Portfolio action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Bull</td>
+                <td>25%</td>
+                <td>Close &gt;1.920-1.930, GTGD duy trì, A/D &gt;1.5, basis cải thiện</td>
+                <td>Rơi lại dưới 1.900</td>
+                <td>1.930-1.960</td>
+                <td>Add on pullback SSI/HPG; VIX trading size nhỏ; PET/PNJ giữ</td>
+              </tr>
+              <tr>
+                <td>Base</td>
+                <td>50%</td>
+                <td>Dao động 1.880-1.920, thanh khoản ổn định</td>
+                <td>Break khỏi biên với volume cao</td>
+                <td>1.880-1.920</td>
+                <td>Giữ danh mục, trailing stop, không margin</td>
+              </tr>
+              <tr>
+                <td>Bear</td>
+                <td>25%</td>
+                <td>Mất 1.880, breadth &lt;0.7, foreign sell tiếp diễn</td>
+                <td>Lấy lại 1.900 với breadth tốt</td>
+                <td>1.840-1.880</td>
+                <td>Giảm VIX/SSI/PET trước; giữ PNJ/HPG core nhỏ; cash 40-60%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="black-swan-extension-matrix">Black Swan Extension Matrix</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tail-risk event</th>
+                <th>Early warning trigger</th>
+                <th>Immediate action</th>
+                <th>Recovery condition</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Fed/Yield shock</td>
+                <td>DXY + UST yield tăng mạnh, Asia equities risk-off</td>
+                <td>Reduce beta; margin 0; ưu tiên cash</td>
+                <td>Yield/DXY stabilize and VNI reclaims 1.900</td>
+              </tr>
+              <tr>
+                <td>FX/VND stress</td>
+                <td>USD/VND breakout, foreign sell accelerates</td>
+                <td>Reduce securities beta, avoid chasing cyclicals</td>
+                <td>Foreign selling normalizes and VNI reclaims key support</td>
+              </tr>
+              <tr>
+                <td>Domestic policy shock</td>
+                <td>Unexpected tightening / regulatory event</td>
+                <td>Freeze new buys, wait for policy clarification</td>
+                <td>Official disclosure resolves uncertainty</td>
+              </tr>
+              <tr>
+                <td>Liquidity shock</td>
+                <td>GTGD spike down-day + A/D &lt;0.5</td>
+                <td>De-risk to cash 50-70%</td>
+                <td>Breadth and volume normalize</td>
+              </tr>
+              <tr>
+                <td>Geopolitical/commodity shock</td>
+                <td>Brent/WTI or regional markets gap</td>
+                <td>Review PET/HPG sector exposure</td>
+                <td>Policy details priced in and volatility normalizes</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="14-institutional-infrastructure-layer">14. INSTITUTIONAL INFRASTRUCTURE LAYER</h1>
+        <h2 id="14-1-real-time-api-integration-blueprint">14.1 Real-time API Integration Blueprint</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Module</th>
+                <th>Provider/API</th>
+                <th>Fields</th>
+                <th>Validation rule</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market data</td>
+                <td>FiinPro/HOSE/HNX/Bloomberg</td>
+                <td>OHLCV, GTGD, KLGD, breadth, cap group</td>
+                <td>Cross-check index and GTGD within tolerance</td>
+                <td>Market dashboard T+0</td>
+              </tr>
+              <tr>
+                <td>Valuation</td>
+                <td>FiinPro/Bloomberg/Refinitiv</td>
+                <td>TTM P/E, FW P/E, P/B, ROE, EPS</td>
+                <td>Definition check: TTM vs forward</td>
+                <td>Valuation score</td>
+              </tr>
+              <tr>
+                <td>Earnings scanner</td>
+                <td>HOSE/HNX disclosure + OCR/parser</td>
+                <td>Revenue, NPATMI, margin, surprise</td>
+                <td>Compare filing vs database</td>
+                <td>Earnings Score</td>
+              </tr>
+              <tr>
+                <td>Order flow</td>
+                <td>Broker API / Level-2 feed</td>
+                <td>Bid/ask depth, tick, VWAP, block trade</td>
+                <td>Reconcile volume with exchange total</td>
+                <td>Smart Money Score</td>
+              </tr>
+              <tr>
+                <td>Sentiment</td>
+                <td>News/social/forum connector</td>
+                <td>Entity, polarity, magnitude, rumor flag</td>
+                <td>Deduplicate and source-rank</td>
+                <td>Sentiment Score</td>
+              </tr>
+              <tr>
+                <td>Alert engine</td>
+                <td>TradingView/broker/Google Sheet bot</td>
+                <td>Price, volume, breadth, basis, portfolio weights</td>
+                <td>Alert audit trail</td>
+                <td>Push notification / audit trail</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="14-2-backtest-calibration-setup">14.2 Backtest &amp; Calibration Setup</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Signal</th>
+                <th>Horizon</th>
+                <th>Metric</th>
+                <th>Initial baseline from this report</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Market Direction 46</td>
+                <td>T+1/T+3/T+5/T+20</td>
+                <td>Forward VN-Index return, drawdown</td>
+                <td>Neutral/Cautious</td>
+              </tr>
+              <tr>
+                <td>Confidence 63</td>
+                <td>T+1/T+5</td>
+                <td>Hit rate of scenario trigger</td>
+                <td>Moderate</td>
+              </tr>
+              <tr>
+                <td>Action 52</td>
+                <td>T+1/T+3/T+5</td>
+                <td>Portfolio return vs VN-Index</td>
+                <td>Hold/Wait</td>
+              </tr>
+              <tr>
+                <td>Sector Score</td>
+                <td>T+5/T+20</td>
+                <td>Sector outperformance</td>
+                <td>Chứng khoán/thép tactical leaders</td>
+              </tr>
+              <tr>
+                <td>Alert rules</td>
+                <td>Intraday/T+1</td>
+                <td>False positive/negative</td>
+                <td>Initialized</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="14-3-sentiment-news-quantification-model">14.3 Sentiment &amp; News Quantification Model</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Signal type</th>
+                <th>Weight</th>
+                <th>Scoring logic</th>
+                <th>Example action impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Confirmed macro policy</td>
+                <td>30%</td>
+                <td>Official source + direct sector impact</td>
+                <td>Can change scenario probability</td>
+              </tr>
+              <tr>
+                <td>Broker consensus tone</td>
+                <td>20%</td>
+                <td>Number of cautious/bullish reports</td>
+                <td>Consensus caution raises scenario clarity but lowers action</td>
+              </tr>
+              <tr>
+                <td>Retail sentiment</td>
+                <td>20%</td>
+                <td>Retail euphoria/fear, rumor intensity, crowding</td>
+                <td>Extreme euphoria caps Action Score</td>
+              </tr>
+              <tr>
+                <td>Derivatives sentiment</td>
+                <td>20%</td>
+                <td>Basis + OI + volume</td>
+                <td>Negative basis + weak breadth raises risk flag</td>
+              </tr>
+              <tr>
+                <td>News reliability</td>
+                <td>10%</td>
+                <td>Confirmed vs rumor</td>
+                <td>Rumor cannot enter base case</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="14-4-intermarket-correlation-dashboard-blueprint">14.4 Intermarket Correlation Dashboard Blueprint</h2>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Why it matters</th>
+                <th>Current use in this report</th>
+                <th>Action when connected</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>DXY</td>
+                <td>Proxy for USD pressure and foreign flow</td>
+                <td>Not connected</td>
+                <td>Raise/lower foreign flow risk flag</td>
+              </tr>
+              <tr>
+                <td>UST 10Y yield</td>
+                <td>Discount rate and global risk appetite</td>
+                <td>Not connected</td>
+                <td>Adjust valuation/macro score</td>
+              </tr>
+              <tr>
+                <td>S&amp;P 500/Nasdaq</td>
+                <td>Global sentiment</td>
+                <td>Not connected</td>
+                <td>Overnight risk note</td>
+              </tr>
+              <tr>
+                <td>Nikkei/Kospi/HSI</td>
+                <td>Regional flow context</td>
+                <td>Not connected</td>
+                <td>Asia correlation score</td>
+              </tr>
+              <tr>
+                <td>Brent/WTI</td>
+                <td>Energy/PET/transport impact</td>
+                <td>Not connected</td>
+                <td>Update PET/oil-gas sector action</td>
+              </tr>
+              <tr>
+                <td>USD/VND</td>
+                <td>Foreign flow and inflation pressure</td>
+                <td>Not connected</td>
+                <td>FX risk alert</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="section-card">
+        <h1 id="15-action-backtest-log-source-map-quality-gate">15. ACTION BACKTEST LOG, SOURCE MAP &amp; QUALITY GATE
+        </h1>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Market score</th>
+                <th>Confidence</th>
+                <th>Action</th>
+                <th>Portfolio rule</th>
+                <th>Invalidation</th>
+                <th>Review horizon</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2026-05-11</td>
+                <td>46 Neutral/Cautious</td>
+                <td>63 Moderate</td>
+                <td>52 Hold/Wait</td>
+                <td>Hold PET/PNJ/SSI/VIX/HPG with no margin; reduce beta if break 1.880</td>
+                <td>Close &lt;1.880 with weak breadth</td>
+                <td>T+1/T+3/T+5/T+20</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Source ID</th>
+                <th>Source</th>
+                <th>Data used</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>S1</td>
+                <td>Vietstock market close summary 11/05</td>
+                <td>VN-Index, breadth, liquidity, top impact, foreign flow summary</td>
+              </tr>
+              <tr>
+                <td>S2</td>
+                <td>Public derivatives summary</td>
+                <td>VN30F1M, basis, sentiment</td>
+              </tr>
+              <tr>
+                <td>S3</td>
+                <td>Market price public pages</td>
+                <td>PET/PNJ/SSI/VIX/HPG close, volume, daily change</td>
+              </tr>
+              <tr>
+                <td>S4</td>
+                <td>SHS Research valuation context early May</td>
+                <td>Ex-Vingroup P/E and P/B baseline</td>
+              </tr>
+              <tr>
+                <td>S5</td>
+                <td>Uploaded V3.4.1 framework</td>
+                <td>Scoring logic, distortion thresholds, action score, quality gate</td>
+              </tr>
+              <tr>
+                <td>S6</td>
+                <td>User portfolio input</td>
+                <td>PET, PNJ, SSI, VIX, HPG</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-card table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Gate</th>
+                <th>Status</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Signal Confidence Score component breakdown</td>
+                <td>Pass</td>
+                <td>9 components included</td>
+              </tr>
+              <tr>
+                <td>Action Score component breakdown</td>
+                <td>Pass</td>
+                <td>8 components included</td>
+              </tr>
+              <tr>
+                <td>Sector Score methodology</td>
+                <td>Pass</td>
+                <td>6-factor score table included</td>
+              </tr>
+              <tr>
+                <td>Technical proxy label</td>
+                <td>Pass</td>
+                <td>Data Quality Note at module opening</td>
+              </tr>
+              <tr>
+                <td>Prepared by human owner</td>
+                <td>Pass</td>
+                <td>Prepared by human analyst owner; assisted by Nguyen Huy Long</td>
+              </tr>
+              <tr>
+                <td>No fabricated API data</td>
+                <td>Pass</td>
+                <td>Provisional/architecture-ready labels applied</td>
+              </tr>
+              <tr>
+                <td>Personalized portfolio</td>
+                <td>Pass</td>
+                <td>PET/PNJ/SSI/VIX/HPG overlay included</td>
+              </tr>
+              <tr>
+                <td>Backtest-ready log</td>
+                <td>Pass</td>
+                <td>Initial action log included</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout-conclusion">
+          <h3>Final disclaimer DISCLAIMER</h3>
+          <p>Báo cáo này phục vụ mục đích nghiên cứu và chuẩn hóa quy trình phân tích, không phải khuyến nghị đầu tư cá
+            nhân hóa. Các tỷ trọng, ticker và hành động trong báo cáo là khung tham khảo dựa trên dữ liệu công khai tại
+            thời điểm lập báo cáo; người sử dụng cần đối chiếu với khẩu vị rủi ro, giá vốn, tỷ trọng thực tế và quy định
+            pháp lý liên quan trước khi ra quyết định.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <section class="end-report">
+    <div class="end-grid">
+      <div>
+        <div class="end-script">Prepared by Nguyen Kim Phuc Bui · Assisted by Nguyen Huy Long</div>
+        <div class="footer-small">Online full-content edition generated from Word PerfectPack. Empty paragraphs are
+          intentionally omitted; all non-empty content blocks and tables are represented.</div>
+      </div>
+      <a href="#top" class="pill status-good">Back to top</a>
+    </div>
+  </section>
+  <a href="#top" class="floating-top">↑</a>
+  <script>
+    (function () {
+      const search = document.getElementById('tocSearch');
+      const links = [...document.querySelectorAll('.nav-link')];
+      if (search) { search.addEventListener('input', () => { const q = search.value.toLowerCase(); links.forEach(a => { a.style.display = a.textContent.toLowerCase().includes(q) ? 'block' : 'none' }) }) }
+      const obs = new IntersectionObserver(entries => { entries.forEach(e => { if (e.isIntersecting) { links.forEach(a => a.classList.remove('active')); const a = document.querySelector(`.nav-link[href="#${e.target.id}"]`); if (a) a.classList.add('active') } }) }, { rootMargin: '-20% 0px -72% 0px' });
+      document.querySelectorAll('.section-card>h1').forEach(h => obs.observe(h));
+    })();
+  </script>
+</body>
+
+</html>

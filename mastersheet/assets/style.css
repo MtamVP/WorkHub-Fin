@@ -1,0 +1,135 @@
+/* ========================================= Soft Minimalism ========================================= */
+body { font-family: var(--font-body); background-color: var(--bg-color); margin: 0; padding: 0; color: var(--text-primary); -webkit-font-smoothing: antialiased; line-height: 1.5; }
+
+.asset-container { max-width: 1400px; margin: 30px auto; padding: 0 20px; }
+
+.top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card-bg); padding: 15px 25px; border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); margin-bottom: 25px;
+    border-bottom: 3px solid var(--finance-accent);
+}
+
+.left-section h1 { margin: 0; font-size: 1.6rem; color: var(--text-primary); font-weight: 800; display: flex; align-items: center; gap: 12px; letter-spacing: -0.02em; }
+
+.back-link {
+    text-decoration: none; color: var(--text-secondary); font-weight: 700; font-size: 0.95rem;
+    margin-right: 20px; padding: 8px 15px; border-radius: var(--radius-sm);
+    background-color: var(--hover-bg); border: 1px solid var(--border-color);
+    transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 8px;
+}
+.back-link:hover { background-color: var(--border-color); color: var(--text-primary); }
+
+#user-display {
+    margin-right: 25px; font-weight: 700; color: var(--text-primary);
+    background: var(--hover-bg); padding: 8px 18px; border-radius: var(--radius-pill);
+    font-size: 0.95rem; border: 1px solid var(--border-color);
+    display: flex; align-items: center; gap: 8px;
+}
+
+.btn-save {
+    background-color: var(--finance-accent); color: #120F0A; border: none;
+    padding: 12px 30px; border-radius: var(--radius-sm); font-weight: 700; font-size: 1rem;
+    cursor: pointer; transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.btn-save:hover { filter: brightness(0.92); transform: translateY(-1px); }
+.btn-save:active { transform: translateY(0); }
+.btn-save:disabled { background-color: var(--text-muted); cursor: not-allowed; transform: none; opacity: 0.8; }
+
+.balance-section { display: flex; gap: 25px; margin-bottom: 25px; }
+
+.balance-card {
+    background: var(--card-bg); padding: 25px 30px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-color); box-shadow: var(--shadow-soft);
+    flex: 1; display: flex; align-items: center; justify-content: space-between;
+    transition: transform 0.2s; border-left: 6px solid var(--success-color);
+}
+.balance-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+.balance-card.debt { border-left-color: var(--danger-color); }
+
+.balance-card label { font-weight: 700; color: var(--text-primary); font-size: 1.1rem; display: flex; align-items: center; gap: 12px; }
+.balance-card label i { font-size: 1.4rem; color: var(--text-secondary); }
+
+.money-input {
+    background-color: var(--hover-bg); border: 1px solid var(--border-color);
+    padding: 12px 18px; border-radius: var(--radius-sm); font-size: 1.25rem; font-weight: 800;
+    color: var(--text-primary); width: 220px; outline: none; text-align: right;
+    transition: var(--transition-fast); font-family: var(--font-mono);
+}
+.money-input:focus { background-color: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
+
+.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); }
+
+#my-spreadsheet { display: flex; justify-content: center; width: 100%; background-color: transparent; overflow-x: auto; }
+
+.jexcel_content { box-shadow: none !important; width: auto !important; }
+
+.jexcel > thead > tr > td {
+    background-color: var(--finance-accent) !important; color: #120F0A !important;
+    font-weight: 700 !important; text-transform: uppercase; font-size: 0.9rem !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important; padding: 14px 10px !important;
+    position: sticky; top: 0; z-index: 100; letter-spacing: 0.04em;
+}
+
+.jexcel_row { background-color: var(--hover-bg) !important; color: var(--text-secondary) !important; font-weight: 700 !important; border-bottom: 1px solid var(--border-color) !important; border-right: 2px solid var(--border-color) !important; }
+
+.jexcel > tbody > tr > td { background-color: var(--card-bg) !important; color: var(--text-primary) !important; font-size: 1rem !important; font-weight: 500; border: 1px solid var(--border-color) !important; padding: 10px 12px !important; vertical-align: middle !important; font-family: var(--font-body) !important; }
+
+.jexcel > tbody > tr:nth-child(even) > td { background-color: var(--bg-color) !important; }
+
+.jexcel > tbody > tr:hover > td { background-color: var(--hover-bg) !important; cursor: pointer; }
+
+.jexcel .highlight { background-color: color-mix(in srgb, var(--finance-accent) 15%, transparent) !important; border: 2px solid var(--finance-accent) !important; font-weight: 700 !important; }
+
+.jexcel > tbody > tr > td.readonly { background-color: var(--hover-bg) !important; color: var(--text-muted) !important; font-style: italic; }
+
+/* Cột Lãi/Lỗ: script.js gắn class text-success/text-danger, cần đặc hiệu hơn rule nền để thắng !important ở trên */
+.jexcel > tbody > tr > td.text-success { color: var(--success-color) !important; }
+.jexcel > tbody > tr > td.text-danger { color: var(--danger-color) !important; }
+
+.jexcel_content::-webkit-scrollbar { width: 12px; height: 12px; }
+.jexcel_content::-webkit-scrollbar-track { background: var(--bg-color); }
+.jexcel_content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; }
+.jexcel_content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+.nav-table-wrapper { background: var(--card-bg); padding: 0 20px 20px 20px; border-radius: 0 0 var(--radius-md) var(--radius-md); border: 1px solid var(--border-color); border-top: none; margin-top: -1px; }
+
+.nav-table-custom { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.nav-table-custom td { padding: 12px 15px; border: 1px solid var(--border-color); font-size: 1rem; vertical-align: middle; }
+.nav-label { text-align: right; padding-right: 20px !important; color: var(--text-secondary); font-weight: 700; }
+.nav-value { text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); font-size: 1.05rem; }
+
+.nav-row-summary { background-color: var(--hover-bg); border-top: 2px solid var(--border-color); }
+.nav-row-summary .nav-label { color: var(--text-primary); text-transform: uppercase; }
+
+.nav-row-total { background-color: color-mix(in srgb, var(--success-color) 14%, var(--card-bg)) !important; border-top: 3px solid var(--success-color); }
+.nav-total-label { color: var(--success-color); font-size: 1.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.nav-total-value { color: var(--success-color); font-size: 1.5rem; font-weight: 900; }
+
+@media (max-width: 768px) {
+    .asset-container { padding: 0 10px; margin: 15px auto; }
+    .top-bar { flex-direction: column; gap: 15px; padding: 15px; }
+    .left-section, .right-section { width: 100%; justify-content: space-between; }
+    .back-link span { display: none; }
+    .balance-section { flex-direction: column; gap: 15px; }
+    .money-input { width: 100%; font-size: 1.2rem; }
+    .jexcel > tbody > tr > td { font-size: 0.9rem !important; padding: 8px !important; }
+    .nav-total-value { font-size: 1.2rem; }
+}
+
+.text-success { color: var(--success-color) !important; font-weight: 700 !important; }
+.text-danger { color: var(--danger-color) !important; font-weight: 700 !important; }
+.text-bold { font-weight: 700 !important; color: var(--text-primary) !important; }
+
+.toast-notification {
+    position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: var(--radius-md);
+    color: #120F0A; font-weight: 700; box-shadow: var(--shadow-modal);
+    z-index: 10000; display: flex; align-items: center; gap: 12px; font-size: 1rem;
+    animation: slideInRight 0.35s ease, fadeOut 0.4s 2.5s forwards; min-width: 320px;
+}
+.toast-success { background-color: var(--success-color); }
+.toast-error { background-color: var(--danger-color); }
+
+@keyframes slideInRight { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; visibility: hidden; } }

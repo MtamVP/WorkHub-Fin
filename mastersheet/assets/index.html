@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Danh Mục Đầu Tư - WorkHub AI</title>
+    <link rel="icon" type="image/png" href="../../logo.png">
+
+    <script src="https://bossanova.uk/jspreadsheet/v4/jexcel.js"></script>
+    <link rel="stylesheet" href="https://bossanova.uk/jspreadsheet/v4/jexcel.css" type="text/css" />
+    <script src="https://jsuites.net/v4/jsuites.js"></script>
+    <link rel="stylesheet" href="https://jsuites.net/v4/jsuites.css" type="text/css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi script.js: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=3.1.0">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=2.1">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="asset-container">
+        <header class="top-bar">
+            <div class="left-section">
+                <a href="/mastersheet/" class="back-link">
+                    <i class="fa-solid fa-chevron-left"></i> <span>Tổng hợp</span>
+                </a>
+                <a href="/" class="back-link">
+                    <i class="fa-solid fa-house"></i> <span>Finance</span>
+                </a>
+
+                <h1>Quản Lý Danh Mục Đầu Tư</h1>
+            </div>
+            <div class="right-section">
+                <span id="user-display"><i class="fa-solid fa-user"></i> Đang tải...</span>
+                <button id="save-btn" class="btn-save" style="background: var(--success-color); color: white; padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; box-shadow: 0 4px 10px rgba(0,255,0,0.2);"><i class="fa-solid fa-cloud-arrow-up"></i> LƯU VÀO SUPABASE</button>
+                </div>
+        </header>
+
+        <div class="spreadsheet-wrapper">
+            <div style="margin-bottom: 20px; display: flex; gap: 20px; background: var(--hover-bg); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px; color: var(--text-primary);">Tiền mặt (VND):</label>
+                    <input type="text" id="inp-cash" class="form-control" placeholder="Nhập số tiền..."
+                        style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-weight: bold; color: var(--success-color); background: var(--card-bg);">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px; color: var(--text-primary);">Dư nợ (VND):</label>
+                    <input type="text" id="inp-debt" class="form-control" placeholder="Nhập dư nợ..."
+                        style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-weight: bold; color: var(--danger-color); background: var(--card-bg);">
+                </div>
+            </div>
+            <div id="my-spreadsheet"></div>
+        </div>
+        
+        <p class="guide-text">
+            * <b>Hướng dẫn:</b> Bấm chuột phải để thêm/xóa cột và dòng
+        </p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../api.js"></script> 
+    <script src="script.js"></script>
+
+</body>
+</html>
+
+

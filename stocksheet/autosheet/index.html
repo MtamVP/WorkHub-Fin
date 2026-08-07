@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Định Giá Cổ Phiếu | WorkHub Finance</title>
+    
+    <link rel="icon" type="image/png" href="../../logo.png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi script.js: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=3.1.0">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.1">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body>
+
+    <div class="asset-container">
+        
+        <div class="top-bar">
+            <div class="left-section">
+                <a href="/stocksheet/" class="back-link">
+                    <i class="fa-solid fa-chevron-left"></i> <span>Tổng hợp</span>
+                </a>
+
+                <a href="/" class="back-link">
+                    <i class="fa-solid fa-house"></i> <span>Finance</span>
+                </a>
+
+                <h1>Định Giá Cổ Phiếu</h1>
+            </div>
+            
+            <div class="right-section">
+                <button onclick="saveToSheet()" class="btn-save" id="btn-save-sheet" style="background: var(--success-color); color: white; padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; box-shadow: 0 4px 10px rgba(0,255,0,0.2);"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
+                
+                <button onclick="resetData()" class="btn-refresh" style="margin-left: 10px;">
+                    <i class="fa-solid fa-rotate-right"></i> Nhập lại
+                </button>
+                </div>
+        </div>
+
+        <div class="calc-wrapper">
+            
+            <div class="stock-header">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div>
+                        <label style="display:block; font-size: 0.9rem; color:var(--text-secondary); margin-bottom:5px; font-weight:600;">Mã Cổ Phiếu:</label>
+                        <input type="text" id="stock-symbol" placeholder="VD: SHS" style="font-size: 1.2rem; font-weight: 800; padding: 10px; width: 120px; text-transform: uppercase; border: 2px solid var(--finance-accent); border-radius: 6px; color: var(--finance-accent); text-align:center;">
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size: 0.9rem; color:var(--text-secondary); margin-bottom:5px; font-weight:600;">Năm:</label>
+                        <input type="number" id="stock-year" value="2026" 
+                               style="font-size: 1.2rem; font-weight: 800; padding: 10px; width: 100px; border: 2px solid var(--finance-accent); border-radius: 6px; color: var(--finance-accent); text-align: center;">
+                    </div>
+                </div>
+            </div>
+
+            <table class="calc-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px; text-align:center;">STT</th>
+                        <th>Chỉ tiêu</th>
+                        <th style="width: 220px; text-align: right;">Giá trị</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="stt">1</td>
+                        <td>Vốn điều lệ (Charter Capital)</td>
+                        <td><input type="text" class="input-val" id="val-1" placeholder="Nhập số..."></td>
+                    </tr>
+                    <tr>
+                        <td class="stt">2</td>
+                        <td>Vốn chủ sở hữu (Equity)</td>
+                        <td><input type="text" class="input-val" id="val-2" placeholder="Nhập số..."></td>
+                    </tr>
+                    <tr>
+                        <td class="stt">3</td>
+                        <td>Lợi nhuận sau thuế</td>
+                        <td><input type="text" class="input-val" id="val-3" placeholder="Nhập số..."></td>
+                    </tr>
+                    
+                    <tr class="row-calc">
+                        <td class="stt">4</td>
+                        <td>Giá trị sổ sách</td>
+                        <td class="output-val" id="val-4">0</td>
+                    </tr>
+                    <tr class="row-calc">
+                        <td class="stt">5</td>
+                        <td>EPS</td>
+                        <td class="output-val" id="val-5">0</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="stt">6</td>
+                        <td style="color: var(--finance-accent); font-weight:800;">Giá cổ phiếu hiện tại</td>
+                        <td><input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá..."></td>
+                    </tr>
+
+                    <tr class="row-result">
+                        <td class="stt">7</td>
+                        <td>P/E</td>
+                        <td class="output-val result" id="val-7">0</td>
+                    </tr>
+                    <tr class="row-result">
+                        <td class="stt">8</td>
+                        <td>P/B</td>
+                        <td class="output-val result" id="val-8">0</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="target-section">
+                <h3>Target</h3>
+                <table class="calc-table">
+                    <thead>
+                        <tr>
+                            <th>Chỉ tiêu</th>
+                            <th style="text-align: right;">Tính theo P/E</th>
+                            <th style="text-align: right;">Tính theo P/B</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight:bold; color:var(--terracotta);">Target</td>
+                            <td><input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E..."></td>
+                            <td><input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B..."></td>
+                        </tr>
+                        <tr class="row-calc">
+                            <td>Price Target</td>
+                            <td class="output-val" id="price-per-pe">0</td>
+                            <td class="output-val" id="price-per-pb">0</td>
+                        </tr>
+                        <tr class="row-return">
+                            <td>Return (%) <br><small>Lợi nhuận</small></td>
+                            <td class="output-val percent" id="return-pe">0%</td>
+                            <td class="output-val percent" id="return-pb">0%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../api.js"></script> 
+    <script src="script.js"></script>
+
+</body>
+</html>
+
+

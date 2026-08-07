@@ -1,0 +1,80 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tổng hợp Cổ Phiếu | WorkHub Finance</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi script.js: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=3.1.0">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=2.1">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body>
+
+    <div class="asset-container">
+        
+        <div class="top-bar">
+            <div class="left-section">
+                <a href="/stocksheet/autosheet/" class="back-link">
+                    <i class="fa-solid fa-chevron-left"></i> <span>Nhập liệu</span>
+                </a>
+
+                <a href="/" class="back-link">
+                    <i class="fa-solid fa-house"></i> <span>Finance</span>
+                </a>
+                <h1>Tổng hợp cổ phiếu</h1>
+            </div>
+            
+            <div class="right-section">
+                <button onclick="loadStockList()" class="btn-refresh">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới
+                </button>
+                </div>
+        </div>
+
+        <div class="control-panel">
+            <label><i class="fa-solid fa-magnifying-glass"></i> Chọn mã cổ phiếu:</label>
+            <select id="stock-select" onchange="loadStockDetail()">
+                <option value="">-- Đang tải danh sách... --</option>
+            </select>
+        </div>
+
+        <div id="sheet-display" class="sheet-wrapper" style="display: none;">
+            <table id="stock-table" class="excel-table">
+                </table>
+        </div>
+
+        <div id="loading-spinner" style="display:none; text-align:center; padding: 50px;">
+            <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--finance-accent);"></i>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+
+

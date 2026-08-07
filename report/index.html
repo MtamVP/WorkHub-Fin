@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mục lục Báo cáo — Onyxline & Co</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --serif: "Cambria", "Times New Roman", "Noto Serif", "DejaVu Serif", Georgia, serif;
+            --sans: "Segoe UI", "Noto Sans", Arial, sans-serif;
+            --bg: #f7f6f1;
+            --paper: #fffdfa;
+            --ink: #282723;
+            --muted: #77736b;
+            --line: #dedbd2;
+            --navy: #20343a;
+            --teal-dark: #2f756e;
+            --gold: #a18438;
+            --radius: 22px;
+            --radius-sm: 14px;
+            --shadow-soft: 0 8px 20px rgba(42, 39, 33, .06);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            color: var(--navy);
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .btn-back:hover {
+            background: #fff;
+            transform: translateY(-2px);
+            border-color: var(--gold);
+        }
+
+        h1 {
+            font-family: var(--serif);
+            font-size: 32px;
+            color: var(--navy);
+            margin: 24px 0 8px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 16px;
+        }
+
+        .report-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 32px;
+        }
+
+        .report-item {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 30px;
+            box-shadow: var(--shadow-soft);
+            transition: transform 0.2s ease;
+        }
+
+        .report-item:hover {
+            transform: scale(1.01);
+        }
+
+        .report-title {
+            font-family: var(--serif);
+            font-size: 22px;
+            color: var(--navy);
+            margin: 0 0 12px;
+            font-weight: 600;
+        }
+
+        .report-summary {
+            font-size: 15px;
+            color: #444;
+            margin-bottom: 16px;
+        }
+
+        .report-notes {
+            font-size: 13px;
+            color: var(--muted);
+            background: #fbf8f0;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 3px solid var(--gold);
+        }
+
+        .btn-view {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            background: var(--teal-dark);
+            color: white;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-view:hover {
+            background: var(--navy);
+            box-shadow: 0 4px 12px rgba(47, 117, 110, 0.3);
+        }
+
+        @media (max-width: 600px) {
+            .report-item {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+        }
+
+        /* Dropdown styles */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-content {
+            visibility: hidden;
+            position: absolute;
+            background-color: var(--paper);
+            min-width: 240px;
+            box-shadow: 0 8px 24px rgba(42, 39, 33, 0.12);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            z-index: 10;
+            padding: 8px 0;
+            top: calc(100% + 10px);
+            left: 0;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dropdown:hover .dropdown-content {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .dropdown-content::before {
+            content: "";
+            position: absolute;
+            top: -6px;
+            left: 24px;
+            width: 10px;
+            height: 10px;
+            background: var(--paper);
+            border-top: 1px solid var(--line);
+            border-left: 1px solid var(--line);
+            transform: rotate(45deg);
+        }
+
+        .dropdown-content a {
+            color: var(--ink);
+            padding: 10px 20px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+            transition: background 0.2s;
+            position: relative;
+            z-index: 2;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #f0eee5;
+            color: var(--teal-dark);
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="btn-back">
+                <i class="fa-solid fa-house"></i> <span>Trở về trang chủ</span>
+            </a>
+            <h1>Danh mục Báo cáo</h1>
+            <p class="subtitle">Danh sách các tài liệu phân tích và báo cáo tài chính.</p>
+        </header>
+
+        <div class="report-list">
+            <!-- Báo cáo 1 -->
+            <div class="report-item">
+                <h2 class="report-title">Báo cáo Phân tích Doanh nghiệp</h2>
+                <p class="report-summary"><b>Tóm tắt:</b> Báo cáo phân tích chuyên sâu về doanh nghiệp.</p>
+                <div class="report-notes">
+                    <b>Ghi chú: Báo cáo phân tích doanh nghiệp bản format và báo cáo mẫu</b>
+                </div>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <div class="dropdown">
+                        <div class="btn-view" style="cursor: pointer;">
+                            Xem Báo cáo mẫu <i class="fa-solid fa-chevron-down" style="font-size: 12px;"></i>
+                        </div>
+                        <div class="dropdown-content">
+                            <a href="/report/Bao_Cao_Phan_Tich_Doanh_Nghiep/VIC_report.html"><i
+                                    class="fa-solid fa-chart-line"
+                                    style="margin-right: 8px; color: var(--teal-dark);"></i> Báo cáo VIC</a>
+                            <!-- Bạn có thể thêm các báo cáo mới vào đây -->
+                        </div>
+                    </div>
+                    <a href="/report/Bao_Cao_Phan_Tich_Doanh_Nghiep/index.html" class="btn-view"
+                        style="background: var(--muted); box-shadow: none;">
+                        Xem Format / Template <i class="fa-solid fa-file-lines"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Ví dụ Báo cáo khác (Placeholder) -->
+            <div class="report-item">
+                <h2 class="report-title">Báo cáo Thị trường hằng ngày</h2>
+                <p class="report-summary"><b>Tóm tắt:</b>Tài liệu hướng dẫn và template chuẩn cho báo cáo thị trường
+                    hằng ngày chuẩn institutional-grade,
+                    giúp chuyển dữ liệu thị trường thành kịch bản, đánh giá rủi ro và hành động danh mục có kiểm chứng.
+                </p>
+                <div class="report-notes">
+                    <b>Ghi chú:</b> v3.4.1 Final Edition. Phục vụ cho mục đích đào tạo và chuẩn hóa dữ liệu nội bộ.
+                </div>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <div class="dropdown">
+                        <div class="btn-view" style="cursor: pointer;">
+                            Xem Báo cáo mẫu <i class="fa-solid fa-chevron-down" style="font-size: 12px;"></i>
+                        </div>
+                        <div class="dropdown-content">
+                            <a href="/report/Bao_Cao_Thi_Truong_Daily/daily_market_report.html"><i
+                                    class="fa-solid fa-chart-line"
+                                    style="margin-right: 8px; color: var(--teal-dark);"></i> Báo cáo Daily</a>
+                            <!-- Bạn có thể thêm các báo cáo mới vào đây -->
+                        </div>
+                    </div>
+                    <a href="/report/Bao_Cao_Thi_Truong_Daily/" class="btn-view"
+                        style="background: var(--muted); box-shadow: none;">
+                        Xem Format / Template <i class="fa-solid fa-file-lines"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="report-item">
+                <h2 class="report-title">Demo</h2>
+                <p class="report-summary"><b>Tóm tắt:</b>Demo</p>
+                <div class="report-notes">
+                    <b>Ghi chú:</b> Demo for next time
+                </div>
+                <a href="#" class="btn-view" style="opacity: 0.6; cursor: not-allowed;">
+                    Đang cập nhật...
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
