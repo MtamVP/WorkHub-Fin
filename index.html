@@ -15,7 +15,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 </head>
@@ -337,25 +337,73 @@
             </select>
           </div>
         </div>
+
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 14px;">
+          <div class="task-view-toggle">
+            <button type="button" class="icon-btn view-toggle-btn active" data-view="table" onclick="switchTaskView('table')" title="Xem dạng bảng"><i class="fa-solid fa-table"></i></button>
+            <button type="button" class="icon-btn view-toggle-btn" data-view="card" onclick="switchTaskView('card')" title="Xem dạng thẻ"><i class="fa-solid fa-grip"></i></button>
+            <button type="button" class="icon-btn view-toggle-btn" data-view="kanban" onclick="switchTaskView('kanban')" title="Xem dạng Kanban"><i class="fa-solid fa-columns"></i></button>
+          </div>
+          <button type="button" class="icon-btn" id="bulk-select-toggle" onclick="toggleBulkSelectMode()" title="Chọn nhiều"><i class="fa-regular fa-square-check"></i></button>
+          <button type="button" class="icon-btn" onclick="exportTasksCsv()" title="Xuất công việc ra CSV"><i class="fa-solid fa-file-csv"></i></button>
+        </div>
       </div>
 
-      <div class="table-container" style="margin-top: 16px;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 26%;">Công việc</th>
-              <th style="width: 12%;">Thành viên</th>
-              <th style="width: 20%;">Mô tả</th>
-              <th style="width: 12%;">Trạng thái</th>
-              <th style="width: 10%;">Hạn chót</th>
-              <th style="width: 10%;">Ưu tiên</th>
-              <th style="width: 10%;">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody id="task-table-body">
-            <tr><td colspan="7" class="empty-state">Vui lòng chọn dự án để xem công việc.</td></tr>
-          </tbody>
-        </table>
+      <div id="bulk-action-bar" class="bulk-action-bar" style="display: none;">
+        <span id="bulk-selected-count" style="font-weight: 700;">0 đã chọn</span>
+
+        <select id="bulk-status-select" class="form-select" style="width: auto; padding: 6px 10px;">
+          <option value="Not Started">Not Started</option>
+          <option value="Working on it">Working on it</option>
+          <option value="Stuck">Stuck</option>
+          <option value="Done">Done</option>
+        </select>
+        <button type="button" class="btn btn-secondary" style="padding: 6px 12px;" onclick="applyBulkStatusChange()">Đổi trạng thái</button>
+
+        <div class="multiselect-container bulk-assignee-picker" style="position: relative;">
+          <button type="button" class="btn btn-secondary" style="padding: 6px 12px;" onclick="showBulkAssigneeCheckboxes()">Chọn người...</button>
+          <div id="bulk-assignee-checkboxes" style="display: none; position: absolute; z-index: 20; top: 110%; left: 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px; min-width: 200px; max-height: 220px; overflow-y: auto; box-shadow: var(--shadow-hover);"></div>
+        </div>
+        <button type="button" class="btn btn-secondary" style="padding: 6px 12px;" onclick="applyBulkAssign()">Gán người</button>
+
+        <input type="date" id="bulk-duedate-input" class="form-select" style="width: auto; padding: 6px 10px;">
+        <button type="button" class="btn btn-secondary" style="padding: 6px 12px;" onclick="applyBulkDueDate()">Đặt hạn</button>
+        <button type="button" class="btn btn-outline" style="padding: 6px 12px;" onclick="applyBulkClearDueDate()">Xóa hạn</button>
+
+        <input type="text" id="bulk-label-input" class="form-select" style="width: 120px; padding: 6px 10px;" placeholder="Nhãn...">
+        <button type="button" class="btn btn-secondary" style="padding: 6px 12px;" onclick="applyBulkAddLabel()">Gắn nhãn</button>
+
+        <button type="button" class="btn btn-danger" style="padding: 6px 12px;" onclick="applyBulkDelete()">Xóa đã chọn</button>
+      </div>
+
+      <div id="task-view-table" style="display: block;">
+        <div class="table-container" style="margin-top: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="bulk-select-col" style="width: 3%; display: none;"><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAllTasks(this.checked)"></th>
+                <th style="width: 26%;">Công việc</th>
+                <th style="width: 12%;">Thành viên</th>
+                <th style="width: 20%;">Mô tả</th>
+                <th style="width: 12%;">Trạng thái</th>
+                <th style="width: 10%;">Hạn chót</th>
+                <th style="width: 10%;">Ưu tiên</th>
+                <th style="width: 10%;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="task-table-body">
+              <tr><td colspan="8" class="empty-state">Vui lòng chọn dự án để xem công việc.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="task-view-card" style="display: none;">
+        <div class="task-card-grid" id="task-card-container"></div>
+      </div>
+
+      <div id="task-view-kanban" style="display: none;">
+        <div class="kanban-board" id="kanban-board-container"></div>
       </div>
     </section>
 
@@ -860,6 +908,6 @@
 
   <script src="api.js?v=5"></script>
 
-  <script src="script.js?v=7"></script>
+  <script src="script.js?v=8"></script>
 </body>
 </html>

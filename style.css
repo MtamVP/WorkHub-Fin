@@ -1716,3 +1716,47 @@ body.app-locked .user-profile-wrapper {
   background: var(--hover-bg); overflow: hidden; max-width: 220px;
 }
 .workload-bar > span { display: block; height: 100%; background: var(--gold); border-radius: inherit; }
+
+/* ---------------------------------------------------------------------- */
+/* 13. TASK: view toggle / bulk-select toolbar / Kanban — ported từ org   */
+/* ---------------------------------------------------------------------- */
+
+.task-view-toggle { display: flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; }
+.task-view-toggle .icon-btn { border-radius: 0; }
+.view-toggle-btn.active { background: var(--gold); color: var(--on-gold); }
+.view-toggle-btn.active:hover { background: var(--gold); color: var(--on-gold); }
+
+.bulk-action-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--gold) 10%, var(--card-bg)); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-top: 16px;
+}
+#bulk-select-toggle.active { background: var(--gold); color: var(--on-gold); }
+
+.kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; margin-top: 16px; }
+.kanban-column {
+  flex: 0 0 280px; background: var(--hover-bg); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); display: flex; flex-direction: column; max-height: 70vh;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.kanban-column-dragover { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 30%, transparent) inset; }
+.kanban-column-header {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
+  font-weight: 700; border-bottom: 1px solid var(--border-color); color: var(--text-primary);
+}
+.kanban-count {
+  background: var(--card-bg); border-radius: var(--radius-pill); padding: 1px 9px;
+  font-size: 11px; color: var(--text-muted);
+}
+.kanban-column-body { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.kanban-card {
+  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  padding: 10px 12px; cursor: grab; box-shadow: var(--shadow-soft); transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.kanban-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card-title { font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.kanban-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kanban-card-labels { margin-bottom: 6px; }
+.kanban-parent-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.dragging-task { opacity: 0.4; }
