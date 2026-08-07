@@ -159,6 +159,7 @@ async function resolveUserProfile(user) {
   unlockApp();
   updateUserProfileUI();
   startPresenceSystem();
+  if (typeof initRealtimeSync === 'function') initRealtimeSync();
 
   if (!window.__financeSessionBootstrapped) {
     window.__financeSessionBootstrapped = true;
@@ -185,6 +186,7 @@ async function initAuth() {
       }
     } else {
       CURRENT_USER = { email: '', nickname: '', groupKey: '' };
+      if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
       lockApp();
     }
   });
@@ -1514,6 +1516,7 @@ function renderTasks(tasks) {
       <td class="bulk-select-col" style="display:none;"><input type="checkbox" class="bulk-select-checkbox" data-task-id="${t.id}" onchange="onBulkCheckboxChange('${t.id}', this.checked)" onclick="event.stopPropagation()"></td>
       <td style="border-left: 3px solid ${statusColor}; font-weight: 600; ${isSubtask ? 'padding-left: 30px;' : ''}">
         ${isSubtask ? '<i class="fa-solid fa-turn-up fa-rotate-90" style="color:var(--text-muted); font-size:0.75em; margin-right:4px;"></i>' : ''}${escapeHtml(t.name)}
+        ${getBlockedBadge(t)}${getChecklistBadge(t)}
         ${renderLabelChips(t.labels)}
       </td>
       <td>${avatarsHTML}</td>
@@ -1522,8 +1525,11 @@ function renderTasks(tasks) {
       <td style="font-size:13px; color:var(--text-muted);">${escapeHtml(t.dueDate || '--')}${getDueDateBadge(t.dueDate, t.status)}</td>
       <td>${renderBadge('priority', t.priority)}</td>
       <td style="white-space:nowrap;">
+        <button class="icon-btn" title="Bình luận & lịch sử" onclick="openTaskActivity('${t.id}', '${safeName}')">
+          <i class="fa-solid fa-comment-dots"></i>
+        </button>
         <button class="icon-btn" title="Sửa"
-          onclick="openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}')">
+          onclick="openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}', '${escapeHtml(escapeJs(t.blocked_by || ''))}')">
           <i class="fa-solid fa-pen"></i>
         </button>
         <button class="icon-btn danger" title="Xóa" onclick="deleteTaskAction('${t.id}', '${safeName}')">
@@ -1572,13 +1578,15 @@ function renderTaskCards(tasks) {
         <input type="checkbox" class="bulk-select-checkbox" data-task-id="${t.id}" onchange="onBulkCheckboxChange('${t.id}', this.checked)" onclick="event.stopPropagation()" style="display:none;">
         <h4 class="task-title" style="flex:1;">${escapeHtml(t.name)}</h4>
       </div>
+      <div>${getBlockedBadge(t)}${getChecklistBadge(t)}</div>
       ${renderLabelChips(t.labels)}
       <div class="card-row"><span class="card-label">Trạng thái</span>${renderBadge('status', t.status)}</div>
       <div class="card-row"><span class="card-label">Ưu tiên</span>${renderBadge('priority', t.priority)}</div>
       <div class="card-row"><span class="card-label">Hạn chót</span><span>${escapeHtml(t.dueDate || '--')}${getDueDateBadge(t.dueDate, t.status)}</span></div>
       <div class="card-row"><span class="card-label">Thành viên</span><span>${escapeHtml((t.assigneeNames || []).join(', ') || '--')}</span></div>
       <div style="display:flex; justify-content:flex-end; gap:4px;">
-        <button class="icon-btn" title="Sửa" onclick="event.stopPropagation(); openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="icon-btn" title="Bình luận & lịch sử" onclick="event.stopPropagation(); openTaskActivity('${t.id}', '${safeName}')"><i class="fa-solid fa-comment-dots"></i></button>
+        <button class="icon-btn" title="Sửa" onclick="event.stopPropagation(); openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}', '${escapeHtml(escapeJs(t.blocked_by || ''))}')"><i class="fa-solid fa-pen"></i></button>
         <button class="icon-btn danger" title="Xóa" onclick="event.stopPropagation(); deleteTaskAction('${t.id}', '${safeName}')"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
@@ -1625,11 +1633,17 @@ function renderKanbanBoard(tasks) {
         const safeName = escapeHtml(escapeJs(t.name));
         const safeDesc = escapeHtml(escapeJs(t.description || '').replace(/\r?\n/g, "\\n"));
         const safeAssignees = escapeHtml(escapeJs(t.assignees || ''));
-        openEditTask(t.id, safeName, escapeHtml(escapeJs(t.status)), escapeHtml(escapeJs(t.priority)), escapeHtml(escapeJs(t.dueDate || '')), safeAssignees, safeDesc, t.parent_task_id || '');
+        openEditTask(t.id, safeName, escapeHtml(escapeJs(t.status)), escapeHtml(escapeJs(t.priority)), escapeHtml(escapeJs(t.dueDate || '')), safeAssignees, safeDesc, t.parent_task_id || '', escapeHtml(escapeJs(t.blocked_by || '')));
       });
 
+      const safeNameForActivity = escapeHtml(escapeJs(t.name));
       card.innerHTML = `
-        <div class="kanban-card-title">${escapeHtml(t.name)}</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+          <div class="kanban-card-title" style="flex:1;">${escapeHtml(t.name)}</div>
+          <button class="icon-btn" title="Bình luận & lịch sử" style="width:26px; height:26px; flex-shrink:0;"
+            onclick="event.stopPropagation(); openTaskActivity('${t.id}', '${safeNameForActivity}')"><i class="fa-solid fa-comment-dots" style="font-size:12px;"></i></button>
+        </div>
+        <div>${getBlockedBadge(t)}${getChecklistBadge(t)}</div>
         ${renderLabelChips(t.labels) ? `<div class="kanban-card-labels">${renderLabelChips(t.labels)}</div>` : ''}
         <div class="kanban-card-meta">
           ${renderBadge('priority', t.priority)}
@@ -1665,6 +1679,7 @@ async function handleKanbanDrop(newStatus) {
       assignees: task.assignees,
       description: task.description,
       parentTaskId: task.parent_task_id,
+      blockedBy: task.blocked_by,
       baseUpdatedAt: task.updated_at,
       groupKey: activeGroup
     });
@@ -1902,6 +1917,7 @@ function resetTaskModalUI() {
   document.getElementById('task-id').value = '';
   document.getElementById('new-task-parent-id').value = '';
   document.querySelectorAll('input[name="task-assignees"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('input[name="task-blockers"]').forEach(cb => cb.checked = false);
 
   const submitBtn = document.querySelector('button[form="task-form"]');
   if (submitBtn) submitBtn.innerHTML = "Lưu Công Việc";
@@ -1912,10 +1928,11 @@ function openAddTask() {
   if (currentTaskProjectID) {
     document.getElementById('new-task-project-id').value = currentTaskProjectID;
   }
+  loadBlockerCheckboxes('');
   openAppModal('add-task-modal');
 }
 
-function openEditTask(id, name, status, priority, dueDate, assigneesStr, description, parentTaskId) {
+function openEditTask(id, name, status, priority, dueDate, assigneesStr, description, parentTaskId, blockedByStr) {
   const sourceTask = (globalAllTasks || []).find(t => t.id === id);
   editingTaskBaseUpdatedAt = sourceTask ? (sourceTask.updated_at || null) : null;
 
@@ -1927,6 +1944,12 @@ function openEditTask(id, name, status, priority, dueDate, assigneesStr, descrip
   document.getElementById('new-task-status').value = status;
   document.getElementById('new-task-priority').value = priority;
   document.getElementById('new-task-duedate').value = dueDate;
+
+  loadBlockerCheckboxes(id);
+  const blockerIds = (blockedByStr || '').split(',').map(x => x.trim()).filter(Boolean);
+  document.querySelectorAll('input[name="task-blockers"]').forEach(cb => {
+    cb.checked = blockerIds.includes(cb.value);
+  });
   document.getElementById('new-task-desc').value = description || '';
   document.getElementById('new-task-parent-id').value = parentTaskId || '';
 
@@ -1952,6 +1975,9 @@ async function handleTaskFormSubmit(e) {
   const checkboxes = document.querySelectorAll('input[name="task-assignees"]:checked');
   const selectedEmails = Array.from(checkboxes).map(cb => cb.value).join(',');
 
+  const blockerCbs = document.querySelectorAll('input[name="task-blockers"]:checked');
+  const selectedBlockers = Array.from(blockerCbs).map(cb => cb.value).join(',');
+
   const taskData = {
     id: document.getElementById('task-id').value,
     projectId: document.getElementById('new-task-project-id').value,
@@ -1962,6 +1988,7 @@ async function handleTaskFormSubmit(e) {
     assignees: selectedEmails,
     description: document.getElementById('new-task-desc').value,
     parentTaskId: document.getElementById('new-task-parent-id').value || null,
+    blockedBy: selectedBlockers,
     labels: normalizeLabels(document.getElementById('new-task-labels') ? document.getElementById('new-task-labels').value : ''),
     baseUpdatedAt: editingTaskBaseUpdatedAt
   };
@@ -2139,6 +2166,61 @@ function renderLabelChips(labelsValue) {
     const hue = labelHue(l);
     return `<span class="task-label-chip" style="--label-hue:${hue};">${escapeHtml(l)}</span>`;
   }).join('');
+}
+
+// --- Phụ thuộc công việc (dependency / "bị chặn bởi") ---
+// Badge "Bị chặn": hiện khi task còn công việc phụ thuộc (blocked_by) chưa Done
+function getBlockedBadge(task) {
+  if (!task.blocked_by) return '';
+  const blockerIds = String(task.blocked_by).split(',').map(x => x.trim()).filter(Boolean);
+  if (blockerIds.length === 0) return '';
+  const unfinished = blockerIds
+    .map(id => (globalAllTasks || []).find(t => t.id === id))
+    .filter(b => b && String(b.status).toLowerCase() !== 'done');
+  if (unfinished.length === 0) return '';
+  const names = unfinished.map(b => escapeHtml(b.name)).join(', ');
+  return `<span class="blocked-badge" title="Bị chặn bởi: ${names}"><i class="fa-solid fa-lock"></i> Bị chặn</span>`;
+}
+
+// Badge tiến độ checklist, ví dụ "3/5" — chỉ hiện khi task có checklist
+function getChecklistBadge(task) {
+  const list = Array.isArray(task.checklist) ? task.checklist : [];
+  if (list.length === 0) return '';
+  const done = list.filter(x => x && x.done).length;
+  const allDone = done === list.length;
+  return `<span class="checklist-badge${allDone ? ' is-complete' : ''}" title="Danh sách kiểm: ${done}/${list.length} xong"><i class="fa-regular fa-square-check"></i> ${done}/${list.length}</span>`;
+}
+
+let blockersExpanded = false;
+function showBlockerCheckboxes() {
+  const box = document.getElementById('blocker-checkboxes');
+  if (!box) return;
+  blockersExpanded = !blockersExpanded;
+  box.style.display = blockersExpanded ? 'block' : 'none';
+}
+
+// Đổ checkbox chọn "công việc chặn" từ các task khác đang có trong bộ nhớ (loại trừ chính task đang sửa)
+function loadBlockerCheckboxes(excludeTaskId) {
+  const container = document.getElementById('blocker-checkboxes');
+  if (!container) return;
+  const tasks = (globalAllTasks || []).filter(t => t.id !== excludeTaskId);
+
+  if (tasks.length === 0) {
+    container.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Chưa có công việc nào khác trong dự án.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  tasks.forEach(t => {
+    const label = document.createElement('label');
+    label.style.display = 'block';
+    label.style.padding = '5px 10px';
+    label.style.cursor = 'pointer';
+    label.onmouseover = function () { this.style.backgroundColor = 'var(--hover-bg)'; };
+    label.onmouseout = function () { this.style.backgroundColor = 'transparent'; };
+    label.innerHTML = `<input type="checkbox" name="task-blockers" value="${escapeHtml(t.id)}" style="margin-right:8px;"> ${escapeHtml(t.name)}`;
+    container.appendChild(label);
+  });
 }
 
 // --- Danh sách chọn người thực hiện (dùng chung cho modal Task & modal Event) ---
@@ -3395,6 +3477,744 @@ function goToTaskInProject(projectId) {
 }
 
 // ==========================================
+// 5b. CHI TIẾT CÔNG VIỆC: Bình luận / Danh sách kiểm / Tệp đính kèm / Lịch sử
+// ported từ WorkHub org (custom-modal -> modal-overlay/modal-card của app này)
+// ==========================================
+
+let currentActivityTaskId = null;
+let taskActivityUserMap = {};
+const TASK_ACTION_LABELS = {
+  saveTask: 'Đã lưu / cập nhật công việc',
+  deleteTask: 'Đã xóa công việc',
+  addTaskComment: 'Đã thêm bình luận',
+  uploadFileToTask: 'Đã tải tệp lên',
+  deleteFileFromTask: 'Đã xóa tệp'
+};
+
+async function openTaskActivity(taskId, taskName) {
+  currentActivityTaskId = taskId;
+  const nameEl = document.getElementById('task-activity-name');
+  if (nameEl) nameEl.textContent = taskName || '';
+  switchTaskActivityTab('comments');
+  openAppModal('task-activity-modal');
+
+  const mentionContainer = document.getElementById('comment-mention-checkboxes');
+  if (mentionContainer) mentionContainer.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+
+  try {
+    const userResp = await callGAS('getAllUsers', { groupKey: activeGroup });
+    taskActivityUserMap = {};
+    if (userResp.status === 'success' && Array.isArray(userResp.data)) {
+      userResp.data.forEach(u => { taskActivityUserMap[u.email] = u.name; });
+
+      if (mentionContainer) {
+        mentionContainer.innerHTML = '';
+        userResp.data.forEach(u => {
+          const label = document.createElement('label');
+          label.style.display = 'block';
+          label.style.padding = '5px 10px';
+          label.style.cursor = 'pointer';
+          label.onmouseover = function () { this.style.backgroundColor = 'var(--hover-bg)'; };
+          label.onmouseout = function () { this.style.backgroundColor = 'transparent'; };
+          label.innerHTML = `<input type="checkbox" name="comment-mentions" value="${escapeHtml(u.email)}" style="margin-right:8px;"> ${escapeHtml(u.name)}`;
+          mentionContainer.appendChild(label);
+        });
+      }
+    }
+  } catch (err) { taskActivityUserMap = {}; }
+
+  loadTaskComments(taskId);
+  loadTaskHistory(taskId);
+  loadTaskChecklist(taskId);
+  loadTaskAttachments(taskId);
+}
+
+let mentionCheckboxesExpanded = false;
+function showMentionCheckboxes() {
+  const box = document.getElementById('comment-mention-checkboxes');
+  if (!box) return;
+  mentionCheckboxesExpanded = !mentionCheckboxesExpanded;
+  box.style.display = mentionCheckboxesExpanded ? 'block' : 'none';
+}
+
+function switchTaskActivityTab(tab) {
+  document.querySelectorAll('.task-activity-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+  const panels = {
+    comments: document.getElementById('task-activity-comments-panel'),
+    checklist: document.getElementById('task-activity-checklist-panel'),
+    attachments: document.getElementById('task-activity-attachments-panel'),
+    history: document.getElementById('task-activity-history-panel')
+  };
+  Object.keys(panels).forEach(key => {
+    if (panels[key]) panels[key].style.display = key === tab ? 'block' : 'none';
+  });
+}
+
+// --- Bình luận ---
+async function loadTaskComments(taskId) {
+  const list = document.getElementById('task-comment-list');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+  try {
+    const response = await callGAS('getTaskComments', { taskId });
+    if (response.status !== 'success') throw new Error(response.message);
+    const comments = response.data || [];
+    if (comments.length === 0) {
+      list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Chưa có bình luận nào.</div>';
+      return;
+    }
+    list.innerHTML = comments.map(c => {
+      const authorName = taskActivityUserMap[c.author_email] || c.author_email;
+      const time = new Date(c.created_at).toLocaleString('vi-VN');
+      return `<div class="task-comment-item">
+        <div class="task-comment-meta"><strong>${escapeHtml(authorName)}</strong> · ${time}</div>
+        <div class="task-comment-content">${escapeHtml(c.content)}</div>
+      </div>`;
+    }).join('');
+    list.scrollTop = list.scrollHeight;
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function handleTaskCommentSubmit(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('task-comment-input');
+  const content = input ? input.value.trim() : '';
+  if (!content || !currentActivityTaskId) return;
+
+  const mentionCbs = document.querySelectorAll('input[name="comment-mentions"]:checked');
+  const mentionedEmails = Array.from(mentionCbs).map(cb => cb.value).join(',');
+
+  try {
+    const response = await callGAS('addTaskComment', {
+      taskId: currentActivityTaskId,
+      content: content,
+      mentionedEmails: mentionedEmails,
+      groupKey: activeGroup,
+      email: CURRENT_USER.email || null
+    });
+    if (response.status !== 'success') throw new Error(response.message);
+    if (input) input.value = '';
+    document.querySelectorAll('input[name="comment-mentions"]:checked').forEach(cb => cb.checked = false);
+    loadTaskComments(currentActivityTaskId);
+    loadTaskHistory(currentActivityTaskId);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+// --- Lịch sử ---
+async function loadTaskHistory(taskId) {
+  const list = document.getElementById('task-history-list');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+  try {
+    const response = await callGAS('getTaskHistory', { taskId });
+    if (response.status !== 'success') throw new Error(response.message);
+    const logs = response.data || [];
+    if (logs.length === 0) {
+      list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Chưa có lịch sử.</div>';
+      return;
+    }
+    list.innerHTML = logs.map(l => {
+      const authorName = taskActivityUserMap[l.user_email] || l.user_email || 'unknown';
+      const time = new Date(l.created_at).toLocaleString('vi-VN');
+      const actionLabel = TASK_ACTION_LABELS[l.action] || l.action;
+      return `<div class="task-history-item">
+        <div class="task-history-meta"><strong>${escapeHtml(authorName)}</strong> · ${time}</div>
+        <div class="task-history-content">${escapeHtml(actionLabel)}</div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// --- Danh sách kiểm (checklist) ---
+async function loadTaskChecklist(taskId) {
+  const list = document.getElementById('task-checklist-list');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+  try {
+    const response = await callGAS('getChecklist', { taskId });
+    if (response.status !== 'success') throw new Error(response.message);
+    renderTaskChecklist(response.data || []);
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderTaskChecklist(items) {
+  const list = document.getElementById('task-checklist-list');
+  if (!list) return;
+
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Chưa có mục nào.</div>';
+    return;
+  }
+
+  const doneCount = items.filter(x => x.done).length;
+  const header = `<div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">${doneCount}/${items.length} đã xong</div>`;
+
+  list.innerHTML = header + items.map(it => {
+    const safeId = escapeHtml(escapeJs(it.id));
+    return `<div class="checklist-item${it.done ? ' is-done' : ''}">
+      <label style="display:flex; align-items:center; gap:8px; flex:1; cursor:pointer; margin:0;">
+        <input type="checkbox" ${it.done ? 'checked' : ''} onchange="toggleChecklistItemAction('${safeId}', this.checked)">
+        <span class="checklist-item-text">${escapeHtml(it.text)}</span>
+      </label>
+      <button class="icon-btn danger" title="Xóa" onclick="deleteChecklistItemAction('${safeId}')">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function handleChecklistFormSubmit(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('task-checklist-input');
+  const text = input ? input.value.trim() : '';
+  if (!text || !currentActivityTaskId) return;
+
+  try {
+    const response = await callGAS('addChecklistItem', { taskId: currentActivityTaskId, text });
+    if (response.status !== 'success') throw new Error(response.message);
+    if (input) input.value = '';
+    renderTaskChecklist(response.data || []);
+    refreshTaskListAfterChecklistChange(response.data || []);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+async function toggleChecklistItemAction(itemId, done) {
+  if (!currentActivityTaskId) return;
+  try {
+    const response = await callGAS('toggleChecklistItem', { taskId: currentActivityTaskId, itemId, done });
+    if (response.status !== 'success') throw new Error(response.message);
+    renderTaskChecklist(response.data || []);
+    refreshTaskListAfterChecklistChange(response.data || []);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+    loadTaskChecklist(currentActivityTaskId);
+  }
+}
+
+async function deleteChecklistItemAction(itemId) {
+  if (!currentActivityTaskId) return;
+  try {
+    const response = await callGAS('deleteChecklistItem', { taskId: currentActivityTaskId, itemId });
+    if (response.status !== 'success') throw new Error(response.message);
+    renderTaskChecklist(response.data || []);
+    refreshTaskListAfterChecklistChange(response.data || []);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+// Vá thẳng checklist mới vào task đang giữ trong bộ nhớ để cập nhật badge "x/y" trên
+// danh sách task mà không phải tải lại cả trang; chỉ tải lại (im lặng) nếu không tìm thấy.
+function refreshTaskListAfterChecklistChange(newChecklist) {
+  const task = (globalAllTasks || []).find(t => t.id === currentActivityTaskId);
+  if (task && Array.isArray(newChecklist)) {
+    task.checklist = newChecklist;
+    if (typeof applyTaskFilters === 'function') applyTaskFilters();
+    return;
+  }
+  if (typeof loadTasksForProject === 'function' && currentTaskProjectID) {
+    loadTasksForProject(currentTaskProjectID, { quiet: true });
+  }
+}
+
+// --- Tệp đính kèm ---
+async function loadTaskAttachments(taskId) {
+  const task = (globalAllTasks || []).find(t => t.id === taskId);
+  let attachments = task ? task.attachments : [];
+  if (typeof attachments === 'string') {
+    try { attachments = JSON.parse(attachments || '[]'); } catch (err) { attachments = []; }
+  }
+  if (!Array.isArray(attachments)) attachments = [];
+  renderTaskAttachments(attachments);
+}
+
+function renderTaskAttachments(attachments) {
+  const list = document.getElementById('task-attachment-list');
+  if (!list) return;
+  if (!attachments || attachments.length === 0) {
+    list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Chưa có tệp đính kèm.</div>';
+    return;
+  }
+  list.innerHTML = attachments.map(f => `
+    <div class="task-attachment-item">
+      <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener" class="task-attachment-name"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(f.name)}</a>
+      <span class="task-attachment-meta">${escapeHtml(f.uploader || '')}${f.date ? ' · ' + escapeHtml(f.date) : ''}</span>
+      <button class="icon-btn danger" title="Xóa" onclick="deleteTaskAttachmentAction('${escapeHtml(escapeJs(f.id))}')"><i class="fa-solid fa-trash"></i></button>
+    </div>`).join('');
+}
+
+async function handleTaskAttachmentUpload(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('task-attachment-input');
+  if (!input || !input.files || !input.files.length || !currentActivityTaskId) return;
+  const file = input.files[0];
+
+  const readFileAsBase64 = (f) => new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = (ev) => resolve(ev.target.result.split(',')[1]);
+    r.readAsDataURL(f);
+  });
+
+  try {
+    const base64Data = await readFileAsBase64(file);
+    const response = await callGAS('uploadFileToTask', {
+      fileData: base64Data,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      taskId: currentActivityTaskId,
+      groupKey: activeGroup,
+      description: '',
+      email: CURRENT_USER.email || null
+    });
+    if (response.status !== 'success') throw new Error(response.message);
+    input.value = '';
+    renderTaskAttachments(response.data || []);
+    const task = (globalAllTasks || []).find(t => t.id === currentActivityTaskId);
+    if (task) task.attachments = response.data || [];
+    showToast('Đã tải tệp lên!', 'success');
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+async function deleteTaskAttachmentAction(fileId) {
+  if (!currentActivityTaskId) return;
+  try {
+    const response = await callGAS('deleteFileFromTask', { taskId: currentActivityTaskId, fileId, groupKey: activeGroup });
+    if (response.status !== 'success') throw new Error(response.message);
+    renderTaskAttachments(response.data || []);
+    const task = (globalAllTasks || []).find(t => t.id === currentActivityTaskId);
+    if (task) task.attachments = response.data || [];
+    showToast('Đã xóa tệp.', 'success');
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+// ==========================================
+// 5c. TÌM KIẾM TOÀN CỤC (Ctrl/Cmd + K)
+// ported từ WorkHub org — mở/đóng qua openAppModal/closeAppModal riêng của app này
+// ==========================================
+
+let searchPaletteResults = [];
+let searchPaletteIndex = -1;
+let searchDebounceTimer = null;
+let searchRequestSeq = 0;
+let searchPaletteReturnFocus = null;
+
+function openSearchPalette() {
+  const input = document.getElementById('search-palette-input');
+  if (!input) return;
+  searchPaletteReturnFocus = document.activeElement;
+  openAppModal('search-palette-modal');
+  input.value = '';
+  searchPaletteResults = [];
+  searchPaletteIndex = -1;
+  renderSearchHint('Gõ ít nhất 2 ký tự để tìm.');
+  setTimeout(() => input.focus(), 30);
+}
+
+function closeSearchPalette() {
+  closeAppModal('search-palette-modal');
+  clearTimeout(searchDebounceTimer);
+  searchPaletteResults = [];
+  searchPaletteIndex = -1;
+  if (searchPaletteReturnFocus && document.body.contains(searchPaletteReturnFocus) && typeof searchPaletteReturnFocus.focus === 'function') {
+    searchPaletteReturnFocus.focus();
+  }
+  searchPaletteReturnFocus = null;
+}
+
+function renderSearchHint(text) {
+  const box = document.getElementById('search-palette-results');
+  if (box) box.innerHTML = `<div class="search-palette-hint">${escapeHtml(text)}</div>`;
+}
+
+function onSearchPaletteInput(value) {
+  clearTimeout(searchDebounceTimer);
+  const q = String(value || '').trim();
+
+  if (q.length < 2) {
+    searchPaletteResults = [];
+    searchPaletteIndex = -1;
+    renderSearchHint('Gõ ít nhất 2 ký tự để tìm.');
+    return;
+  }
+
+  renderSearchHint('Đang tìm...');
+  searchDebounceTimer = setTimeout(async () => {
+    const mySeq = ++searchRequestSeq;
+    try {
+      const response = await callGAS('globalSearch', { query: q, groupKey: activeGroup });
+      if (mySeq !== searchRequestSeq) return;
+      if (response.status !== 'success') throw new Error(response.message);
+      renderSearchResults(response.data || { projects: [], tasks: [], files: [], events: [], comments: [], milestones: [] });
+    } catch (err) {
+      if (mySeq !== searchRequestSeq) return;
+      renderSearchHint('Lỗi tìm kiếm: ' + err.message);
+    }
+  }, 250);
+}
+
+function renderSearchResults(data) {
+  const box = document.getElementById('search-palette-results');
+  if (!box) return;
+
+  searchPaletteResults = [
+    ...(data.projects || []).map(x => ({ ...x, type: 'project' })),
+    ...(data.tasks || []).map(x => ({ ...x, type: 'task' })),
+    ...(data.milestones || []).map(x => ({ ...x, type: 'milestone' })),
+    ...(data.events || []).map(x => ({ ...x, type: 'event' })),
+    ...(data.comments || []).map(x => ({ ...x, type: 'comment' })),
+    ...(data.files || []).map(x => ({ ...x, type: 'file' }))
+  ];
+  searchPaletteIndex = searchPaletteResults.length > 0 ? 0 : -1;
+
+  if (searchPaletteResults.length === 0) {
+    renderSearchHint('Không tìm thấy kết quả nào.');
+    return;
+  }
+
+  const GROUP_META = {
+    project: { label: 'Dự án', icon: 'fa-diagram-project' },
+    task: { label: 'Công việc', icon: 'fa-list-check' },
+    milestone: { label: 'Cột mốc', icon: 'fa-flag-checkered' },
+    event: { label: 'Sự kiện', icon: 'fa-calendar-check' },
+    comment: { label: 'Bình luận', icon: 'fa-comment-dots' },
+    file: { label: 'Tệp', icon: 'fa-file' }
+  };
+
+  let html = '';
+  let flatIndex = 0;
+  ['project', 'task', 'milestone', 'event', 'comment', 'file'].forEach(type => {
+    const items = searchPaletteResults.filter(r => r.type === type);
+    if (items.length === 0) return;
+    html += `<div class="search-palette-group">${GROUP_META[type].label}</div>`;
+    items.forEach(item => {
+      const idx = flatIndex++;
+      const dueBadge = item.type === 'task' ? getDueDateBadge(item.dueDate, item.status) : '';
+      html += `
+        <div class="search-palette-item${idx === 0 ? ' is-active' : ''}" data-index="${idx}"
+             onclick="activateSearchResult(${idx})" onmouseenter="setSearchActiveIndex(${idx})">
+          <i class="fa-solid ${GROUP_META[type].icon}"></i>
+          <div class="search-palette-item-text">
+            <div class="search-palette-item-title">${escapeHtml(item.title || '')}${dueBadge}</div>
+            ${item.subtitle ? `<div class="search-palette-item-sub">${escapeHtml(item.subtitle)}</div>` : ''}
+          </div>
+        </div>`;
+    });
+  });
+
+  box.innerHTML = html;
+}
+
+function setSearchActiveIndex(idx) {
+  searchPaletteIndex = idx;
+  document.querySelectorAll('.search-palette-item').forEach(el => {
+    el.classList.toggle('is-active', Number(el.dataset.index) === idx);
+  });
+}
+
+function moveSearchSelection(step) {
+  if (searchPaletteResults.length === 0) return;
+  let next = searchPaletteIndex + step;
+  if (next < 0) next = searchPaletteResults.length - 1;
+  if (next >= searchPaletteResults.length) next = 0;
+  setSearchActiveIndex(next);
+  const el = document.querySelector(`.search-palette-item[data-index="${next}"]`);
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+}
+
+function activateSearchResult(idx) {
+  const item = searchPaletteResults[idx];
+  if (!item) return;
+  closeSearchPalette();
+
+  if (item.type === 'file') {
+    if (item.url) window.open(item.url, '_blank', 'noopener');
+    return;
+  }
+  if (item.type === 'task') {
+    if (typeof goToTaskInProject === 'function') goToTaskInProject(item.projectId);
+    return;
+  }
+  if (item.type === 'comment') {
+    // Bình luận thuộc về 1 task cụ thể — mở thẳng modal "Chi tiết công việc" của task đó
+    if (typeof openTaskActivity === 'function') openTaskActivity(item.taskId, '');
+    return;
+  }
+  if (item.type === 'milestone' || item.type === 'project') {
+    switchSection('progress');
+    if (item.type === 'milestone' && typeof openMilestonesModal === 'function') {
+      setTimeout(() => openMilestonesModal(item.projectId, item.subtitle || ''), 250);
+    }
+    return;
+  }
+  if (item.type === 'event') {
+    switchSection('calendar');
+    if (item.startTime && typeof window.selectDate === 'function') {
+      const d = new Date(item.startTime);
+      setTimeout(() => window.selectDate(d.getFullYear(), d.getMonth(), d.getDate()), 250);
+    }
+  }
+}
+
+document.addEventListener('keydown', function (e) {
+  const key = (e.key || '').toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'k') {
+    e.preventDefault();
+    const palette = document.getElementById('search-palette-modal');
+    if (palette && palette.classList.contains('open')) closeSearchPalette();
+    else openSearchPalette();
+  }
+});
+
+// ==========================================
+// 5d. ĐỒNG BỘ THỜI GIAN THỰC (Realtime)
+// Chỉ tải lại đúng phần đang hiển thị, gom nhiều thay đổi liên tiếp thành 1 lần tải,
+// và không báo "vừa cập nhật" cho chính thao tác của mình vừa gây ra.
+// KHÔNG port kênh chat/pin/presence của org — app này không có tính năng chat.
+// ==========================================
+
+let realtimePendingTables = new Set();
+let realtimeDebounceTimer = null;
+
+function initRealtimeSync() {
+  if (typeof API === 'undefined' || !API.realtime) return;
+
+  API.realtime.subscribe(
+    (change) => {
+      realtimePendingTables.add(change.table);
+      clearTimeout(realtimeDebounceTimer);
+      realtimeDebounceTimer = setTimeout(flushRealtimeChanges, 400);
+    },
+    (status) => {
+      setRealtimeIndicator(status === 'SUBSCRIBED');
+    }
+  );
+}
+
+function stopRealtimeSync() {
+  if (typeof API !== 'undefined' && API.realtime) API.realtime.unsubscribe();
+  clearTimeout(realtimeDebounceTimer);
+  realtimePendingTables.clear();
+  setRealtimeIndicator(false);
+}
+
+function flushRealtimeChanges() {
+  const tables = new Set(realtimePendingTables);
+  realtimePendingTables.clear();
+  if (tables.size === 0) return;
+
+  // Thay đổi do chính mình vừa gây ra thì các hàm lưu đã tự tải lại rồi — bỏ qua để
+  // không tải chồng và không hiện thông báo thừa.
+  const isOwnChange = (Date.now() - (window.lastLocalMutationAt || 0)) < 2500;
+  if (isOwnChange) return;
+
+  const touchedTasks = tables.has('tasks');
+  const touchedProjects = tables.has('projects') || tables.has('project_milestones');
+  const touchedEvents = tables.has('events');
+
+  if (currentSectionKey === 'task' && touchedTasks) {
+    if (typeof loadTasksForProject === 'function' && currentTaskProjectID) loadTasksForProject(currentTaskProjectID, { quiet: true });
+  } else if (currentSectionKey === 'mytasks' && (touchedTasks || touchedProjects)) {
+    if (typeof loadMyTasks === 'function') loadMyTasks();
+  } else if (currentSectionKey === 'progress' && (touchedTasks || touchedProjects)) {
+    if (typeof loadProjectOverview === 'function') loadProjectOverview({ quiet: true });
+  } else if (currentSectionKey === 'calendar' && touchedEvents) {
+    if (typeof loadCalendarData === 'function') loadCalendarData({ quiet: true });
+  } else if (currentSectionKey === 'dashboard' && (touchedTasks || touchedProjects || touchedEvents)) {
+    if (typeof loadDashboardOverview === 'function') loadDashboardOverview();
+  } else {
+    return; // phần đang xem không liên quan tới bảng vừa đổi
+  }
+
+  showToast('Dữ liệu vừa được người khác cập nhật.', 'info');
+}
+
+// Chấm nhỏ trên chuông thông báo: xanh = đang đồng bộ trực tiếp, xám = mất kết nối
+function setRealtimeIndicator(isLive) {
+  const anchor = document.getElementById('observation-toggle-btn');
+  if (!anchor) return;
+  let dot = document.getElementById('realtime-indicator');
+  if (!dot) {
+    dot = document.createElement('span');
+    dot.id = 'realtime-indicator';
+    dot.className = 'realtime-indicator';
+    anchor.appendChild(dot);
+  }
+  dot.classList.toggle('is-live', !!isLive);
+  dot.title = isLive ? 'Đang đồng bộ trực tiếp' : 'Mất kết nối đồng bộ';
+}
+
+// ==========================================
+// 5e. THÙNG RÁC (khôi phục / dọn dữ liệu đã xóa mềm)
+// ==========================================
+
+const TRASH_RETENTION_DAYS = 30;
+
+function openTrashModal() {
+  openAppModal('trash-modal');
+  loadTrashItems();
+}
+
+function getTrashAgeDays(deletedAt) {
+  if (!deletedAt) return null;
+  const t = new Date(deletedAt).getTime();
+  if (isNaN(t)) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
+function getTrashAgeInfo(deletedAt) {
+  const days = getTrashAgeDays(deletedAt);
+  if (days === null) return '';
+  if (days >= TRASH_RETENTION_DAYS) {
+    return `<span class="trash-age is-old"><i class="fa-solid fa-triangle-exclamation"></i> Đã ${days} ngày — nên dọn</span>`;
+  }
+  if (days >= 1) return `<span class="trash-age">${days} ngày trước</span>`;
+  return '';
+}
+
+// quiet = true: tải lại sau khôi phục/xóa vĩnh viễn/dọn rác quá hạn, không xóa trắng danh sách ra placeholder
+async function loadTrashItems(options) {
+  const quiet = !!(options && options.quiet);
+  const list = document.getElementById('trash-list');
+  const categorySelect = document.getElementById('trash-category');
+  const category = categorySelect ? categorySelect.value : 'tasks';
+  if (!list) return;
+
+  if (!quiet) list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+
+  try {
+    const response = await callGAS('getDeletedItems', { tableName: category, groupKey: activeGroup });
+    if (response.status !== 'success') throw new Error(response.message);
+    const items = response.data || [];
+
+    if (items.length === 0) {
+      list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Thùng rác trống.</div>';
+      return;
+    }
+
+    let html = items.map(item => {
+      const name = item.name || item.title || 'Không có tên';
+      let sub = item.deleted_at ? new Date(item.deleted_at).toLocaleString('vi-VN') : '';
+      if (category === 'tasks' && item.projectName) sub += ` · Dự án: ${item.projectName}`;
+      const ageInfo = getTrashAgeInfo(item.deleted_at);
+      return `<div class="trash-item">
+        <div class="trash-item-info">
+          <div class="trash-item-name">${escapeHtml(name)}</div>
+          <div class="trash-item-sub">${escapeHtml(sub)} ${ageInfo}</div>
+        </div>
+        <div class="trash-item-actions">
+          <button class="btn btn-success btn-sm" onclick="restoreTrashItemAction('${category}', '${escapeHtml(escapeJs(item.id))}')"><i class="fa-solid fa-clock-rotate-left"></i> Khôi phục</button>
+          <button class="btn btn-danger btn-sm" onclick="hardDeleteTrashItemAction('${category}', '${escapeHtml(escapeJs(item.id))}')"><i class="fa-solid fa-trash"></i> Xóa hẳn</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const oldItems = items.filter(x => (getTrashAgeDays(x.deleted_at) || 0) >= TRASH_RETENTION_DAYS);
+    if (oldItems.length > 0) {
+      const ids = oldItems.map(x => x.id).join('|');
+      html += `<div class="trash-purge-row">
+        <span>${oldItems.length} mục đã ở thùng rác quá ${TRASH_RETENTION_DAYS} ngày.</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="purgeOldTrash('${category}', '${ids}')"><i class="fa-solid fa-broom"></i> Dọn hết</button>
+      </div>`;
+    }
+
+    list.innerHTML = html;
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function restoreTrashItemAction(category, id) {
+  Swal.fire({
+    title: 'Khôi phục mục này?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Khôi phục',
+    cancelButtonText: 'Hủy',
+    confirmButtonColor: 'var(--success-color)',
+    cancelButtonColor: 'var(--text-muted)'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const response = await callGAS('restoreItem', { tableName: category, id, groupKey: activeGroup });
+      if (response.status !== 'success') throw new Error(response.message);
+      showToast(response.data || 'Khôi phục thành công!', 'success');
+      loadTrashItems({ quiet: true });
+      if (category === 'files' && typeof loadFileList === 'function') loadFileList(false, { quiet: true });
+      else if ((category === 'projects' || category === 'tasks') && typeof loadProjectOverview === 'function') loadProjectOverview({ quiet: true });
+      else if (category === 'events' && typeof loadCalendarData === 'function') loadCalendarData({ quiet: true });
+    } catch (err) {
+      showToast('Lỗi: ' + err.message, 'error');
+    }
+  });
+}
+
+function hardDeleteTrashItemAction(category, id) {
+  Swal.fire({
+    title: 'Xóa vĩnh viễn?',
+    text: 'Không thể hoàn tác.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Xóa vĩnh viễn',
+    cancelButtonText: 'Hủy',
+    confirmButtonColor: 'var(--danger-color)',
+    cancelButtonColor: 'var(--text-muted)'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const response = await callGAS('hardDeleteItem', { tableName: category, id, groupKey: activeGroup });
+      if (response.status !== 'success') throw new Error(response.message);
+      showToast('Đã xóa vĩnh viễn!', 'success');
+      loadTrashItems({ quiet: true });
+    } catch (err) {
+      showToast('Lỗi: ' + err.message, 'error');
+    }
+  });
+}
+
+async function purgeOldTrash(category, idsJoined) {
+  const ids = String(idsJoined || '').split('|').filter(Boolean);
+  if (ids.length === 0) return;
+
+  const result = await Swal.fire({
+    title: `Xóa vĩnh viễn ${ids.length} mục?`,
+    html: `Các mục này đã ở thùng rác quá ${TRASH_RETENTION_DAYS} ngày.<br><b>Không thể hoàn tác.</b><br>Gõ <code>XOA</code> để xác nhận:`,
+    icon: 'warning',
+    input: 'text',
+    inputPlaceholder: 'XOA',
+    showCancelButton: true,
+    confirmButtonColor: 'var(--danger-color)',
+    confirmButtonText: 'Xóa vĩnh viễn',
+    cancelButtonText: 'Hủy',
+    inputValidator: (value) => (value || '').trim().toUpperCase() !== 'XOA' ? 'Gõ đúng chữ XOA để xác nhận.' : null
+  });
+  if (!result.isConfirmed) return;
+
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const r = await callGAS('hardDeleteItem', { tableName: category, id, groupKey: activeGroup });
+      if (r.status === 'success') ok++; else fail++;
+    } catch (err) { fail++; }
+  }
+  showToast(fail === 0 ? `Đã dọn ${ok} mục.` : `Đã dọn ${ok} mục, ${fail} mục lỗi.`, fail === 0 ? 'success' : 'error');
+  loadTrashItems({ quiet: true });
+}
+
+// ==========================================
 // 6. INITIALIZATION
 // ==========================================
 
@@ -3436,6 +4256,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.target === overlay) overlay.classList.remove('open');
     });
   });
+
+  // Tìm kiếm toàn cục: điều hướng bằng phím trong ô nhập
+  const searchPaletteInput = document.getElementById('search-palette-input');
+  if (searchPaletteInput) {
+    searchPaletteInput.addEventListener('input', function () {
+      onSearchPaletteInput(this.value);
+    });
+    searchPaletteInput.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveSearchSelection(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveSearchSelection(-1); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (searchPaletteIndex >= 0) activateSearchResult(searchPaletteIndex); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeSearchPalette(); }
+    });
+  }
 
   await initAuth();
 

@@ -851,6 +851,8 @@ body.app-locked #observation-drawer,
 body.app-locked #members-drawer,
 body.app-locked .members-btn,
 body.app-locked #observation-toggle-btn,
+body.app-locked #search-trigger-btn,
+body.app-locked #trash-toggle-btn,
 body.app-locked .user-profile-wrapper {
   display: none !important;
 }
@@ -1547,7 +1549,7 @@ body.app-locked .user-profile-wrapper {
 .selectBox:hover select { border-color: var(--text-secondary); }
 .overSelect { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
 
-#checkboxes, #event-attendee-checkboxes {
+#checkboxes, #event-attendee-checkboxes, #blocker-checkboxes, #comment-mention-checkboxes {
   display: none;
   position: absolute;
   width: 100%;
@@ -1562,7 +1564,7 @@ body.app-locked .user-profile-wrapper {
   z-index: 1150;
 }
 
-#checkboxes label, #event-attendee-checkboxes label {
+#checkboxes label, #event-attendee-checkboxes label, #blocker-checkboxes label, #comment-mention-checkboxes label {
   display: flex;
   align-items: center;
   padding: 9px 12px;
@@ -1572,8 +1574,8 @@ body.app-locked .user-profile-wrapper {
   font-weight: 500;
   transition: all 0.15s ease;
 }
-#checkboxes label:hover, #event-attendee-checkboxes label:hover { background-color: var(--hover-bg); }
-#checkboxes input[type="checkbox"], #event-attendee-checkboxes input[type="checkbox"] {
+#checkboxes label:hover, #event-attendee-checkboxes label:hover, #blocker-checkboxes label:hover, #comment-mention-checkboxes label:hover { background-color: var(--hover-bg); }
+#checkboxes input[type="checkbox"], #event-attendee-checkboxes input[type="checkbox"], #blocker-checkboxes input[type="checkbox"], #comment-mention-checkboxes input[type="checkbox"] {
   margin-right: 12px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--gold);
 }
 
@@ -1769,3 +1771,135 @@ body.app-locked .user-profile-wrapper {
 }
 .milestone-item.milestone-done .milestone-title { text-decoration: line-through; color: var(--text-muted); }
 .milestone-title { color: var(--text-primary); font-weight: 500; }
+
+/* ---------------------------------------------------------------------- */
+/* 14. TÌM KIẾM TOÀN CỤC (Ctrl/Cmd + K) — ported từ WorkHub org           */
+/* ---------------------------------------------------------------------- */
+
+.search-palette-overlay { align-items: flex-start; padding-top: 12vh; }
+.search-palette-card { display: flex; flex-direction: column; max-height: 70vh; }
+.search-palette-input-row {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color); color: var(--text-secondary);
+}
+.search-palette-input-row input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-size: 1.05rem; font-family: inherit; color: var(--text-primary);
+}
+.search-palette-input-row:focus-within { box-shadow: inset 0 -2px 0 var(--gold); }
+.search-palette-esc {
+  font-size: 11px; padding: 2px 7px; border-radius: var(--radius-sm);
+  background: var(--hover-bg); border: 1px solid var(--border-color); color: var(--text-muted);
+}
+.search-palette-results { overflow-y: auto; padding: 6px; }
+.search-palette-hint { padding: 22px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.search-palette-group {
+  padding: 8px 12px 4px; font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+}
+.search-palette-item {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary);
+}
+.search-palette-item.is-active, .search-palette-item:hover { background: color-mix(in srgb, var(--gold) 14%, var(--card-bg)); }
+.search-palette-item > i { color: var(--text-muted); width: 16px; text-align: center; }
+.search-palette-item-text { min-width: 0; flex: 1; }
+.search-palette-item-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-palette-item-sub { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------------------------------------------------------------------- */
+/* 15. CHI TIẾT CÔNG VIỆC: tabs Bình luận / Danh sách kiểm / Tệp / Lịch sử */
+/* ---------------------------------------------------------------------- */
+
+.task-activity-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; flex-wrap: wrap; }
+.task-activity-tab {
+  background: none; border: none; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--text-muted);
+  cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s ease;
+}
+.task-activity-tab:hover { color: var(--text-primary); }
+.task-activity-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.task-activity-panel { max-height: 320px; overflow-y: auto; }
+
+.task-comment-list, .task-history-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.task-comment-item, .task-history-item {
+  background: var(--hover-bg); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border-color);
+  font-size: 13px;
+}
+.task-comment-meta, .task-history-meta { margin-bottom: 4px; font-size: 12px; color: var(--text-muted); }
+.task-comment-content { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+.task-history-content { color: var(--text-secondary); }
+
+.task-checklist-list { max-height: 300px; overflow-y: auto; margin-bottom: 10px; }
+.checklist-item {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px; margin-bottom: 6px;
+  background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+}
+.checklist-item.is-done .checklist-item-text { text-decoration: line-through; color: var(--text-muted); }
+.checklist-item-text { color: var(--text-primary); font-size: 13px; }
+.checklist-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--success-color); }
+
+.checklist-badge {
+  display: inline-block; margin-left: 6px; padding: 2px 8px;
+  border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;
+  background: var(--hover-bg); color: var(--text-secondary); white-space: nowrap; vertical-align: middle;
+}
+.checklist-badge.is-complete { background: color-mix(in srgb, var(--success-color) 16%, var(--card-bg)); color: var(--success-color); }
+
+.blocked-badge {
+  display: inline-block; margin-left: 6px; padding: 2px 8px;
+  border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;
+  background: color-mix(in srgb, var(--danger-color) 16%, var(--card-bg)); color: var(--danger-color);
+  white-space: nowrap; vertical-align: middle;
+}
+
+.task-attachment-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.task-attachment-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+}
+.task-attachment-name {
+  color: var(--gold); font-weight: 600; font-size: 13px; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none;
+}
+.task-attachment-name:hover { text-decoration: underline; }
+.task-attachment-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* ---------------------------------------------------------------------- */
+/* 16. ĐỒNG BỘ THỜI GIAN THỰC — chấm trạng thái cạnh chuông thông báo      */
+/* ---------------------------------------------------------------------- */
+
+.realtime-indicator {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-muted); opacity: 0.45;
+  position: absolute; bottom: 6px; right: 6px;
+  transition: all 0.2s ease;
+}
+.realtime-indicator.is-live {
+  background: var(--success-color); opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-color) 22%, transparent);
+}
+
+/* ---------------------------------------------------------------------- */
+/* 17. THÙNG RÁC — khôi phục / dọn dữ liệu đã xóa mềm                     */
+/* ---------------------------------------------------------------------- */
+
+.trash-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; margin-bottom: 4px; }
+.trash-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px;
+  background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.trash-item-info { min-width: 0; flex: 1; }
+.trash-item-name { color: var(--text-primary); font-weight: 600; font-size: 13.5px; }
+.trash-item-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.trash-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.trash-age { font-size: 11px; color: var(--text-muted); }
+.trash-age.is-old { color: var(--danger-color); font-weight: 700; }
+.trash-purge-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-top: 4px;
+  background: color-mix(in srgb, var(--danger-color) 8%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--danger-color) 30%, transparent);
+  border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-secondary);
+}
+.btn-sm { padding: 5px 10px; font-size: 12.5px; }
