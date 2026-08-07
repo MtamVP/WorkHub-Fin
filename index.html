@@ -12,10 +12,11 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 </head>
@@ -476,10 +477,13 @@
               <option value="percent_asc">% Tăng dần</option>
             </select>
           </div>
-          <div class="form-group" style="flex: 0 0 auto;">
-            <label class="form-label">&nbsp;</label>
+          <div class="form-group" style="flex: 0 0 auto; display: flex; gap: 8px;">
+            <label class="form-label" style="width: 100%;">&nbsp;</label>
             <button type="button" id="toggle-archived-btn" class="btn btn-outline" onclick="toggleArchivedProjectsView()">
               <i class="fa-solid fa-box-archive"></i> Xem kho lưu trữ
+            </button>
+            <button type="button" class="btn btn-outline" onclick="exportProjectsCsv()" title="Xuất danh sách dự án ra CSV">
+              <i class="fa-solid fa-file-csv"></i> Xuất CSV
             </button>
           </div>
         </div>
@@ -830,6 +834,45 @@
     </div>
   </div>
 
+  <!-- Milestones Modal -->
+  <div class="modal-overlay" id="milestones-modal">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-flag-checkered" style="color: var(--gold);"></i> Cột mốc: <span id="milestones-project-name"></span></h3>
+        <button class="header-btn" onclick="closeAppModal('milestones-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="milestone-list" class="milestone-list"><div style="padding: 8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div></div>
+        <form id="milestone-form" style="display: flex; gap: 8px;" onsubmit="handleMilestoneFormSubmit(event)">
+          <input type="text" id="milestone-title-input" class="form-control" placeholder="Tên cột mốc...">
+          <input type="date" id="milestone-date-input" class="form-control" style="max-width: 150px;">
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('milestones-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Burndown Chart Modal -->
+  <div class="modal-overlay" id="burndown-modal">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-chart-line" style="color: var(--gold);"></i> Tiến độ: <span id="burndown-project-name"></span></h3>
+        <button class="header-btn" onclick="closeAppModal('burndown-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div style="position: relative; height: 320px;">
+          <canvas id="burndown-chart-canvas"></canvas>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('burndown-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add / Edit Event Modal -->
   <div class="modal-overlay" id="add-event-modal">
     <div class="modal-card" style="max-width: 600px;">
@@ -910,6 +953,6 @@
 
   <script src="api.js?v=5"></script>
 
-  <script src="script.js?v=8"></script>
+  <script src="script.js?v=9"></script>
 </body>
 </html>

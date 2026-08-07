@@ -1760,3 +1760,12 @@ body.app-locked .user-profile-wrapper {
 .kanban-card-labels { margin-bottom: 6px; }
 .kanban-parent-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
 .dragging-task { opacity: 0.4; }
+
+/* --- Cột mốc dự án (Milestones) --- */
+.milestone-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; margin-bottom: 8px; }
+.milestone-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: var(--hover-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+}
+.milestone-item.milestone-done .milestone-title { text-decoration: line-through; color: var(--text-muted); }
+.milestone-title { color: var(--text-primary); font-weight: 500; }

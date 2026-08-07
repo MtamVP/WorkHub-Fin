@@ -1053,6 +1053,12 @@ function renderProgressTable() {
         <button class="icon-btn" onclick="toggleProjectArchive('${safeIdArg}', '${safeNameArg}', ${p.archivedAt ? 'false' : 'true'})" title="${p.archivedAt ? 'Đưa trở lại danh sách đang chạy' : 'Lưu trữ dự án'}">
           <i class="fa-solid ${p.archivedAt ? 'fa-box-open' : 'fa-box-archive'}"></i>
         </button>
+        <button class="icon-btn" onclick="openMilestonesModal('${safeIdArg}', '${safeNameArg}')" title="Cột mốc dự án">
+          <i class="fa-solid fa-flag-checkered"></i>
+        </button>
+        <button class="icon-btn" onclick="openBurndownModal('${safeIdArg}', '${safeNameArg}')" title="Biểu đồ tiến độ">
+          <i class="fa-solid fa-chart-line"></i>
+        </button>
         <button class="icon-btn danger" onclick="deleteProjectAction('${safeIdArg}', '${safeNameArg}')" title="Xóa Dự Án">
           <i class="fa-solid fa-trash"></i>
         </button>
@@ -1072,6 +1078,165 @@ function getProgressBarColor(percent) {
   if (percent >= 50) return 'var(--gold)';
   if (percent > 0) return 'var(--warning-color)';
   return 'var(--border-color)';
+}
+
+function exportProjectsCsv() {
+  const projects = globalAllProjects || [];
+  if (projects.length === 0) { showToast('Không có dự án nào để xuất.', 'error'); return; }
+
+  const rows = [['Tên dự án', 'Trạng thái', 'Tiến độ (%)', 'Mô tả', 'Chủ dự án', 'Quá hạn', 'Sắp đến hạn', 'Cập nhật lần cuối', 'Lưu trữ']];
+  projects.forEach(p => rows.push([
+    p.name, p.status || '', p.percent || 0, p.description || '', p.owner || '',
+    p.overdueCount || 0, p.dueSoonCount || 0, p.lastUpdated || '', p.archivedAt ? 'Có' : ''
+  ]));
+
+  downloadCsv(`du-an-${stamp()}.csv`, rows);
+  showToast(`Đã xuất ${projects.length} dự án.`, 'success');
+}
+
+// -------------------- Cột mốc dự án (Milestones) --------------------
+
+let currentMilestoneProjectId = null;
+
+function openMilestonesModal(projectId, projectName) {
+  currentMilestoneProjectId = projectId;
+  const nameEl = document.getElementById('milestones-project-name');
+  if (nameEl) nameEl.textContent = projectName;
+  openAppModal('milestones-modal');
+  loadMilestones(projectId);
+}
+
+async function loadMilestones(projectId) {
+  const list = document.getElementById('milestone-list');
+  if (!list) return;
+  list.innerHTML = '<div style="padding: 8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div>';
+  try {
+    const response = await callGAS('getMilestones', { projectId });
+    if (response.status !== 'success') throw new Error(response.message);
+    const milestones = response.data || [];
+    if (milestones.length === 0) {
+      list.innerHTML = '<div style="padding: 8px; color: var(--text-muted); font-size: 12.5px;">Chưa có cột mốc nào.</div>';
+      return;
+    }
+    list.innerHTML = milestones.map(m => {
+      const dateStr = m.target_date ? new Date(m.target_date + 'T00:00:00').toLocaleDateString('vi-VN') : '';
+      return `<div class="milestone-item ${m.is_done ? 'milestone-done' : ''}">
+        <label style="display:flex; align-items:center; gap:8px; flex:1; cursor:pointer; margin:0;">
+          <input type="checkbox" ${m.is_done ? 'checked' : ''} onchange="toggleMilestoneStatus('${m.id}', this.checked)">
+          <span class="milestone-title">${escapeHtml(m.title)}</span>
+          ${dateStr ? `<span style="color:var(--text-muted); font-size:12px; margin-left:auto;">${dateStr}</span>` : ''}
+        </label>
+        <button class="icon-btn danger" onclick="deleteMilestoneAction('${m.id}')" title="Xóa">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function handleMilestoneFormSubmit(e) {
+  if (e) e.preventDefault();
+  const titleInput = document.getElementById('milestone-title-input');
+  const dateInput = document.getElementById('milestone-date-input');
+  const title = titleInput ? titleInput.value.trim() : '';
+  if (!title || !currentMilestoneProjectId) return;
+
+  try {
+    const response = await callGAS('addMilestone', { projectId: currentMilestoneProjectId, title, targetDate: dateInput ? dateInput.value : '', groupKey: activeGroup });
+    if (response.status !== 'success') throw new Error(response.message);
+    if (titleInput) titleInput.value = '';
+    if (dateInput) dateInput.value = '';
+    loadMilestones(currentMilestoneProjectId);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+async function toggleMilestoneStatus(milestoneId, isDone) {
+  try {
+    const response = await callGAS('toggleMilestone', { milestoneId, isDone });
+    if (response.status !== 'success') throw new Error(response.message);
+    loadMilestones(currentMilestoneProjectId);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+async function deleteMilestoneAction(milestoneId) {
+  try {
+    const response = await callGAS('deleteMilestone', { milestoneId });
+    if (response.status !== 'success') throw new Error(response.message);
+    loadMilestones(currentMilestoneProjectId);
+  } catch (err) {
+    showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+// -------------------- Biểu đồ tiến độ (Burndown) --------------------
+
+let burndownChartInstance = null;
+
+async function openBurndownModal(projectId, projectName) {
+  const nameEl = document.getElementById('burndown-project-name');
+  if (nameEl) nameEl.textContent = projectName;
+  openAppModal('burndown-modal');
+
+  const canvas = document.getElementById('burndown-chart-canvas');
+  if (!canvas) return;
+
+  try {
+    const response = await callGAS('getBurndownData', { projectId });
+    if (response.status !== 'success') throw new Error(response.message);
+    const tasks = response.data || [];
+
+    if (tasks.length === 0 || typeof Chart === 'undefined') {
+      if (burndownChartInstance) { burndownChartInstance.destroy(); burndownChartInstance = null; }
+      return;
+    }
+
+    const allDates = tasks.map(t => new Date(t.created_at));
+    let cursor = new Date(Math.min(...allDates));
+    cursor.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const labels = [];
+    const totalSeries = [];
+    const doneSeries = [];
+
+    while (cursor <= today) {
+      const dayEnd = new Date(cursor); dayEnd.setHours(23, 59, 59, 999);
+      const totalByDay = tasks.filter(t => new Date(t.created_at) <= dayEnd).length;
+      const doneByDay = tasks.filter(t => String(t.status).toLowerCase() === 'done' && new Date(t.updated_at) <= dayEnd).length;
+
+      labels.push(cursor.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }));
+      totalSeries.push(totalByDay);
+      doneSeries.push(doneByDay);
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (burndownChartInstance) burndownChartInstance.destroy();
+    burndownChartInstance = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Tổng công việc', data: totalSeries, borderColor: getComputedStyle(document.documentElement).getPropertyValue('--warning-color').trim(), backgroundColor: 'transparent', stepped: true },
+          { label: 'Đã hoàn thành', data: doneSeries, borderColor: getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim(), backgroundColor: 'transparent', stepped: true }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  } catch (err) {
+    showToast('Lỗi tải biểu đồ: ' + err.message, 'error');
+  }
 }
 
 async function toggleProjectArchive(projectId, projectName, archive) {
