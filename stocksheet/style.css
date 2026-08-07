@@ -83,7 +83,7 @@ body {
     border: 1px solid var(--border-color); padding: 20px; margin-top: 20px;
 }
 .perf-chart-title { margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
-.perf-chart-title i { color: var(--finance-accent); }
+.perf-chart-title i { color: var(--text-secondary); }
 
 .text-right { text-align: right; font-family: var(--font-mono); font-weight: 600; }
 .text-bold { font-weight: 700; }
@@ -99,8 +99,8 @@ body {
    4. STOCK DETAIL — hero + stat-card layout (thay cho bảng hàng-cột cũ)
    ========================================= */
 .stock-hero {
-    background: linear-gradient(135deg, var(--finance-accent-subtle), var(--card-bg));
-    border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft);
+    background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--finance-accent);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-soft);
     padding: 24px 28px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
 }
 .stock-hero-id { display: flex; align-items: baseline; gap: 12px; }
@@ -111,7 +111,7 @@ body {
 .stock-hero-price-value { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .stock-section-title { margin: 0 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-.stock-section-title i { color: var(--finance-accent); }
+.stock-section-title i { color: var(--text-secondary); }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
 .stat-tile {
@@ -120,7 +120,7 @@ body {
     transition: transform 0.2s, box-shadow 0.2s;
 }
 .stat-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-.stat-tile-icon { color: var(--finance-accent); font-size: 1rem; }
+.stat-tile-icon { color: var(--text-secondary); font-size: 1rem; }
 .stat-tile-label { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
 .stat-tile-value { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
