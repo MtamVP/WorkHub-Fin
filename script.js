@@ -100,10 +100,10 @@ let todayEventList, manageEventBtn, addEventBtn, eventForm;
 let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
-// Section navigation (Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
-let currentSectionKey = 'pipeline';
-const SECTION_LOADED = { projects: false, calendar: false, drive: false, mytasks: false };
+// Section navigation (Tổng Quan / Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
+const SECTION_KEYS = ['dashboard', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
+let currentSectionKey = 'dashboard';
+const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -164,6 +164,7 @@ async function resolveUserProfile(user) {
     window.__financeSessionBootstrapped = true;
     fetchLiveObservationLogs();
     loadFinanceMembers();
+    switchSection(currentSectionKey); // tải dữ liệu cho section đang hiển thị sẵn (mặc định: dashboard)
   }
 
   return true;
@@ -743,6 +744,11 @@ function switchSection(sectionKey) {
   if (target) target.classList.add('active');
 
   if (!CURRENT_USER.email) return; // chưa đăng nhập: chỉ đổi giao diện, không gọi API
+
+  if (sectionKey === 'dashboard' && !SECTION_LOADED.dashboard) {
+    SECTION_LOADED.dashboard = true;
+    loadDashboardOverview();
+  }
 
   if ((sectionKey === 'task' || sectionKey === 'progress') && !SECTION_LOADED.projects) {
     SECTION_LOADED.projects = true;
@@ -1806,6 +1812,7 @@ async function loadCalendarData(options) {
       currentMonthEvents = response.data || [];
       renderEventDots();
       renderEventsForSelectedDate();
+      renderDashboardCalendar(currentMonthEvents);
     } else {
       handleCalendarError(new Error(response.message));
     }
@@ -2608,6 +2615,110 @@ function renderFileStats(fileData) {
   setContent('pptx-cnt', stats.pptx);
   setContent('zip-cnt', stats.zip);
   setContent('total-cnt', totalFiles);
+}
+
+// -------------------- Dashboard overview (Tổng Quan) --------------------
+
+async function loadDashboardOverview() {
+  if (!CURRENT_USER.email) return;
+
+  try {
+    const files = await API.file.getRecentFilesForDashboard(CURRENT_USER.groupKey);
+    renderFileStats(files || []);
+    renderRecentFiles((files || []).slice(0, 9));
+  } catch (error) {
+    console.error("Lỗi tải file dashboard:", error);
+  }
+
+  loadCalendarData();
+  loadDashboardTopProgress();
+}
+
+function renderDashboardCalendar(events) {
+  const container = document.getElementById('today-calendar-view');
+  if (!container) return;
+
+  const today = new Date();
+  const todayEvents = (events || []).filter(e => {
+    const d = new Date(e.startTime);
+    return d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear();
+  });
+
+  todayEvents.sort((a, b) => (b.isImportant === true) - (a.isImportant === true));
+
+  if (todayEvents.length === 0) {
+    container.innerHTML = `<p style="color: var(--text-secondary);">Hôm nay không có lịch.</p>`;
+    return;
+  }
+
+  let html = '<ul style="list-style: none; padding: 0; margin: 0;">';
+  todayEvents.slice(0, 4).forEach(e => {
+    const time = e.type === 'task' ? 'Hạn chót' : new Date(e.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const iconColor = e.isImportant ? 'var(--danger-color)' : 'var(--info-color)';
+    const iconClass = e.type === 'task' ? 'fa-list-check' : (e.isImportant ? 'fa-star' : 'fa-circle');
+
+    html += `
+      <li style="padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 6px; background: var(--hover-bg); border-left: 3px solid ${iconColor}; display: flex; align-items: center; gap: 10px;">
+        <i class="fa-solid ${iconClass}" style="color: ${iconColor}; font-size: 0.75em;"></i>
+        <span style="flex: 1;">${escapeHtml(e.title || '')}</span>
+        <span style="color: var(--text-muted); font-size: 0.85em;">${time}</span>
+      </li>`;
+  });
+  html += '</ul>';
+  container.innerHTML = html;
+}
+
+async function loadDashboardTopProgress() {
+  const container = document.getElementById('project-progress-view');
+  if (!container) return;
+
+  container.innerHTML = skeletonListItems(3);
+
+  try {
+    const response = await callGAS("getProjectListWithTaskStats", { filters: {}, groupKey: activeGroup });
+
+    if (response.status !== 'success') {
+      container.innerHTML = `<p style="color: var(--danger-color); font-size: 0.9em;">Lỗi tải: ${escapeHtml(response.message || '')}</p>`;
+      return;
+    }
+
+    const projects = response.data;
+    if (!projects || projects.length === 0) {
+      container.innerHTML = `<p style="color: var(--text-secondary);">Chưa có dự án nào.</p>`;
+      return;
+    }
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
+    projects.slice(0, 5).forEach(p => {
+      const percent = p.percent || 0;
+      const barColor = getProgressBarColor(percent);
+      const stats = p.taskStats || { done: 0, working: 0, stuck: 0, notStarted: 0 };
+
+      html += `
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 0.9rem;">${escapeHtml(p.name || '')}</strong>
+            <span class="status-pill pill-neutral">${percent}%</span>
+          </div>
+          <div class="score-gauge" style="height: 6px; margin-bottom: 8px;">
+            <div class="score-gauge-fill" style="width: ${percent}%; background: ${barColor};"></div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span class="status-pill pill-success" title="Done"><i class="fa-solid fa-check"></i> ${stats.done}</span>
+            <span class="status-pill pill-warning" title="Working on it"><i class="fa-solid fa-spinner"></i> ${stats.working}</span>
+            <span class="status-pill pill-danger" title="Stuck"><i class="fa-solid fa-triangle-exclamation"></i> ${stats.stuck}</span>
+            <span class="status-pill pill-neutral" title="Not Started"><i class="fa-solid fa-pause"></i> ${stats.notStarted}</span>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    console.error("Lỗi Dashboard Progress:", err);
+    container.innerHTML = `<p style="color: var(--danger-color); font-size: 0.9em;">Lỗi kết nối!</p>`;
+  }
 }
 
 function shareFileAction(fileId, fileName) {

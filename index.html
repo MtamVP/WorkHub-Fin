@@ -80,7 +80,10 @@
     <nav id="app-sidebar">
       <div id="hamburger-menu" title="Thu gọn / Mở rộng thanh điều hướng"><i class="fa-solid fa-bars"></i></div>
       <ul>
-        <li class="nav-item active" data-section="pipeline" onclick="switchSection('pipeline')">
+        <li class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')">
+          <i class="fa-solid fa-chart-pie"></i><span> Tổng Quan</span>
+        </li>
+        <li class="nav-item" data-section="pipeline" onclick="switchSection('pipeline')">
           <i class="fa-solid fa-diagram-project"></i><span> Pipeline</span>
         </li>
         <li class="nav-item" data-section="task" onclick="switchSection('task')">
@@ -112,7 +115,56 @@
 
     <main id="main-content">
 
-    <section class="app-section active" id="pipeline-section">
+    <section class="app-section active" id="dashboard-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-chart-pie" style="color: var(--gold);"></i> Tổng Quan Nhóm Tài Chính</h3>
+          <p>Deadline hôm nay, tiến độ dự án và kho file chung — tất cả trong một màn hình.</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 16px;"><i class="fa-solid fa-calendar-check" style="color: var(--gold); margin-right: 8px;"></i>Deadline Hôm Nay</h3>
+          <div id="today-calendar-view">
+            <p style="color: var(--text-secondary);">Đang tải sự kiện hôm nay...</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 16px;"><i class="fa-solid fa-chart-line" style="color: var(--gold); margin-right: 8px;"></i>Tiến Độ Dự Án</h3>
+          <div id="project-progress-view">
+            <p style="color: var(--text-secondary);">Đang tải tiến độ dự án...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 16px;"><i class="fa-solid fa-file-import" style="color: var(--gold); margin-right: 8px;"></i>Kho File Chung</h3>
+        <div class="grid-2" style="gap: 20px;">
+          <div>
+            <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary);">Tài liệu gần đây</h4>
+            <div id="myfiles-list-view">
+              <p style="color: var(--text-secondary);">Đang tải file...</p>
+            </div>
+          </div>
+          <div style="border-left: 1px solid var(--border-color); padding-left: 20px;">
+            <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary);">Thống kê theo loại</h4>
+            <div id="file-insight-view" style="font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px;">
+              <p><i class="fa-solid fa-file-word" style="color: var(--info-color); margin-right: 8px;"></i>Word: <span id="word-cnt" style="font-weight: 700;">0</span></p>
+              <p><i class="fa-solid fa-file-excel" style="color: var(--success-color); margin-right: 8px;"></i>Excel: <span id="excel-cnt" style="font-weight: 700;">0</span></p>
+              <p><i class="fa-solid fa-file-pdf" style="color: var(--danger-color); margin-right: 8px;"></i>PDF: <span id="pdf-cnt" style="font-weight: 700;">0</span></p>
+              <p><i class="fa-solid fa-file-image" style="color: var(--warning-color); margin-right: 8px;"></i>Ảnh: <span id="image-cnt" style="font-weight: 700;">0</span></p>
+              <p><i class="fa-solid fa-file-powerpoint" style="color: var(--text-muted); margin-right: 8px;"></i>PPTX: <span id="pptx-cnt" style="font-weight: 700;">0</span></p>
+              <p><i class="fa-solid fa-file-zipper" style="color: var(--text-muted); margin-right: 8px;"></i>Zip: <span id="zip-cnt" style="font-weight: 700;">0</span></p>
+              <hr style="border-color: var(--border-color); margin: 6px 0;">
+              <p><i class="fa-solid fa-folder" style="margin-right: 8px;"></i>Tổng: <span id="total-cnt" style="font-weight: 700;">0</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="app-section" id="pipeline-section">
 
     <section class="pipeline-overview-card">
       <div class="pipeline-header-row">
@@ -808,6 +860,6 @@
 
   <script src="api.js?v=5"></script>
 
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>
