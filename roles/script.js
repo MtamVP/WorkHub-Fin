@@ -3,7 +3,11 @@
 let currentUserEmail = '';
 let isFinAdmin = false;
 
-const ROLE_LABELS = { asset_manager: 'Quản lý & đầu tư tài sản', fin_admin: 'Quản trị phân quyền' };
+const ROLE_LABELS = {
+    asset_manager: 'Quản lý & đầu tư tài sản', fin_admin: 'Quản trị phân quyền',
+    platform_lead: 'Phụ Trách Nền Tảng', chief_assistant: 'Trưởng Trợ Lý',
+    executive_member: 'Thành Viên Điều Hành'
+};
 
 document.addEventListener('DOMContentLoaded', async function () {
     currentUserEmail = localStorage.getItem('userEmail') || '';
