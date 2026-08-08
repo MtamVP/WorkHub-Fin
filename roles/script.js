@@ -10,7 +10,16 @@ const ROLE_LABELS = {
 };
 
 document.addEventListener('DOMContentLoaded', async function () {
-    currentUserEmail = localStorage.getItem('userEmail') || '';
+    // Trang /roles/ là một document riêng — CURRENT_USER trong bộ nhớ của index.html
+    // không tồn tại ở đây. Phải đọc trực tiếp phiên đăng nhập Supabase đã lưu (sbClient
+    // tự động khôi phục session), không dùng localStorage.getItem('userEmail') vì key đó
+    // không bao giờ được ghi ở đâu trong app (chỉ tồn tại như biến JS trong bộ nhớ).
+    try {
+        const { data: { user } } = await sbClient.auth.getUser();
+        currentUserEmail = user ? user.email : '';
+    } catch (e) {
+        console.error('Lỗi lấy phiên đăng nhập:', e);
+    }
 
     try {
         const myRolesResp = await callGAS('getMyFinRoles', { email: currentUserEmail });
