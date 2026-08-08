@@ -16,7 +16,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 </head>
@@ -88,35 +88,52 @@
 
     <nav id="app-sidebar">
       <div id="hamburger-menu" title="Thu gọn / Mở rộng thanh điều hướng"><i class="fa-solid fa-bars"></i></div>
-      <ul>
-        <li class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')">
+
+      <ul class="nav-group">
+        <li class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')" title="Tổng Quan">
           <i class="fa-solid fa-chart-pie"></i><span> Tổng Quan</span>
         </li>
-        <li class="nav-item" data-section="pipeline" onclick="switchSection('pipeline')">
+      </ul>
+
+      <div class="nav-group-label"><span>Tài Chính</span></div>
+      <ul class="nav-group">
+        <li class="nav-item" data-section="pipeline" onclick="switchSection('pipeline')" title="Pipeline">
           <i class="fa-solid fa-diagram-project"></i><span> Pipeline</span>
         </li>
-        <li class="nav-item" onclick="window.top.location.href='/mastersheet/'">
+        <li class="nav-item" onclick="window.top.location.href='/mastersheet/'" title="Quản Lý Tài Sản">
           <i class="fa-solid fa-sack-dollar"></i><span> Quản Lý Tài Sản</span>
         </li>
-        <li class="nav-item" onclick="window.top.location.href='/report/'">
+        <li class="nav-item" onclick="window.top.location.href='/report/'" title="Format Reports">
           <i class="fa-solid fa-newspaper"></i><span> Format Reports</span>
         </li>
-        <li class="nav-item" data-section="drive" onclick="switchSection('drive')">
-          <i class="fa-solid fa-file-import"></i><span> UploadFile</span>
-        </li>
-        <li class="nav-item" data-section="calendar" onclick="switchSection('calendar')">
-          <i class="fa-solid fa-calendar-days"></i><span> Lịch</span>
-        </li>
-        <li class="nav-item" data-section="progress" onclick="switchSection('progress')">
+      </ul>
+
+      <div class="nav-group-label"><span>Dự Án</span></div>
+      <ul class="nav-group">
+        <li class="nav-item" data-section="progress" onclick="switchSection('progress')" title="Tiến Độ">
           <i class="fa-solid fa-chart-line"></i><span> Tiến Độ</span>
         </li>
-        <li class="nav-item" data-section="mytasks" onclick="switchSection('mytasks')">
+        <li class="nav-item" data-section="mytasks" onclick="switchSection('mytasks')" title="Việc của tôi">
           <i class="fa-solid fa-user-check"></i><span> Việc của tôi</span>
         </li>
-        <li class="nav-item" data-section="task" onclick="switchSection('task')">
+        <li class="nav-item" data-section="task" onclick="switchSection('task')" title="Nhiệm Vụ">
           <i class="fa-solid fa-list-check"></i><span> Nhiệm Vụ</span>
         </li>
-        <li class="nav-item" onclick="window.top.location.href='/roles/'">
+      </ul>
+
+      <div class="nav-group-label"><span>Công Cụ</span></div>
+      <ul class="nav-group">
+        <li class="nav-item" data-section="drive" onclick="switchSection('drive')" title="UploadFile">
+          <i class="fa-solid fa-file-import"></i><span> UploadFile</span>
+        </li>
+        <li class="nav-item" data-section="calendar" onclick="switchSection('calendar')" title="Lịch">
+          <i class="fa-solid fa-calendar-days"></i><span> Lịch</span>
+        </li>
+      </ul>
+
+      <div class="nav-group-label"><span>Quản Trị</span></div>
+      <ul class="nav-group">
+        <li class="nav-item" onclick="window.top.location.href='/roles/'" title="Phân Quyền">
           <i class="fa-solid fa-user-shield"></i><span> Phân Quyền</span>
         </li>
       </ul>
