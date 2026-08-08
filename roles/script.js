@@ -14,7 +14,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     try {
         const myRolesResp = await callGAS('getMyFinRoles', { email: currentUserEmail });
-        isFinAdmin = (myRolesResp.data || []).includes('fin_admin');
+        const myRoles = myRolesResp.data || [];
+        // platform_lead/chief_assistant là vai trò toàn quyền — DB (current_user_has_fin_role) đã coi
+        // họ như có mọi vai trò, nên UI cũng phải hiện khung "Gán vai trò" cho họ, không chỉ fin_admin.
+        isFinAdmin = myRoles.includes('fin_admin') || myRoles.includes('platform_lead') || myRoles.includes('chief_assistant');
     } catch (e) {
         console.error('Lỗi getMyFinRoles:', e);
     }

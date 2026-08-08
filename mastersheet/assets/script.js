@@ -18,16 +18,22 @@ document.addEventListener('DOMContentLoaded', async function () {
     const userDisplay = document.getElementById('user-display');
     if (userDisplay) userDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${userEmail}`;
 
+    let canManageReferenceData = false;
     try {
         const rolesResp = await callGAS('getMyFinRoles', { email: userEmail });
-        isAssetManager = (rolesResp.data || []).includes('asset_manager');
+        const myRoles = rolesResp.data || [];
+        // platform_lead/chief_assistant là vai trò toàn quyền — DB (current_user_has_fin_role) đã coi
+        // họ như có mọi vai trò, nên UI cũng phải mở khóa các khung dành cho asset_manager tương ứng.
+        isAssetManager = myRoles.includes('asset_manager') || myRoles.includes('platform_lead') || myRoles.includes('chief_assistant');
+        // executive_member chỉ được quản trị dữ liệu tham chiếu (giá VN-Index), không có toàn quyền asset_manager
+        canManageReferenceData = isAssetManager || myRoles.includes('executive_member');
     } catch (e) {
         console.error('Lỗi getMyFinRoles:', e);
     }
     await setupTargetUserSwitcher();
 
     const benchmarkPanel = document.getElementById('benchmark-admin-panel');
-    if (benchmarkPanel && isAssetManager) benchmarkPanel.style.display = 'block';
+    if (benchmarkPanel && canManageReferenceData) benchmarkPanel.style.display = 'block';
 
     setupCashDebtListeners();
     await loadCashDebt();
