@@ -25,6 +25,10 @@ body {
     --shadow-gold: 0 8px 20px rgba(176, 137, 42, 0.18); --shadow-modal: 0 24px 50px rgba(15, 23, 42, 0.20);
     /* Bộ màu category đã validate qua dataviz skill (validate_palette.js) — dùng cho mọi biểu đồ donut */
     --series-1: #2a78d6; --series-2: #eda100; --series-3: #1baf7a; --series-4: #4a3aa7; --series-other: #9a9a94;
+    /* --font-display và --transition-fast không tồn tại ở /style.css gốc dù được dùng khắp nơi
+       (kể cả trong code cũ trước khi có finance-shared.css) — khai báo riêng ở đây. */
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --transition-fast: all 0.15s ease;
 
     font-family: var(--font-body);
     background-color: var(--bg-color);
