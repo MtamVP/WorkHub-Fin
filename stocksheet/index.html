@@ -23,7 +23,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/style.css?v=3.3">
+    <link rel="stylesheet" href="/finance-shared.css?v=1.0">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=4.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,22 +38,26 @@
         
         <div class="top-bar">
             <div class="left-section">
-                <a href="/stocksheet/autosheet/" class="back-link">
-                    <i class="fa-solid fa-chevron-left"></i> <span>Nhập liệu</span>
-                </a>
-
                 <a href="/" class="back-link">
                     <i class="fa-solid fa-house"></i> <span>Finance</span>
                 </a>
-                <h1>Tổng hợp cổ phiếu</h1>
+                <h1>Tổng Hợp Cổ Phiếu</h1>
             </div>
-            
+
             <div class="right-section">
                 <button onclick="loadStockList()" class="btn-refresh">
                     <i class="fa-solid fa-rotate-right"></i> Làm mới
                 </button>
-                </div>
+            </div>
         </div>
+
+        <nav class="fin-tool-nav">
+            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+            <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+            <a href="/stocksheet/" class="active"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+            <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            <a href="/roles/"><i class="fa-solid fa-user-shield"></i> Phân Quyền</a>
+        </nav>
 
         <div class="control-panel">
             <label><i class="fa-solid fa-magnifying-glass"></i> Chọn mã cổ phiếu:</label>

@@ -22,7 +22,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/roles/style.css?v=1.0">
+    <link rel="stylesheet" href="/finance-shared.css?v=1.0">
+    <link rel="stylesheet" href="/roles/style.css?v=2.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -48,13 +49,21 @@
             </div>
         </div>
 
+        <nav class="fin-tool-nav">
+            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+            <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+            <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+            <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            <a href="/roles/" class="active"><i class="fa-solid fa-user-shield"></i> Phân Quyền</a>
+        </nav>
+
         <p class="roles-intro">
             Vai trò cấp 2 riêng của WorkHub Finance — độc lập với nhóm (group) do org quản lý. Vai trò ở đây quyết định
             ai được toàn quyền chỉnh sửa dữ liệu Quản Lý Tài Sản / Quản Lý Cổ Phiếu thay cho người khác.
         </p>
 
         <div id="admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
-            <h3 class="roles-section-title"><i class="fa-solid fa-user-plus"></i> Gán vai trò</h3>
+            <h3 class="stock-section-title"><i class="fa-solid fa-user-plus"></i> Gán vai trò</h3>
             <form id="grant-form" class="grant-form-grid">
                 <div class="grant-field">
                     <label for="grant-member">Thành viên</label>

@@ -24,7 +24,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=4.3">
+    <link rel="stylesheet" href="/finance-shared.css?v=1.0">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=5.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -38,9 +39,6 @@
     <div class="asset-container">
         <header class="top-bar">
             <div class="left-section">
-                <a href="/mastersheet/" class="back-link">
-                    <i class="fa-solid fa-chevron-left"></i> <span>Tổng hợp</span>
-                </a>
                 <a href="/" class="back-link">
                     <i class="fa-solid fa-house"></i> <span>Finance</span>
                 </a>
@@ -54,6 +52,14 @@
                 <span id="user-display"><i class="fa-solid fa-user"></i> Đang tải...</span>
             </div>
         </header>
+
+        <nav class="fin-tool-nav">
+            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+            <a href="/mastersheet/assets/" class="active"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+            <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+            <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            <a href="/roles/"><i class="fa-solid fa-user-shield"></i> Phân Quyền</a>
+        </nav>
 
         <!-- KPI tổng quan -->
         <div class="kpi-row" id="kpi-row">

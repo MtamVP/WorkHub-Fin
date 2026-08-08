@@ -25,7 +25,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.4">
+    <link rel="stylesheet" href="/finance-shared.css?v=1.0">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=3.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -39,25 +40,27 @@
         
         <div class="top-bar">
             <div class="left-section">
-                <a href="/stocksheet/" class="back-link">
-                    <i class="fa-solid fa-chevron-left"></i> <span>Tổng hợp</span>
-                </a>
-
                 <a href="/" class="back-link">
                     <i class="fa-solid fa-house"></i> <span>Finance</span>
                 </a>
-
                 <h1>Định Giá Cổ Phiếu</h1>
             </div>
-            
+
             <div class="right-section">
                 <button onclick="saveToSheet()" class="btn-save btn-save-cloud" id="btn-save-sheet"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
-
-                <button onclick="resetData()" class="btn-refresh" style="margin-left: 10px;">
+                <button onclick="resetData()" class="btn-refresh">
                     <i class="fa-solid fa-rotate-right"></i> Nhập lại
                 </button>
-                </div>
+            </div>
         </div>
+
+        <nav class="fin-tool-nav">
+            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+            <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+            <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+            <a href="/stocksheet/autosheet/" class="active"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            <a href="/roles/"><i class="fa-solid fa-user-shield"></i> Phân Quyền</a>
+        </nav>
 
         <div class="calc-wrapper">
 
