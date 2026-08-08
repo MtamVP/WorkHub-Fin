@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/finance-shared.css?v=1.1">
+    <link rel="stylesheet" href="/finance-shared.css?v=1.2">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=5.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
@@ -101,6 +101,10 @@
             <div class="balance-card debt">
                 <label><i class="fa-solid fa-money-bill-transfer"></i> Dư nợ (VND)</label>
                 <input type="text" id="inp-debt" class="money-input" placeholder="0">
+            </div>
+            <div class="balance-card net">
+                <label><i class="fa-solid fa-scale-balanced"></i> Vốn ròng</label>
+                <span id="disp-net-capital" class="money-input money-input-readonly">0</span>
             </div>
         </div>
 
@@ -229,7 +233,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=7"></script>
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
 
 </body>
 </html>

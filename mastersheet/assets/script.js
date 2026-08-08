@@ -84,9 +84,19 @@ async function loadCashDebt() {
         const inpDebt = document.getElementById('inp-debt');
         if (inpCash) inpCash.value = Number(cd.cash || 0).toLocaleString('en-US');
         if (inpDebt) inpDebt.value = Number(cd.debt || 0).toLocaleString('en-US');
+        updateNetCapital(Number(cd.cash || 0), Number(cd.debt || 0));
     } catch (e) {
         console.error('Lỗi loadCashDebt:', e);
     }
+}
+
+function updateNetCapital(cash, debt) {
+    const el = document.getElementById('disp-net-capital');
+    if (!el) return;
+    const net = (Number(cash) || 0) - (Number(debt) || 0);
+    el.textContent = formatVnd(net);
+    el.classList.remove('text-success', 'text-danger');
+    el.classList.add(net >= 0 ? 'text-success' : 'text-danger');
 }
 
 function setupCashDebtListeners() {
@@ -100,6 +110,7 @@ function setupCashDebtListeners() {
         el.addEventListener('change', async function () {
             const cash = parseMoney(document.getElementById('inp-cash').value);
             const debt = parseMoney(document.getElementById('inp-debt').value);
+            updateNetCapital(cash, debt);
             try {
                 await callGAS('setCashDebt', { email: targetEmail, cash, debt });
                 showToast('Đã cập nhật tiền mặt/dư nợ', 'success');
@@ -460,7 +471,9 @@ function cssVar(name) {
 }
 
 function formatVnd(num) {
-    return Number(num).toLocaleString('vi-VN') + ' ₫';
+    // VND không có phần thập phân — làm tròn để tránh nhiễu số lẻ do tính toán
+    // dấu phẩy động (vd 0.01) khiến chuỗi hiển thị dài ra và tràn khỏi thẻ KPI.
+    return Math.round(Number(num) || 0).toLocaleString('vi-VN') + ' ₫';
 }
 
 function parseMoney(value) {

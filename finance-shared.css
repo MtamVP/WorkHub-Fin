@@ -52,7 +52,9 @@ body {
 }
 .left-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .left-section h1 {
-    margin: 0 0 0 6px; font-family: var(--font-display); font-size: 1.55rem; font-weight: 400;
+    /* Tiêu đề luôn là tiếng Việt có dấu — DM Serif Display (var(--font-display)) làm vỡ dấu tiếng Việt
+       (đây là lý do styles.css gốc chỉ cho phép font-display trên chuỗi ASCII). Dùng font-body đậm thay thế. */
+    margin: 0 0 0 6px; font-family: var(--font-body); font-size: 1.4rem; font-weight: 800;
     color: var(--text-primary); letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px;
 }
 .right-section { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -134,11 +136,12 @@ body {
 /* =========================================================================
    4. KPI CARDS
    ========================================================================= */
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .kpi-card {
     background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid var(--border-color);
     border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 18px 20px;
     display: flex; align-items: center; gap: 15px; transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+    min-width: 0; overflow: hidden;
 }
 .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
 .kpi-icon {
@@ -149,9 +152,15 @@ body {
 .kpi-card.kpi-positive .kpi-icon { background: var(--success-bg); color: var(--success-color); }
 .kpi-card.kpi-negative { border-left-color: var(--danger-color); }
 .kpi-card.kpi-negative .kpi-icon { background: var(--danger-bg); color: var(--danger-color); }
-.kpi-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.kpi-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .kpi-label { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-.kpi-value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Số tiền lớn (vd -88.327.832 ₫) có thể rộng hơn thẻ KPI ở màn hẹp — cho phép co cỡ chữ
+   và xuống dòng an toàn thay vì tràn (nowrap) ra ngoài viền thẻ. */
+.kpi-value {
+    font-size: clamp(1rem, 1.6vw + 0.6rem, 1.4rem); font-weight: 800; color: var(--text-primary);
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: normal;
+    overflow-wrap: break-word; line-height: 1.2;
+}
 .kpi-value.text-success { color: var(--success-color) !important; }
 .kpi-value.text-danger { color: var(--danger-color) !important; }
 
@@ -166,14 +175,18 @@ body {
 }
 .balance-card:hover { transform: translateY(-2px); }
 .balance-card.debt { border-left-color: var(--danger-color); }
+.balance-card.net { border-left-color: var(--gold); }
 .balance-card label { font-weight: 700; color: var(--text-primary); font-size: 0.92rem; display: flex; align-items: center; gap: 10px; }
 .balance-card label i { font-size: 1.15rem; color: var(--text-secondary); }
 .money-input {
     background: var(--hover-bg); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-sm);
     font-size: 1.05rem; font-weight: 800; color: var(--text-primary); width: 170px; outline: none;
     text-align: right; font-family: var(--font-mono); transition: var(--transition-fast);
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .money-input:focus { background: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
+/* Vốn ròng là số tính toán, không phải ô nhập — dùng lại hình dạng money-input nhưng vô hiệu tương tác/focus */
+.money-input-readonly { display: inline-flex; align-items: center; justify-content: flex-end; border-style: dashed; cursor: default; }
 
 /* =========================================================================
    6. TABS
