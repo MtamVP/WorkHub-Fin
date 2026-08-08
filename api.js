@@ -1383,6 +1383,39 @@ const API = {
             return table;
         }
     },
+    finRoles: {
+        // Vai trò tầng 2 riêng của Fin — không liên quan group_key của org.
+        getMyRoles: async (email) => {
+            const userId = await getUserId(email);
+            const { data, error } = await sbClient.from('fin_roles').select('role').eq('user_id', userId);
+            if (error) throw error;
+            return (data || []).map(r => r.role);
+        },
+        listAll: async () => {
+            const { data: members, error: mErr } = await sbClient.from('users').select('id, email, nickname').in('group_key', ['finance', 'all']);
+            if (mErr) throw mErr;
+            const { data: roles, error: rErr } = await sbClient.from('fin_roles').select('user_id, role');
+            if (rErr) throw rErr;
+            return (members || []).map(m => ({
+                email: m.email,
+                nickname: m.nickname || m.email,
+                roles: (roles || []).filter(r => r.user_id === m.id).map(r => r.role)
+            }));
+        },
+        grantRole: async (targetEmail, role, byEmail) => {
+            const targetId = await getUserId(targetEmail);
+            const byId = await getUserId(byEmail);
+            const { error } = await sbClient.from('fin_roles').insert({ user_id: targetId, role, granted_by: byId });
+            if (error) throw error;
+            return { success: true };
+        },
+        revokeRole: async (targetEmail, role) => {
+            const targetId = await getUserId(targetEmail);
+            const { error } = await sbClient.from('fin_roles').delete().eq('user_id', targetId).eq('role', role);
+            if (error) throw error;
+            return { success: true };
+        }
+    },
     note: {
         getFinanceUsers: async () => {
             const { data } = await sbClient.from('users').select('email, nickname').in('group_key', ['finance', 'all']);
@@ -1872,7 +1905,8 @@ const MUTATING_ACTIONS = new Set([
     'uploadFile', 'deleteFile', 'shareFile',
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
-    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation'
+    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
+    'grantFinRole', 'revokeFinRole'
 ]);
 
 window.callGAS = async function(action, params = {}) {
@@ -1967,6 +2001,11 @@ window.callGAS = async function(action, params = {}) {
             case 'getStockDetail': result = await API.stock.getStockDetail(params.symbol, params.year); break;
             case 'getStockHistory': result = await API.stock.getStockHistory(params.symbol); break;
             case 'saveStockValuation': result = await API.stock.saveStockValuation(params, params.email); break;
+
+            case 'getMyFinRoles': result = await API.finRoles.getMyRoles(params.email); break;
+            case 'listFinRoles': result = await API.finRoles.listAll(); break;
+            case 'grantFinRole': result = await API.finRoles.grantRole(params.targetEmail, params.role, params.byEmail); break;
+            case 'revokeFinRole': result = await API.finRoles.revokeRole(params.targetEmail, params.role); break;
 
             case 'getDeletedItems': result = await API.system.getDeletedItems(params.tableName, params.groupKey); break;
             case 'restoreItem': result = await API.system.restoreItem(params.tableName, params.id); break;

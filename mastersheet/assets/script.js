@@ -1,6 +1,10 @@
 /* --- FILE: /mastersheet/assets/script.js --- */
 
 let userEmail = 'Khách';
+// targetEmail = tài khoản đang được xem/chỉnh sửa dữ liệu — mặc định là chính mình,
+// chỉ đổi được nếu userEmail có vai trò 'asset_manager' (xem /roles/).
+let targetEmail = 'Khách';
+let isAssetManager = false;
 let navChartInstance = null;
 let allocationChartInstance = null;
 const TAB_LOADED = { holdings: false, ledger: false, performance: false };
@@ -8,8 +12,17 @@ const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--seri
 
 document.addEventListener('DOMContentLoaded', async function () {
     userEmail = localStorage.getItem('userEmail') || 'Khách';
+    targetEmail = userEmail;
     const userDisplay = document.getElementById('user-display');
     if (userDisplay) userDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${userEmail}`;
+
+    try {
+        const rolesResp = await callGAS('getMyFinRoles', { email: userEmail });
+        isAssetManager = (rolesResp.data || []).includes('asset_manager');
+    } catch (e) {
+        console.error('Lỗi getMyFinRoles:', e);
+    }
+    await setupTargetUserSwitcher();
 
     setupCashDebtListeners();
     await loadCashDebt();
@@ -22,6 +35,32 @@ document.addEventListener('DOMContentLoaded', async function () {
     const dateInput = document.getElementById('txn-date');
     if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
 });
+
+// --- ĐANG CHỈNH SỬA DỮ LIỆU CỦA AI (chỉ hiện với vai trò asset_manager) ---
+async function setupTargetUserSwitcher() {
+    const wrap = document.getElementById('target-user-switcher');
+    const select = document.getElementById('target-user-select');
+    if (!wrap || !select || !isAssetManager) return;
+
+    try {
+        const membersResp = await callGAS('getMemberList');
+        const members = membersResp.data || [];
+        select.innerHTML = members.map(email =>
+            `<option value="${escapeAssetHtml(email)}" ${email === userEmail ? 'selected' : ''}>${escapeAssetHtml(email)}${email === userEmail ? ' (Tôi)' : ''}</option>`
+        ).join('');
+        wrap.style.display = 'flex';
+        select.addEventListener('change', async () => {
+            targetEmail = select.value;
+            TAB_LOADED.ledger = false; TAB_LOADED.performance = false;
+            switchAssetTab('holdings');
+            await loadCashDebt();
+            await loadKpis();
+            await loadHoldings();
+        });
+    } catch (e) {
+        console.error('Lỗi getMemberList:', e);
+    }
+}
 
 // --- TAB SWITCHING ---
 function switchAssetTab(tab) {
@@ -39,7 +78,7 @@ function switchAssetTab(tab) {
 // --- TIỀN MẶT / DƯ NỢ ---
 async function loadCashDebt() {
     try {
-        const response = await callGAS('getCashDebt', { email: userEmail });
+        const response = await callGAS('getCashDebt', { email: targetEmail });
         const cd = response.data || { cash: 0, debt: 0 };
         const inpCash = document.getElementById('inp-cash');
         const inpDebt = document.getElementById('inp-debt');
@@ -62,7 +101,7 @@ function setupCashDebtListeners() {
             const cash = parseMoney(document.getElementById('inp-cash').value);
             const debt = parseMoney(document.getElementById('inp-debt').value);
             try {
-                await callGAS('setCashDebt', { email: userEmail, cash, debt });
+                await callGAS('setCashDebt', { email: targetEmail, cash, debt });
                 showToast('Đã cập nhật tiền mặt/dư nợ', 'success');
                 await loadKpis();
                 if (TAB_LOADED.performance) loadPerformanceChart();
@@ -76,7 +115,7 @@ function setupCashDebtListeners() {
 // --- KPI ---
 async function loadKpis() {
     try {
-        const response = await callGAS('getAssetSummaryKpis', { email: userEmail });
+        const response = await callGAS('getAssetSummaryKpis', { email: targetEmail });
         const k = response.data || {};
         setKpi('kpi-nav', k.nav, true);
         setKpi('kpi-unrealized', k.unrealizedPnl, true, true);
@@ -108,7 +147,7 @@ async function loadHoldings() {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
-        const response = await callGAS('getHoldingsView', { email: userEmail });
+        const response = await callGAS('getHoldingsView', { email: targetEmail });
         const holdings = response.data || [];
 
         if (holdings.length === 0) {
@@ -217,7 +256,7 @@ async function handleMarketPriceChange(input) {
     const price = parseMoney(input.value);
     input.value = price.toLocaleString('en-US');
     try {
-        await callGAS('setMarketPrice', { email: userEmail, symbol, price });
+        await callGAS('setMarketPrice', { email: targetEmail, symbol, price });
         showToast(`Đã cập nhật giá TT của ${symbol}`, 'success');
         await loadHoldings();
         await loadKpis();
@@ -234,7 +273,7 @@ async function loadLedger() {
     tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
-        const response = await callGAS('listAssetTransactions', { email: userEmail });
+        const response = await callGAS('listAssetTransactions', { email: targetEmail });
         const txns = response.data || [];
 
         if (txns.length === 0) {
@@ -286,7 +325,7 @@ async function handleTxnSubmit(e) {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
 
     try {
-        const response = await callGAS('addAssetTransaction', { email: userEmail, txn });
+        const response = await callGAS('addAssetTransaction', { email: targetEmail, txn });
         if (response.status === 'success') {
             showToast(response.message, 'success');
             e.target.reset();
@@ -309,7 +348,7 @@ async function handleTxnSubmit(e) {
 async function deleteTxn(id) {
     if (!confirm('Xóa lệnh giao dịch này? Khối lượng/giá vốn của danh mục sẽ được tính lại.')) return;
     try {
-        const response = await callGAS('deleteAssetTransaction', { email: userEmail, id });
+        const response = await callGAS('deleteAssetTransaction', { email: targetEmail, id });
         showToast(response.message, 'success');
         await loadLedger();
         await loadHoldings();
@@ -323,7 +362,7 @@ async function deleteTxn(id) {
 // --- HIỆU SUẤT (NAV chart) ---
 async function loadPerformanceChart() {
     try {
-        const response = await callGAS('getNavHistory', { email: userEmail });
+        const response = await callGAS('getNavHistory', { email: targetEmail });
         const history = response.data || [];
         renderNavChart(history);
         renderPerfStats(history);

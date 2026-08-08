@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân Quyền | WorkHub Finance</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi script.js: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=3.1.0">
+    <link rel="stylesheet" href="/roles/style.css?v=1.0">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body>
+
+    <div class="asset-container">
+
+        <div class="top-bar">
+            <div class="left-section">
+                <a href="/" class="back-link">
+                    <i class="fa-solid fa-house"></i> <span>Finance</span>
+                </a>
+                <h1>Phân Quyền</h1>
+            </div>
+            <div class="right-section">
+                <button onclick="loadRoles()" class="btn-refresh">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới
+                </button>
+            </div>
+        </div>
+
+        <p class="roles-intro">
+            Vai trò cấp 2 riêng của WorkHub Finance — độc lập với nhóm (group) do org quản lý. Vai trò ở đây quyết định
+            ai được toàn quyền chỉnh sửa dữ liệu Quản Lý Tài Sản / Quản Lý Cổ Phiếu thay cho người khác.
+        </p>
+
+        <div id="admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
+            <h3 class="roles-section-title"><i class="fa-solid fa-user-plus"></i> Gán vai trò</h3>
+            <form id="grant-form" class="grant-form-grid">
+                <div class="grant-field">
+                    <label for="grant-member">Thành viên</label>
+                    <select id="grant-member" required>
+                        <option value="">-- Chọn --</option>
+                    </select>
+                </div>
+                <div class="grant-field">
+                    <label for="grant-role">Vai trò</label>
+                    <select id="grant-role">
+                        <option value="asset_manager">Quản lý &amp; đầu tư tài sản</option>
+                        <option value="fin_admin">Quản trị phân quyền</option>
+                    </select>
+                </div>
+                <div class="grant-field">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn-save"><i class="fa-solid fa-plus"></i> Gán vai trò</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="spreadsheet-wrapper">
+            <table class="asset-table" id="roles-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Thành viên</th>
+                        <th>Vai trò hiện tại</th>
+                        <th class="text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="roles-table-body">
+                    <tr><td colspan="3" class="empty-state">Đang tải...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js?v=7"></script>
+    <script src="script.js?v=1"></script>
+</body>
+</html>

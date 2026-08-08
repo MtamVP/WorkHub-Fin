@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=4.2">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=4.3">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -47,6 +47,10 @@
                 <h1>Quản Lý Danh Mục Đầu Tư</h1>
             </div>
             <div class="right-section">
+                <div id="target-user-switcher" class="target-user-switcher" style="display:none;">
+                    <label for="target-user-select"><i class="fa-solid fa-user-pen"></i> Đang chỉnh sửa của:</label>
+                    <select id="target-user-select"></select>
+                </div>
                 <span id="user-display"><i class="fa-solid fa-user"></i> Đang tải...</span>
             </div>
         </header>
@@ -219,8 +223,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=6"></script>
-    <script src="script.js?v=3"></script>
+    <script src="../../api.js?v=7"></script>
+    <script src="script.js?v=4"></script>
 
 </body>
 </html>

@@ -37,6 +37,18 @@ body { font-family: var(--font-body); background-color: var(--bg-color); margin:
     display: flex; align-items: center; gap: 8px;
 }
 
+.target-user-switcher {
+    display: flex; align-items: center; gap: 8px; margin-right: 15px;
+    background: var(--finance-accent-subtle); padding: 6px 14px; border-radius: var(--radius-pill);
+    border: 1px solid color-mix(in srgb, var(--finance-accent) 30%, transparent);
+}
+.target-user-switcher label { font-size: 0.82rem; font-weight: 700; color: var(--finance-accent); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.target-user-switcher select {
+    padding: 5px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+    background: var(--card-bg); color: var(--text-primary); font-size: 0.82rem; font-family: var(--font-body);
+    max-width: 220px;
+}
+
 .btn-save {
     background-color: var(--finance-accent); color: #120F0A; border: none;
     padding: 12px 30px; border-radius: var(--radius-sm); font-weight: 700; font-size: 1rem;
