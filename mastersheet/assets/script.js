@@ -7,7 +7,9 @@ let targetEmail = 'Khách';
 let isAssetManager = false;
 let navChartInstance = null;
 let allocationChartInstance = null;
+let benchmarkChartInstance = null;
 const TAB_LOADED = { holdings: false, ledger: false, performance: false };
+const LEDGER_SUB_LOADED = { cashflow: false, corporate: false };
 const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -24,6 +26,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
     await setupTargetUserSwitcher();
 
+    const benchmarkPanel = document.getElementById('benchmark-admin-panel');
+    if (benchmarkPanel && isAssetManager) benchmarkPanel.style.display = 'block';
+
     setupCashDebtListeners();
     await loadCashDebt();
     await loadKpis();
@@ -31,9 +36,18 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     const txnForm = document.getElementById('txn-form');
     if (txnForm) txnForm.addEventListener('submit', handleTxnSubmit);
+    const cashflowForm = document.getElementById('cashflow-form');
+    if (cashflowForm) cashflowForm.addEventListener('submit', handleCashFlowSubmit);
+    const corpActionForm = document.getElementById('corpaction-form');
+    if (corpActionForm) corpActionForm.addEventListener('submit', handleCorpActionSubmit);
+    const benchmarkForm = document.getElementById('benchmark-form');
+    if (benchmarkForm) benchmarkForm.addEventListener('submit', handleBenchmarkSubmit);
 
-    const dateInput = document.getElementById('txn-date');
-    if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    ['txn-date', 'cf-date', 'ca-date', 'bm-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = today;
+    });
 });
 
 // --- ĐANG CHỈNH SỬA DỮ LIỆU CỦA AI (chỉ hiện với vai trò asset_manager) ---
@@ -72,7 +86,19 @@ function switchAssetTab(tab) {
     });
 
     if (tab === 'ledger' && !TAB_LOADED.ledger) { loadLedger(); TAB_LOADED.ledger = true; }
-    if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); TAB_LOADED.performance = true; }
+    if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
+}
+
+// --- SỔ LỆNH: chuyển sub-tab (Giao Dịch CP / Dòng Tiền / Hành Động DN) ---
+function switchLedgerSubTab(sub) {
+    ['trades', 'cashflow', 'corporate'].forEach(t => {
+        const panel = document.getElementById('ledger-sub-' + t);
+        const btn = document.querySelector(`.ledger-sub-toggle .view-toggle-btn[data-subtab="${t}"]`);
+        if (panel) panel.style.display = t === sub ? 'block' : 'none';
+        if (btn) btn.classList.toggle('active', t === sub);
+    });
+    if (sub === 'cashflow' && !LEDGER_SUB_LOADED.cashflow) { loadCashFlows(); LEDGER_SUB_LOADED.cashflow = true; }
+    if (sub === 'corporate' && !LEDGER_SUB_LOADED.corporate) { loadCorporateActions(); LEDGER_SUB_LOADED.corporate = true; }
 }
 
 // --- TIỀN MẶT / DƯ NỢ ---
@@ -370,6 +396,202 @@ async function deleteTxn(id) {
     }
 }
 
+// --- DÒNG TIỀN (nạp vốn / rút vốn / cổ tức) — tách khỏi lãi/lỗ đầu tư ---
+const CASH_FLOW_LABELS = {
+    deposit: '<span class="txn-type-badge buy"><i class="fa-solid fa-arrow-down"></i>Nạp vốn</span>',
+    withdrawal: '<span class="txn-type-badge sell"><i class="fa-solid fa-arrow-up"></i>Rút vốn</span>',
+    dividend: '<span class="txn-type-badge buy"><i class="fa-solid fa-coins"></i>Cổ tức</span>'
+};
+
+function toggleCashFlowSymbolField() {
+    const type = document.getElementById('cf-type').value;
+    const field = document.getElementById('cf-symbol-field');
+    if (field) field.style.display = type === 'dividend' ? 'flex' : 'none';
+}
+
+async function loadCashFlows() {
+    const tbody = document.getElementById('cashflow-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+    try {
+        const response = await callGAS('listCashFlows', { email: targetEmail });
+        const flows = response.data || [];
+        if (flows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-money-bill-transfer"></i>Chưa có dòng tiền nào.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = flows.map(f => `
+            <tr>
+                <td>${f.flow_date}</td>
+                <td>${CASH_FLOW_LABELS[f.flow_type] || f.flow_type}</td>
+                <td class="text-bold">${escapeAssetHtml(f.symbol || '—')}</td>
+                <td class="text-right">${formatVnd(Number(f.amount))}</td>
+                <td>${escapeAssetHtml(f.note || '')}</td>
+                <td><button class="icon-btn danger" title="Xóa" onclick="deleteCashFlowRow('${f.id}')"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>`).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+    }
+}
+
+async function handleCashFlowSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalHtml = btn.innerHTML;
+    const flow = {
+        flowType: document.getElementById('cf-type').value,
+        amount: document.getElementById('cf-amount').value,
+        symbol: document.getElementById('cf-symbol').value,
+        flowDate: document.getElementById('cf-date').value,
+        note: document.getElementById('cf-note').value
+    };
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+    try {
+        const response = await callGAS('addCashFlow', { email: targetEmail, flow });
+        if (response.status === 'success') {
+            showToast(response.message, 'success');
+            e.target.reset();
+            document.getElementById('cf-date').value = new Date().toISOString().slice(0, 10);
+            toggleCashFlowSymbolField();
+            await loadCashFlows();
+            await loadCashDebt();
+            await loadKpis();
+            if (TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); }
+        } else {
+            showToast('Lỗi: ' + response.message, 'error');
+        }
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+async function deleteCashFlowRow(id) {
+    if (!confirm('Xóa dòng tiền này? Số dư tiền mặt sẽ được hoàn tác tương ứng.')) return;
+    try {
+        const response = await callGAS('deleteCashFlow', { email: targetEmail, id });
+        showToast(response.message, 'success');
+        await loadCashFlows();
+        await loadCashDebt();
+        await loadKpis();
+        if (TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); }
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+// --- HÀNH ĐỘNG DOANH NGHIỆP (tách/gộp cổ phiếu, cổ tức cổ phiếu) — điều chỉnh FIFO hồi tố ---
+const CORP_ACTION_LABELS = { split: 'Tách/gộp CP', stock_dividend: 'Cổ tức CP' };
+
+function toggleCorpActionRatioLabel() {
+    const type = document.getElementById('ca-type').value;
+    const label = document.getElementById('ca-ratio-label');
+    if (!label) return;
+    label.textContent = type === 'stock_dividend'
+        ? 'Tỷ lệ thập phân (vd thưởng 10% → nhập 0.1)'
+        : 'Tỷ lệ mới/cũ (vd tách 1:2 → nhập 2)';
+}
+
+async function loadCorporateActions() {
+    const tbody = document.getElementById('corpaction-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+    try {
+        const response = await callGAS('listCorporateActions', { email: targetEmail });
+        const actions = response.data || [];
+        if (actions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fa-solid fa-building-columns"></i>Chưa có hành động doanh nghiệp nào.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = actions.map(a => `
+            <tr>
+                <td>${a.ex_date}</td>
+                <td class="text-bold">${escapeAssetHtml(a.symbol)}</td>
+                <td>${CORP_ACTION_LABELS[a.action_type] || a.action_type}</td>
+                <td class="text-right">${a.action_type === 'stock_dividend' ? (Number(a.ratio) * 100).toFixed(1) + '%' : Number(a.ratio).toLocaleString('en-US')}</td>
+                <td>${escapeAssetHtml(a.note || '')}</td>
+                <td><button class="icon-btn danger" title="Xóa" onclick="deleteCorpActionRow('${a.id}')"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>`).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+    }
+}
+
+async function handleCorpActionSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalHtml = btn.innerHTML;
+    const action = {
+        symbol: document.getElementById('ca-symbol').value,
+        actionType: document.getElementById('ca-type').value,
+        ratio: document.getElementById('ca-ratio').value,
+        exDate: document.getElementById('ca-date').value,
+        note: document.getElementById('ca-note').value
+    };
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+    try {
+        const response = await callGAS('addCorporateAction', { email: targetEmail, action });
+        if (response.status === 'success') {
+            showToast(response.message, 'success');
+            e.target.reset();
+            document.getElementById('ca-date').value = new Date().toISOString().slice(0, 10);
+            toggleCorpActionRatioLabel();
+            await loadCorporateActions();
+            await loadHoldings();
+            await loadKpis();
+        } else {
+            showToast('Lỗi: ' + response.message, 'error');
+        }
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+async function deleteCorpActionRow(id) {
+    if (!confirm('Xóa hành động doanh nghiệp này? Khối lượng/giá vốn FIFO sẽ được tính lại.')) return;
+    try {
+        const response = await callGAS('deleteCorporateAction', { email: targetEmail, id });
+        showToast(response.message, 'success');
+        await loadCorporateActions();
+        await loadHoldings();
+        await loadKpis();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+async function handleBenchmarkSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+    try {
+        const priceDate = document.getElementById('bm-date').value;
+        const closeValue = document.getElementById('bm-value').value;
+        const response = await callGAS('upsertBenchmarkPrice', { email: targetEmail, indexCode: 'VNINDEX', priceDate, closeValue });
+        if (response.status === 'success') {
+            showToast(response.message, 'success');
+            document.getElementById('bm-value').value = '';
+            if (TAB_LOADED.performance) loadPerformanceMetrics();
+        } else {
+            showToast('Lỗi: ' + response.message, 'error');
+        }
+    } catch (err) {
+        showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
 // --- HIỆU SUẤT (NAV chart) ---
 async function loadPerformanceChart() {
     try {
@@ -457,6 +679,77 @@ function renderNavChart(history) {
                     },
                     grid: { color: cssVar('--border-color') }
                 }
+            }
+        }
+    });
+}
+
+// --- RỦI RO & HIỆU SUẤT (Sharpe, Max Drawdown, biến động, so sánh VN-Index) ---
+async function loadPerformanceMetrics() {
+    try {
+        const response = await callGAS('getPerformanceMetrics', { email: targetEmail });
+        const m = response.data || {};
+
+        const sharpeEl = document.getElementById('perf-sharpe');
+        if (sharpeEl) {
+            sharpeEl.textContent = m.sharpe === null || m.sharpe === undefined ? '--' : m.sharpe.toFixed(2);
+            sharpeEl.classList.toggle('text-success', m.sharpe > 0);
+            sharpeEl.classList.toggle('text-danger', m.sharpe < 0);
+        }
+        const maxddEl = document.getElementById('perf-maxdd');
+        if (maxddEl) {
+            maxddEl.textContent = m.maxDrawdown === null || m.maxDrawdown === undefined ? '--' : (m.maxDrawdown * 100).toFixed(1) + '%';
+            maxddEl.classList.toggle('text-danger', m.maxDrawdown < 0);
+        }
+        const volEl = document.getElementById('perf-vol');
+        if (volEl) volEl.textContent = m.volatility === null || m.volatility === undefined ? '--' : (m.volatility * 100).toFixed(1) + '%';
+
+        renderBenchmarkChart(m.benchmark);
+    } catch (e) {
+        console.error('Lỗi loadPerformanceMetrics:', e);
+    }
+}
+
+function renderBenchmarkChart(benchmark) {
+    const wrapper = document.getElementById('benchmark-chart-wrapper');
+    if (!wrapper) return;
+    if (benchmarkChartInstance) { benchmarkChartInstance.destroy(); benchmarkChartInstance = null; }
+
+    if (!benchmark || benchmark.length < 2) {
+        wrapper.style.display = 'none';
+        return;
+    }
+    wrapper.style.display = 'block';
+    const canvas = document.getElementById('benchmarkChart');
+    const ctx = canvas.getContext('2d');
+
+    benchmarkChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: benchmark.map(b => b.date),
+            datasets: [
+                {
+                    label: 'Danh mục', data: benchmark.map(b => b.portfolioIndexed),
+                    borderColor: cssVar('--finance-accent'), backgroundColor: 'transparent',
+                    tension: 0.3, pointRadius: benchmark.length > 30 ? 0 : 3
+                },
+                {
+                    label: 'VN-Index', data: benchmark.map(b => b.benchmarkIndexed),
+                    borderColor: cssVar('--series-1'), backgroundColor: 'transparent',
+                    borderDash: [5, 4], tension: 0.3, pointRadius: benchmark.length > 30 ? 0 : 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { color: cssVar('--text-secondary') } },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toFixed(2)}` } }
+            },
+            scales: {
+                x: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--border-color') } },
+                y: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--border-color') } }
             }
         }
     });

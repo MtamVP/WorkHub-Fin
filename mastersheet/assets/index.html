@@ -144,59 +144,167 @@
 
         <!-- Tab: Sổ Lệnh -->
         <section id="tab-ledger" class="asset-tab-panel" style="display:none;">
-            <form id="txn-form" class="txn-form">
-                <h3 class="txn-form-title"><i class="fa-solid fa-plus-circle"></i> Thêm Lệnh Giao Dịch</h3>
-                <div class="txn-form-grid">
-                    <div class="txn-field">
-                        <label for="txn-type">Loại lệnh</label>
-                        <select id="txn-type" required>
-                            <option value="buy">Mua</option>
-                            <option value="sell">Bán</option>
-                        </select>
+            <div class="task-view-toggle ledger-sub-toggle">
+                <button class="view-toggle-btn active" data-subtab="trades" onclick="switchLedgerSubTab('trades')"><i class="fa-solid fa-right-left"></i> Giao Dịch CP</button>
+                <button class="view-toggle-btn" data-subtab="cashflow" onclick="switchLedgerSubTab('cashflow')"><i class="fa-solid fa-money-bill-transfer"></i> Dòng Tiền</button>
+                <button class="view-toggle-btn" data-subtab="corporate" onclick="switchLedgerSubTab('corporate')"><i class="fa-solid fa-building-columns"></i> Hành Động DN</button>
+            </div>
+
+            <div id="ledger-sub-trades" class="ledger-sub-panel">
+                <form id="txn-form" class="txn-form">
+                    <h3 class="txn-form-title"><i class="fa-solid fa-plus-circle"></i> Thêm Lệnh Giao Dịch</h3>
+                    <div class="txn-form-grid">
+                        <div class="txn-field">
+                            <label for="txn-type">Loại lệnh</label>
+                            <select id="txn-type" required>
+                                <option value="buy">Mua</option>
+                                <option value="sell">Bán</option>
+                            </select>
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-symbol">Mã</label>
+                            <input type="text" id="txn-symbol" placeholder="VD: SSI" required style="text-transform:uppercase;">
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-quantity">Khối lượng</label>
+                            <input type="number" id="txn-quantity" placeholder="0" min="0" step="any" required>
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-price">Giá</label>
+                            <input type="number" id="txn-price" placeholder="0" min="0" step="any" required>
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-fee">Phí (tùy chọn)</label>
+                            <input type="number" id="txn-fee" placeholder="0" min="0" step="any">
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-date">Ngày</label>
+                            <input type="date" id="txn-date">
+                        </div>
+                        <div class="txn-field txn-field-wide">
+                            <label for="txn-note">Ghi chú (tùy chọn)</label>
+                            <input type="text" id="txn-note" placeholder="Ghi chú...">
+                        </div>
+                        <div class="txn-field">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
+                        </div>
                     </div>
-                    <div class="txn-field">
-                        <label for="txn-symbol">Mã</label>
-                        <input type="text" id="txn-symbol" placeholder="VD: SSI" required style="text-transform:uppercase;">
-                    </div>
-                    <div class="txn-field">
-                        <label for="txn-quantity">Khối lượng</label>
-                        <input type="number" id="txn-quantity" placeholder="0" min="0" step="any" required>
-                    </div>
-                    <div class="txn-field">
-                        <label for="txn-price">Giá</label>
-                        <input type="number" id="txn-price" placeholder="0" min="0" step="any" required>
-                    </div>
-                    <div class="txn-field">
-                        <label for="txn-fee">Phí (tùy chọn)</label>
-                        <input type="number" id="txn-fee" placeholder="0" min="0" step="any">
-                    </div>
-                    <div class="txn-field">
-                        <label for="txn-date">Ngày</label>
-                        <input type="date" id="txn-date">
-                    </div>
-                    <div class="txn-field txn-field-wide">
-                        <label for="txn-note">Ghi chú (tùy chọn)</label>
-                        <input type="text" id="txn-note" placeholder="Ghi chú...">
-                    </div>
-                    <div class="txn-field">
-                        <label>&nbsp;</label>
-                        <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
-                    </div>
+                </form>
+                <p class="guide-text">
+                    * <b>Lưu ý:</b> Giá vốn/lãi-lỗ đã chốt được tính theo phương pháp FIFO (lô mua cũ nhất bán trước) — chuẩn kế toán, không phải giá vốn bình quân đơn giản.
+                </p>
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">KL</th>
+                                <th class="text-right">Giá</th><th class="text-right">Phí</th>
+                                <th class="text-right">Lãi/lỗ đã chốt (FIFO)</th><th>Ghi chú</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-body">
+                            <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
-            </form>
-            <div class="spreadsheet-wrapper">
-                <table class="excel-table asset-table" id="ledger-table">
-                    <thead>
-                        <tr>
-                            <th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">KL</th>
-                            <th class="text-right">Giá</th><th class="text-right">Phí</th>
-                            <th class="text-right">Lãi/lỗ đã chốt</th><th>Ghi chú</th><th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="ledger-body">
-                        <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
-                    </tbody>
-                </table>
+            </div>
+
+            <div id="ledger-sub-cashflow" class="ledger-sub-panel" style="display:none;">
+                <form id="cashflow-form" class="txn-form">
+                    <h3 class="txn-form-title"><i class="fa-solid fa-money-bill-transfer"></i> Ghi Nhận Dòng Tiền</h3>
+                    <div class="txn-form-grid">
+                        <div class="txn-field">
+                            <label for="cf-type">Loại</label>
+                            <select id="cf-type" onchange="toggleCashFlowSymbolField()">
+                                <option value="deposit">Nạp vốn</option>
+                                <option value="withdrawal">Rút vốn</option>
+                                <option value="dividend">Cổ tức tiền</option>
+                            </select>
+                        </div>
+                        <div class="txn-field">
+                            <label for="cf-amount">Số tiền</label>
+                            <input type="number" id="cf-amount" placeholder="0" min="0" step="any" required>
+                        </div>
+                        <div class="txn-field" id="cf-symbol-field" style="display:none;">
+                            <label for="cf-symbol">Mã CP (cổ tức từ mã nào)</label>
+                            <input type="text" id="cf-symbol" placeholder="VD: SSI" style="text-transform:uppercase;">
+                        </div>
+                        <div class="txn-field">
+                            <label for="cf-date">Ngày</label>
+                            <input type="date" id="cf-date">
+                        </div>
+                        <div class="txn-field txn-field-wide">
+                            <label for="cf-note">Ghi chú (tùy chọn)</label>
+                            <input type="text" id="cf-note" placeholder="Ghi chú...">
+                        </div>
+                        <div class="txn-field">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu</button>
+                        </div>
+                    </div>
+                </form>
+                <p class="guide-text">
+                    * <b>Vì sao tách riêng?</b> Nạp/rút vốn không phải lãi/lỗ đầu tư — tách ra để "Vốn ròng" và các chỉ số rủi ro (Sharpe, biến động) không bị méo bởi tiền góp thêm.
+                </p>
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="cashflow-table">
+                        <thead>
+                            <tr><th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">Số tiền</th><th>Ghi chú</th><th></th></tr>
+                        </thead>
+                        <tbody id="cashflow-body">
+                            <tr><td colspan="6" class="empty-state">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="ledger-sub-corporate" class="ledger-sub-panel" style="display:none;">
+                <form id="corpaction-form" class="txn-form">
+                    <h3 class="txn-form-title"><i class="fa-solid fa-building-columns"></i> Ghi Nhận Hành Động Doanh Nghiệp</h3>
+                    <div class="txn-form-grid">
+                        <div class="txn-field">
+                            <label for="ca-symbol">Mã CP</label>
+                            <input type="text" id="ca-symbol" placeholder="VD: SSI" required style="text-transform:uppercase;">
+                        </div>
+                        <div class="txn-field">
+                            <label for="ca-type">Loại</label>
+                            <select id="ca-type" onchange="toggleCorpActionRatioLabel()">
+                                <option value="split">Tách/gộp cổ phiếu</option>
+                                <option value="stock_dividend">Cổ tức cổ phiếu</option>
+                            </select>
+                        </div>
+                        <div class="txn-field">
+                            <label for="ca-ratio" id="ca-ratio-label">Tỷ lệ mới/cũ (vd tách 1:2 → nhập 2)</label>
+                            <input type="number" id="ca-ratio" placeholder="0" min="0" step="any" required>
+                        </div>
+                        <div class="txn-field">
+                            <label for="ca-date">Ngày hiệu lực (ex-date)</label>
+                            <input type="date" id="ca-date">
+                        </div>
+                        <div class="txn-field txn-field-wide">
+                            <label for="ca-note">Ghi chú (tùy chọn)</label>
+                            <input type="text" id="ca-note" placeholder="Ghi chú...">
+                        </div>
+                        <div class="txn-field">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu</button>
+                        </div>
+                    </div>
+                </form>
+                <p class="guide-text">
+                    * <b>Tách/gộp cổ phiếu:</b> nhập tỷ lệ số cổ phiếu mới/cũ (tách 1:2 → nhập 2). <b>Cổ tức cổ phiếu:</b> nhập tỷ lệ thập phân (thưởng 10% → nhập 0.1). Giá vốn từng lô FIFO sẽ được điều chỉnh hồi tố tương ứng.
+                </p>
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="corpaction-table">
+                        <thead>
+                            <tr><th>Ngày hiệu lực</th><th>Mã</th><th>Loại</th><th class="text-right">Tỷ lệ</th><th>Ghi chú</th><th></th></tr>
+                        </thead>
+                        <tbody id="corpaction-body">
+                            <tr><td colspan="6" class="empty-state">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
@@ -217,12 +325,58 @@
                         <span class="kpi-value" id="perf-total-return-pct">--</span>
                     </span>
                 </div>
+                <div class="kpi-card">
+                    <span class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></span>
+                    <span class="kpi-body">
+                        <span class="kpi-label">Sharpe Ratio</span>
+                        <span class="kpi-value" id="perf-sharpe">--</span>
+                    </span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-icon"><i class="fa-solid fa-arrow-trend-down"></i></span>
+                    <span class="kpi-body">
+                        <span class="kpi-label">Max Drawdown</span>
+                        <span class="kpi-value" id="perf-maxdd">--</span>
+                    </span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-icon"><i class="fa-solid fa-wave-square"></i></span>
+                    <span class="kpi-body">
+                        <span class="kpi-label">Biến động (năm hóa)</span>
+                        <span class="kpi-value" id="perf-vol">--</span>
+                    </span>
+                </div>
             </div>
             <div class="spreadsheet-wrapper perf-chart-wrapper">
                 <h3 class="perf-chart-title"><i class="fa-solid fa-chart-area"></i> NAV theo thời gian</h3>
                 <div style="position:relative; height:340px;" id="nav-chart-box">
                     <canvas id="navChart"></canvas>
                 </div>
+            </div>
+
+            <div id="benchmark-chart-wrapper" class="spreadsheet-wrapper perf-chart-wrapper" style="display:none;">
+                <h3 class="perf-chart-title"><i class="fa-solid fa-chart-line"></i> So Sánh Với VN-Index (chỉ số hóa gốc 100)</h3>
+                <div style="position:relative; height:300px;" id="benchmark-chart-box">
+                    <canvas id="benchmarkChart"></canvas>
+                </div>
+            </div>
+
+            <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
+                <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Cập Nhật Giá Đóng Cửa VN-Index</h3>
+                <form id="benchmark-form" class="grant-form-grid">
+                    <div class="grant-field">
+                        <label for="bm-date">Ngày</label>
+                        <input type="date" id="bm-date" required>
+                    </div>
+                    <div class="grant-field">
+                        <label for="bm-value">Giá đóng cửa VN-Index</label>
+                        <input type="number" id="bm-value" placeholder="0" min="0" step="any" required>
+                    </div>
+                    <div class="grant-field">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn-save"><i class="fa-solid fa-floppy-disk"></i> Lưu giá</button>
+                    </div>
+                </form>
             </div>
         </section>
 
@@ -232,8 +386,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=7"></script>
-    <script src="script.js?v=5"></script>
+    <script src="../../api.js?v=8"></script>
+    <script src="script.js?v=6"></script>
 
 </body>
 </html>

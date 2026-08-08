@@ -1162,28 +1162,58 @@ const API = {
             if (error) throw error;
             return data || [];
         },
-        // Tính khối lượng + giá vốn bình quân gia quyền (weighted-average) từ toàn bộ lịch sử lệnh
-        computeHoldings: async (userId) => {
+        // Sổ lệnh FIFO chuẩn kế toán: lô cũ nhất bán trước. Hành động doanh nghiệp (tách/gộp,
+        // cổ tức cổ phiếu) được replay xen kẽ theo đúng ex_date để điều chỉnh khối lượng/giá vốn hồi tố.
+        // Trả về map { symbol: [{quantity, cost}, ...] } — thứ tự mảng = thứ tự mua (lô cũ nhất ở đầu).
+        computeLots: async (userId) => {
             const { data: txns, error } = await sbClient.from('finance_transactions')
                 .select('*').eq('user_id', userId).is('deleted_at', null)
                 .order('trade_date', { ascending: true }).order('created_at', { ascending: true });
             if (error) throw error;
+            const { data: actions } = await sbClient.from('finance_corporate_actions')
+                .select('*').eq('user_id', userId).is('deleted_at', null);
 
-            const bySymbol = {};
-            (txns || []).forEach(t => {
-                if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { symbol: t.symbol, quantity: 0, avgCost: 0 };
-                const pos = bySymbol[t.symbol];
-                const qty = Number(t.quantity) || 0;
-                if (t.type === 'buy') {
-                    const totalCost = pos.avgCost * pos.quantity + Number(t.price) * qty;
-                    pos.quantity += qty;
-                    pos.avgCost = pos.quantity > 0 ? totalCost / pos.quantity : 0;
+            const events = [
+                ...(txns || []).map(t => ({ ...t, _kind: 'txn', _date: t.trade_date, _ts: t.created_at })),
+                ...(actions || []).map(a => ({ ...a, _kind: 'action', _date: a.ex_date, _ts: a.created_at }))
+            ].sort((a, b) => (new Date(a._date) - new Date(b._date)) || (new Date(a._ts) - new Date(b._ts)));
+
+            const lotsBySymbol = {};
+            events.forEach(ev => {
+                if (ev._kind === 'action') {
+                    const lots = lotsBySymbol[ev.symbol];
+                    if (!lots || !lots.length) return;
+                    // split: ratio = số cổ phiếu mới / cũ (vd 2:1 -> 2). stock_dividend: ratio = % thưởng (vd 10% -> 0.1, hệ số 1.1)
+                    const multiplier = ev.action_type === 'split' ? Number(ev.ratio) : (1 + Number(ev.ratio));
+                    if (multiplier > 0) lots.forEach(lot => { lot.quantity *= multiplier; lot.cost /= multiplier; });
+                    return;
+                }
+                const symbol = ev.symbol;
+                if (!lotsBySymbol[symbol]) lotsBySymbol[symbol] = [];
+                const lots = lotsBySymbol[symbol];
+                const qty = Number(ev.quantity) || 0;
+                if (ev.type === 'buy') {
+                    lots.push({ quantity: qty, cost: Number(ev.price) || 0 });
                 } else {
-                    pos.quantity -= qty;
-                    if (pos.quantity <= 0) { pos.quantity = 0; pos.avgCost = 0; }
+                    let remaining = qty;
+                    while (remaining > 1e-9 && lots.length) {
+                        const lot = lots[0];
+                        const consumed = Math.min(lot.quantity, remaining);
+                        lot.quantity -= consumed; remaining -= consumed;
+                        if (lot.quantity <= 1e-9) lots.shift();
+                    }
                 }
             });
-            return Object.values(bySymbol).filter(p => p.quantity > 0);
+            return lotsBySymbol;
+        },
+        // Tổng hợp lô FIFO thành khối lượng + giá vốn bình quân hiện tại của từng mã (để hiển thị danh mục)
+        computeHoldings: async (userId) => {
+            const lotsBySymbol = await API.asset.computeLots(userId);
+            return Object.entries(lotsBySymbol).map(([symbol, lots]) => {
+                const quantity = lots.reduce((s, l) => s + l.quantity, 0);
+                const totalCost = lots.reduce((s, l) => s + l.quantity * l.cost, 0);
+                return { symbol, quantity, avgCost: quantity > 0 ? totalCost / quantity : 0 };
+            }).filter(p => p.quantity > 1e-9);
         },
         addTransaction: async (email, txn) => {
             const userId = await getUserId(email);
@@ -1196,10 +1226,20 @@ const API = {
 
             let realizedPnl = null;
             if (txn.type === 'sell') {
-                const holdings = await API.asset.computeHoldings(userId);
-                const pos = holdings.find(h => h.symbol === symbol);
-                if (!pos || pos.quantity < quantity) throw new Error(`Không đủ khối lượng "${symbol}" để bán (đang có ${pos ? pos.quantity : 0})`);
-                realizedPnl = (price - pos.avgCost) * quantity;
+                // Lãi/lỗ đã chốt tính theo FIFO: tiêu thụ lô cũ nhất trước, không phải giá vốn bình quân
+                const lotsBySymbol = await API.asset.computeLots(userId);
+                const lots = (lotsBySymbol[symbol] || []).map(l => ({ ...l }));
+                const totalAvail = lots.reduce((s, l) => s + l.quantity, 0);
+                if (totalAvail < quantity - 1e-9) throw new Error(`Không đủ khối lượng "${symbol}" để bán (đang có ${totalAvail})`);
+                let remaining = quantity, realized = 0;
+                while (remaining > 1e-9 && lots.length) {
+                    const lot = lots[0];
+                    const consumed = Math.min(lot.quantity, remaining);
+                    realized += (price - lot.cost) * consumed;
+                    lot.quantity -= consumed; remaining -= consumed;
+                    if (lot.quantity <= 1e-9) lots.shift();
+                }
+                realizedPnl = realized;
             }
 
             const { error } = await sbClient.from('finance_transactions').insert({
@@ -1272,6 +1312,122 @@ const API = {
             return "Đã cập nhật tiền mặt/dư nợ!";
         },
 
+        // --- Dòng tiền phi giao dịch: nạp vốn / rút vốn / cổ tức tiền — tách khỏi lãi/lỗ đầu tư ---
+        cashFlow: {
+            list: async (email) => {
+                const userId = await getUserId(email);
+                const { data, error } = await sbClient.from('finance_cash_flows')
+                    .select('*').eq('user_id', userId).is('deleted_at', null)
+                    .order('flow_date', { ascending: false }).order('created_at', { ascending: false });
+                if (error) throw error;
+                return data || [];
+            },
+            add: async (email, flow) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const amount = Number(flow.amount) || 0;
+                if (amount <= 0) throw new Error("Số tiền phải lớn hơn 0");
+                const flowType = ['deposit', 'withdrawal', 'dividend'].includes(flow.flowType) ? flow.flowType : 'deposit';
+                const { error } = await sbClient.from('finance_cash_flows').insert({
+                    user_id: userId, flow_type: flowType, amount,
+                    flow_date: flow.flowDate || new Date().toISOString().slice(0, 10),
+                    symbol: flow.symbol ? String(flow.symbol).trim().toUpperCase() : null,
+                    note: flow.note || null, created_by: email
+                });
+                if (error) throw error;
+
+                const { data: cd } = await sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle();
+                const cash = cd ? Number(cd.cash) || 0 : 0;
+                const debt = cd ? Number(cd.debt) || 0 : 0;
+                const delta = flowType === 'withdrawal' ? -amount : amount;
+                await sbClient.from('finance_assets').upsert({ user_id: userId, cash: cash + delta, debt }, { onConflict: 'user_id' });
+
+                await API.asset.recomputeAndSnapshot(email);
+                return "Đã ghi nhận dòng tiền!";
+            },
+            delete: async (email, id) => {
+                const userId = await getUserId(email);
+                const { data: flow } = await sbClient.from('finance_cash_flows').select('*').eq('id', id).eq('user_id', userId).maybeSingle();
+                if (!flow) throw new Error("Không tìm thấy dòng tiền");
+                const { error } = await sbClient.from('finance_cash_flows')
+                    .update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+
+                // Hoàn tác đúng số tiền đã cộng/trừ khi ghi nhận dòng tiền này
+                const { data: cd } = await sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle();
+                const cash = cd ? Number(cd.cash) || 0 : 0;
+                const debt = cd ? Number(cd.debt) || 0 : 0;
+                const delta = flow.flow_type === 'withdrawal' ? Number(flow.amount) : -Number(flow.amount);
+                await sbClient.from('finance_assets').upsert({ user_id: userId, cash: cash + delta, debt }, { onConflict: 'user_id' });
+
+                await API.asset.recomputeAndSnapshot(email);
+                return "Đã xóa dòng tiền!";
+            }
+        },
+
+        // --- Hành động doanh nghiệp: tách/gộp cổ phiếu, cổ tức cổ phiếu — điều chỉnh FIFO hồi tố ---
+        corporateAction: {
+            list: async (email) => {
+                const userId = await getUserId(email);
+                const { data, error } = await sbClient.from('finance_corporate_actions')
+                    .select('*').eq('user_id', userId).is('deleted_at', null)
+                    .order('ex_date', { ascending: false });
+                if (error) throw error;
+                return data || [];
+            },
+            add: async (email, action) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const symbol = String(action.symbol || '').trim().toUpperCase();
+                if (!symbol) throw new Error("Thiếu mã cổ phiếu");
+                const ratio = Number(action.ratio) || 0;
+                if (ratio <= 0) throw new Error("Tỷ lệ phải lớn hơn 0");
+                const actionType = action.actionType === 'stock_dividend' ? 'stock_dividend' : 'split';
+                const { error } = await sbClient.from('finance_corporate_actions').insert({
+                    user_id: userId, symbol, action_type: actionType, ratio,
+                    ex_date: action.exDate || new Date().toISOString().slice(0, 10),
+                    note: action.note || null, created_by: email
+                });
+                if (error) throw error;
+                await API.asset.recomputeAndSnapshot(email);
+                return "Đã ghi nhận hành động doanh nghiệp!";
+            },
+            delete: async (email, id) => {
+                const userId = await getUserId(email);
+                const { error } = await sbClient.from('finance_corporate_actions')
+                    .update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+                await API.asset.recomputeAndSnapshot(email);
+                return "Đã xóa hành động doanh nghiệp!";
+            }
+        },
+
+        // --- Giá đóng cửa VN-Index/VN30: dữ liệu tham chiếu dùng chung, nhập tay bởi asset_manager ---
+        benchmark: {
+            list: async (indexCode, days) => {
+                let query = sbClient.from('finance_benchmark_prices').select('*').order('price_date', { ascending: true });
+                if (indexCode) query = query.eq('index_code', indexCode);
+                if (days) {
+                    const from = new Date(); from.setDate(from.getDate() - Number(days));
+                    query = query.gte('price_date', from.toISOString().slice(0, 10));
+                }
+                const { data, error } = await query;
+                if (error) throw error;
+                return data || [];
+            },
+            upsert: async (indexCode, priceDate, closeValue, email) => {
+                const value = Number(closeValue) || 0;
+                if (value <= 0) throw new Error("Giá trị phải lớn hơn 0");
+                const code = ['VNINDEX', 'VN30'].includes(indexCode) ? indexCode : 'VNINDEX';
+                const { error } = await sbClient.from('finance_benchmark_prices').upsert({
+                    index_code: code, price_date: priceDate || new Date().toISOString().slice(0, 10),
+                    close_value: value, created_by: email
+                }, { onConflict: 'index_code,price_date' });
+                if (error) throw error;
+                return "Đã cập nhật giá chỉ số!";
+            }
+        },
+
         // --- Tính lại NAV hiện tại (lưu vào finance_assets) + chốt 1 điểm snapshot/ngày (finance_nav_history) ---
         recomputeAndSnapshot: async (email) => {
             const userId = await getUserId(email);
@@ -1285,9 +1441,18 @@ const API = {
 
             await sbClient.from('finance_assets').upsert({ user_id: userId, cash, debt, nav }, { onConflict: 'user_id' });
 
+            // Vốn ròng đã nạp lũy kế (nạp - rút, KHÔNG gồm cổ tức) — dùng để tách lợi nhuận đầu tư
+            // thực khỏi tiền góp thêm khi tính các chỉ số rủi ro/hiệu suất.
+            const { data: flows } = await sbClient.from('finance_cash_flows')
+                .select('flow_type, amount').eq('user_id', userId).is('deleted_at', null)
+                .in('flow_type', ['deposit', 'withdrawal']);
+            const netContributed = (flows || []).reduce((s, f) =>
+                s + (f.flow_type === 'withdrawal' ? -Number(f.amount) : Number(f.amount)), 0);
+
             const today = new Date().toISOString().slice(0, 10);
             await sbClient.from('finance_nav_history').upsert({
-                user_id: userId, snapshot_date: today, nav, cash, debt, market_value: marketValue
+                user_id: userId, snapshot_date: today, nav, cash, debt, market_value: marketValue,
+                net_contributed: netContributed
             }, { onConflict: 'user_id,snapshot_date' });
 
             return nav;
@@ -1322,6 +1487,64 @@ const API = {
                 debt: cd ? Number(cd.debt) || 0 : 0,
                 marketValue, unrealizedPnl, realizedPnl
             };
+        },
+
+        // --- Rủi ro & hiệu suất: Sharpe, Max Drawdown, biến động hóa năm, so sánh VN-Index ---
+        getPerformanceMetrics: async (email) => {
+            const history = await API.asset.getNavHistory(email);
+            if (!history || history.length < 2) {
+                return { sharpe: null, maxDrawdown: null, volatility: null, annualizedReturn: null, dataPoints: history ? history.length : 0, benchmark: null };
+            }
+
+            // Lợi nhuận ngày "sạch": bỏ qua các ngày có nạp/rút vốn vì NAV bị méo bởi tiền góp
+            // thêm, không phản ánh lãi/lỗ đầu tư thực sự trong ngày đó.
+            const dailyReturns = [];
+            for (let i = 1; i < history.length; i++) {
+                const prev = history[i - 1], cur = history[i];
+                const flowChanged = Math.abs((Number(cur.net_contributed) || 0) - (Number(prev.net_contributed) || 0)) > 1;
+                const prevNav = Number(prev.nav) || 0;
+                if (flowChanged || prevNav <= 0) continue;
+                dailyReturns.push((Number(cur.nav) - prevNav) / prevNav);
+            }
+
+            const n = dailyReturns.length;
+            const meanReturn = n > 0 ? dailyReturns.reduce((s, r) => s + r, 0) / n : 0;
+            const variance = n > 1 ? dailyReturns.reduce((s, r) => s + Math.pow(r - meanReturn, 2), 0) / (n - 1) : 0;
+            const annualizedVol = Math.sqrt(variance) * Math.sqrt(252);
+            const annualizedReturn = meanReturn * 252;
+            // Sharpe giả định lãi suất phi rủi ro = 0 — đơn giản hóa hợp lý cho một portfolio nội bộ
+            const sharpe = annualizedVol > 0 ? annualizedReturn / annualizedVol : null;
+
+            // Max Drawdown trên chuỗi NAV thực tế (không loại ngày có dòng tiền — đây là mức sụt
+            // giá trị tài khoản nhà đầu tư thực sự trải qua, kể cả khi có rút vốn giữa chừng)
+            let peak = Number(history[0].nav) || 0, maxDD = 0;
+            history.forEach(h => {
+                const nav = Number(h.nav) || 0;
+                if (nav > peak) peak = nav;
+                if (peak > 0) { const dd = (nav - peak) / peak; if (dd < maxDD) maxDD = dd; }
+            });
+
+            // So sánh benchmark: chỉ số hóa NAV và VN-Index về gốc 100 tại ngày đầu tiên có dữ liệu chung
+            let benchmark = null;
+            try {
+                const idxData = await API.asset.benchmark.list('VNINDEX');
+                if (idxData && idxData.length) {
+                    const idxByDate = {};
+                    idxData.forEach(d => { idxByDate[d.price_date] = Number(d.close_value); });
+                    const overlap = history.filter(h => idxByDate[h.snapshot_date] !== undefined);
+                    if (overlap.length >= 2) {
+                        const baseNav = Number(overlap[0].nav) || 1;
+                        const baseIdx = idxByDate[overlap[0].snapshot_date] || 1;
+                        benchmark = overlap.map(h => ({
+                            date: h.snapshot_date,
+                            portfolioIndexed: baseNav > 0 ? (Number(h.nav) / baseNav) * 100 : 100,
+                            benchmarkIndexed: baseIdx > 0 ? (idxByDate[h.snapshot_date] / baseIdx) * 100 : 100
+                        }));
+                    }
+                }
+            } catch (e) { /* chưa có dữ liệu VN-Index — bỏ qua phần benchmark, không chặn các chỉ số khác */ }
+
+            return { sharpe, maxDrawdown: maxDD, volatility: annualizedVol, annualizedReturn, dataPoints: n, benchmark };
         },
 
         // --- Trang "Tổng hợp" của cả team ---
@@ -1906,7 +2129,8 @@ const MUTATING_ACTIONS = new Set([
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
-    'grantFinRole', 'revokeFinRole'
+    'grantFinRole', 'revokeFinRole',
+    'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice'
 ]);
 
 window.callGAS = async function(action, params = {}) {
@@ -1990,6 +2214,15 @@ window.callGAS = async function(action, params = {}) {
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;
+            case 'listCashFlows': result = await API.asset.cashFlow.list(params.email); break;
+            case 'addCashFlow': result = await API.asset.cashFlow.add(params.email, params.flow); break;
+            case 'deleteCashFlow': result = await API.asset.cashFlow.delete(params.email, params.id); break;
+            case 'listCorporateActions': result = await API.asset.corporateAction.list(params.email); break;
+            case 'addCorporateAction': result = await API.asset.corporateAction.add(params.email, params.action); break;
+            case 'deleteCorporateAction': result = await API.asset.corporateAction.delete(params.email, params.id); break;
+            case 'listBenchmarkPrices': result = await API.asset.benchmark.list(params.indexCode, params.days); break;
+            case 'upsertBenchmarkPrice': result = await API.asset.benchmark.upsert(params.indexCode, params.priceDate, params.closeValue, params.email); break;
+            case 'getPerformanceMetrics': result = await API.asset.getPerformanceMetrics(params.email); break;
 
             case 'getFinanceUsers': result = await API.note.getFinanceUsers(); break;
             case 'getFinanceNotes': result = await API.note.getFinanceNotes(); break;
