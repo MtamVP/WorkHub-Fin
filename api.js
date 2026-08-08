@@ -147,7 +147,7 @@ const API = {
                 const { data: usersData, error: userErr } = await sbClient
                     .from('users')
                     .select('email, nickname, group_key, created_at')
-                    .in('group_key', ['finance', 'admin', 'all', 'Finance', 'Admin', 'All'])
+                    .eq('group_key', 'finance')
                     .order('created_at', { ascending: false });
 
                 if (userErr) console.warn("Lỗi lấy users:", userErr);
