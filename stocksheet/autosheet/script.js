@@ -179,12 +179,11 @@ function calculate() {
     colorReturn(elReturnPB, returnPB);
 }
 
-// Hàm phụ trợ tô màu
+// Hàm phụ trợ tô màu (dùng class + token màu của theme, không hardcode hex)
 function colorReturn(el, val) {
     el.classList.remove('text-green', 'text-red');
-    el.style.color = '#333'; // Mặc định
-    if (val > 0) el.style.color = '#28a745'; // Xanh
-    else if (val < 0) el.style.color = '#dc3545'; // Đỏ
+    if (val > 0) el.classList.add('text-green');
+    else if (val < 0) el.classList.add('text-red');
 }
 
 // Hàm Reset form nhập liệu

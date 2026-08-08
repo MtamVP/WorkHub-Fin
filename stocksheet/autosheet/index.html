@@ -25,7 +25,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.2">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.3">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -51,8 +51,8 @@
             </div>
             
             <div class="right-section">
-                <button onclick="saveToSheet()" class="btn-save" id="btn-save-sheet" style="background: var(--success-color); color: white; padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; box-shadow: 0 4px 10px rgba(0,255,0,0.2);"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
-                
+                <button onclick="saveToSheet()" class="btn-save btn-save-cloud" id="btn-save-sheet"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
+
                 <button onclick="resetData()" class="btn-refresh" style="margin-left: 10px;">
                     <i class="fa-solid fa-rotate-right"></i> Nhập lại
                 </button>
@@ -60,19 +60,16 @@
         </div>
 
         <div class="calc-wrapper">
-            
-            <div class="stock-header">
-                <div style="display: flex; gap: 20px; align-items: center;">
-                    <div>
-                        <label style="display:block; font-size: 0.9rem; color:var(--text-secondary); margin-bottom:5px; font-weight:600;">Mã Cổ Phiếu:</label>
-                        <input type="text" id="stock-symbol" placeholder="VD: SHS" style="font-size: 1.2rem; font-weight: 800; padding: 10px; width: 120px; text-transform: uppercase; border: 2px solid var(--finance-accent); border-radius: 6px; color: var(--finance-accent); text-align:center;">
-                    </div>
 
-                    <div>
-                        <label style="display:block; font-size: 0.9rem; color:var(--text-secondary); margin-bottom:5px; font-weight:600;">Năm:</label>
-                        <input type="number" id="stock-year" value="2026" 
-                               style="font-size: 1.2rem; font-weight: 800; padding: 10px; width: 100px; border: 2px solid var(--finance-accent); border-radius: 6px; color: var(--finance-accent); text-align: center;">
-                    </div>
+            <div class="stock-header" style="gap: 20px;">
+                <div class="stock-header-field">
+                    <label for="stock-symbol">Mã Cổ Phiếu:</label>
+                    <input type="text" id="stock-symbol" class="stock-header-input" placeholder="VD: SHS" style="text-transform: uppercase;">
+                </div>
+
+                <div class="stock-header-field">
+                    <label for="stock-year">Năm:</label>
+                    <input type="number" id="stock-year" class="stock-header-input year-input" value="2026">
                 </div>
             </div>
 
@@ -114,7 +111,7 @@
                     
                     <tr>
                         <td class="stt">6</td>
-                        <td style="color: var(--finance-accent); font-weight:800;">Giá cổ phiếu hiện tại</td>
+                        <td class="stock-price-label">Giá cổ phiếu hiện tại</td>
                         <td><input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá..."></td>
                     </tr>
 
@@ -143,7 +140,7 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="font-weight:bold; color:var(--terracotta);">Target</td>
+                            <td class="stock-price-label">Target</td>
                             <td><input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E..."></td>
                             <td><input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B..."></td>
                         </tr>
@@ -167,7 +164,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=6"></script>
-    <script src="script.js?v=2"></script>
+    <script src="script.js?v=3"></script>
 
 </body>
 </html>

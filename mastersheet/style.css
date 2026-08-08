@@ -112,115 +112,107 @@ body {
 }
 
 /* =========================================
-   3. FINANCE WRAPPER (Khung chứa bảng)
+   3. Categorical chart palette (team allocation donut) — cùng bộ màu đã validate với trang Nhập liệu
    ========================================= */
-.finance-wrapper {
-    background: var(--card-bg);
-    padding: 0;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-soft);
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+.asset-container {
+    --series-1: #2a78d6; --series-2: #eda100; --series-3: #1baf7a; --series-4: #4a3aa7; --series-other: #9a9a94;
 }
-
-.finance-header {
-    padding: 15px 25px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: var(--card-bg);
-}
-
-.finance-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 1.15rem;
-    font-weight: 700;
-}
-
-.finance-header p {
-    margin: 2px 0 0 0;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-.status-badge {
-    background-color: color-mix(in srgb, var(--success-color) 14%, var(--card-bg));
-    color: var(--success-color);
-    padding: 4px 12px;
-    border-radius: var(--radius-pill);
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid color-mix(in srgb, var(--success-color) 25%, transparent);
-    text-transform: uppercase;
-}
-
-.status-badge i { font-size: 0.6rem; animation: pulse 2s infinite; }
-@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.7; } 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.7; } }
 
 /* =========================================
-   4. JSPREADSHEET CUSTOMIZATION
+   4. Control panel (chọn thành viên) — cùng ngôn ngữ với Stocksheet
    ========================================= */
-.spreadsheet-area { width: 100%; overflow-x: auto; min-height: 400px; background: transparent; }
-
-.jexcel_content { box-shadow: none !important; width: 100% !important; padding: 0 !important; border: none !important; }
-
-.jexcel > thead > tr > td {
-    background-color: var(--finance-accent) !important;
-    color: #120F0A !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
-    text-transform: uppercase;
-    border: 1px solid rgba(0, 0, 0, 0.1) !important;
-    padding: 12px 8px !important;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    letter-spacing: 0.04em;
+.control-panel {
+    background: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 25px;
+    box-shadow: var(--shadow-soft); border: 1px solid var(--border-color);
+    display: flex; align-items: center; gap: 15px; flex-wrap: wrap;
 }
-
-.jexcel_row {
-    background-color: var(--hover-bg) !important;
-    color: var(--text-secondary) !important;
-    font-weight: 600;
-    border-right: 2px solid var(--border-color) !important;
-    border-bottom: 1px solid var(--border-color) !important;
+.control-panel label { font-weight: 700; color: var(--text-secondary); font-size: 1rem; display: inline-flex; align-items: center; gap: 8px; }
+.control-panel select {
+    padding: 10px 16px; font-size: 1rem; font-weight: 700; border-radius: var(--radius-sm); min-width: 260px;
+    outline: none; cursor: pointer; color: var(--text-primary); background-color: var(--hover-bg);
+    border: 1px solid var(--border-color); transition: var(--transition-fast);
 }
+.control-panel select:focus { background-color: var(--card-bg); border-color: var(--finance-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--finance-accent) 15%, transparent); }
 
-.jexcel > tbody > tr > td {
-    background-color: var(--card-bg) !important;
-    padding: 10px 12px !important;
-    font-size: 1rem !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
-    vertical-align: middle !important;
-    font-family: var(--font-body) !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* =========================================
+   5. KPI cards — cùng component với trang Nhập liệu
+   ========================================= */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 25px; }
+.kpi-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft); padding: 20px 22px; display: flex; align-items: center; gap: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
-
-.jexcel > tbody > tr:nth-child(even) > td { background-color: var(--bg-color) !important; }
-
-.jexcel > tbody > tr:hover > td {
-    background-color: var(--hover-bg) !important;
-    color: var(--finance-accent) !important;
-    cursor: default;
+.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.kpi-icon {
+    width: 46px; height: 46px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; flex-shrink: 0; background: var(--finance-accent-subtle); color: var(--finance-accent);
 }
+.kpi-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi-label { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.jexcel .highlight { background-color: color-mix(in srgb, var(--finance-accent) 15%, transparent) !important; }
-.jexcel .selection { border: 2px solid var(--finance-accent) !important; }
+/* =========================================
+   6. Bảng (asset-table) — cùng component với trang Nhập liệu, thay cho .excel-table cũ không có style
+   ========================================= */
+.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 20px; }
 
-.jexcel_content::-webkit-scrollbar { width: 12px; height: 12px; }
-.jexcel_content::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 0 0 8px 8px; }
-.jexcel_content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; border: 2px solid var(--bg-color); }
-.jexcel_content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.asset-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); }
+.asset-table thead th {
+    background-color: var(--hover-bg); color: var(--text-secondary); font-weight: 700; text-transform: uppercase;
+    font-size: 0.8rem; padding: 13px 14px; text-align: left; letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--finance-accent);
+}
+.asset-table thead th.text-right { text-align: right; }
+.asset-table thead th.text-center { text-align: center; }
+.asset-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+.asset-table tbody tr:nth-child(even) { background-color: var(--bg-color); }
+.asset-table tbody tr:hover { background-color: var(--hover-bg); }
+.asset-table .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); font-variant-numeric: normal; }
+.asset-table .empty-state i { display: block; font-size: 1.8rem; margin-bottom: 10px; color: var(--border-color); }
+
+.symbol-cell { display: flex; align-items: center; gap: 10px; }
+.symbol-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.symbol-name { font-weight: 700; color: var(--text-primary); }
+
+.table-total-row td { background-color: color-mix(in srgb, var(--gold) 12%, var(--card-bg)) !important; font-weight: 800; border-top: 2px solid var(--border-color); }
+.table-email-row td { background: var(--hover-bg); color: var(--text-primary); font-weight: 800; font-size: 1.05rem; padding: 12px 14px; }
+.table-header-row td { background: var(--hover-bg); color: var(--text-secondary); font-weight: 700; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.03em; border-bottom: 2px solid var(--finance-accent); text-align: center; }
+.table-highlight-row td { background-color: color-mix(in srgb, var(--gold) 10%, var(--card-bg)) !important; font-weight: 700; }
+.table-nav-row td { color: var(--gold); font-size: 1rem; border-top: 2px solid var(--gold); }
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-success { color: var(--success-color) !important; font-weight: 700 !important; }
+.text-danger { color: var(--danger-color) !important; font-weight: 700 !important; }
+
+/* =========================================
+   7. Holdings layout: bảng + donut chart — cùng bố cục với trang Nhập liệu
+   ========================================= */
+.holdings-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+.allocation-card {
+    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft); padding: 20px;
+}
+.allocation-card h3 { margin: 0 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.allocation-card h3 i { color: var(--text-secondary); }
+.allocation-chart-box { position: relative; height: 200px; margin-bottom: 14px; }
+.allocation-legend { display: flex; flex-direction: column; gap: 8px; }
+.allocation-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.allocation-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.allocation-legend-name { flex: 1; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.allocation-legend-pct { font-family: var(--font-mono); font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.allocation-empty { text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 30px 10px; }
+
+@media (max-width: 900px) {
+    .holdings-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr; }
+}
 
 /* =========================================
    5. FOOTER / GUIDE

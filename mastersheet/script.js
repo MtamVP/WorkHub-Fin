@@ -1,5 +1,7 @@
 /* --- FILE: /mastersheet/script.js --- */
 
+const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Page Loaded. Initializing...");
     
@@ -73,44 +75,36 @@ function renderMemberTable(data) {
     let html = '';
 
     data.forEach((row, index) => {
-        let trClass = '';
-        let tdStyle = 'padding: 8px 12px; border: 1px solid var(--border-color); font-size: 0.95rem;';
-
         // Header Email
         if (index === 0) {
-            html += `<tr><td colspan="10" style="background:var(--primary-color); color:var(--card-bg); font-weight:bold; font-size:1.1rem; padding:10px;">${row[0]}</td></tr>`;
+            html += `<tr class="table-email-row"><td colspan="10">${escapeAssetHtml(row[0])}</td></tr>`;
             return;
         }
 
         // Header Cột
-        if (index === 1) {
-            trClass = 'background:var(--primary-color); color:var(--card-bg); font-weight:bold; text-align:center;';
-            tdStyle += 'border: 1px solid var(--primary-hover);';
-        }
+        let rowClass = '';
+        if (index === 1) rowClass = 'table-header-row';
 
         // Highlight các dòng Tổng/NAV
         let firstCell = (row[1] || "").toString().toLowerCase();
         if (firstCell.includes('tổng') || firstCell.includes('tiền') || firstCell.includes('nav') || firstCell.includes('dư nợ')) {
-             trClass = 'background:color-mix(in srgb, var(--gold) 10%, var(--card-bg)); font-weight:bold;';
-             if (firstCell.includes('nav')) trClass += ' color:var(--gold); font-size:1rem; border-top: 2px solid var(--gold);';
+            rowClass = 'table-highlight-row' + (firstCell.includes('nav') ? ' table-nav-row' : '');
         }
 
-        html += `<tr style="${trClass}">`;
+        html += `<tr class="${rowClass}">`;
 
         row.forEach((cell, cellIndex) => {
-            let align = 'left';
-            if (cellIndex === 0) align = 'center';
-            if (cellIndex >= 2) align = 'right';
+            let alignClass = cellIndex === 0 ? 'text-center' : (cellIndex >= 2 ? 'text-right' : '');
 
             // Tô màu Lãi/Lỗ
-            let colorStyle = '';
+            let colorClass = '';
             if (cellIndex === 9 && index > 1) {
                 let valNum = parseFloat(cell.toString().replace(/,/g, '').replace(/\./g, '').replace(/[^\d-]/g, ''));
-                if (valNum > 0) colorStyle = 'color: var(--success-color); font-weight:bold;';
-                if (valNum < 0) colorStyle = 'color: var(--danger-color); font-weight:bold;';
+                if (valNum > 0) colorClass = 'text-success';
+                if (valNum < 0) colorClass = 'text-danger';
             }
 
-            html += `<td style="${tdStyle} text-align:${align}; ${colorStyle}">${cell}</td>`;
+            html += `<td class="${alignClass} ${colorClass}">${escapeAssetHtml(cell)}</td>`;
         });
 
         html += `</tr>`;
@@ -127,7 +121,7 @@ async function loadTeamSummary() {
         return;
     }
 
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu tổng hợp...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu tổng hợp...</td></tr>';
     
     try {
         console.log("Calling getTeamSummary...");
@@ -138,7 +132,8 @@ async function loadTeamSummary() {
             const data = response.data; 
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Chưa có dữ liệu tổng hợp trong MasterSheet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Chưa có dữ liệu tổng hợp trong MasterSheet.</td></tr>';
+                renderChart([], [], []);
                 return;
             }
 
@@ -150,56 +145,50 @@ async function loadTeamSummary() {
             if (kpiCount) kpiCount.textContent = memberRows.length;
             if (kpiNav) kpiNav.textContent = (totalRow ? totalRow.nav : '0') + ' ₫';
 
-            // B. VẼ BẢNG
-            let html = '';
-            let chartLabels = [];
-            let chartValues = [];
-            // Bộ màu theo palette Cream thay vì màu rainbow mặc định của chart lib
-            let colors = chartPalette();
+            // B. Gán màu cho từng thành viên (chỉ những người có NAV dương mới vào biểu đồ) —
+            // dùng chung index để chấm màu trong bảng khớp đúng với lát cắt trên biểu đồ.
+            const chartMembers = memberRows
+                .map(item => ({
+                    name: item.name || 'Unknown',
+                    navNum: parseFloat((item.nav || '0').toString().replace(/[^0-9-]/g, '')) || 0
+                }))
+                .filter(m => m.navNum > 0);
+            const colorByName = {};
+            chartMembers.forEach((m, i) => { colorByName[m.name] = allocationColorFor(i); });
 
+            // C. VẼ BẢNG
+            let html = '';
             data.forEach(item => {
-                let rowStyle = '';
                 let name = item.name || "Unknown";
                 let navStr = item.nav || "0";
                 let percentStr = item.percent || "0%";
 
-                // Kiểm tra dòng TỔNG CỘNG
-                if(name.toUpperCase().includes('TỔNG')) {
-                    rowStyle = 'background:color-mix(in srgb, var(--gold) 12%, var(--card-bg)); font-weight:bold; border-top: 2px solid var(--border-color);';
-                    // Không push dòng tổng vào chart
+                if (name.toUpperCase().includes('TỔNG')) {
+                    html += `<tr class="table-total-row"><td>${escapeAssetHtml(name)}</td><td class="text-right">${escapeAssetHtml(navStr)}</td><td class="text-center">${escapeAssetHtml(percentStr)}</td></tr>`;
                 } else {
-                    // Push thành viên vào chart
-                    chartLabels.push(name.split('@')[0]); // Lấy tên ngắn gọn
-
-                    // Parse NAV để vẽ chart (Xóa dấu chấm/phẩy, giữ số)
-                    let rawNav = navStr.toString().replace(/[^0-9-]/g, '');
-                    let navNum = parseFloat(rawNav);
-                    if(navNum > 0) chartValues.push(navNum); // Chỉ vẽ số dương
+                    const dotColor = colorByName[name] || cssVar('--border-color');
+                    html += `<tr>
+                        <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${escapeAssetHtml(name)}</span></span></td>
+                        <td class="text-right">${escapeAssetHtml(navStr)}</td>
+                        <td class="text-center">${escapeAssetHtml(percentStr)}</td>
+                    </tr>`;
                 }
-
-                html += `
-                    <tr style="${rowStyle}">
-                        <td style="padding:10px; border-bottom:1px solid var(--border-color);">${name}</td>
-                        <td style="padding:10px; border-bottom:1px solid var(--border-color); text-align:right; font-weight:bold;">${navStr}</td>
-                        <td style="padding:10px; border-bottom:1px solid var(--border-color); text-align:center;">${percentStr}</td>
-                    </tr>
-                `;
             });
             tbody.innerHTML = html;
 
-            // C. VẼ BIỂU ĐỒ TRÒN
-            if(chartValues.length > 0) {
-                renderChart(chartLabels, chartValues, colors);
-            } else {
-                console.warn("Không có dữ liệu hợp lệ để vẽ biểu đồ");
-            }
+            // D. VẼ BIỂU ĐỒ TRÒN + LEGEND
+            renderChart(
+                chartMembers.map(m => m.name.split('@')[0]),
+                chartMembers.map(m => m.navNum),
+                chartMembers.map((m, i) => allocationColorFor(i))
+            );
 
         } else {
-            tbody.innerHTML = `<tr><td colspan="3" style="color:var(--danger-color); text-align:center; padding:20px;">Lỗi API: ${response.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" class="empty-state text-danger">Lỗi API: ${escapeAssetHtml(response.message)}</td></tr>`;
         }
     } catch (e) {
         console.error("Lỗi loadTeamSummary:", e);
-        tbody.innerHTML = `<tr><td colspan="3" style="color:var(--danger-color); text-align:center; padding:20px;">Lỗi kết nối: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" class="empty-state text-danger">Lỗi kết nối: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
 }
 
@@ -208,30 +197,33 @@ function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-// Bộ màu chart theo đúng palette Cream (gold/sage/terracotta...) thay vì rainbow mặc định
-function chartPalette() {
-    return [cssVar('--gold'), cssVar('--sage'), cssVar('--terracotta'), cssVar('--info-color'), cssVar('--gold-light'), cssVar('--text-secondary')];
+// Màu chart lấy từ bộ categorical palette đã validate (--series-1..4 + --series-other), cùng bộ với trang Nhập liệu
+function allocationColorFor(idx) {
+    if (idx < ALLOCATION_COLOR_VARS.length) return cssVar(ALLOCATION_COLOR_VARS[idx]);
+    return cssVar('--series-other');
 }
 
-// --- 5. HÀM VẼ BIỂU ĐỒ (CHART.JS) ---
+// --- 5. HÀM VẼ BIỂU ĐỒ (CHART.JS) + LEGEND — cùng bố cục với Cơ Cấu Danh Mục ở trang Nhập liệu ---
 let teamChartInstance = null;
 
 function renderChart(labels, data, colors) {
     const canvas = document.getElementById('teamChart');
-    if (!canvas) {
-        console.warn("Không tìm thấy canvas #teamChart");
+    const legendBox = document.getElementById('team-legend');
+    if (!canvas || !legendBox) return;
+    if (teamChartInstance) { teamChartInstance.destroy(); teamChartInstance = null; }
+
+    if (!data || data.length === 0) {
+        canvas.style.display = 'none';
+        legendBox.innerHTML = '<div class="allocation-empty"><i class="fa-solid fa-chart-pie" style="display:block; font-size:1.6rem; margin-bottom:8px; opacity:.4;"></i>Chưa có dữ liệu để vẽ cơ cấu.</div>';
         return;
     }
+    canvas.style.display = 'block';
 
+    const total = data.reduce((s, v) => s + v, 0);
     const ctx = canvas.getContext('2d');
-    
-    // Hủy biểu đồ cũ nếu đã tồn tại để vẽ mới
-    if (teamChartInstance) {
-        teamChartInstance.destroy();
-    }
 
     teamChartInstance = new Chart(ctx, {
-        type: 'doughnut', // 'pie' hoặc 'doughnut' nhìn hiện đại hơn
+        type: 'doughnut',
         data: {
             labels: labels,
             datasets: [{
@@ -239,41 +231,37 @@ function renderChart(labels, data, colors) {
                 backgroundColor: colors,
                 borderWidth: 2,
                 borderColor: cssVar('--card-bg'),
-                hoverOffset: 4
+                hoverOffset: 6
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false, // Để chart co giãn theo div cha
+            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        boxWidth: 12,
-                        padding: 15,
-                        font: { size: 11 },
-                        color: cssVar('--text-primary')
-                    }
-                },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            let value = context.raw;
-                            // Format tiền Việt Nam
-                            return ' ' + value.toLocaleString('vi-VN') + ' VND';
-                        }
+                        label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString('vi-VN')} ₫ (${((ctx.raw / total) * 100).toFixed(1)}%)`
                     }
-                },
-                title: {
-                    display: false,
-                    text: 'Cơ Cấu Tài Sản Team'
                 }
             }
         }
     });
+
+    legendBox.innerHTML = labels.map((label, i) => `
+        <div class="allocation-legend-item">
+            <span class="allocation-legend-dot" style="background:${colors[i]};"></span>
+            <span class="allocation-legend-name">${escapeAssetHtml(label)}</span>
+            <span class="allocation-legend-pct">${((data[i] / total) * 100).toFixed(1)}%</span>
+        </div>`).join('');
 }
 
 // --- UTILS ---
+function escapeAssetHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
