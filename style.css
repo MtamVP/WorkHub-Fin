@@ -15,6 +15,7 @@
   --gold: #C9A84C;
   --gold-light: #E8C87A;
   --gold-glow: rgba(201, 168, 76, 0.25);
+  --gold-dim: rgba(201, 168, 76, 0.12);
   --on-gold: #1A1407;
   --primary-color: var(--gold);
   --primary-hover: var(--gold-light);
@@ -71,6 +72,7 @@
   --gold: #B0892A;
   --gold-light: #8A6A17;
   --gold-glow: rgba(176, 137, 42, 0.18);
+  --gold-dim: rgba(176, 137, 42, 0.14);
   --finance-accent: #9A6B0D;
   --finance-accent-subtle: rgba(154, 107, 13, 0.10);
 
@@ -238,7 +240,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   display: flex; flex-direction: column; overflow-x: hidden;
 }
 #app-sidebar.expanded { width: var(--sidebar-width); }
-#app-sidebar ul { list-style: none; padding: 0 12px; margin: 0; }
+#app-sidebar ul { list-style: none; padding: 0 10px; margin: 0; }
 
 #hamburger-menu {
   text-align: center; padding: 10px; margin-bottom: 10px; cursor: pointer;
@@ -247,43 +249,43 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 #hamburger-menu:hover { color: var(--text-primary); }
 
-/* Nhãn nhóm chức năng (Tài Chính / Dự Án / Công Cụ / Quản Trị) — chữ nhỏ khi mở rộng,
-   thu lại thành một gạch chia mảnh khi sidebar ở chế độ icon-only để vẫn giữ được ranh giới
-   nhóm mà không chiếm chỗ. */
+/* Nhãn nhóm chức năng (Tài Chính / Dự Án / Công Cụ / Quản Trị) — mật độ/kiểu chữ lấy đúng
+   theo .nav-group của src/styles.css (app kế toán): nhỏ, mảnh, không in đậm. Thu lại thành
+   một gạch chia mảnh khi sidebar ở chế độ icon-only để vẫn giữ ranh giới nhóm mà không chiếm chỗ. */
 .nav-group-label {
-  padding: 16px 22px 6px; margin: 0;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 14px 12px 6px; margin: 0;
+  font-size: 10px; font-weight: 400; letter-spacing: 1.4px; text-transform: uppercase;
   color: var(--text-muted); white-space: nowrap; overflow: hidden;
-  transition: opacity 0.2s ease;
 }
 #app-sidebar:not(.expanded) .nav-group-label {
-  padding: 10px 22px; margin: 6px 0 2px;
+  padding: 10px 16px; margin: 6px 0 2px;
   border-top: 1px solid var(--border-color);
 }
 #app-sidebar:not(.expanded) .nav-group-label span { display: none; }
 
+/* .nav-item mật độ/hành vi lấy đúng theo src/styles.css: đệm hẹp hơn, chữ 13.5px, active
+   dùng inset box-shadow (không đổi kích thước khung) thay vì border-left, hover chỉ nhích
+   icon 1px thay vì dịch cả hàng — tinh tế hơn, đúng chất "clean" của web kế toán. */
 .nav-item {
-  display: flex; align-items: center; padding: 11px 14px; margin-bottom: 2px;
-  cursor: pointer; border-radius: var(--radius-sm);
-  color: var(--text-secondary); font-weight: 500; font-size: 14px;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px; margin-bottom: 1px;
+  cursor: pointer; border-radius: var(--radius-sm); position: relative;
+  color: var(--text-secondary); font-weight: 500; font-size: 13.5px;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   justify-content: center; white-space: nowrap;
-  border-left: 2px solid transparent;
 }
-.nav-item span { font-size: 15px; font-weight: 500; }
+.nav-item span { font-size: 13.5px; font-weight: 500; }
 .nav-item:hover { background-color: var(--hover-bg); color: var(--text-primary); }
-#app-sidebar.expanded .nav-item:hover { transform: translateX(2px); }
+.nav-item:hover i { transform: translateX(1px); }
 .nav-item.active {
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  background: var(--gold-dim);
   color: var(--gold-light);
   font-weight: 600;
-  border-left-color: var(--gold);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 18%, transparent);
+  box-shadow: inset 3px 0 0 var(--gold);
 }
-.nav-item i { font-size: 17px; min-width: 24px; text-align: center; }
+.nav-item i { font-size: 18px; width: 20px; text-align: center; transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
 #app-sidebar.expanded .nav-item { justify-content: flex-start; }
-#app-sidebar.expanded .nav-item span { display: inline-block; margin-left: 14px; }
+#app-sidebar.expanded .nav-item span { display: inline-block; }
 #app-sidebar:not(.expanded) .nav-item span { display: none; }
 
 .pipeline-overview-card {
