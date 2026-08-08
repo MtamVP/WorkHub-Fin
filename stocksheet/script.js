@@ -91,21 +91,26 @@ function renderStockDetail(d) {
     document.getElementById('hero-year').textContent = d.year ? `Năm ${d.year}` : '';
     document.getElementById('hero-price').textContent = num(d.price, 0);
 
-    const fundamentals = [
+    // Tách 2 nhóm — Quy mô & Lợi nhuận (3 ô) / Định giá (4 ô) — để mỗi hàng luôn chia hết, không lẻ dòng
+    const scaleStats = [
         { icon: 'fa-building-columns', label: 'Vốn điều lệ', value: num(d.charter_capital, 0) },
         { icon: 'fa-scale-balanced', label: 'Vốn chủ sở hữu', value: num(d.equity, 0) },
-        { icon: 'fa-sack-dollar', label: 'Lợi nhuận sau thuế', value: num(d.lnst, 0) },
+        { icon: 'fa-sack-dollar', label: 'Lợi nhuận sau thuế', value: num(d.lnst, 0) }
+    ];
+    const valuationStats = [
         { icon: 'fa-book', label: 'Giá trị sổ sách', value: num(d.book_value) },
         { icon: 'fa-chart-line', label: 'EPS', value: num(d.eps) },
         { icon: 'fa-divide', label: 'P/E', value: num(d.pe) },
         { icon: 'fa-percent', label: 'P/B', value: num(d.pb) }
     ];
-    document.getElementById('fundamentals-grid').innerHTML = fundamentals.map(f => `
+    const renderStatTiles = (stats) => stats.map(f => `
         <div class="stat-tile">
             <span class="stat-tile-icon"><i class="fa-solid ${f.icon}"></i></span>
             <span class="stat-tile-label">${f.label}</span>
             <span class="stat-tile-value">${f.value}</span>
         </div>`).join('');
+    document.getElementById('fundamentals-grid-scale').innerHTML = renderStatTiles(scaleStats);
+    document.getElementById('fundamentals-grid-valuation').innerHTML = renderStatTiles(valuationStats);
 
     const returnPe = Number(d.return_pe);
     const returnPb = Number(d.return_pb);

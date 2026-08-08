@@ -23,7 +23,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/style.css?v=3.2">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=3.3">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -76,9 +76,10 @@
                 </div>
             </div>
 
-            <!-- Chỉ số cơ bản -->
+            <!-- Chỉ số cơ bản: tách 2 nhóm (Quy mô & Lợi nhuận / Định giá) để lưới luôn chia đều hàng, không bị lẻ dòng -->
             <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉ Số Cơ Bản</h3>
-            <div class="stat-grid" id="fundamentals-grid"></div>
+            <div class="stat-grid stat-grid-3" id="fundamentals-grid-scale"></div>
+            <div class="stat-grid stat-grid-4" id="fundamentals-grid-valuation"></div>
 
             <!-- Định giá mục tiêu -->
             <h3 class="stock-section-title"><i class="fa-solid fa-bullseye"></i> Định Giá Mục Tiêu</h3>
@@ -105,7 +106,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=6"></script>
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>
 

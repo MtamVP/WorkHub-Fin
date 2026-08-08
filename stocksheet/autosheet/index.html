@@ -25,7 +25,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=3.1.0">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.3">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=2.4">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -73,89 +73,70 @@
                 </div>
             </div>
 
-            <table class="calc-table">
-                <thead>
-                    <tr>
-                        <th style="width: 50px; text-align:center;">STT</th>
-                        <th>Chỉ tiêu</th>
-                        <th style="width: 220px; text-align: right;">Giá trị</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="stt">1</td>
-                        <td>Vốn điều lệ (Charter Capital)</td>
-                        <td><input type="text" class="input-val" id="val-1" placeholder="Nhập số..."></td>
-                    </tr>
-                    <tr>
-                        <td class="stt">2</td>
-                        <td>Vốn chủ sở hữu (Equity)</td>
-                        <td><input type="text" class="input-val" id="val-2" placeholder="Nhập số..."></td>
-                    </tr>
-                    <tr>
-                        <td class="stt">3</td>
-                        <td>Lợi nhuận sau thuế</td>
-                        <td><input type="text" class="input-val" id="val-3" placeholder="Nhập số..."></td>
-                    </tr>
-                    
-                    <tr class="row-calc">
-                        <td class="stt">4</td>
-                        <td>Giá trị sổ sách</td>
-                        <td class="output-val" id="val-4">0</td>
-                    </tr>
-                    <tr class="row-calc">
-                        <td class="stt">5</td>
-                        <td>EPS</td>
-                        <td class="output-val" id="val-5">0</td>
-                    </tr>
-                    
-                    <tr>
-                        <td class="stt">6</td>
-                        <td class="stock-price-label">Giá cổ phiếu hiện tại</td>
-                        <td><input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá..."></td>
-                    </tr>
+            <h3 class="stock-section-title"><i class="fa-solid fa-pen-to-square"></i> Chỉ Số Đầu Vào</h3>
+            <div class="input-field-grid">
+                <div class="input-field">
+                    <label for="val-1">Vốn điều lệ</label>
+                    <input type="text" class="input-val" id="val-1" placeholder="Nhập số...">
+                </div>
+                <div class="input-field">
+                    <label for="val-2">Vốn chủ sở hữu</label>
+                    <input type="text" class="input-val" id="val-2" placeholder="Nhập số...">
+                </div>
+                <div class="input-field">
+                    <label for="val-3">Lợi nhuận sau thuế</label>
+                    <input type="text" class="input-val" id="val-3" placeholder="Nhập số...">
+                </div>
+                <div class="input-field">
+                    <label for="val-6" class="input-field-highlight-label">Giá cổ phiếu hiện tại</label>
+                    <input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá...">
+                </div>
+            </div>
 
-                    <tr class="row-result">
-                        <td class="stt">7</td>
-                        <td>P/E</td>
-                        <td class="output-val result" id="val-7">0</td>
-                    </tr>
-                    <tr class="row-result">
-                        <td class="stt">8</td>
-                        <td>P/B</td>
-                        <td class="output-val result" id="val-8">0</td>
-                    </tr>
-                </tbody>
-            </table>
+            <h3 class="stock-section-title"><i class="fa-solid fa-calculator"></i> Chỉ Số Tính Toán</h3>
+            <div class="stat-grid">
+                <div class="stat-tile">
+                    <span class="stat-tile-icon"><i class="fa-solid fa-book"></i></span>
+                    <span class="stat-tile-label">Giá trị sổ sách</span>
+                    <span class="stat-tile-value output-val" id="val-4">0</span>
+                </div>
+                <div class="stat-tile">
+                    <span class="stat-tile-icon"><i class="fa-solid fa-chart-line"></i></span>
+                    <span class="stat-tile-label">EPS</span>
+                    <span class="stat-tile-value output-val" id="val-5">0</span>
+                </div>
+                <div class="stat-tile stat-tile-highlight">
+                    <span class="stat-tile-icon"><i class="fa-solid fa-divide"></i></span>
+                    <span class="stat-tile-label">P/E</span>
+                    <span class="stat-tile-value output-val result" id="val-7">0</span>
+                </div>
+                <div class="stat-tile stat-tile-highlight">
+                    <span class="stat-tile-icon"><i class="fa-solid fa-percent"></i></span>
+                    <span class="stat-tile-label">P/B</span>
+                    <span class="stat-tile-value output-val result" id="val-8">0</span>
+                </div>
+            </div>
 
             <div class="target-section">
-                <h3>Target</h3>
-                <table class="calc-table">
-                    <thead>
-                        <tr>
-                            <th>Chỉ tiêu</th>
-                            <th style="text-align: right;">Tính theo P/E</th>
-                            <th style="text-align: right;">Tính theo P/B</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="stock-price-label">Target</td>
-                            <td><input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E..."></td>
-                            <td><input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B..."></td>
-                        </tr>
-                        <tr class="row-calc">
-                            <td>Price Target</td>
-                            <td class="output-val" id="price-per-pe">0</td>
-                            <td class="output-val" id="price-per-pb">0</td>
-                        </tr>
-                        <tr class="row-return">
-                            <td>Return (%) <br><small>Lợi nhuận</small></td>
-                            <td class="output-val percent" id="return-pe">0%</td>
-                            <td class="output-val percent" id="return-pb">0%</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h3 class="stock-section-title"><i class="fa-solid fa-bullseye"></i> Target</h3>
+                <div class="target-grid">
+                    <div class="target-card">
+                        <div class="target-card-title">Theo P/E</div>
+                        <input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E...">
+                        <div class="target-card-price-label">Price Target</div>
+                        <div class="target-card-price output-val" id="price-per-pe">0</div>
+                        <div class="target-card-price-label">Return (%) — Lợi nhuận</div>
+                        <div class="output-val percent" id="return-pe">0%</div>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-card-title">Theo P/B</div>
+                        <input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B...">
+                        <div class="target-card-price-label">Price Target</div>
+                        <div class="target-card-price output-val" id="price-per-pb">0</div>
+                        <div class="target-card-price-label">Return (%) — Lợi nhuận</div>
+                        <div class="output-val percent" id="return-pb">0%</div>
+                    </div>
+                </div>
             </div>
 
         </div>

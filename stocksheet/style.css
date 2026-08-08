@@ -123,7 +123,17 @@ body {
 .stock-section-title { margin: 0 0 14px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .stock-section-title i { color: var(--text-secondary); }
 
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.stat-grid:last-of-type { margin-bottom: 28px; }
+/* Số cột cố định (không auto-fit) để 2 nhóm chỉ số luôn chia hết hàng, không lẻ dòng như khi gộp chung 7 ô */
+.stat-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 700px) {
+    .stat-grid-3, .stat-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+    .stat-grid-3, .stat-grid-4 { grid-template-columns: 1fr; }
+}
 .stat-tile {
     background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
     box-shadow: var(--shadow-soft); padding: 16px; display: flex; flex-direction: column; gap: 6px;
