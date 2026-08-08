@@ -194,7 +194,10 @@ async function loadTeamSummary() {
 
 // --- UTILS: đọc màu thật từ CSS variable (canvas không hiểu var(--x) trực tiếp) ---
 function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    // Đọc trên .asset-container (không phải <html>) vì bảng màu sáng cố định và bảng màu category
+    // được khai báo trên body/.asset-container — đọc từ <html> sẽ luôn ra giá trị theme tối cũ.
+    const scope = document.querySelector('.asset-container') || document.documentElement;
+    return getComputedStyle(scope).getPropertyValue(name).trim();
 }
 
 // Màu chart lấy từ bộ categorical palette đã validate (--series-1..4 + --series-other), cùng bộ với trang Nhập liệu

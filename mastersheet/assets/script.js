@@ -414,7 +414,10 @@ function renderNavChart(history) {
 
 // --- UTILS ---
 function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    // Đọc trên .asset-container (không phải <html>) vì bảng màu sáng cố định và bảng màu category
+    // được khai báo trên body/.asset-container — đọc từ <html> sẽ luôn ra giá trị theme tối cũ.
+    const scope = document.querySelector('.asset-container') || document.documentElement;
+    return getComputedStyle(scope).getPropertyValue(name).trim();
 }
 
 function formatVnd(num) {
