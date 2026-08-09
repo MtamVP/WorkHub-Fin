@@ -60,7 +60,7 @@ const STAGES_META = {
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
 
-const ALLOWED_GROUPS = ['workhub-fin', 'admin', 'all'];
+const ALLOWED_GROUPS = ['workhub-fin', 'admin', const ALLOWED_GROUPS = ['workhub-fin', 'admin', 'all', 'finance'];
 
 let CURRENT_USER = {
   email: '',
