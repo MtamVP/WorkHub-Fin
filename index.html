@@ -16,7 +16,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
 </head>
@@ -92,6 +92,9 @@
       <ul class="nav-group">
         <li class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')" title="Tổng Quan">
           <i class="fa-solid fa-chart-pie"></i><span> Tổng Quan</span>
+        </li>
+        <li class="nav-item" data-section="chat" onclick="switchSection('chat')" title="Trò Chuyện">
+          <i class="fa-solid fa-comments"></i><span> Trò Chuyện</span>
         </li>
       </ul>
 
@@ -692,6 +695,49 @@
       </div>
     </section>
 
+    <section class="app-section" id="chat-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-comments" style="color: var(--gold);"></i> Trò Chuyện Nhóm</h3>
+          <p>Không gian trao đổi chung của nhóm Finance & Economics — nhắn tin, trả lời, ghim và thả cảm xúc theo thời gian thực.</p>
+        </div>
+      </div>
+
+      <div class="chat-layout">
+        <div class="chat-panel card">
+          <div id="chat-pinned-bar" class="chat-pinned-bar" style="display:none;">
+            <i class="fa-solid fa-thumbtack"></i>
+            <div id="chat-pinned-list" class="chat-pinned-list"></div>
+          </div>
+          <div id="chat-messages-list" class="chat-messages-list">
+            <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải tin nhắn...</div>
+          </div>
+          <div id="chat-reply-preview" class="chat-reply-preview" style="display:none;">
+            <div class="chat-reply-preview-body">
+              <span class="chat-reply-name" id="chat-reply-name"></span>
+              <div class="chat-reply-text" id="chat-reply-text"></div>
+            </div>
+            <button type="button" class="icon-btn" onclick="cancelChatReply()" title="Huỷ trả lời"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <form id="chat-input-form" class="chat-input-row">
+            <div id="chat-mention-dropdown" class="chat-mention-dropdown" style="display:none;"></div>
+            <input type="text" id="chat-msg-input" class="form-control" placeholder="Nhập tin nhắn... (gõ @ để nhắc ai đó)" autocomplete="off">
+            <button type="submit" id="chat-send-btn" title="Gửi tin nhắn"><i class="fa-solid fa-paper-plane"></i></button>
+          </form>
+        </div>
+
+        <aside class="chat-presence-panel card">
+          <div class="chat-presence-header">
+            <span><i class="fa-solid fa-users"></i> Thành viên</span>
+            <span class="chat-presence-count" id="chat-presence-online-count">0</span>
+          </div>
+          <div class="chat-presence-list" id="chat-presence-list">
+            <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     </main>
   </div>
 
@@ -1093,6 +1139,6 @@
 
   <script src="api.js?v=8"></script>
 
-  <script src="script.js?v=11"></script>
+  <script src="script.js?v=12"></script>
 </body>
 </html>

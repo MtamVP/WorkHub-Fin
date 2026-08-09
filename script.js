@@ -101,9 +101,9 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Tổng Quan / Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['dashboard', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
+const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
 let currentSectionKey = 'dashboard';
-const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false };
+const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -121,6 +121,7 @@ function unlockApp() {
 
 async function resolveUserProfile(user) {
   CURRENT_USER.email = user.email;
+  CURRENT_USER.id = user.id;
 
   try {
     const info = await API.auth.getUserInfo(user.email);
@@ -185,8 +186,9 @@ async function initAuth() {
         logPipelineEvent(`Đã đăng nhập tài khoản: ${user.email}`, 'success', 'USER_LOGIN');
       }
     } else {
-      CURRENT_USER = { email: '', nickname: '', groupKey: '' };
+      CURRENT_USER = { email: '', nickname: '', groupKey: '', id: '' };
       if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
+      if (chatChannel && sbClient) { sbClient.removeChannel(chatChannel); chatChannel = null; }
       lockApp();
     }
   });
@@ -773,6 +775,399 @@ function switchSection(sectionKey) {
     SECTION_LOADED.mytasks = true;
     loadMyTasks();
   }
+
+  if (sectionKey === 'chat' && !SECTION_LOADED.chat) {
+    SECTION_LOADED.chat = true;
+    loadChatMessages();
+  }
+}
+
+// -------------------- Chat (Trò Chuyện) --------------------
+
+let chatChannel = null;
+let currentChatReply = null;
+let chatMessagesCache = [];
+const CHAT_EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+function formatChatTime(timestamp) {
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return '';
+  const now = new Date();
+  const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  if (isToday) return timeStr;
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) + ', ' + timeStr;
+}
+
+function formatChatText(text) {
+  let html = escapeHtml(text);
+  html = html.replace(/@All/gi, '<span class="chat-mention-tag">@All</span>');
+  FINANCE_MEMBERS.map(m => m.nickname).filter(Boolean).forEach(name => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('@' + escaped, 'gi');
+    html = html.replace(re, (m) => m.includes('<span') ? m : '<span class="chat-mention-tag">' + m + '</span>');
+  });
+  return html;
+}
+
+function renderChatMessage(msg) {
+  const list = document.getElementById('chat-messages-list');
+  if (!list) return;
+  const emptyState = list.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+
+  const isMe = !!(CURRENT_USER.id && msg.uid === CURRENT_USER.id);
+  const isPinned = !!msg.is_pinned;
+
+  const reactions = msg.reactions || {};
+  const counts = {};
+  let myReaction = null;
+  Object.keys(reactions).forEach(uid => {
+    const icon = reactions[uid];
+    counts[icon] = (counts[icon] || 0) + 1;
+    if (uid === CURRENT_USER.id) myReaction = icon;
+  });
+  const reactionHtml = Object.keys(counts).length
+    ? '<div class="chat-reaction-bar">' + Object.keys(counts).map(icon =>
+        '<span class="chat-reaction-bubble' + (icon === myReaction ? ' is-mine' : '') + '" onclick="toggleChatReaction(\'' + msg.id + '\',\'' + icon + '\')">' + icon + ' ' + counts[icon] + '</span>'
+      ).join('') + '</div>'
+    : '';
+
+  const replyHtml = msg.reply_to
+    ? '<div class="chat-reply-quote"><strong>' + escapeHtml(msg.reply_to.name) + '</strong>' + escapeHtml(msg.reply_to.text) + '</div>'
+    : '';
+
+  const emojiButtons = CHAT_EMOJI_LIST.map(em => '<span onclick="toggleChatReaction(\'' + msg.id + '\',\'' + em + '\')">' + em + '</span>').join('');
+
+  let div = document.getElementById('chat-msg-' + msg.id);
+  if (!div) {
+    div = document.createElement('div');
+    div.id = 'chat-msg-' + msg.id;
+    list.appendChild(div);
+  }
+  div.className = 'chat-msg-row ' + (isMe ? 'is-me' : 'is-other');
+
+  const senderLabel = !isMe ? '<div class="chat-msg-sender">' + escapeHtml(msg.display_name || '') + '</div>' : '';
+  const nameArg = escapeHtml(escapeJs(msg.display_name || ''));
+  const textArg = escapeHtml(escapeJs(msg.text || ''));
+  const pinIcon = isPinned ? '<i class="fa-solid fa-thumbtack"></i> ' : '';
+
+  div.innerHTML =
+    senderLabel +
+    '<div class="chat-msg-bubble ' + (isMe ? 'is-me' : 'is-other') + (isPinned ? ' is-pinned' : '') + '">' +
+    replyHtml +
+    '<span>' + formatChatText(msg.text) + '</span>' +
+    '<span class="chat-msg-time">' + pinIcon + formatChatTime(msg.created_at) + '</span>' +
+    '</div>' +
+    reactionHtml +
+    '<div class="chat-msg-actions">' +
+    '<div class="chat-emoji-wrap">' +
+    '<button type="button" class="icon-btn chat-msg-action-btn" title="Thả cảm xúc" onclick="toggleChatEmojiPicker(\'' + msg.id + '\')"><i class="fa-regular fa-face-smile"></i></button>' +
+    '<div class="chat-emoji-popup" id="chat-emoji-' + msg.id + '">' + emojiButtons + '</div>' +
+    '</div>' +
+    '<button type="button" class="icon-btn chat-msg-action-btn" title="Trả lời" onclick="startChatReply(\'' + msg.id + '\',\'' + nameArg + '\',\'' + textArg + '\')"><i class="fa-solid fa-reply"></i></button>' +
+    '<button type="button" class="icon-btn chat-msg-action-btn" title="' + (isPinned ? 'Bỏ ghim' : 'Ghim') + '" onclick="toggleChatPin(\'' + msg.id + '\', ' + isPinned + ')"><i class="fa-solid fa-thumbtack"></i></button>' +
+    '</div>';
+}
+
+function renderChatPinnedBar() {
+  const bar = document.getElementById('chat-pinned-bar');
+  const list = document.getElementById('chat-pinned-list');
+  if (!bar || !list) return;
+  const pinned = chatMessagesCache.filter(m => m.is_pinned).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  if (!pinned.length) { bar.style.display = 'none'; list.innerHTML = ''; return; }
+  bar.style.display = 'flex';
+  list.innerHTML = pinned.map(m =>
+    '<div class="chat-pinned-item"><span><strong>' + escapeHtml(m.display_name || '') + ':</strong> ' + escapeHtml(m.text || '') + '</span>' +
+    '<button type="button" class="icon-btn chat-msg-action-btn" title="Bỏ ghim" onclick="toggleChatPin(\'' + m.id + '\', true)"><i class="fa-solid fa-xmark"></i></button></div>'
+  ).join('');
+}
+
+function toggleChatEmojiPicker(msgId) {
+  document.querySelectorAll('.chat-emoji-popup.open').forEach(el => {
+    if (el.id !== 'chat-emoji-' + msgId) el.classList.remove('open');
+  });
+  const popup = document.getElementById('chat-emoji-' + msgId);
+  if (popup) popup.classList.toggle('open');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.chat-emoji-wrap')) {
+    document.querySelectorAll('.chat-emoji-popup.open').forEach(el => el.classList.remove('open'));
+  }
+});
+
+async function toggleChatReaction(msgId, emoji) {
+  if (!CURRENT_USER.id) return;
+  const popup = document.getElementById('chat-emoji-' + msgId);
+  if (popup) popup.classList.remove('open');
+  try {
+    const { data, error } = await sbClient.from('messages').select('reactions').eq('id', msgId).single();
+    if (error) throw error;
+    const reactions = data.reactions || {};
+    if (reactions[CURRENT_USER.id] === emoji) delete reactions[CURRENT_USER.id];
+    else reactions[CURRENT_USER.id] = emoji;
+    const { error: updateError } = await sbClient.from('messages').update({ reactions }).eq('id', msgId);
+    if (updateError) throw updateError;
+  } catch (err) {
+    console.error('Lỗi thả cảm xúc:', err);
+  }
+}
+
+function startChatReply(id, name, text) {
+  currentChatReply = { id, name, text };
+  const bar = document.getElementById('chat-reply-preview');
+  const nameEl = document.getElementById('chat-reply-name');
+  const textEl = document.getElementById('chat-reply-text');
+  if (nameEl) nameEl.textContent = 'Trả lời ' + name;
+  if (textEl) textEl.textContent = text;
+  if (bar) bar.style.display = 'flex';
+  const input = document.getElementById('chat-msg-input');
+  if (input) input.focus();
+}
+
+function cancelChatReply() {
+  currentChatReply = null;
+  const bar = document.getElementById('chat-reply-preview');
+  if (bar) bar.style.display = 'none';
+}
+
+async function toggleChatPin(msgId, currentStatus) {
+  try {
+    const { error } = await sbClient.from('messages').update({ is_pinned: !currentStatus }).eq('id', msgId);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Lỗi ghim tin nhắn:', err);
+    showToast('Không thể ghim tin nhắn.', 'error');
+  }
+}
+
+async function loadChatMessages() {
+  const list = document.getElementById('chat-messages-list');
+  if (!list || !sbClient) return;
+  list.innerHTML = '<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải tin nhắn...</div>';
+
+  const { data, error } = await sbClient.from('messages')
+    .select('*')
+    .eq('group_key', 'finance')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error('Lỗi tải tin nhắn:', error);
+    list.innerHTML = '<div class="empty-state">Không thể tải tin nhắn. Vui lòng thử lại sau.</div>';
+    return;
+  }
+
+  chatMessagesCache = (data || []).slice().reverse();
+  list.innerHTML = chatMessagesCache.length ? '' : '<div class="empty-state"><i class="fa-solid fa-comment-slash"></i> Chưa có tin nhắn nào. Hãy là người đầu tiên!</div>';
+  chatMessagesCache.forEach(msg => renderChatMessage(msg));
+  renderChatPinnedBar();
+  list.scrollTop = list.scrollHeight;
+
+  renderChatPresenceList();
+  loadFinanceMembers().then(() => renderChatPresenceList()).catch(() => {});
+
+  const input = document.getElementById('chat-msg-input');
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (input) input.disabled = false;
+  if (sendBtn) sendBtn.disabled = false;
+
+  if (chatChannel) sbClient.removeChannel(chatChannel);
+  chatChannel = sbClient.channel('fin-chat-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: 'group_key=eq.finance' }, payload => {
+      if (payload.eventType === 'DELETE') {
+        const el = document.getElementById('chat-msg-' + payload.old.id);
+        if (el) el.remove();
+        chatMessagesCache = chatMessagesCache.filter(m => m.id !== payload.old.id);
+        renderChatPinnedBar();
+        return;
+      }
+      const msg = payload.new;
+      const idx = chatMessagesCache.findIndex(m => m.id === msg.id);
+      const wasAtBottom = (list.scrollHeight - list.scrollTop - list.clientHeight) < 80;
+      if (idx >= 0) chatMessagesCache[idx] = msg;
+      else chatMessagesCache.push(msg);
+
+      const emptyState2 = list.querySelector('.empty-state');
+      if (emptyState2) emptyState2.remove();
+      renderChatMessage(msg);
+      renderChatPinnedBar();
+
+      if (payload.eventType === 'INSERT' && wasAtBottom) list.scrollTop = list.scrollHeight;
+    })
+    .subscribe();
+}
+
+async function sendChatMessage(event) {
+  if (event) event.preventDefault();
+  const input = document.getElementById('chat-msg-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text || !CURRENT_USER.id) return;
+
+  const payload = {
+    text,
+    uid: CURRENT_USER.id,
+    display_name: CURRENT_USER.nickname || CURRENT_USER.email,
+    is_pinned: false,
+    group_key: 'finance'
+  };
+  if (currentChatReply) {
+    payload.reply_to = { id: currentChatReply.id, name: currentChatReply.name, text: currentChatReply.text };
+  }
+
+  input.value = '';
+  cancelChatReply();
+
+  try {
+    const { error } = await sbClient.from('messages').insert(payload);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Lỗi gửi tin nhắn:', err);
+    showToast('Không thể gửi tin nhắn. Vui lòng thử lại.', 'error');
+    input.value = text;
+  }
+}
+
+function renderChatPresenceList() {
+  const list = document.getElementById('chat-presence-list');
+  const countEl = document.getElementById('chat-presence-online-count');
+  if (!list) return;
+
+  if (!FINANCE_MEMBERS.length) {
+    list.innerHTML = '<div class="empty-state"><i class="fa-solid fa-user-slash"></i> Chưa có dữ liệu thành viên</div>';
+    if (countEl) countEl.textContent = '0';
+    return;
+  }
+
+  const sorted = FINANCE_MEMBERS.slice().sort((a, b) => (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0));
+  if (countEl) countEl.textContent = String(sorted.filter(m => m.isOnline).length);
+
+  list.innerHTML = sorted.map(member => {
+    const initials = getInitials(member.nickname || member.email);
+    const statusDotClass = member.isOnline ? 'online' : 'offline';
+    const statusText = member.isOnline ? 'Đang hoạt động' : timeAgoVietnamese(member.last_changed);
+    const isMe = (member.email || '').toLowerCase() === (CURRENT_USER.email || '').toLowerCase();
+
+    return `
+      <div class="member-item-card chat-presence-item" title="${escapeHtml(member.email)}">
+        <div class="member-avatar-box">
+          <div class="member-avatar-circle">${escapeHtml(initials)}</div>
+          <div class="status-dot-indicator ${statusDotClass}"></div>
+        </div>
+        <div class="member-content">
+          <div class="member-email-title">
+            <span>${escapeHtml(member.nickname || member.email)}</span>
+            ${isMe ? '<span class="member-badge-pill">Bạn</span>' : ''}
+          </div>
+          <div class="member-activity-status ${statusDotClass}"><span>${escapeHtml(statusText)}</span></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// -------------------- Chat @mention autocomplete --------------------
+
+let chatMentionMatches = [];
+let chatMentionActiveIndex = -1;
+let chatMentionAtPos = -1;
+
+function chatMentionCandidates() {
+  const list = FINANCE_MEMBERS.filter(m => m.nickname).map(m => ({ label: m.nickname }));
+  list.unshift({ label: 'All' });
+  return list;
+}
+
+function updateChatMentionDropdown() {
+  const input = document.getElementById('chat-msg-input');
+  const dropdown = document.getElementById('chat-mention-dropdown');
+  if (!input || !dropdown) return;
+
+  const text = input.value;
+  const caret = input.selectionStart;
+  const at = text.lastIndexOf('@', caret - 1);
+
+  if (at === -1) { closeChatMentionDropdown(); return; }
+  const fragment = text.slice(at + 1, caret);
+  if (fragment.includes('\n') || fragment.length > 24) { closeChatMentionDropdown(); return; }
+
+  const query = fragment.toLowerCase();
+  const matches = chatMentionCandidates().filter(c => c.label.toLowerCase().includes(query));
+  if (!matches.length) { closeChatMentionDropdown(); return; }
+
+  chatMentionMatches = matches;
+  chatMentionActiveIndex = 0;
+  chatMentionAtPos = at;
+
+  dropdown.innerHTML = matches.map((c, i) =>
+    '<div class="chat-mention-item' + (i === 0 ? ' active' : '') + '" onmousedown="event.preventDefault(); pickChatMention(' + i + ')">' +
+    '<span class="chat-mention-avatar">' + escapeHtml(getInitials(c.label)) + '</span>' +
+    '<span>' + escapeHtml(c.label) + '</span>' +
+    '</div>'
+  ).join('');
+  dropdown.style.display = 'block';
+}
+
+function closeChatMentionDropdown() {
+  const dropdown = document.getElementById('chat-mention-dropdown');
+  if (dropdown) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; }
+  chatMentionMatches = [];
+  chatMentionActiveIndex = -1;
+  chatMentionAtPos = -1;
+}
+
+function highlightChatMentionActive() {
+  document.querySelectorAll('#chat-mention-dropdown .chat-mention-item').forEach((el, i) => {
+    el.classList.toggle('active', i === chatMentionActiveIndex);
+  });
+}
+
+function pickChatMention(index) {
+  const input = document.getElementById('chat-msg-input');
+  const match = chatMentionMatches[index];
+  if (!input || !match || chatMentionAtPos === -1) { closeChatMentionDropdown(); return; }
+
+  const caret = input.selectionStart;
+  const before = input.value.slice(0, chatMentionAtPos);
+  const after = input.value.slice(caret);
+  const insertion = '@' + match.label + ' ';
+  input.value = before + insertion + after;
+
+  const newCaret = (before + insertion).length;
+  input.setSelectionRange(newCaret, newCaret);
+  input.focus();
+  closeChatMentionDropdown();
+}
+
+function handleChatMentionKeydown(e) {
+  const dropdown = document.getElementById('chat-mention-dropdown');
+  if (!dropdown || dropdown.style.display !== 'block' || !chatMentionMatches.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    chatMentionActiveIndex = (chatMentionActiveIndex + 1) % chatMentionMatches.length;
+    highlightChatMentionActive();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    chatMentionActiveIndex = (chatMentionActiveIndex - 1 + chatMentionMatches.length) % chatMentionMatches.length;
+    highlightChatMentionActive();
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    pickChatMention(chatMentionActiveIndex);
+  } else if (e.key === 'Escape') {
+    closeChatMentionDropdown();
+  }
+}
+
+const chatInputForm = document.getElementById('chat-input-form');
+if (chatInputForm) chatInputForm.addEventListener('submit', sendChatMessage);
+
+const chatMsgInputEl = document.getElementById('chat-msg-input');
+if (chatMsgInputEl) {
+  chatMsgInputEl.addEventListener('input', updateChatMentionDropdown);
+  chatMsgInputEl.addEventListener('keydown', handleChatMentionKeydown);
+  chatMsgInputEl.addEventListener('blur', () => setTimeout(closeChatMentionDropdown, 150));
 }
 
 // ==========================================
