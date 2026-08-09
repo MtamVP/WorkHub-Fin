@@ -1371,17 +1371,17 @@ async function handleProjectCreationOrUpdate() {
   }
 }
 
-// Chia sẻ dự án sang Dashboard Chung — sao chép dự án + toàn bộ task sang app tổng.
+// Chia sẻ dự án sang Dashboard Chung — bật cờ is_shared trên đúng dự án này, không tạo bản sao.
 function shareProjectAction(projectId, projectName) {
   Swal.fire({
-    title: 'Chia sẻ Dự án?',
-    html: `Bạn có muốn sao chép dự án <b>"${projectName}"</b> và toàn bộ công việc sang Dashboard Chung không?<br><small style="color:var(--text-muted);">(Sẽ tạo một bản sao mới)</small>`,
+    title: 'Chia sẻ dự án lên WorkHub Org?',
+    html: `Dự án <b>"${projectName}"</b> sẽ được hiển thị trên Dashboard Chung của WorkHub Org.<br><small style="color:var(--text-muted);">Đây là chia sẻ trực tiếp — không tạo bản sao, mọi cập nhật sau này (tiến độ, công việc...) sẽ luôn tự động đồng bộ.</small>`,
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: 'var(--gold)',
     cancelButtonColor: 'var(--text-muted)',
-    confirmButtonText: 'Chia sẻ ngay',
-    cancelButtonText: 'Thôi'
+    confirmButtonText: 'Chia sẻ',
+    cancelButtonText: 'Huỷ'
   }).then(async (result) => {
     if (result.isConfirmed) {
       Swal.fire({
