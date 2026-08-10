@@ -1512,7 +1512,7 @@ body.app-locked .user-profile-wrapper {
 .chat-msg-bubble.is-other .chat-reply-quote { background: var(--hover-bg); }
 .chat-reply-quote strong { display: block; opacity: .85; }
 
-.chat-mention-tag { background: var(--gold-dim); color: var(--gold-light); padding: 1px 5px; border-radius: var(--radius-xs); font-weight: 600; }
+.chat-mention-tag { background: var(--warning-bg); color: var(--warning-color); padding: 1px 5px; border-radius: var(--radius-xs); font-weight: 600; }
 
 .chat-msg-actions { display: flex; gap: 2px; margin-top: 3px; opacity: 0; transition: opacity .15s ease; }
 .chat-msg-row:hover .chat-msg-actions,
