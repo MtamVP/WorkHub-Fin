@@ -149,7 +149,7 @@ async function resolveUserProfile(user) {
         if (res.isConfirmed) {
           auth.signOut().then(() => openAuthModal(true));
         } else {
-          window.location.href = 'https://workhub-ai.pages.dev/';
+          window.location.href = 'https://workhub-org.pages.dev/';
         }
       });
     }
