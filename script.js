@@ -759,6 +759,10 @@ function switchSection(sectionKey) {
     if (typeof loadAssigneeDropdown === 'function') loadAssigneeDropdown();
   }
 
+  if (sectionKey === 'task' && typeof renderProjectManagerList === 'function') {
+    renderProjectManagerList();
+  }
+
   if (sectionKey === 'calendar' && !SECTION_LOADED.calendar) {
     SECTION_LOADED.calendar = true;
     loadCalendarData();
@@ -1314,6 +1318,7 @@ async function loadProjectOverview(options) {
       if (!globalAllProjects.length) {
         if (tableBody) tableBody.innerHTML = `<tr><td colspan="${colSpanCount}" class="empty-state">Chưa có dự án nào.</td></tr>`;
         if (typeof loadMemberCheckboxes === 'function') loadMemberCheckboxes();
+        if (typeof renderProjectManagerList === 'function') renderProjectManagerList();
         return;
       }
 
@@ -1354,6 +1359,7 @@ async function loadProjectOverview(options) {
       if (typeof loadMemberCheckboxes === 'function') loadMemberCheckboxes();
 
       renderProgressTable();
+      if (typeof renderProjectManagerList === 'function') renderProjectManagerList();
 
     } else if (!quiet) {
       if (tableBody) tableBody.innerHTML = `<tr><td colspan="${colSpanCount}" class="empty-state" style="color:var(--danger-color);">Lỗi Server: ${response.message}</td></tr>`;
@@ -1380,16 +1386,24 @@ function renderProgressTable() {
 
   const filterOwnerDropdown = document.getElementById('progress-search-input');
   const filterProjectDropdown = document.getElementById('progress-project-filter');
+  const filterStatusDropdown = document.getElementById('progress-status-filter');
+  const nameSearchInput = document.getElementById('progress-name-search');
   const sortSelect = document.getElementById('progress-sort-select');
 
   const filterOwner = filterOwnerDropdown ? filterOwnerDropdown.value : "";
   const filterProject = filterProjectDropdown ? filterProjectDropdown.value : "";
+  const filterStatus = filterStatusDropdown ? filterStatusDropdown.value : "";
+  const nameSearch = nameSearchInput ? nameSearchInput.value.trim().toLowerCase() : "";
   const sortVal = sortSelect ? sortSelect.value : "date_desc";
 
   let projects = (globalAllProjects || []).filter(p => {
     const matchOwner = !filterOwner || p.owner === filterOwner;
     const matchProject = !filterProject || p.name === filterProject;
-    return matchOwner && matchProject;
+    const matchStatus = !filterStatus || p.status === filterStatus;
+    const matchSearch = !nameSearch
+      || (p.name || '').toLowerCase().includes(nameSearch)
+      || (p.description || '').toLowerCase().includes(nameSearch);
+    return matchOwner && matchProject && matchStatus && matchSearch;
   });
 
   if (sortVal === 'percent_desc') {
@@ -1818,6 +1832,8 @@ async function loadTasksForProject(projectId, options) {
 
   if (!projectId) {
     if (tableBody) tableBody.innerHTML = '<tr><td colspan="7" class="empty-state">Vui lòng chọn dự án để xem công việc.</td></tr>';
+    const filesCard = document.getElementById('task-project-files-card');
+    if (filesCard) filesCard.style.display = 'none';
     return;
   }
 
@@ -1847,6 +1863,7 @@ async function loadTasksForProject(projectId, options) {
       populateLabelFilter();
       applyPendingTaskFilterRestore();
       applyTaskFilters();
+      loadProjectFiles(projectId);
 
     } else {
       if (!quiet) {
@@ -1861,6 +1878,276 @@ async function loadTasksForProject(projectId, options) {
     }
     showToast("Lỗi kết nối: " + err.message, "error");
   }
+}
+
+// -------------------- Quản lý dự án (trong section Nhiệm Vụ) --------------------
+// Danh sách toàn bộ dự án (không chỉ dự án đang chọn), lọc theo trạng thái/tên,
+// để tìm nhanh các dự án đã hoàn thành (Completed) v.v. Đọc từ cache globalAllProjects
+// đã được loadProjectOverview() nạp sẵn ngay sau đăng nhập — không gọi API riêng.
+
+let projectManagerPanelCollapsed = false;
+
+function toggleProjectManagerPanel() {
+  projectManagerPanelCollapsed = !projectManagerPanelCollapsed;
+  const body = document.getElementById('task-project-manager-body');
+  const btn = document.getElementById('task-project-manager-toggle-btn');
+  if (body) body.style.display = projectManagerPanelCollapsed ? 'none' : 'block';
+  if (btn) btn.innerHTML = `<i class="fa-solid ${projectManagerPanelCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>`;
+}
+
+function renderProjectManagerList() {
+  const tbody = document.getElementById('task-project-manager-body-list');
+  const countBadge = document.getElementById('task-project-manager-count');
+  if (!tbody) return;
+
+  const statusFilter = document.getElementById('task-project-status-filter');
+  const searchInput = document.getElementById('task-project-search');
+  const filterStatus = statusFilter ? statusFilter.value : '';
+  const search = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  const projects = (globalAllProjects || []).filter(p => {
+    const matchStatus = !filterStatus || p.status === filterStatus;
+    const matchSearch = !search || (p.name || '').toLowerCase().includes(search);
+    return matchStatus && matchSearch;
+  });
+
+  if (countBadge) countBadge.textContent = String((globalAllProjects || []).length);
+
+  if (projects.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Không tìm thấy dự án phù hợp.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = projects.map(p => {
+    const isSelected = p.id === currentTaskProjectID;
+    const safeIdArg = escapeHtml(escapeJs(p.id));
+    return `
+    <tr style="${isSelected ? 'background: var(--hover-bg);' : ''}">
+      <td style="font-weight:600;">${escapeHtml(p.name)}</td>
+      <td>${p.status ? `<span class="status-pill pill-neutral" style="font-size:10px; padding:1px 8px;">${escapeHtml(p.status)}</span>` : ''}</td>
+      <td>
+        <div class="score-gauge" style="height:10px;">
+          <div class="score-gauge-fill" style="width:${p.percent || 0}%; background:${getProgressBarColor(p.percent)};"></div>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${p.percent || 0}%</div>
+      </td>
+      <td style="font-size:13px; color: var(--text-secondary);">${escapeHtml(p.lastUpdated || '')}</td>
+      <td style="text-align:center;">
+        <button type="button" class="btn ${isSelected ? 'btn-secondary' : 'btn-outline'}" style="padding: 4px 10px; font-size:12px;" onclick="selectProjectFromManager('${safeIdArg}')">
+          ${isSelected ? 'Đang xem' : 'Chọn'}
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function selectProjectFromManager(projectId) {
+  const select = document.getElementById('task-project-select');
+  if (select) select.value = projectId;
+  loadTasksForProject(projectId);
+}
+
+// -------------------- Tệp của dự án (upload trực tiếp vào dự án, files.project_id) --------------------
+
+let projectFilesPanelCollapsed = false;
+
+function toggleProjectFilesPanel() {
+  projectFilesPanelCollapsed = !projectFilesPanelCollapsed;
+  const body = document.getElementById('task-project-files-body');
+  const btn = document.getElementById('task-project-files-toggle-btn');
+  if (body) body.style.display = projectFilesPanelCollapsed ? 'none' : 'block';
+  if (btn) btn.innerHTML = `<i class="fa-solid ${projectFilesPanelCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>`;
+}
+
+let projectFilesCache = [];
+
+async function loadProjectFiles(projectId) {
+  const card = document.getElementById('task-project-files-card');
+  const list = document.getElementById('task-project-files-list');
+  if (!card || !list) return;
+
+  if (!projectId) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = '<div style="padding:8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div>';
+
+  try {
+    projectFilesCache = await API.file.list(activeGroup, { projectId });
+    renderProjectFilesList();
+  } catch (err) {
+    list.innerHTML = `<div style="padding:8px; color: var(--danger-color); font-size: 12.5px;">Lỗi tải file: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderProjectFilesList() {
+  const list = document.getElementById('task-project-files-list');
+  const countBadge = document.getElementById('task-project-files-count');
+  if (!list) return;
+
+  const items = projectFilesCache || [];
+  if (countBadge) countBadge.textContent = String(items.length);
+
+  if (items.length === 0) {
+    list.innerHTML = '<div style="padding:8px; color: var(--text-muted); font-size: 12.5px;">Chưa có file nào được tải lên dự án này.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(f => {
+    const relatedTask = f.taskId ? (globalAllTasks || []).find(t => t.id === f.taskId) : null;
+    const taskLabel = relatedTask ? `Công việc: ${escapeHtml(relatedTask.name)} · ` : '';
+    return `
+    <div class="task-attachment-item">
+      <div style="min-width:0; flex:1; overflow:hidden;">
+        <a href="${escapeHtml(f.url || '#')}" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(f.name || 'Không tên')}</a>
+        <div class="task-attachment-meta">${taskLabel}${escapeHtml((f.uploader || '').split('@')[0])} · ${escapeHtml(f.date || '')}</div>
+      </div>
+      <button type="button" class="icon-btn danger" title="Xóa file" onclick="deleteProjectFileAction('${escapeHtml(escapeJs(f.id))}', '${escapeHtml(escapeJs(f.name || ''))}')">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>
+  `;
+  }).join('');
+}
+
+async function handleProjectFileUpload() {
+  const input = document.getElementById('task-project-file-input');
+  const btn = document.getElementById('task-project-file-upload-btn');
+  if (!input || !input.files || input.files.length === 0) return;
+  if (!currentTaskProjectID) { showToast('Vui lòng chọn dự án trước.', 'error'); return; }
+
+  const file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) { showToast('Tệp quá lớn! Vui lòng chọn tệp < 5MB.', 'error'); input.value = ''; return; }
+
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...'; }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    const base64Data = e.target.result.split(',')[1];
+    try {
+      const response = await callGAS('uploadFile', {
+        fileData: base64Data,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        groupKey: activeGroup,
+        description: '',
+        email: CURRENT_USER.email,
+        folderPath: '',
+        projectId: currentTaskProjectID
+      });
+      if (response.status !== 'success') throw new Error(response.message);
+      showToast('Tải file lên thành công!', 'success');
+      loadProjectFiles(currentTaskProjectID);
+    } catch (err) {
+      showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+      input.value = '';
+      if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function deleteProjectFileAction(fileId, fileName) {
+  Swal.fire({
+    title: 'Xóa File?',
+    text: `Bạn có chắc muốn xóa file "${fileName}"?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: 'var(--danger-color)',
+    cancelButtonColor: 'var(--text-muted)',
+    confirmButtonText: 'Xóa',
+    cancelButtonText: 'Hủy'
+  }).then(async (result) => {
+    if (!result.isConfirmed) return;
+    try {
+      const response = await callGAS('deleteFile', { fileId, groupKey: activeGroup });
+      if (response.status !== 'success') throw new Error(response.message);
+      showToast(response.message, 'success');
+      await loadProjectFiles(currentTaskProjectID);
+      if (document.getElementById('task-files-modal').classList.contains('open')) renderTaskFilesModalList();
+    } catch (err) {
+      showToast('Lỗi: ' + err.message, 'error');
+    }
+  });
+}
+
+// -------------------- Cửa sổ tệp của từng công việc --------------------
+
+let currentTaskFilesPopupTaskId = null;
+
+function openTaskFilesPopup(taskId, taskName) {
+  if (!currentTaskProjectID) { showToast('Vui lòng chọn dự án trước.', 'error'); return; }
+  currentTaskFilesPopupTaskId = taskId;
+  const nameEl = document.getElementById('task-files-modal-name');
+  if (nameEl) nameEl.textContent = taskName || '';
+  openAppModal('task-files-modal');
+  renderTaskFilesModalList();
+}
+
+function renderTaskFilesModalList() {
+  const list = document.getElementById('task-files-modal-list');
+  if (!list || !currentTaskFilesPopupTaskId) return;
+
+  const items = (projectFilesCache || []).filter(f => f.taskId === currentTaskFilesPopupTaskId);
+
+  if (items.length === 0) {
+    list.innerHTML = '<div style="padding:8px; color: var(--text-muted); font-size: 12.5px;">Chưa có file nào cho công việc này.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(f => `
+    <div class="task-attachment-item">
+      <div style="min-width:0; flex:1; overflow:hidden;">
+        <a href="${escapeHtml(f.url || '#')}" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(f.name || 'Không tên')}</a>
+        <div class="task-attachment-meta">${escapeHtml((f.uploader || '').split('@')[0])} · ${escapeHtml(f.date || '')}</div>
+      </div>
+      <button type="button" class="icon-btn danger" title="Xóa file" onclick="deleteProjectFileAction('${escapeHtml(escapeJs(f.id))}', '${escapeHtml(escapeJs(f.name || ''))}')">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+async function handleTaskModalFileUpload() {
+  const input = document.getElementById('task-files-modal-input');
+  const btn = document.getElementById('task-files-modal-upload-btn');
+  if (!input || !input.files || input.files.length === 0) return;
+  const taskId = currentTaskFilesPopupTaskId;
+  if (!taskId) return;
+
+  const file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) { showToast('Tệp quá lớn! Vui lòng chọn tệp < 5MB.', 'error'); input.value = ''; return; }
+
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...'; }
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    const base64Data = e.target.result.split(',')[1];
+    try {
+      const response = await callGAS('uploadFile', {
+        fileData: base64Data,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        groupKey: activeGroup,
+        description: '',
+        email: CURRENT_USER.email,
+        folderPath: '',
+        projectId: currentTaskProjectID,
+        taskId: taskId
+      });
+      if (response.status !== 'success') throw new Error(response.message);
+      showToast('Tải file lên thành công!', 'success');
+      await loadProjectFiles(currentTaskProjectID);
+      renderTaskFilesModalList();
+    } catch (err) {
+      showToast('Lỗi: ' + err.message, 'error');
+    } finally {
+      input.value = '';
+      if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 function renderTasks(tasks) {
@@ -1926,6 +2213,9 @@ function renderTasks(tasks) {
           onclick="openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}', '${escapeHtml(escapeJs(t.blocked_by || ''))}')">
           <i class="fa-solid fa-pen"></i>
         </button>
+        <button class="icon-btn" title="Tệp của công việc này" onclick="openTaskFilesPopup('${t.id}', '${safeName}')">
+          <i class="fa-solid fa-upload"></i>
+        </button>
         <button class="icon-btn danger" title="Xóa" onclick="deleteTaskAction('${t.id}', '${safeName}')">
           <i class="fa-solid fa-trash"></i>
         </button>
@@ -1981,6 +2271,7 @@ function renderTaskCards(tasks) {
       <div style="display:flex; justify-content:flex-end; gap:4px;">
         <button class="icon-btn" title="Bình luận & lịch sử" onclick="event.stopPropagation(); openTaskActivity('${t.id}', '${safeName}')"><i class="fa-solid fa-comment-dots"></i></button>
         <button class="icon-btn" title="Sửa" onclick="event.stopPropagation(); openEditTask('${t.id}', '${safeName}', '${escapeHtml(escapeJs(t.status))}', '${escapeHtml(escapeJs(t.priority))}', '${escapeHtml(escapeJs(t.dueDate || ''))}', '${safeAssignees}', '${safeDesc}', '${t.parent_task_id || ''}', '${escapeHtml(escapeJs(t.blocked_by || ''))}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="icon-btn" title="Tệp của công việc này" onclick="event.stopPropagation(); openTaskFilesPopup('${t.id}', '${safeName}')"><i class="fa-solid fa-upload"></i></button>
         <button class="icon-btn danger" title="Xóa" onclick="event.stopPropagation(); deleteTaskAction('${t.id}', '${safeName}')"><i class="fa-solid fa-trash"></i></button>
       </div>
     `;
@@ -4641,6 +4932,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (addEventBtn) addEventBtn.addEventListener('click', handleAddEventClick);
   const calendarToggleEl = document.getElementById('calendar-toggle');
   if (calendarToggleEl) calendarToggleEl.addEventListener('change', handleCalendarToggleChange);
+
+  // Progress: filter/sort dropdowns lọc lại từ cache (globalAllProjects), không gọi lại API
+  ['progress-search-input', 'progress-project-filter', 'progress-status-filter', 'progress-sort-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => renderProgressTable());
+  });
+  const progressNameSearchEl = document.getElementById('progress-name-search');
+  if (progressNameSearchEl) progressNameSearchEl.addEventListener('input', () => renderProgressTable());
   if (manageEventBtn) manageEventBtn.addEventListener('click', handleToggleImportantClick);
 
   // Đóng modal Task/Event khi bấm ra ngoài (auth-modal bị khóa nên không áp dụng ở đây)
