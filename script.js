@@ -156,11 +156,6 @@ async function resolveUserProfile(user) {
     return false;
   }
 
-  // 'admin' là giá trị group_key mới cho tài khoản quản trị (thay cho 'all' cũ, xem CHECK
-  // constraint public.users_group_key_check). Chuẩn hóa lại thành 'all' sau khi cổng
-  // ALLOWED_GROUPS đã thông qua, để mọi chỗ check CURRENT_USER.groupKey === 'all' vẫn đúng.
-  if (CURRENT_USER.groupKey === 'admin') CURRENT_USER.groupKey = 'all';
-
   unlockApp();
   updateUserProfileUI();
   startPresenceSystem();
@@ -3695,7 +3690,7 @@ function renderFileTable(fileData) {
 
   fileTableBody.innerHTML = '';
 
-  const showGroupCol = CURRENT_USER.groupKey === 'all';
+  const showGroupCol = CURRENT_USER.groupKey === 'all' || CURRENT_USER.groupKey === 'admin';
 
   let headerHTML = '<th>Tên File</th><th>Đường dẫn</th><th>Mô tả</th>';
   if (showGroupCol) headerHTML += '<th style="text-align:center;">Nhóm</th>';

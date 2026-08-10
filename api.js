@@ -82,7 +82,7 @@ const API = {
         getAllUsers: async (groupKey) => {
             if (!sbClient) return [];
             let query = sbClient.from('users').select('email, name:nickname');
-            if (groupKey && groupKey !== 'all') query = query.eq('group_key', groupKey);
+            if (groupKey && groupKey !== 'all' && groupKey !== 'admin') query = query.eq('group_key', groupKey);
             const { data } = await query;
             return data || [];
         },
@@ -273,8 +273,8 @@ const API = {
             if (archiveScope === 'active') query = query.is('archived_at', null);
             else if (archiveScope === 'archived') query = query.not('archived_at', 'is', null);
 
-            if (groupKey === 'all') {
-                // 'all' là quyền của TÀI KHOẢN (admin xem trực tiếp trong Fin), không phải app
+            if (groupKey === 'admin') {
+                // 'admin' là quyền của TÀI KHOẢN (admin xem trực tiếp trong Fin), không phải app
                 // đang chạy -- chỉ ORG mới được phép gộp is_shared từ app khác vào. Trong Fin,
                 // admin chỉ nên thấy dự án CỦA Fin (cả group_key cũ 'workhub-fin' lẫn 'finance'
                 // mới, xem MTamVP's rename commit), không kéo theo dự án share từ Sci hay dự
@@ -338,8 +338,8 @@ const API = {
         create: async (projectData, groupKey) => {
             const id = genId("PJ");
             const ownerId = await getUserId(projectData.owner);
-            // Cùng lý do như list() ở trên: không stamp thẳng 'all' vào group_key.
-            const effectiveGroupKey = groupKey === 'all' ? 'finance' : groupKey;
+            // Cùng lý do như list() ở trên: không stamp thẳng 'admin' vào group_key.
+            const effectiveGroupKey = groupKey === 'admin' ? 'finance' : groupKey;
 
             const { error } = await sbClient.from('projects').insert({
                 id: id,
@@ -536,7 +536,7 @@ const API = {
             const targetEmail = String(email).trim().toLowerCase();
 
             let projectQuery = sbClient.from('projects').select('id, name').is('deleted_at', null);
-            if (groupKey && groupKey !== 'all') projectQuery = projectQuery.eq('group_key', groupKey);
+            if (groupKey && groupKey !== 'all' && groupKey !== 'admin') projectQuery = projectQuery.eq('group_key', groupKey);
             const { data: projects } = await projectQuery;
             if (!projects || projects.length === 0) return [];
 
@@ -581,7 +581,7 @@ const API = {
             if (!sbClient) return [];
 
             let projectQuery = sbClient.from('projects').select('id').is('deleted_at', null).is('archived_at', null);
-            if (groupKey && groupKey !== 'all') projectQuery = projectQuery.eq('group_key', groupKey);
+            if (groupKey && groupKey !== 'all' && groupKey !== 'admin') projectQuery = projectQuery.eq('group_key', groupKey);
             const { data: projects } = await projectQuery;
             if (!projects || projects.length === 0) return [];
             const projectIds = projects.map(p => p.id);
@@ -900,7 +900,7 @@ const API = {
         list: async (groupKey, filters) => {
             if (!sbClient) return [];
             let query = sbClient.from('files').select('*, users!uploader_id(email)').is('deleted_at', null).order('created_at', { ascending: false }).limit(500);
-            if (groupKey === 'all') {
+            if (groupKey === 'admin') {
                 // Cùng lý do như project.list(): admin xem trực tiếp trong Fin chỉ nên thấy
                 // file CỦA Fin, không kéo theo file share từ Sci hay file riêng của ORG.
                 query = query.in('group_key', ['finance', 'workhub-fin']);
@@ -965,9 +965,9 @@ const API = {
             const filePath = `${fileId}_${safeFileName}`;
             const bucketName = groupKey === 'finance' ? 'finance_bucket' :
                 (groupKey === 'science' ? 'science_bucket' : 'general_bucket');
-            // Admin tải file trực tiếp trong Fin ('all') vẫn phải là file của Fin, không stamp
-            // thẳng 'all' (cùng lý do như project.create()).
-            const effectiveGroupKey = groupKey === 'all' ? 'finance' : groupKey;
+            // Admin tải file trực tiếp trong Fin ('admin') vẫn phải là file của Fin, không
+            // stamp thẳng 'admin' (cùng lý do như project.create()).
+            const effectiveGroupKey = groupKey === 'admin' ? 'finance' : groupKey;
 
             const fullStoragePath = `bronze/${folderPath ? folderPath + '/' : ''}${filePath}`;
 
@@ -1071,8 +1071,8 @@ const API = {
 
             if (calendarType !== 'personal') {
                 let projQuery = sbClient.from('projects').select('id, name').is('deleted_at', null);
-                projQuery = groupKey === 'all'
-                    ? projQuery.or('group_key.eq.all,is_shared.eq.true')
+                projQuery = groupKey === 'admin'
+                    ? projQuery.in('group_key', ['finance', 'workhub-fin'])
                     : projQuery.eq('group_key', groupKey);
                 const { data: projectsForTasks } = await projQuery;
 
@@ -1588,7 +1588,7 @@ const API = {
             return result;
         },
         getMemberList: async () => {
-            const { data } = await sbClient.from('users').select('email').in('group_key', ['finance', 'all']);
+            const { data } = await sbClient.from('users').select('email').in('group_key', ['finance', 'admin']);
             return data ? data.map(d => d.email) : [];
         },
         getMemberDetail: async (email) => {
@@ -1635,7 +1635,7 @@ const API = {
             return (data || []).map(r => r.role);
         },
         listAll: async () => {
-            const { data: members, error: mErr } = await sbClient.from('users').select('id, email, nickname').in('group_key', ['finance', 'all']);
+            const { data: members, error: mErr } = await sbClient.from('users').select('id, email, nickname').in('group_key', ['finance', 'admin']);
             if (mErr) throw mErr;
             const { data: roles, error: rErr } = await sbClient.from('fin_roles').select('user_id, role');
             if (rErr) throw rErr;
@@ -1661,7 +1661,7 @@ const API = {
     },
     note: {
         getFinanceUsers: async () => {
-            const { data } = await sbClient.from('users').select('email, nickname').in('group_key', ['finance', 'all']);
+            const { data } = await sbClient.from('users').select('email, nickname').in('group_key', ['finance', 'admin']);
             return data ? data.map(d => ({ name: d.nickname || d.email, email: d.email })) : [];
         },
         addFinanceNote: async (payload) => {
@@ -1992,8 +1992,8 @@ const API = {
             const pattern = `%${safe}%`;
 
             let projQuery = sbClient.from('projects').select('id, name, description, group_key').is('deleted_at', null);
-            projQuery = groupKey === 'all'
-                ? projQuery.or('group_key.eq.all,is_shared.eq.true')
+            projQuery = groupKey === 'admin'
+                ? projQuery.in('group_key', ['finance', 'workhub-fin'])
                 : projQuery.eq('group_key', groupKey);
             const { data: allProjects } = await projQuery;
 
@@ -2027,8 +2027,8 @@ const API = {
             }
 
             let fileQuery = sbClient.from('files').select('id, name, description, storage_path, group_key').is('deleted_at', null);
-            fileQuery = groupKey === 'all'
-                ? fileQuery.or('group_key.eq.all,is_shared.eq.true')
+            fileQuery = groupKey === 'admin'
+                ? fileQuery.in('group_key', ['finance', 'workhub-fin'])
                 : fileQuery.eq('group_key', groupKey);
             const { data: fileRows } = await fileQuery.or(`name.ilike.${pattern},description.ilike.${pattern}`).limit(8);
             const files = (fileRows || []).map(f => ({
