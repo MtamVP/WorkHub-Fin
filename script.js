@@ -59,7 +59,7 @@ const STAGES_META = {
 
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
-const ALLOWED_GROUPS = ['workhub-fin', 'admin', 'all', 'finance'];
+const ALLOWED_GROUPS = ['admin', 'all', 'finance'];
 
 let CURRENT_USER = {
   email: '',
@@ -77,7 +77,7 @@ const auth = sbClient ? sbClient.auth : null;
 // activeGroup = định danh cố định "dữ liệu của app nào" được gửi làm groupKey trong mọi
 // lời gọi callGAS(...) — khác với CURRENT_USER.groupKey (quyền của người dùng đang đăng
 // nhập). App này chỉ phục vụ nhóm Finance nên giá trị luôn cố định.
-let activeGroup = 'workhub-fin';
+let activeGroup = 'finance';
 
 // ===== Project / Task / Calendar module globals (ported từ app WorkHub anh em) =====
 let currentTaskProjectID = null;
@@ -342,7 +342,7 @@ function startPresenceSystem() {
 
   const pingPresence = async () => {
     try {
-      await API.presence.setOnline(CURRENT_USER.email, CURRENT_USER.nickname, 'workhub-fin');
+      await API.presence.setOnline(CURRENT_USER.email, CURRENT_USER.nickname, 'finance');
     } catch (err) {
       console.warn("Lỗi ping presence:", err);
     }
@@ -421,42 +421,42 @@ async function loadFinanceMembers(showToast = false) {
         {
           email: 'vophucminhtam@gmail.com',
           nickname: 'Minh Tâm',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: true,
           last_changed: new Date().toISOString()
         },
         {
           email: 'phucbui281207@gmail.com',
           nickname: 'Phúc Bùi',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: false,
           last_changed: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'id-test-1785592017660@gmail.com',
           nickname: 'Finance QA Bot',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: false,
           last_changed: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'ta-test-1785580354510@gmail.com',
           nickname: 'Analytics Engine',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: false,
           last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'fn-test-1785579721390@gmail.com',
           nickname: 'Reporting Daemon',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: false,
           last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
         },
         {
           email: 'rt-test-1785370194902@gmail.com',
           nickname: 'Realtime Auditor',
-          group_key: 'workhub-fin',
+          group_key: 'finance',
           isOnline: false,
           last_changed: new Date(Date.now() - 9 * 24 * 3600 * 1000).toISOString()
         }
@@ -472,7 +472,7 @@ async function loadFinanceMembers(showToast = false) {
       members.unshift({
         email: CURRENT_USER.email,
         nickname: CURRENT_USER.nickname || CURRENT_USER.email.split('@')[0],
-        group_key: CURRENT_USER.groupKey || 'workhub-fin',
+        group_key: CURRENT_USER.groupKey || 'finance',
         isOnline: true,
         last_changed: new Date().toISOString()
       });
@@ -601,7 +601,7 @@ function renderMembersList() {
     const isMe = member.email.toLowerCase() === CURRENT_USER.email.toLowerCase();
 
     return `
-      <div class="member-item-card" title="${member.email} (${member.group_key || 'workhub-fin'})">
+      <div class="member-item-card" title="${member.email} (${member.group_key || 'finance'})">
         <div class="member-avatar-box">
           <div class="member-avatar-circle">
             ${initials}
@@ -1183,7 +1183,7 @@ async function fetchLiveObservationLogs() {
   const email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser') || '';
   if (API && API.notification) {
     try {
-      const logs = await API.notification.get('workhub-fin', 25, email);
+      const logs = await API.notification.get('finance', 25, email);
       if (logs && logs.length > 0) {
         LOCAL_LOGS = logs.map(l => ({
           time: new Date(l.timestamp).toTimeString().slice(0, 8),
@@ -1234,7 +1234,7 @@ async function logPipelineEvent(text, type = 'info', action = 'PIPELINE_FIN_ACTI
   const traceId = "TRC_FIN_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
   if (API && API.system && API.system.logAction) {
     try {
-      await API.system.logAction(traceId, action, text, type === 'danger' ? 'error' : 'success', userEmail, 'workhub-fin', null);
+      await API.system.logAction(traceId, action, text, type === 'danger' ? 'error' : 'success', userEmail, 'finance', null);
     } catch (err) {
       console.warn("Không thể ghi log lên Supabase system_logs:", err);
     }
@@ -1274,7 +1274,7 @@ function setupThemeToggle() {
 // ==========================================
 // Ported từ app WorkHub anh em (script.js loadProjectOverview/renderProgressTable/...).
 // Bỏ nhánh isGeneralPage (activeGroup === 'all') vì app này chỉ có 1 nhóm cố định
-// (activeGroup luôn là 'workhub-fin') — cột "Chia sẻ" luôn hiện nút share.
+// (activeGroup luôn là 'finance') — cột "Chia sẻ" luôn hiện nút share.
 // Milestones/Burndown/CSV export KHÔNG được port trong đợt này (xem báo cáo bàn giao).
 
 async function loadProjectOverview(options) {
@@ -3716,7 +3716,7 @@ function renderFileTable(fileData) {
     if (showGroupCol) {
       const groupCell = row.insertCell();
       groupCell.style.textAlign = 'center';
-      groupCell.innerHTML = `<span class="status-pill pill-info">${escapeHtml(file.groupKey || 'workhub-fin')}</span>`;
+      groupCell.innerHTML = `<span class="status-pill pill-info">${escapeHtml(file.groupKey || 'finance')}</span>`;
     }
 
     row.insertCell().textContent = (file.uploader || 'Unknown').split('@')[0];

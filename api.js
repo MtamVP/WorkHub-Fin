@@ -274,7 +274,7 @@ const API = {
             else if (archiveScope === 'archived') query = query.not('archived_at', 'is', null);
 
             if (groupKey === 'all') {
-                query = query.or('group_key.eq.all,is_shared.eq.true');
+                query = query.or('group_key.eq.finance,group_key.eq.all,is_shared.eq.true');
             } else {
                 query = query.eq('group_key', groupKey);
             }
