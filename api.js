@@ -274,7 +274,13 @@ const API = {
             else if (archiveScope === 'archived') query = query.not('archived_at', 'is', null);
 
             if (groupKey === 'all') {
-                query = query.or('group_key.eq.finance,group_key.eq.all,is_shared.eq.true');
+                // 'all' là quyền của TÀI KHOẢN (admin xem trực tiếp trong Fin), không phải app
+                // đang chạy -- chỉ ORG mới được phép gộp is_shared từ app khác vào. Trong Fin,
+                // admin chỉ nên thấy dự án CỦA Fin (cả group_key cũ 'workhub-fin' lẫn 'finance'
+                // mới, xem MTamVP's rename commit), không kéo theo dự án share từ Sci hay dự
+                // án riêng của ORG. Fin's own UI luôn gọi bằng activeGroup cố định nên nhánh
+                // này hiện không có call site nào kích hoạt, nhưng vẫn khoá chặt để phòng xa.
+                query = query.in('group_key', ['finance', 'workhub-fin']);
             } else {
                 query = query.eq('group_key', groupKey);
             }
@@ -332,6 +338,8 @@ const API = {
         create: async (projectData, groupKey) => {
             const id = genId("PJ");
             const ownerId = await getUserId(projectData.owner);
+            // Cùng lý do như list() ở trên: không stamp thẳng 'all' vào group_key.
+            const effectiveGroupKey = groupKey === 'all' ? 'finance' : groupKey;
 
             const { error } = await sbClient.from('projects').insert({
                 id: id,
@@ -339,7 +347,7 @@ const API = {
                 owner_id: ownerId,
                 status: projectData.status || "Planning",
                 description: projectData.description || '',
-                group_key: groupKey
+                group_key: effectiveGroupKey
             });
             if (error) throw error;
             return `Đã tạo dự án ${projectData.name}!`;
@@ -893,7 +901,9 @@ const API = {
             if (!sbClient) return [];
             let query = sbClient.from('files').select('*, users!uploader_id(email)').is('deleted_at', null).order('created_at', { ascending: false }).limit(500);
             if (groupKey === 'all') {
-                query = query.or('group_key.eq.all,is_shared.eq.true');
+                // Cùng lý do như project.list(): admin xem trực tiếp trong Fin chỉ nên thấy
+                // file CỦA Fin, không kéo theo file share từ Sci hay file riêng của ORG.
+                query = query.in('group_key', ['finance', 'workhub-fin']);
             } else {
                 query = query.eq('group_key', groupKey);
             }
@@ -955,6 +965,9 @@ const API = {
             const filePath = `${fileId}_${safeFileName}`;
             const bucketName = groupKey === 'finance' ? 'finance_bucket' :
                 (groupKey === 'science' ? 'science_bucket' : 'general_bucket');
+            // Admin tải file trực tiếp trong Fin ('all') vẫn phải là file của Fin, không stamp
+            // thẳng 'all' (cùng lý do như project.create()).
+            const effectiveGroupKey = groupKey === 'all' ? 'finance' : groupKey;
 
             const fullStoragePath = `bronze/${folderPath ? folderPath + '/' : ''}${filePath}`;
 
@@ -968,7 +981,7 @@ const API = {
                 storage_path: `${bucketName}/${fullStoragePath}`,
                 mime_type: mimeType,
                 uploader_id: uploaderId,
-                group_key: groupKey,
+                group_key: effectiveGroupKey,
                 description: description || '',
                 project_id: projectId || null,
                 task_id: taskId || null
