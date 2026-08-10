@@ -59,7 +59,7 @@ const STAGES_META = {
 
 const STAGE_KEYS = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'];
 let currentStageIndex = 0;
-const ALLOWED_GROUPS = ['admin', 'all', 'finance'];
+const ALLOWED_GROUPS = ['admin', 'finance'];
 
 let CURRENT_USER = {
   email: '',
