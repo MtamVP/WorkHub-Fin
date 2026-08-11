@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quên Mật Khẩu - WorkHub-Finance</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/style.css?v=3.2.1">
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#120F0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/api.js?v=1786351126923"></script>
+
+    <style>
+        .back-link { margin-top: 20px; display: block; text-decoration: none; color: var(--text-secondary); font-weight: 600; }
+        .back-link:hover { text-decoration: underline; color: var(--text-primary); }
+    </style>
+</head>
+<body class="auth-page">
+
+<div class="auth-stars"></div>
+<div class="auth-twinkling"></div>
+
+<div class="auth-card" style="text-align:center;">
+    <div id="form-view">
+        <i class="fa-solid fa-shield-cat fa-3x text-warning mb-3"></i>
+        <h3 style="font-weight:800;">Quên mật khẩu?</h3>
+        <p class="auth-subtitle">Hãy nhập tên đăng nhập để nhận email khôi phục.</p>
+
+        <form id="forgot-form">
+            <div class="auth-input-group">
+                <span class="auth-input-icon"><i class="fa-solid fa-user-tag"></i></span>
+                <input type="text" id="username" class="form-control" placeholder="Tên đăng nhập (Username)" required>
+            </div>
+
+            <button type="submit" id="btn-submit" class="auth-btn-submit">
+                Gửi yêu cầu <i class="fa-solid fa-paper-plane ms-2"></i>
+            </button>
+        </form>
+
+        <div id="status-msg" class="mt-3 small fw-bold"></div>
+    </div>
+
+    <a href="/" class="back-link">
+        <i class="fa-solid fa-arrow-left me-1"></i> Quay lại Đăng nhập
+    </a>
+</div>
+
+<script>
+    // Khởi tạo Supabase Client từ api.js
+    const auth = sbClient.auth;
+
+    // 2. DOM Elements
+    var forgotForm = document.getElementById('forgot-form');
+    var btnSubmit = document.getElementById('btn-submit');
+    var statusMsg = document.getElementById('status-msg');
+    var usernameInput = document.getElementById('username');
+
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            var username = usernameInput.value.trim();
+            if (!username) return;
+
+            // UI Loading
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra...';
+            statusMsg.innerHTML = '';
+            statusMsg.className = '';
+
+            try {
+                const realEmail = await API.auth.getRealEmail(username);
+
+                if (!realEmail) {
+                    throw new Error("Không tìm thấy tên đăng nhập này trong hệ thống.");
+                }
+
+                btnSubmit.innerHTML = '<i class="fa-solid fa-paper-plane fa-spin"></i> Đang gửi mail...';
+                
+                const { error } = await auth.resetPasswordForEmail(realEmail);
+                if (error) throw error;
+
+                btnSubmit.innerHTML = '<i class="fa-solid fa-check"></i> Đã gửi!';
+                btnSubmit.classList.remove('auth-btn-submit');
+                btnSubmit.classList.add('btn', 'btn-success', 'w-100'); // Đổi màu nút thành xanh lá
+
+                // Ẩn bớt email cho bảo mật (voph***@gmail.com)
+                var hiddenEmail = realEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+
+                statusMsg.className = "mt-3 text-success";
+                statusMsg.innerHTML = `
+                    <i class="fa-solid fa-envelope-circle-check"></i> Đã gửi email về: ${hiddenEmail}<br>
+                    <span class="fw-normal text-muted">Vui lòng kiểm tra hộp thư (bao gồm mục Spam).</span>
+                `;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Đã gửi yêu cầu!',
+                    text: `Link khôi phục mật khẩu đã được gửi đến email đăng ký của tài khoản "${username}".`,
+                    confirmButtonText: 'Đã hiểu'
+                });
+
+            } catch (error) {
+                console.error(error);
+
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = 'Thử lại';
+
+                statusMsg.className = "mt-3 text-danger";
+                statusMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + error.message;
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
+

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đổi Mật Khẩu - WorkHub-Finance</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/style.css?v=3.2.1">
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#120F0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/api.js?v=1786351126923"></script>
+</head>
+<body class="auth-page">
+
+    <div class="auth-stars"></div>
+    <div class="auth-twinkling"></div>
+
+    
+    <input type="file" id="login-bg-input" accept="image/*" style="display: none;" onchange="handleLoginBgUpload(this)">
+
+    <div class="auth-card auth-card-wide">
+        <div id="alert-message" class="alert alert-danger d-none" role="alert"></div>
+
+        <form id="reset-form">
+            <h3 style="font-weight:800; margin-bottom:25px;"><i class="fa-solid fa-shield-halved text-warning me-2"></i> Đổi Mật khẩu</h3>
+
+            <div class="mb-3">
+                <label for="newPassword" class="form-label">Mật khẩu mới</label>
+                <div class="auth-input-group">
+                    <span class="auth-input-icon"><i class="fa-solid fa-key"></i></span>
+                    <input type="password" class="form-control" id="newPassword" required minlength="6" placeholder="Nhập mật khẩu mới">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="confirmPassword" class="form-label">Xác nhận Mật khẩu mới</label>
+                <div class="auth-input-group">
+                    <span class="auth-input-icon"><i class="fa-solid fa-check-double"></i></span>
+                    <input type="password" class="form-control" id="confirmPassword" required placeholder="Nhập lại mật khẩu">
+                </div>
+            </div>
+
+            <button type="submit" class="auth-btn-submit">
+                <i class="fa-solid fa-floppy-disk me-2"></i> Cập nhật Mật khẩu
+            </button>
+
+            <button type="button" class="auth-btn-secondary" id="back-to-dashboard-btn">
+                <i class="fa-solid fa-arrow-left me-2"></i> Trở về Dashboard
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Khởi tạo Supabase Client từ api.js
+        const auth = sbClient.auth;
+
+        // 2. ĐIỀU HƯỚNG
+        function goToDashboard() { window.location.href = "/"; }
+        function goToLogin() { window.location.href = "/"; }
+
+        // 3. LOGIC HÌNH NỀN
+        function handleLoginBgUpload(input) {
+            if (input.files && input.files[0]) {
+                var file = input.files[0];
+                if (file.size > 700 * 1024) { Swal.fire("Ảnh nặng quá!", "Ảnh lưu vào Supabase (giới hạn 1MB/document) nên cần dưới 700KB.", "warning"); return; }
+
+                const btnIcon = document.querySelector('.auth-btn-control i.fa-camera');
+                const oldClass = btnIcon.className;
+                btnIcon.className = "fa-solid fa-spinner fa-spin";
+
+                var reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const { data: { user } } = await auth.getUser();
+                        const userEmail = user ? user.email : 'Unknown';
+                        await API.settings.updateSetting('login_theme', e.target.result, userEmail);
+                        btnIcon.className = oldClass;
+                        Swal.fire({ icon: 'success', title: 'Thành công!', text: 'Đã cập nhật hình nền Login.', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                    } catch (err) {
+                        btnIcon.className = oldClass; Swal.fire("Lỗi", err.message, "error");
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function confirmResetTheme() {
+            Swal.fire({
+                title: 'Reset giao diện?', text: "Xóa ảnh nền và quay về mặc định?", icon: 'question',
+                showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Ok, xóa đi ní!', cancelButtonText: 'Khoan...'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const { data: { user } } = await auth.getUser();
+                        const userEmail = user ? user.email : 'Unknown';
+                        await API.settings.updateSetting('login_theme', '', userEmail);
+                        Swal.fire({ icon: 'success', title: 'Đã Reset!', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
+                    } catch (err) {
+                        Swal.fire("Lỗi", err.message, "error");
+                    }
+                }
+            });
+        }
+
+        async function initLoginThemeListener() {
+            // Fetch lần đầu
+            const val = await API.settings.getSetting('login_theme');
+            if (val) {
+                var finalValue = val.startsWith('url') ? val : "url('" + val + "')";
+                document.documentElement.style.setProperty('--login-bg-image', finalValue);
+                document.body.classList.add('has-custom-bg');
+            } else {
+                document.documentElement.style.removeProperty('--login-bg-image');
+                document.body.classList.remove('has-custom-bg');
+            }
+
+            // Lắng nghe realtime Supabase
+            sbClient.channel('custom-reset-theme-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.login_theme' }, (payload) => {
+                    if (payload.new && payload.new.value) {
+                        var imageUrl = payload.new.value;
+                        var finalValue = imageUrl.startsWith('url') ? imageUrl : "url('" + imageUrl + "')";
+                        document.documentElement.style.setProperty('--login-bg-image', finalValue);
+                        document.body.classList.add('has-custom-bg');
+                    } else {
+                        document.documentElement.style.removeProperty('--login-bg-image');
+                        document.body.classList.remove('has-custom-bg');
+                    }
+                })
+                .subscribe();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initLoginThemeListener();
+
+            const resetForm = document.getElementById('reset-form');
+            const alertMessage = document.getElementById('alert-message');
+            const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
+
+            function showAlert(message, type = 'danger') {
+                alertMessage.innerHTML = message;
+                alertMessage.className = 'alert alert-' + type;
+                alertMessage.classList.remove('d-none');
+            }
+
+            // Kiểm tra đăng nhập
+            auth.onAuthStateChange(function(event, session) {
+                if (!session?.user) goToLogin();
+            });
+
+            // Xử lý Submit
+            resetForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                alertMessage.classList.add('d-none');
+
+                const newPass = document.getElementById('newPassword').value;
+                const confirmPass = document.getElementById('confirmPassword').value;
+                const { data: { user } } = await auth.getUser();
+
+                if (newPass !== confirmPass) { showAlert('Mật khẩu xác nhận không khớp.'); return; }
+                if (!user) { showAlert('Vui lòng đăng nhập lại.'); setTimeout(goToLogin, 2000); return; }
+
+                const btnSubmit = resetForm.querySelector('button[type="submit"]');
+                const oldText = btnSubmit.innerHTML;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+                btnSubmit.disabled = true;
+
+                // Gọi Supabase Update Password
+                const { error } = await auth.updateUser({ password: newPass });
+                
+                if (error) {
+                    btnSubmit.innerHTML = oldText; btnSubmit.disabled = false;
+                    showAlert('Lỗi: ' + error.message);
+                } else {
+                    if (window.API && API.system) {
+                        API.system.logAction(Date.now().toString(), 'auth', `Đã đổi mật khẩu thành công`, 'success', user.email, 'all');
+                    }
+                    Swal.fire({
+                        title: 'Thành công!',
+                        text: 'Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.',
+                        icon: 'success',
+                        confirmButtonText: 'Đăng nhập lại'
+                    }).then(() => {
+                        auth.signOut().then(() => goToLogin());
+                    });
+                }
+            });
+
+            backToDashboardBtn.addEventListener('click', goToDashboard);
+        });
+    </script>
+</body>
+</html>
+
+
