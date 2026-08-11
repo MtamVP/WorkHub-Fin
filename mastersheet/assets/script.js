@@ -24,7 +24,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     userEmail = localStorage.getItem('userEmail') || 'Khách';
     targetEmail = userEmail;
     const userDisplay = document.getElementById('user-display');
-    if (userDisplay) userDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${userEmail}`;
+    if (userDisplay) {
+        // Ô này CỐ Ý luôn hiện tài khoản THẬT đang đăng nhập (không đổi theo dropdown
+        // "Đang chỉnh sửa của") -- người dùng từng tưởng đây là lỗi vì nó nằm sát dropdown kia
+        // mà không bao giờ đổi. Gắn title + đổi icon để rõ ràng đây là 2 khái niệm khác nhau.
+        userDisplay.title = 'Tài khoản đang đăng nhập (khác với "Đang chỉnh sửa của")';
+        userDisplay.innerHTML = `<i class="fa-solid fa-shield-halved"></i> ${escapeAssetHtml(userEmail)}`;
+    }
 
     let canManageReferenceData = false;
     try {
