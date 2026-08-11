@@ -1257,8 +1257,8 @@ body.app-locked .user-profile-wrapper {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #80e8dd, #48bfae);
-  color: #0c332d;
+  background: linear-gradient(135deg, var(--gold), #7A5812);
+  color: var(--on-gold);
   font-size: 15px;
   font-weight: 800;
   display: flex;
@@ -1285,12 +1285,12 @@ body.app-locked .user-profile-wrapper {
 }
 
 .status-dot-indicator.online {
-  background: #10B981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  background: var(--success-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-color) 22%, transparent);
 }
 
 .status-dot-indicator.offline {
-  background: #6B7280;
+  background: var(--text-muted);
 }
 
 .member-content {

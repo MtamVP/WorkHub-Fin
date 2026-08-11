@@ -115,14 +115,20 @@ const API = {
             const cleanEmail = email.trim().toLowerCase();
             const displayName = nickname || cleanEmail.split('@')[0];
             try {
+                // uid PHẢI là auth.uid() thật (không phải email) -- RLS "Insert/Update own presence"
+                // kiểm tra đúng uid = auth.uid(), gửi email vào đây khiến mọi lần ping presence bị
+                // chặn im lặng (catch nuốt lỗi) nên trạng thái online/offline không bao giờ cập nhật thật.
+                const { data: authData } = await sbClient.auth.getUser();
+                const authUid = authData && authData.user ? authData.user.id : null;
+                if (!authUid) return;
                 await sbClient.from('user_status').upsert({
-                    uid: cleanEmail,
+                    uid: authUid,
                     email: cleanEmail,
                     display_name: displayName,
                     state: 'online',
                     last_changed: new Date().toISOString(),
                     current_group: groupKey,
-                    photo_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=80e8dd&color=0d2b27&bold=true`
+                    photo_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=C9A84C&color=1A1407&bold=true`
                 });
             } catch (err) {
                 console.warn("Không thể cập nhật presence online:", err);

@@ -414,54 +414,7 @@ async function loadFinanceMembers(showToast = false) {
     if (API && API.presence) {
       members = await API.presence.getFinanceMembers();
     }
-
-    // Default fallback members if database returned empty
-    if (!members || members.length === 0) {
-      members = [
-        {
-          email: 'vophucminhtam@gmail.com',
-          nickname: 'Minh Tâm',
-          group_key: 'finance',
-          isOnline: true,
-          last_changed: new Date().toISOString()
-        },
-        {
-          email: 'phucbui281207@gmail.com',
-          nickname: 'Phúc Bùi',
-          group_key: 'finance',
-          isOnline: false,
-          last_changed: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
-        },
-        {
-          email: 'id-test-1785592017660@gmail.com',
-          nickname: 'Finance QA Bot',
-          group_key: 'finance',
-          isOnline: false,
-          last_changed: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
-        },
-        {
-          email: 'ta-test-1785580354510@gmail.com',
-          nickname: 'Analytics Engine',
-          group_key: 'finance',
-          isOnline: false,
-          last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
-        },
-        {
-          email: 'fn-test-1785579721390@gmail.com',
-          nickname: 'Reporting Daemon',
-          group_key: 'finance',
-          isOnline: false,
-          last_changed: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
-        },
-        {
-          email: 'rt-test-1785370194902@gmail.com',
-          nickname: 'Realtime Auditor',
-          group_key: 'finance',
-          isOnline: false,
-          last_changed: new Date(Date.now() - 9 * 24 * 3600 * 1000).toISOString()
-        }
-      ];
-    }
+    if (!Array.isArray(members)) members = [];
 
     // Always ensure currently logged-in user is marked online
     const currentMember = members.find(m => m.email.toLowerCase() === CURRENT_USER.email.toLowerCase());

@@ -13,6 +13,14 @@ const LEDGER_SUB_LOADED = { cashflow: false, corporate: false };
 const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
 
 document.addEventListener('DOMContentLoaded', async function () {
+    // Trang này tạo sbClient riêng (qua api.js) khi mở/điều hướng lại, và việc khôi phục phiên
+    // đăng nhập Supabase từ localStorage có thể chưa xong nếu tải liền các truy vấn ngay bên
+    // dưới -- khi đó auth.uid() rỗng và mọi ghi dữ liệu (thêm/xóa lệnh, v.v.) bị RLS chặn dù
+    // giao diện vẫn cho thao tác. Đợi phiên khôi phục xong trước khi làm gì khác.
+    if (sbClient) {
+        try { await sbClient.auth.getSession(); } catch (e) { console.warn('Lỗi khôi phục phiên:', e); }
+    }
+
     userEmail = localStorage.getItem('userEmail') || 'Khách';
     targetEmail = userEmail;
     const userDisplay = document.getElementById('user-display');
