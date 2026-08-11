@@ -121,6 +121,12 @@ function unlockApp() {
 async function resolveUserProfile(user) {
   CURRENT_USER.email = user.email;
   CURRENT_USER.id = user.id;
+  // localStorage.getItem('userEmail') is read as a "who am I" fallback in many places across
+  // this app family (api.js's callGAS, mastersheet/, mastersheet/assets/, note/, observation
+  // logs) but nothing ever wrote it — it only ever existed as an in-memory variable here. Any
+  // browser that once had this key set (by an older build) kept reading that same stale email
+  // forever, no matter who actually logs in now. Keep it in sync with the real session.
+  try { localStorage.setItem('userEmail', user.email); } catch (e) {}
 
   try {
     const info = await API.auth.getUserInfo(user.email);
@@ -186,6 +192,7 @@ async function initAuth() {
       }
     } else {
       CURRENT_USER = { email: '', nickname: '', groupKey: '', id: '' };
+      try { localStorage.removeItem('userEmail'); } catch (e) {}
       if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
       if (chatChannel && sbClient) { sbClient.removeChannel(chatChannel); chatChannel = null; }
       lockApp();

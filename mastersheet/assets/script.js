@@ -21,8 +21,20 @@ document.addEventListener('DOMContentLoaded', async function () {
         try { await sbClient.auth.getSession(); } catch (e) { console.warn('Lỗi khôi phục phiên:', e); }
     }
 
-    userEmail = localStorage.getItem('userEmail') || 'Khách';
+    // Đọc thẳng phiên Supabase thật thay vì tin vào localStorage.getItem('userEmail') -- key đó
+    // trước đây KHÔNG BAO GIỜ được ghi ở bất kỳ đâu trong app (chỉ tồn tại như biến JS trong bộ
+    // nhớ của index.html), nên nếu trình duyệt từng có key đó từ một bản build cũ, nó sẽ luôn đọc
+    // ra đúng email cũ đó mãi mãi, bất kể tài khoản nào đang thực sự đăng nhập.
+    let realUserEmail = null;
+    if (sbClient) {
+        try {
+            const { data: { user } } = await sbClient.auth.getUser();
+            if (user) realUserEmail = user.email;
+        } catch (e) { console.warn('Lỗi lấy phiên đăng nhập:', e); }
+    }
+    userEmail = realUserEmail || localStorage.getItem('userEmail') || 'Khách';
     targetEmail = userEmail;
+    if (realUserEmail) { try { localStorage.setItem('userEmail', realUserEmail); } catch (e) {} }
     const userDisplay = document.getElementById('user-display');
     if (userDisplay) {
         // Ô này CỐ Ý luôn hiện tài khoản THẬT đang đăng nhập (không đổi theo dropdown
