@@ -52,6 +52,12 @@
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
+  /* Dùng bởi các trang auth (đổi biệt danh / quên & đổi mật khẩu). Trước đây chỉ
+     được định nghĩa trong finance-shared.css -- file mà những trang đó không nạp --
+     nên mọi hiệu ứng hover/focus ở đó im lặng không chạy. */
+  --transition-fast: all 0.15s ease;
+  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
   --header-height: 66px;
   --sidebar-width: 250px;
   --sidebar-collapsed: 72px;
