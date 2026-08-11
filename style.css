@@ -2151,14 +2151,24 @@ html, body.auth-page {
 
 body.auth-page {
   display: flex; justify-content: center; align-items: center;
-  background-color: #120F0A;
+  background-color: var(--bg-color);
   font-family: var(--font-body);
   position: relative; overflow: hidden;
-  color: #F4EFE6;
+  color: var(--text-primary);
   background-image: var(--login-bg-image);
   background-size: cover; background-position: center; background-repeat: no-repeat;
   transition: background-image 0.5s ease-in-out;
 }
+
+/* These pages pull in Bootstrap for layout only -- its text-* utilities are
+   tuned for a light background and clash/low-contrast on this app's dark
+   theme (and use !important, so they must be matched here to override).
+   Re-point them at this app's own already-tuned semantic color tokens. */
+body.auth-page .text-info { color: var(--info-color) !important; }
+body.auth-page .text-warning { color: var(--warning-color) !important; }
+body.auth-page .text-success { color: var(--success-color) !important; }
+body.auth-page .text-danger { color: var(--danger-color) !important; }
+body.auth-page .text-muted { color: var(--text-muted) !important; }
 
 /* Theme Controls */
 .auth-theme-controls { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 10px; }
