@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đổi Biệt Danh</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/style.css?v=3.2.1">
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#120F0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/api.js?v=1786351126923"></script>
+
+    <style>
+        .auth-avatar-preview:hover { transform: scale(1.05) rotate(5deg); }
+    </style>
+</head>
+<body class="auth-page">
+
+    <div class="auth-stars"></div>
+    <div class="auth-twinkling"></div>
+
+    
+    <input type="file" id="login-bg-input" accept="image/*" style="display: none;" onchange="handleLoginBgUpload(this)">
+
+    <div class="auth-card auth-card-wide" style="text-align:center;">
+        <h3 class="mb-4" style="font-weight:800;"><i class="fa-solid fa-id-card-clip text-info me-2"></i> Đổi Biệt Danh</h3>
+
+        <img id="preview-avatar" src="https://ui-avatars.com/api/?name=User&background=random&size=128&bold=true" class="auth-avatar-preview" alt="Xem trước avatar">
+        <p class="text-muted small mb-4">Nhập tên mới để xem trước Avatar</p>
+
+        <form id="change-form">
+            <div class="mb-3">
+                <input type="text" class="form-control text-center fw-bold" id="newNickname" required placeholder="Nhập biệt danh mới" autocomplete="off" style="height:48px; border-radius: var(--radius-md);">
+            </div>
+
+            <button type="submit" class="auth-btn-submit">
+                <i class="fa-solid fa-floppy-disk me-2"></i> Lưu thay đổi
+            </button>
+            <button type="button" class="auth-btn-secondary" onclick="goToDashboard()">
+                <i class="fa-solid fa-arrow-left me-2"></i> Hủy bỏ
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const auth = sbClient.auth;
+
+        function goToDashboard() { window.location.href = "/"; }
+        function goToLogin() { window.location.href = "/"; }
+
+        function handleLoginBgUpload(input) {
+            if (input.files && input.files[0]) {
+                var file = input.files[0];
+                if (file.size > 700 * 1024) { Swal.fire("Ảnh nặng quá!", "Ảnh lưu vào Supabase (giới hạn 1MB/document) nên cần dưới 700KB.", "warning"); return; }
+
+                const btnIcon = document.querySelector('.auth-btn-control i.fa-camera');
+                const oldClass = btnIcon.className;
+                btnIcon.className = "fa-solid fa-spinner fa-spin";
+
+                var reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const { data: { user } } = await auth.getUser();
+                        const userEmail = user ? user.email : 'Unknown';
+                        await API.settings.updateSetting('login_theme', e.target.result, userEmail);
+                        btnIcon.className = oldClass;
+                        Swal.fire({ icon: 'success', title: 'Đã đổi nền!', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                    } catch (err) {
+                        btnIcon.className = oldClass; Swal.fire("Lỗi", err.message, "error");
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function confirmResetTheme() {
+            Swal.fire({
+                title: 'Reset giao diện?', text: "Xóa ảnh nền và quay về mặc định?", icon: 'question',
+                showCancelButton: true, confirmButtonColor: '#d33', cancelButtonText: 'Khoan...', confirmButtonText: 'Ok, xóa đi ní!'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const { data: { user } } = await auth.getUser();
+                        const userEmail = user ? user.email : 'Unknown';
+                        await API.settings.updateSetting('login_theme', '', userEmail);
+                        Swal.fire({ icon: 'success', title: 'Đã Reset!', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
+                    } catch (err) {
+                        Swal.fire("Lỗi", err.message, "error");
+                    }
+                }
+            });
+        }
+
+        async function initLoginThemeListener() {
+            // Fetch lần đầu
+            const val = await API.settings.getSetting('login_theme');
+            if (val) {
+                var finalValue = val.startsWith('url') ? val : "url('" + val + "')";
+                document.documentElement.style.setProperty('--login-bg-image', finalValue);
+                document.body.classList.add('has-custom-bg');
+            } else {
+                document.documentElement.style.removeProperty('--login-bg-image');
+                document.body.classList.remove('has-custom-bg');
+            }
+
+            // Lắng nghe realtime Supabase
+            sbClient.channel('custom-nickname-theme-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.login_theme' }, (payload) => {
+                    if (payload.new && payload.new.value) {
+                        var imageUrl = payload.new.value;
+                        var finalValue = imageUrl.startsWith('url') ? imageUrl : "url('" + imageUrl + "')";
+                        document.documentElement.style.setProperty('--login-bg-image', finalValue);
+                        document.body.classList.add('has-custom-bg');
+                    } else {
+                        document.documentElement.style.removeProperty('--login-bg-image');
+                        document.body.classList.remove('has-custom-bg');
+                    }
+                })
+                .subscribe();
+        }
+        initLoginThemeListener();
+
+        const newNicknameInput = document.getElementById('newNickname');
+        const previewAvatar = document.getElementById('preview-avatar');
+
+        newNicknameInput.addEventListener('input', function() {
+            let name = this.value || "User";
+            previewAvatar.src = 'https://ui-avatars.com/api/?name=' + name + '&background=random&size=128&bold=true';
+        });
+
+        auth.onAuthStateChange((event, session) => {
+            const user = session?.user;
+            if (!user) { goToLogin(); return; }
+            newNicknameInput.value = user.user_metadata?.display_name || "";
+            newNicknameInput.dispatchEvent(new Event('input')); // Kích hoạt preview
+        });
+
+        document.getElementById('change-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const newName = newNicknameInput.value.trim();
+            try {
+                const { data: { user } } = await auth.getUser();
+                if(!newName || !user) return;
+
+                const res = await API.auth.updateNickname(user.email, newName);
+
+                if(res === "Success") {
+                    await auth.updateUser({
+                        data: {
+                            display_name: newName,
+                            photo_url: 'https://ui-avatars.com/api/?name=' + newName + '&background=random&size=128&bold=true'
+                        }
+                    });
+
+                    if (window.API && API.system) {
+                        await API.system.logAction(Date.now().toString(), 'auth', `Đã đổi biệt danh thành "${newName}"`, 'success', user.email, 'all');
+                    }
+
+                    Swal.fire({
+                        title: 'Thành công!',
+                        text: 'Biệt danh mới đã được lưu.',
+                        icon: 'success',
+                        confirmButtonText: 'Về Dashboard'
+                    }).then(() => {
+                        goToDashboard();
+                    });
+
+                } else {
+                    throw new Error(res);
+                }
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Lỗi', 'Không thể cập nhật: ' + err.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
+
+
