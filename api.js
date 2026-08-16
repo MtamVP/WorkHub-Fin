@@ -2310,3 +2310,41 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.error('Lỗi kích hoạt:', err));
     });
 }
+
+(function initPwaInstallPrompt() {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    let deferredPrompt = null;
+    let btn = null;
+
+    function showButton() {
+        if (btn) { btn.style.display = 'flex'; return; }
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'pwa-install-btn';
+        btn.innerHTML = '<i class="fa-solid fa-download"></i> Cài đặt ứng dụng';
+        btn.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:9999;display:flex;align-items:center;gap:8px;' +
+            'background:#C9A84C;color:#0A0A0F;border:none;border-radius:999px;padding:12px 18px;' +
+            'font-weight:600;font-size:14px;font-family:inherit;box-shadow:0 6px 20px rgba(0,0,0,0.4);cursor:pointer;';
+        btn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            btn.style.display = 'none';
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+        });
+        document.body.appendChild(btn);
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showButton();
+    });
+
+    window.addEventListener('appinstalled', () => {
+        if (btn) btn.style.display = 'none';
+        deferredPrompt = null;
+    });
+})();
