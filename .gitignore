@@ -1,1 +1,4 @@
 graphify-out/
+
+node_modules/
+tauri-dist/

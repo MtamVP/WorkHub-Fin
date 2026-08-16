@@ -1,0 +1,24 @@
+{
+  "name": "wh-fin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "api.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MtamVP/WorkHub-Fin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/MtamVP/WorkHub-Fin/issues"
+  },
+  "homepage": "https://github.com/MtamVP/WorkHub-Fin#readme",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

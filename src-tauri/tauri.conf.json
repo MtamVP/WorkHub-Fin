@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "WorkHub-Fin",
+  "version": "0.1.0",
+  "identifier": "com.workhub.fin",
+  "build": {
+    "frontendDist": "../tauri-dist",
+    "devUrl": "http://localhost:5701",
+    "beforeBuildCommand": "node scripts/sync-web.mjs"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "WorkHub Finance",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}
