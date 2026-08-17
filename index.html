@@ -1173,6 +1173,19 @@
     </div>
   </div>
 
+  <!-- Sync Conflict Modal -->
+  <div class="modal-overlay" id="sync-conflict-modal">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color, #e53e3e);"></i> Thay đổi ngoại tuyến không đồng bộ được</h3>
+        <button class="header-btn" onclick="closeAppModal('sync-conflict-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="sync-conflict-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add / Edit Event Modal -->
   <div class="modal-overlay" id="add-event-modal">
     <div class="modal-card" style="max-width: 600px;">
@@ -1183,6 +1196,7 @@
       <div class="modal-body">
         <form id="event-form" onsubmit="handleEventFormSubmit(event)">
           <input type="hidden" id="event-id" value="">
+          <input type="hidden" id="event-expected-version" value="">
           <div class="form-group">
             <label class="form-label" for="event-title">Tên Sự kiện</label>
             <input type="text" id="event-title" name="title" class="form-control" required>
@@ -1252,7 +1266,14 @@
   </div>
 
   <script src="api.js?v=16"></script>
+  <script src="sync-config.js?v=1"></script>
+  <script src="sync-engine.js?v=1"></script>
 
   <script src="script.js?v=16"></script>
+  <script src="tray-hotkey.js?v=1"></script>
+  <script src="sync-conflict-ui.js?v=1"></script>
+  <script src="notify-deadlines.js?v=1"></script>
+  <script src="backup-config.js?v=1"></script>
+  <script src="local-backup.js?v=1"></script>
 </body>
 </html>

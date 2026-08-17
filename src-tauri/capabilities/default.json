@@ -7,6 +7,25 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default"
+    "core:tray:default",
+    "core:menu:default",
+    "opener:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
+    "notification:default",
+    "fs:allow-mkdir",
+    "fs:allow-write-text-file",
+    "fs:allow-read-dir",
+    "fs:allow-remove",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "$APPLOCALDATA/**" }]
+    },
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select"
   ]
 }

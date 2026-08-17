@@ -373,9 +373,17 @@ const API = {
             if (payload && payload.status) updates.status = payload.status;
             if (payload && payload.description !== undefined) updates.description = payload.description;
 
-            const { data, error } = await sbClient.from('projects').update(updates).eq('id', projectId).select('name').maybeSingle();
+            const expectedVersion = payload && payload.expectedVersion;
+            let query = sbClient.from('projects').update(updates).eq('id', projectId);
+            if (expectedVersion !== undefined && expectedVersion !== null) {
+                query = query.eq('version', expectedVersion);
+            }
+            const { data, error } = await query.select('name').maybeSingle();
             if (error) throw error;
-            return `Đã cập nhật dự án "${data.name}" thành công!`;
+            if (expectedVersion !== undefined && expectedVersion !== null && !data) {
+                throw new Error("Người khác vừa sửa dự án này. Hãy đóng cửa sổ, xem lại nội dung mới rồi sửa lại để không ghi đè lên thay đổi của họ.");
+            }
+            return `Đã cập nhật dự án "${data ? data.name : ''}" thành công!`;
         },
         share: async (projectId, groupKey) => {
             const { data, error } = await sbClient.from('projects').update({ is_shared: true }).eq('id', projectId).select('name').maybeSingle();
@@ -1124,9 +1132,16 @@ const API = {
             if (calendarType === 'personal' && email) {
                 query = query.eq('created_by', email);
             }
+            const expectedVersion = eventData.expectedVersion;
+            if (expectedVersion !== undefined && expectedVersion !== null) {
+                query = query.eq('version', expectedVersion);
+            }
             const { data, error } = await query.select('title').maybeSingle();
             if (error) throw error;
-            return `Đã cập nhật sự kiện "${data.title}" thành công!`;
+            if (expectedVersion !== undefined && expectedVersion !== null && !data) {
+                throw new Error("Người khác vừa sửa sự kiện này. Hãy đóng cửa sổ, xem lại nội dung mới rồi sửa lại để không ghi đè lên thay đổi của họ.");
+            }
+            return `Đã cập nhật sự kiện "${data ? data.title : ''}" thành công!`;
         },
         deleteEvent: async (eventId, calendarType, groupKey, email) => {
             let query = sbClient.from('events').update({ deleted_at: new Date().toISOString() }).eq('id', eventId);
@@ -2121,8 +2136,18 @@ const MUTATING_ACTIONS = new Set([
     'grantFinRole', 'revokeFinRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice'
 ]);
+window.MUTATING_ACTIONS = MUTATING_ACTIONS;
 
+// callGAS is now a thin wrapper: it hands off to WorkHubSync (offline cache/queue layer,
+// sync-engine.js) when present, else dispatches straight through. _dispatchAction is exposed
+// so sync-engine.js can replay queued writes through the exact same ~90-case switch below,
+// with no per-action porting needed for the offline write path.
 window.callGAS = async function(action, params = {}) {
+    if (window.WorkHubSync) return window.WorkHubSync.handle(action, params, _dispatchAction);
+    return _dispatchAction(action, params);
+};
+
+async function _dispatchAction(action, params = {}) {
     if (!params.email || params.email === 'unknown' || params.email === 'Khách') {
         const storedEmail = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
         if (storedEmail) {
@@ -2160,7 +2185,7 @@ window.callGAS = async function(action, params = {}) {
             case 'getProjectListWithTaskStats': result = await API.project.listWithStats(params.groupKey, params.searchName, params.archiveScope); break;
             case 'setProjectArchived': result = await API.project.setArchived(params.projectId, params.archived); break;
             case 'createProject': result = await API.project.create(params, params.groupKey); break;
-            case 'updateProject': result = await API.project.updateNote(params.projectId, { status: params.status, description: params.description }, params.groupKey); break;
+            case 'updateProject': result = await API.project.updateNote(params.projectId, { status: params.status, description: params.description, expectedVersion: params.expectedVersion }, params.groupKey); break;
             case 'shareProject': result = await API.project.share(params.projectId, params.groupKey); break;
             case 'deleteProject': result = await API.project.delete(params.projectId, params.groupKey); break;
             case 'getMilestones': result = await API.project.getMilestones(params.projectId); break;

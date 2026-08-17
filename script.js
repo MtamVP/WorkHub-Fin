@@ -1714,11 +1714,13 @@ async function handleProjectCreationOrUpdate() {
         showToast("Lỗi: " + response.message, "error");
       }
     } else if (selectedProjectId) {
+      const currentProject = (globalAllProjects || []).find(p => p.id === selectedProjectId);
       const response = await callGAS("updateProject", {
         projectId: selectedProjectId,
         status: status,
         description: note,
-        groupKey: activeGroup
+        groupKey: activeGroup,
+        expectedVersion: currentProject ? currentProject.version : undefined
       });
 
       if (response.status === 'success') {
@@ -3292,6 +3294,7 @@ async function loadEventAttendeeCheckboxes() {
 
 function resetEventModalUI() {
   document.getElementById('event-id').value = '';
+  document.getElementById('event-expected-version').value = '';
 
   const modalTitle = document.getElementById('event-modal-title');
   if (modalTitle && eventModalDefaultTitleHTML !== null) modalTitle.innerHTML = eventModalDefaultTitleHTML;
@@ -3316,6 +3319,7 @@ window.openEditEvent = function (id, e) {
   const toTimeStr = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
   document.getElementById('event-id').value = event.id;
+  document.getElementById('event-expected-version').value = event.version != null ? event.version : '';
   document.getElementById('event-title').value = event.title || '';
   document.getElementById('start-date').value = toDateStr(start);
   document.getElementById('start-time').value = toTimeStr(start);
@@ -3445,6 +3449,8 @@ async function handleEventFormSubmit(e) {
 
   const editingId = document.getElementById('event-id').value;
   const isEditing = !!editingId;
+  const expectedVersionRaw = document.getElementById('event-expected-version').value;
+  const expectedVersion = expectedVersionRaw !== '' ? Number(expectedVersionRaw) : undefined;
 
   const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
   if (submitBtn) {
@@ -3458,7 +3464,8 @@ async function handleEventFormSubmit(e) {
       eventId: editingId,
       calendarType: currentCalendarType,
       groupKey: activeGroup,
-      email: CURRENT_USER.email || null
+      email: CURRENT_USER.email || null,
+      expectedVersion: isEditing ? expectedVersion : undefined
     });
 
     if (response.status !== 'success') throw new Error(response.message || 'Không thể lưu sự kiện.');
@@ -4645,6 +4652,7 @@ function initRealtimeSync() {
     },
     (status) => {
       setRealtimeIndicator(status === 'SUBSCRIBED');
+      if (window.WorkHubSync) window.WorkHubSync.onRealtimeStatus(status);
     }
   );
 }
