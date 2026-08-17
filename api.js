@@ -694,47 +694,11 @@ const API = {
             const isNew = !taskData.id;
             taskData.id = taskData.id || genId("T");
 
-            if (!isNew && taskData.blockedBy) {
-                const directIds = String(taskData.blockedBy).split(',').map(x => x.trim()).filter(Boolean);
-                if (directIds.includes(taskData.id)) {
-                    throw new Error("Một công việc không thể tự chặn chính nó.");
-                }
-
-                const visited = new Set(directIds);
-                let frontier = directIds;
-
-                for (let depth = 0; depth < 50 && frontier.length > 0; depth++) {
-                    const { data: rows } = await sbClient.from('tasks')
-                        .select('id, name, blocked_by').in('id', frontier).is('deleted_at', null);
-
-                    const next = [];
-                    for (const row of rows || []) {
-                        const parents = String(row.blocked_by || '').split(',').map(x => x.trim()).filter(Boolean);
-                        for (const parentId of parents) {
-                            if (parentId === taskData.id) {
-                                throw new Error(`Không thể đặt phụ thuộc này: sẽ tạo thành vòng lặp. Công việc "${row.name}" đang bị chặn ngược lại bởi chính công việc bạn đang sửa.`);
-                            }
-                            if (!visited.has(parentId)) {
-                                visited.add(parentId);
-                                next.push(parentId);
-                            }
-                        }
-                    }
-                    frontier = next;
-                }
-            }
-
-            if (taskData.status === 'Done' && taskData.blockedBy) {
-                const blockerIds = String(taskData.blockedBy).split(',').map(x => x.trim()).filter(Boolean);
-                if (blockerIds.length > 0) {
-                    const { data: blockers } = await sbClient.from('tasks').select('name, status').in('id', blockerIds).is('deleted_at', null);
-                    const unfinished = (blockers || []).filter(b => String(b.status).toLowerCase() !== 'done');
-                    if (unfinished.length > 0) {
-                        throw new Error(`Không thể đánh dấu Done: còn đang bị chặn bởi "${unfinished.map(b => b.name).join('", "')}"`);
-                    }
-                }
-            }
-
+            // Vòng lặp phụ thuộc và "không thể Done khi còn blocker" từng được kiểm tra
+            // ở đây (đọc trước rồi mới ghi) -- giờ do trigger validate_task_dependencies
+            // trên chính bảng tasks đảm nhiệm, chặn ở tầng DB cho MỌI đường ghi chứ không
+            // chỉ đường này. Lỗi ném ra từ if (error) throw error phía dưới đã đúng nguyên
+            // văn tiếng Việt của trigger, không cần map lại.
             const payload = {
                 project_id: taskData.projectId,
                 name: taskData.name,
