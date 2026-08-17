@@ -1,3 +1,13 @@
+window.openExternalUrl = function (url) {
+    if (window.__TAURI__ && window.__TAURI__.opener) {
+        window.__TAURI__.opener.openUrl(url).catch(function (err) {
+            console.error('Không mở được link trong app desktop:', err);
+        });
+        return;
+    }
+    window.open(url, '_blank', 'noopener');
+};
+
 window.escapeHtml = function (value) {
     return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function (ch) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
