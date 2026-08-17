@@ -694,19 +694,6 @@ const API = {
             const isNew = !taskData.id;
             taskData.id = taskData.id || genId("T");
 
-            if (!isNew && taskData.baseUpdatedAt) {
-                const { data: current } = await sbClient.from('tasks')
-                    .select('updated_at').eq('id', taskData.id).maybeSingle();
-                if (current && current.updated_at) {
-                    const dbTime = new Date(current.updated_at).getTime();
-                    const seenTime = new Date(taskData.baseUpdatedAt).getTime();
-
-                    if (dbTime - seenTime > 1000) {
-                        throw new Error("Người khác vừa sửa công việc này. Hãy đóng cửa sổ, xem lại nội dung mới rồi sửa lại để không ghi đè lên thay đổi của họ.");
-                    }
-                }
-            }
-
             if (!isNew && taskData.blockedBy) {
                 const directIds = String(taskData.blockedBy).split(',').map(x => x.trim()).filter(Boolean);
                 if (directIds.includes(taskData.id)) {
@@ -748,8 +735,7 @@ const API = {
                 }
             }
 
-            const { error } = await sbClient.from('tasks').upsert({
-                id: taskData.id,
+            const payload = {
                 project_id: taskData.projectId,
                 name: taskData.name,
                 status: taskData.status,
@@ -757,13 +743,31 @@ const API = {
                 due_date: taskData.dueDate,
                 description: taskData.description,
                 attachments: typeof taskData.attachments === 'string' ? JSON.parse(taskData.attachments || '[]') : taskData.attachments,
-
                 assignees: Array.isArray(taskData.assignees) ? taskData.assignees.join(', ') : taskData.assignees,
                 parent_task_id: taskData.parentTaskId || null,
                 blocked_by: taskData.blockedBy || null,
                 labels: taskData.labels || null
-            });
-            if (error) throw error;
+            };
+
+            if (isNew) {
+                const { error } = await sbClient.from('tasks').insert({ id: taskData.id, ...payload });
+                if (error) throw error;
+            } else {
+                // version = optimistic-lock token (see [[workhub-group-key-privesc-fixed]]-style fix:
+                // tasks.version auto-increments via DB trigger on every UPDATE). Matching it in the
+                // WHERE clause makes the whole check-and-write atomic in one statement -- no separate
+                // read-then-compare round trip that a concurrent writer could slip in between.
+                const expectedVersion = taskData.expectedVersion;
+                let query = sbClient.from('tasks').update(payload).eq('id', taskData.id);
+                if (expectedVersion !== undefined && expectedVersion !== null) {
+                    query = query.eq('version', expectedVersion);
+                }
+                const { data, error } = await query.select('id');
+                if (error) throw error;
+                if (expectedVersion !== undefined && expectedVersion !== null && (!data || data.length === 0)) {
+                    throw new Error("Người khác vừa sửa công việc này. Hãy đóng cửa sổ, xem lại nội dung mới rồi sửa lại để không ghi đè lên thay đổi của họ.");
+                }
+            }
             await API.task._writeAssignees(taskData.id, taskData.assignees);
             if (taskData.projectId) await API.project.recalculate(taskData.projectId, groupKey);
             return `Đã lưu task "${taskData.name}"!`;

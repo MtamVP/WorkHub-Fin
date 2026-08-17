@@ -84,7 +84,7 @@ let currentTaskProjectID = null;
 let globalAllProjects = [];
 let globalAllTasks = [];
 let showArchivedProjects = false;
-let editingTaskBaseUpdatedAt = null;
+let editingTaskExpectedVersion = null;
 let pendingTaskFilterRestore = null;
 let expanded = false; // toggle dropdown #checkboxes (chọn người thực hiện task)
 let eventAttendeesExpanded = false; // toggle dropdown #event-attendee-checkboxes
@@ -2325,7 +2325,7 @@ async function handleKanbanDrop(newStatus) {
       description: task.description,
       parentTaskId: task.parent_task_id,
       blockedBy: task.blocked_by,
-      baseUpdatedAt: task.updated_at,
+      expectedVersion: task.version,
       groupKey: activeGroup
     });
     if (response.status !== 'success') throw new Error(response.message);
@@ -2558,7 +2558,7 @@ function exportTasksCsv() {
 function resetTaskModalUI() {
   const form = document.getElementById('task-form');
   if (form) form.reset();
-  editingTaskBaseUpdatedAt = null;
+  editingTaskExpectedVersion = null;
   document.getElementById('task-id').value = '';
   document.getElementById('new-task-parent-id').value = '';
   document.querySelectorAll('input[name="task-assignees"]').forEach(cb => cb.checked = false);
@@ -2579,7 +2579,7 @@ function openAddTask() {
 
 function openEditTask(id, name, status, priority, dueDate, assigneesStr, description, parentTaskId, blockedByStr) {
   const sourceTask = (globalAllTasks || []).find(t => t.id === id);
-  editingTaskBaseUpdatedAt = sourceTask ? (sourceTask.updated_at || null) : null;
+  editingTaskExpectedVersion = sourceTask && sourceTask.version != null ? sourceTask.version : null;
 
   const labelsInput = document.getElementById('new-task-labels');
   if (labelsInput) labelsInput.value = sourceTask ? (sourceTask.labels || '') : '';
@@ -2635,7 +2635,7 @@ async function handleTaskFormSubmit(e) {
     parentTaskId: document.getElementById('new-task-parent-id').value || null,
     blockedBy: selectedBlockers,
     labels: normalizeLabels(document.getElementById('new-task-labels') ? document.getElementById('new-task-labels').value : ''),
-    baseUpdatedAt: editingTaskBaseUpdatedAt
+    expectedVersion: editingTaskExpectedVersion
   };
 
   if (!taskData.projectId) {
