@@ -48,6 +48,8 @@ function loadPipelineStage(stageKey) {
     if (titleEl) {
       if (stageKey === 'e2') {
         titleEl.innerHTML = 'E2: Data Integrity & Source Validation';
+      } else if (stageKey === 'e3') {
+        titleEl.innerHTML = 'E3: Data Standardization & Cleaning';
       } else {
         titleEl.innerHTML = 'Thiết lập Auto Process';
       }
@@ -62,6 +64,15 @@ function loadPipelineStage(stageKey) {
         btn.classList.add('pipeline-btn-secondary');
       }
       runE2Validation();
+    } else if (stageKey === 'e3') {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
+      runE3Cleaning();
     } else {
       window.isAutoPaused = false;
       const btn = document.getElementById('btn-toggle-auto');
@@ -218,6 +229,135 @@ async function runE2Validation() {
     }
 
     checkNextFile();
+
+  } catch (err) {
+    addTerminalLog(consoleLog, 'ERROR', 'Lỗi kết nối tới Storage: ' + err.message, 'error');
+  }
+}
+
+async function runE3Cleaning() {
+  const progressBar = document.getElementById('auto-progress-bar');
+  const progressText = document.getElementById('auto-progress-text');
+  const consoleLog = document.getElementById('agent-console');
+  
+  if (!progressBar || !progressText || !consoleLog) return;
+
+  progressBar.style.width = '0%';
+  progressText.textContent = '0%';
+  consoleLog.innerHTML = '';
+
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng chuẩn hóa và làm sạch (Cleaning & Parsing)...', 'info');
+  
+  try {
+    const response = await callGAS('getFileList', { groupKey: 'finance' });
+    let files = [];
+    if (response && response.status === 'success') {
+      files = response.data || [];
+    } else if (Array.isArray(response)) {
+      files = response;
+    }
+    
+    // Lọc lấy các file từ bronze
+    const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
+    
+    if (bronzeFiles.length === 0) {
+      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào ở phân vùng Bronze để làm sạch.', 'warning');
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      return;
+    }
+
+    let currentStep = 0;
+    
+    // Khởi tạo Web Worker
+    const parserWorker = new Worker('pipeline/parser-worker.js');
+    
+    function cleanNextFile() {
+      if (window.isAutoPaused) {
+        setTimeout(cleanNextFile, 500);
+        return;
+      }
+
+      if (currentStep >= bronzeFiles.length) {
+         progressBar.style.width = '100%';
+         progressText.textContent = '100%';
+         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất quy trình làm sạch (E3). Dữ liệu được đẩy vào Silver.', 'success');
+         parserWorker.terminate();
+         
+         setTimeout(() => {
+           if (typeof navStage === 'function') navStage(1);
+         }, 2500);
+         return;
+      }
+
+      const file = bronzeFiles[currentStep];
+      const p = Math.floor(10 + (currentStep / bronzeFiles.length) * 80);
+      progressBar.style.width = `${p}%`;
+      progressText.textContent = `${p}%`;
+
+      const extMatch = file.name.match(/\.([^.]+)$/);
+      const ext = extMatch ? extMatch[1].toLowerCase() : '';
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      const cleanName = `clean_${baseName}.txt`;
+
+      addTerminalLog(consoleLog, 'INFO', `Đang tải file ${file.name} từ Bronze về bộ nhớ tạm...`, 'info');
+
+      // Tải file và parse qua Web Worker
+      fetch(file.url)
+        .then(res => res.arrayBuffer())
+        .then(arrayBuffer => {
+           addTerminalLog(consoleLog, 'INFO', `Đã nạp ArrayBuffer. Kích hoạt Web Worker bóc tách dữ liệu...`, 'info');
+           
+           parserWorker.onmessage = async (e) => {
+             if (e.data.success) {
+               addTerminalLog(consoleLog, 'SUCCESS', `Bóc tách thành công! Bắt đầu upload lên Silver...`, 'success');
+               const rawText = e.data.text;
+               // Base64 encode an toàn với Unicode
+               const base64Data = btoa(unescape(encodeURIComponent(rawText)));
+               const email = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.email : 'unknown';
+               
+               try {
+                 const res = await callGAS('uploadFile', {
+                    fileData: base64Data,
+                    fileName: cleanName,
+                    mimeType: 'text/plain',
+                    groupKey: 'finance',
+                    description: `[Cleaned] Dữ liệu từ ${file.name}`,
+                    email: email,
+                    folderPath: 'silver'
+                 });
+                 if (res && res.status === 'error') {
+                    addTerminalLog(consoleLog, 'ERROR', `Lỗi tải lên Silver: ${res.message}`, 'error');
+                 } else {
+                    addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại phân vùng Silver.`, 'success');
+                 }
+               } catch (err) {
+                 addTerminalLog(consoleLog, 'ERROR', `Lỗi kết nối khi đẩy dữ liệu sang Silver.`, 'error');
+               }
+             } else {
+               addTerminalLog(consoleLog, 'ERROR', `Lỗi bóc tách dữ liệu: ${e.data.error}`, 'error');
+             }
+             
+             // Xử lý file tiếp theo
+             currentStep++;
+             setTimeout(cleanNextFile, 1000);
+           };
+
+           // Gửi lệnh parse
+           parserWorker.postMessage({
+              fileBytes: arrayBuffer,
+              fileName: file.name,
+              ext: ext
+           }, [arrayBuffer]); // Transferrable object để tiết kiệm RAM
+        })
+        .catch(err => {
+           addTerminalLog(consoleLog, 'ERROR', `Không thể tải file ${file.name}: ${err.message}`, 'error');
+           currentStep++;
+           setTimeout(cleanNextFile, 1000);
+        });
+    }
+
+    cleanNextFile();
 
   } catch (err) {
     addTerminalLog(consoleLog, 'ERROR', 'Lỗi kết nối tới Storage: ' + err.message, 'error');
