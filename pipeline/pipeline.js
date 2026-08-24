@@ -1,6 +1,22 @@
 // pipeline.js
 // Handles UI interactions and animations for the pipeline stages
 
+window.isAutoPaused = false;
+
+function toggleAutoProcess() {
+  window.isAutoPaused = !window.isAutoPaused;
+  const btn = document.getElementById('btn-toggle-auto');
+  if (btn) {
+    if (window.isAutoPaused) {
+      btn.innerHTML = '<i class="fa-solid fa-play"></i> Tiếp tục';
+      btn.classList.replace('pipeline-btn-secondary', 'pipeline-btn-primary');
+    } else {
+      btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+      btn.classList.replace('pipeline-btn-primary', 'pipeline-btn-secondary');
+    }
+  }
+}
+
 function loadPipelineStage(stageKey) {
   // Hide all panels
   const panels = document.querySelectorAll('.pipeline-stage-panel');
@@ -38,8 +54,22 @@ function loadPipelineStage(stageKey) {
     }
 
     if (stageKey === 'e2') {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
       runE2Validation();
     } else {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
       simulateAutoProcessing(stageKey);
     }
   }
@@ -72,6 +102,8 @@ function simulateAutoProcessing(stageKey) {
 
   let progress = 0;
   const interval = setInterval(() => {
+    if (window.isAutoPaused) return;
+
     progress += Math.floor(Math.random() * 20) + 10;
     if (progress > 100) progress = 100;
 
@@ -122,8 +154,8 @@ async function runE2Validation() {
   progressText.textContent = '0%';
   consoleLog.innerHTML = '';
 
-  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng kiểm tra định dạng và cấu trúc (Source Validation)...', 'info');
-  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới kho chứa phân vùng Bronze...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng kiểm tra định dạng và cấu trúc...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới bronze...', 'info');
 
   try {
     const response = await callGAS('getFileList', { groupKey: 'finance' });
@@ -137,7 +169,7 @@ async function runE2Validation() {
     const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
     
     if (bronzeFiles.length === 0) {
-      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào trong phân vùng Bronze để kiểm tra.', 'warning');
+      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào trong bronze để kiểm tra.', 'warning');
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       return;
@@ -148,10 +180,15 @@ async function runE2Validation() {
     let currentStep = 0;
     
     function checkNextFile() {
+      if (window.isAutoPaused) {
+        setTimeout(checkNextFile, 500);
+        return;
+      }
+
       if (currentStep >= bronzeFiles.length) {
          progressBar.style.width = '100%';
          progressText.textContent = '100%';
-         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất kiểm tra cơ bản tất cả các tập tin. Chuyển sang E3 (Cleaning)...', 'success');
+         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất kiểm tra cơ bản tất cả các tập tin. Chuyển sang E3...', 'success');
          
          setTimeout(() => {
            if (typeof navStage === 'function') navStage(1);
@@ -167,10 +204,10 @@ async function runE2Validation() {
       addTerminalLog(consoleLog, 'INFO', `Đang kiểm tra tập tin: ${file.name}...`, 'info');
 
       setTimeout(() => {
-        addTerminalLog(consoleLog, 'INFO', `Xác minh bảng mã (Encoding) và tính toàn vẹn: Không phát hiện lỗi nghiêm trọng.`, 'info');
+        addTerminalLog(consoleLog, 'INFO', `Xác minh encoding và tính toàn vẹn: Không phát hiện lỗi nghiêm trọng.`, 'info');
         
         setTimeout(() => {
-          addTerminalLog(consoleLog, 'SUCCESS', `Tập tin ${file.name} hợp lệ (đọc được nội dung).`, 'success');
+          addTerminalLog(consoleLog, 'SUCCESS', `Tập tin ${file.name} hợp lệ.`, 'success');
           
           currentStep++;
           const delay = Math.floor(Math.random() * 300) + 200;

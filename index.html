@@ -416,8 +416,13 @@
               <p style="color: var(--text-secondary); font-size: 14px;">Giai đoạn này tự động chạy nền. Các rules sẽ kiểm tra dữ liệu rỗng, sai định dạng hoặc bất thường trước khi xử lý.</p>
               
               <div style="margin-top: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-                  <span>Tiến độ xử lý</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>Tiến độ xử lý</span>
+                    <button id="btn-toggle-auto" class="pipeline-btn pipeline-btn-secondary" style="padding: 2px 8px; font-size: 11px; height: 24px;" onclick="toggleAutoProcess()">
+                      <i class="fa-solid fa-pause"></i> Tạm dừng
+                    </button>
+                  </div>
                   <span style="color: var(--gold);" id="auto-progress-text">0%</span>
                 </div>
                 <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 4px; height: 6px; overflow: hidden;">
