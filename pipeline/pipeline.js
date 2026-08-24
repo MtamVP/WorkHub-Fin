@@ -306,11 +306,11 @@ async function runE3Cleaning() {
       fetch(file.url)
         .then(res => res.arrayBuffer())
         .then(arrayBuffer => {
-           addTerminalLog(consoleLog, 'INFO', `Đã nạp ArrayBuffer. Kích hoạt Web Worker bóc tách dữ liệu...`, 'info');
+           addTerminalLog(consoleLog, 'INFO', `Đã nạp ArrayBuffer. Kích hoạt Web Worker parse dữ liệu...`, 'info');
            
            parserWorker.onmessage = async (e) => {
              if (e.data.success) {
-               addTerminalLog(consoleLog, 'SUCCESS', `Bóc tách thành công! Bắt đầu upload lên Silver...`, 'success');
+               addTerminalLog(consoleLog, 'SUCCESS', `Parse thành công! Bắt đầu upload lên Silver...`, 'success');
                const rawText = e.data.text;
                // Base64 encode an toàn với Unicode
                const base64Data = btoa(unescape(encodeURIComponent(rawText)));
@@ -329,7 +329,7 @@ async function runE3Cleaning() {
                  if (res && res.status === 'error') {
                     addTerminalLog(consoleLog, 'ERROR', `Lỗi tải lên Silver: ${res.message}`, 'error');
                  } else {
-                    addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại phân vùng Silver.`, 'success');
+                    addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại Silver.`, 'success');
                  }
                } catch (err) {
                  addTerminalLog(consoleLog, 'ERROR', `Lỗi kết nối khi đẩy dữ liệu sang Silver.`, 'error');
