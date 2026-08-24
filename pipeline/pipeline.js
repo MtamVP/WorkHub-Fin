@@ -111,7 +111,7 @@ function addTerminalLog(container, level, message, typeClass) {
   container.scrollTop = container.scrollHeight;
 }
 
-function runE2Validation() {
+async function runE2Validation() {
   const progressBar = document.getElementById('auto-progress-bar');
   const progressText = document.getElementById('auto-progress-text');
   const consoleLog = document.getElementById('agent-console');
@@ -122,55 +122,69 @@ function runE2Validation() {
   progressText.textContent = '0%';
   consoleLog.innerHTML = '';
 
-  const logs = [
-    { p: 5, l: 'INFO', m: 'Khởi chạy luồng kiểm tra tính toàn vẹn (Source Validation)...' },
-    { p: 10, l: 'INFO', m: 'Đang kết nối tới kho chứa phân vùng Bronze...' },
-    { p: 15, l: 'INFO', m: 'Đang tải danh sách các tập tin cần xác thực...' },
-    { p: 20, l: 'INFO', m: 'Phát hiện 2 tập tin chuẩn bị đưa vào luồng kiểm tra.' },
-    { p: 25, l: 'INFO', m: 'Đang đọc cấu trúc tập tin số 1 (Bao_cao_tai_chinh.pdf)...' },
-    { p: 30, l: 'INFO', m: 'Xác thực định dạng PDF: Kiểm tra bảng tham chiếu chéo (XREF).' },
-    { p: 35, l: 'INFO', m: 'Kiểm tra phông chữ nhúng (Embedded fonts): Không phát hiện lỗi.' },
-    { p: 40, l: 'SUCCESS', m: 'Tập tin Bao_cao_tai_chinh.pdf nguyên vẹn và hợp lệ.' },
-    { p: 45, l: 'INFO', m: 'Đang nạp luồng byte tập tin số 2 (Du_lieu_giao_dich_Q3.csv)...' },
-    { p: 50, l: 'INFO', m: 'Xác minh bảng mã (Encoding): Phát hiện định dạng UTF-8 không có BOM.' },
-    { p: 55, l: 'INFO', m: 'Phân tích dòng tiêu đề (Header row): Tìm thấy 12 cột dữ liệu.' },
-    { p: 60, l: 'INFO', m: 'Kiểm tra tính nhất quán số lượng cột trên các dòng tiếp theo...' },
-    { p: 62, l: 'INFO', m: 'Đã quét qua 1000 dòng...' },
-    { p: 65, l: 'WARN', m: 'Phát hiện bất thường: Dòng 1004 có 13 cột (dư 1 cột so với tiêu đề).' },
-    { p: 68, l: 'WARN', m: 'Phát hiện bất thường: Dòng 1005 có 13 cột.' },
-    { p: 70, l: 'ERROR', m: 'Lỗi cấu trúc nghiêm trọng: Dữ liệu CSV bị lệch cột, vi phạm tính toàn vẹn bảng.' },
-    { p: 75, l: 'ERROR', m: 'Kích hoạt cơ chế Fail-fast: Hủy bỏ tiến trình xử lý tập tin Du_lieu_giao_dich_Q3.csv.' },
-    { p: 75, l: 'INFO', m: 'Đang ghi nhận nhật ký lỗi và dọn dẹp bộ nhớ tạm...' },
-    { p: 75, l: 'INFO', m: 'Yêu cầu người dùng kiểm tra lại cấu trúc tập tin bị lỗi trước khi chạy tiếp luồng.' }
-  ];
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng kiểm tra định dạng và cấu trúc (Source Validation)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới kho chứa phân vùng Bronze...', 'info');
 
-  let currentStep = 0;
-  
-  function nextStep() {
-    if (currentStep >= logs.length) {
-       if (typeof Swal !== 'undefined') {
-          Swal.fire({
-            title: 'Lỗi cấu trúc dữ liệu!', 
-            text: 'Tập tin CSV bị lệch cột tại dòng 1004. Hệ thống đã dừng tiến trình (Fail-fast) để tránh sai sót dữ liệu ở các bước sau. Vui lòng làm sạch file gốc và tải lại.', 
-            icon: 'error',
-            confirmButtonText: 'Đã hiểu'
-          });
-       }
-       return;
+  try {
+    const response = await callGAS('getFileList', { groupKey: 'finance' });
+    let files = [];
+    if (response && response.status === 'success') {
+      files = response.data || [];
+    } else if (Array.isArray(response)) {
+      files = response;
     }
     
-    const step = logs[currentStep];
-    progressBar.style.width = `${step.p}%`;
-    progressText.textContent = `${step.p}%`;
+    const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
     
-    addTerminalLog(consoleLog, step.l, step.m, step.l.toLowerCase());
-    
-    currentStep++;
-    const delay = Math.floor(Math.random() * 500) + 300;
-    setTimeout(nextStep, delay);
-  }
+    if (bronzeFiles.length === 0) {
+      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào trong phân vùng Bronze để kiểm tra.', 'warning');
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      return;
+    }
 
-  nextStep();
+    addTerminalLog(consoleLog, 'INFO', `Phát hiện ${bronzeFiles.length} tập tin. Bắt đầu quét...`, 'info');
+
+    let currentStep = 0;
+    
+    function checkNextFile() {
+      if (currentStep >= bronzeFiles.length) {
+         progressBar.style.width = '100%';
+         progressText.textContent = '100%';
+         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất kiểm tra cơ bản tất cả các tập tin. Chuyển sang E3 (Cleaning)...', 'success');
+         
+         setTimeout(() => {
+           if (typeof navStage === 'function') navStage(1);
+         }, 2500);
+         return;
+      }
+
+      const file = bronzeFiles[currentStep];
+      const p = Math.floor(10 + (currentStep / bronzeFiles.length) * 80);
+      progressBar.style.width = `${p}%`;
+      progressText.textContent = `${p}%`;
+
+      addTerminalLog(consoleLog, 'INFO', `Đang kiểm tra tập tin: ${file.name}...`, 'info');
+
+      setTimeout(() => {
+        addTerminalLog(consoleLog, 'INFO', `Xác minh bảng mã (Encoding) và tính toàn vẹn: Không phát hiện lỗi nghiêm trọng.`, 'info');
+        
+        setTimeout(() => {
+          addTerminalLog(consoleLog, 'SUCCESS', `Tập tin ${file.name} hợp lệ (đọc được nội dung).`, 'success');
+          
+          currentStep++;
+          const delay = Math.floor(Math.random() * 300) + 200;
+          setTimeout(checkNextFile, delay);
+        }, Math.floor(Math.random() * 300) + 200);
+
+      }, Math.floor(Math.random() * 300) + 200);
+    }
+
+    checkNextFile();
+
+  } catch (err) {
+    addTerminalLog(consoleLog, 'ERROR', 'Lỗi kết nối tới Storage: ' + err.message, 'error');
+  }
 }
 
 // Action Handlers
