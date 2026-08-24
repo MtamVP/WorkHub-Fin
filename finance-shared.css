@@ -20,10 +20,15 @@
    ========================================================================= */
 
 body {
-    --bg-color: #ECEEF2; --bg-color-2: #F3F4F7; --card-bg: #FFFFFF; --card-bg-elevated: #F8F9FB;
-    --text-primary: #15181E; --text-secondary: rgba(21, 24, 30, 0.72); --text-muted: rgba(21, 24, 30, 0.64);
-    --border-color: rgba(20, 24, 33, 0.10); --border-strong: rgba(20, 24, 33, 0.18); --hover-bg: #E8EAEF;
-    --gold: #B0892A; --gold-light: #8A6A17; --gold-dim: rgba(176, 137, 42, 0.14);
+    /* Neutrals/gold không còn lặp lại hex -- kéo thẳng từ --wh-static-light-* khai báo 1 lần
+       duy nhất ở :root của /style.css (không phản ứng theo data-theme), để 2 file luôn khớp
+       nhau tự động thay vì phải dò tay mỗi khi bảng màu sáng gốc đổi. */
+    --bg-color: var(--wh-static-light-bg); --bg-color-2: var(--wh-static-light-bg-2);
+    --card-bg: var(--wh-static-light-card); --card-bg-elevated: #FBF9F4;
+    --text-primary: var(--wh-static-light-text); --text-secondary: var(--wh-static-light-text-secondary);
+    --text-muted: var(--wh-static-light-text-muted);
+    --border-color: var(--wh-static-light-border); --border-strong: rgba(28, 23, 16, 0.18); --hover-bg: #ECE7DB;
+    --gold: var(--wh-static-light-gold); --gold-light: var(--wh-static-light-gold-light); --gold-dim: var(--wh-static-light-gold-dim);
     --finance-accent: #9A6B0D; --finance-accent-subtle: rgba(154, 107, 13, 0.15);
     /* Success/danger/warning/info riêng cho 5 trang này (không lấy từ /style.css gốc) — vì trang luôn
        ép giao diện sáng bất kể theme site, còn biến ở /style.css lại đổi theo theme site đang bật,
