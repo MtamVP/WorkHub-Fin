@@ -2267,3 +2267,5 @@ body.auth-page .text-muted { color: var(--text-muted) !important; }
 
 /* Extras */
 body.auth-page #toast-container { left: 50%; right: auto; top: 24px; transform: translateX(-50%); }
+.swal2-container { z-index: 9999 !important; }
+

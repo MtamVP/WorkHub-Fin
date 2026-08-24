@@ -687,6 +687,11 @@ function updateStageUI(stageKey) {
     badgeEl.className = `status-pill ${meta.layerClass}`;
   }
   if (storageTierEl) storageTierEl.textContent = meta.storageTier;
+
+  // Render layout for the dynamic panel
+  if (typeof window.loadPipelineStage === 'function') {
+    window.loadPipelineStage(stageKey);
+  }
 }
 
 // ==========================================
@@ -3669,7 +3674,7 @@ function renderFileTable(fileData) {
 
   if (!fileData || fileData.length === 0) {
     const colCount = fileTableHeadRow.children.length;
-    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state" style="text-align: center; color: var(--text-muted); padding: 20px;">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
     return;
   }
 

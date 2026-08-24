@@ -944,7 +944,11 @@ const API = {
 
             const blob = b64toBlob(fileData, mimeType);
             const fileId = "F_" + Date.now() + Math.floor(Math.random()*1000);
-            const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            
+            // Xử lý giữ nguyên chữ tiếng Việt không dấu thay vì xóa trắng
+            let normalizedName = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+            const safeFileName = normalizedName.replace(/[^a-zA-Z0-9.\-_ ]/g, '_').replace(/\s+/g, '_');
+            
             const filePath = `${fileId}_${safeFileName}`;
             const bucketName = groupKey === 'finance' ? 'finance_bucket' :
                 (groupKey === 'science' ? 'science_bucket' : 'general_bucket');
