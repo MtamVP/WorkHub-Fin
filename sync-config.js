@@ -3,7 +3,7 @@ window.WORKHUB_SYNC_CONFIG = {
     // Actions eligible for optimistic local UI patching on offline write (small allowlist —
     // everything else in MUTATING_ACTIONS still queues+replays correctly, it just won't
     // reflect in the UI instantly while offline).
-    optimisticActions: ['saveTask', 'deleteTask', 'addAssetTransaction', 'deleteAssetTransaction'],
+    optimisticActions: ['saveTask', 'deleteTask', 'addAssetTransaction', 'deleteAssetTransaction', 'savePersonalItem', 'deletePersonalItem'],
     describeAction: function (action, params) {
         var labels = {
             saveTask: 'Lưu công việc "' + (params.name || '') + '"',
@@ -15,7 +15,9 @@ window.WORKHUB_SYNC_CONFIG = {
             deleteProject: 'Xoá dự án',
             createEvent: 'Tạo sự kiện',
             updateEvent: 'Cập nhật sự kiện',
-            deleteEvent: 'Xoá sự kiện'
+            deleteEvent: 'Xoá sự kiện',
+            savePersonalItem: 'Lưu mục cá nhân "' + (params.title || '') + '"',
+            deletePersonalItem: 'Xoá mục cá nhân'
         };
         return labels[action] || action;
     }

@@ -146,6 +146,13 @@
         </li>
       </ul>
 
+      <div class="nav-group-label nav-group-label-personal"><span>Cá Nhân</span></div>
+      <ul class="nav-group nav-group-personal">
+        <li class="nav-item" data-section="personal" onclick="switchSection('personal')" title="Không gian cá nhân">
+          <i class="fa-solid fa-user-lock"></i><span> Không Gian Riêng</span>
+        </li>
+      </ul>
+
       <div class="nav-group-label"><span>Quản Trị</span></div>
       <ul class="nav-group">
         <li class="nav-item" onclick="window.top.location.href='/roles/'" title="Phân Quyền">
@@ -947,6 +954,21 @@
       </div>
     </section>
 
+    <section class="app-section personal-hub-section" id="personal-section">
+      <div class="section-hero-card card personal-hub-hero">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Không Gian Riêng</h3>
+          <p>Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="personal-add-btn" onclick="openPersonalItemModal(null)">
+          <i class="fa-solid fa-plus"></i> Thêm mới
+        </button>
+      </div>
+
+      <div id="personal-hub-tabs" class="personal-hub-tabs"></div>
+      <div id="personal-hub-list" class="personal-hub-list"></div>
+    </section>
+
     <section class="app-section" id="chat-section">
       <div class="section-hero-card card">
         <div class="section-hero-info">
@@ -1174,6 +1196,41 @@
   </div>
 
   <!-- Task Activity Modal: Bình luận / Danh sách kiểm / Tệp đính kèm / Lịch sử -->
+  <div class="modal-overlay" id="personal-item-modal">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="personal-item-modal-title"><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Thêm mục cá nhân</h3>
+        <button class="header-btn" onclick="closeAppModal('personal-item-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="personal-item-form" onsubmit="submitPersonalItemForm(event)">
+          <input type="hidden" id="personal-item-id">
+          <input type="hidden" id="personal-item-type">
+
+          <div class="form-group">
+            <label class="form-label">Tiêu đề</label>
+            <input type="text" id="personal-item-title" class="form-control" placeholder="Ví dụ: Ghi chú họp sáng nay" required>
+          </div>
+
+          <div class="form-group" id="personal-item-body-field">
+            <label class="form-label">Nội dung</label>
+            <textarea id="personal-item-body" class="form-control" rows="4" placeholder="Nội dung ghi chú..."></textarea>
+          </div>
+
+          <div class="form-group" id="personal-item-url-field" style="display:none;">
+            <label class="form-label">Đường dẫn</label>
+            <input type="text" id="personal-item-url" class="form-control" placeholder="https://...">
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+            <button type="button" class="btn btn-outline" onclick="closeAppModal('personal-item-modal')">Huỷ</button>
+            <button type="submit" class="btn btn-primary">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="task-activity-modal">
     <div class="modal-card" style="max-width: 560px;">
       <div class="modal-header">
@@ -1425,15 +1482,15 @@
     </div>
   </div>
 
-  <script src="api.js?v=16"></script>
-  <script src="sync-config.js?v=1"></script>
+  <script src="api.js?v=17"></script>
+  <script src="sync-config.js?v=2"></script>
   <script src="sync-engine.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=16"></script>
+  <script src="script.js?v=17"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=1"></script>
-  <script src="backup-config.js?v=1"></script>
+  <script src="backup-config.js?v=2"></script>
   <script src="local-backup.js?v=1"></script>
 </body>
 </html>

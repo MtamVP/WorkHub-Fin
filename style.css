@@ -1452,6 +1452,72 @@ body.app-locked .user-profile-wrapper {
 }
 
 /* ==========================================================================
+   PERSONAL HUB (Cá Nhân) — private, per-user workspace shared across
+   Fin/Sci/Org. Visually distinct from group/team sections on purpose: dashed
+   borders + neutral tint instead of the gold-accented team surfaces, so it
+   reads as "just yours", not a new tier above group data.
+   ========================================================================== */
+
+.nav-group-personal .nav-item.active {
+  background: var(--card-bg-elevated);
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 var(--text-secondary);
+}
+
+.personal-hub-hero { border-left-color: var(--text-muted); }
+
+.personal-hub-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 14px;
+}
+.personal-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.personal-tab:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+.personal-tab.active {
+  background: var(--card-bg-elevated); color: var(--text-primary);
+  border-style: solid; border-color: var(--border-strong);
+}
+
+.personal-hub-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.personal-hub-list .empty-state { grid-column: 1 / -1; }
+
+.personal-item-card {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  background: var(--card-bg); border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg); padding: 14px 16px;
+  transition: border-color 0.2s ease;
+}
+.personal-item-card:hover { border-color: var(--gold); border-style: solid; }
+.personal-note-card { cursor: pointer; }
+.personal-item-body { flex: 1; min-width: 0; }
+.personal-item-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.personal-item-body p {
+  font-size: 12.5px; color: var(--text-secondary); margin: 0;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+  -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.personal-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.personal-item-delete {
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius-sm);
+  flex-shrink: 0; transition: color 0.15s ease, background-color 0.15s ease;
+}
+.personal-item-delete:hover { color: var(--danger-color); background: var(--hover-bg); }
+
+.personal-checklist-row { align-items: center; padding: 10px 16px; }
+.personal-checklist-check { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13.5px; flex: 1; }
+.personal-checklist-check input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
+.personal-item-done { text-decoration: line-through; color: var(--text-muted); }
+
+/* ==========================================================================
    CHAT (Trò Chuyện) — full sidebar section, realtime team chat
    ========================================================================== */
 
