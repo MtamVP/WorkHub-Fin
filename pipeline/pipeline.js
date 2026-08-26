@@ -69,8 +69,8 @@ async function callGemini(prompt, isJsonMode = false, modelFallback = null) {
   
   // Nếu quét hết các key cho gemini-2.5-flash mà vẫn xịt (tức là model sập chung)
   if (!modelFallback) {
-      console.warn(`[Gemini] All keys failed for gemini-2.5-flash. Falling back to gemini-1.5-flash...`);
-      return callGemini(prompt, isJsonMode, "gemini-1.5-flash");
+      console.warn(`[Gemini] All keys failed for gemini-2.5-flash. Falling back to gemini-3.5-flash...`);
+      return callGemini(prompt, isJsonMode, "gemini-3.5-flash");
   }
   
   throw new Error("Tất cả API keys và Models đều bị quá tải. Vui lòng thử lại sau.");
