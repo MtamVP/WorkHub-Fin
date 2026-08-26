@@ -853,3 +853,198 @@ function applyBulkFolder() {
 }
 
 window.loadPipelineStage = loadPipelineStage;
+
+// ==========================================
+// E4: ANALYSIS
+// ==========================================
+async function runE4Analysis() {
+  const progressBar = document.getElementById('auto-progress-bar');
+  const progressText = document.getElementById('auto-progress-text');
+  const consoleLog = document.getElementById('agent-console');
+  
+  if (!progressBar || !progressText || !consoleLog) return;
+
+  progressBar.style.width = '0%';
+  progressText.textContent = '0%';
+  consoleLog.innerHTML = '';
+
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Phân tích & Băm dữ liệu (Analysis)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới phân vùng Silver...', 'info');
+
+  try {
+    const response = await callGAS('getFileList', { groupKey: 'finance' });
+    let files = [];
+    if (response && response.status === 'success') {
+      files = response.data || [];
+    } else if (Array.isArray(response)) {
+      files = response;
+    }
+    
+    // Chỉ lấy các file nằm đúng ở gốc silver/
+    const silverFiles = files.filter(f => f.url && f.folderPath === 'silver/');
+    
+    if (silverFiles.length === 0) {
+      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin .txt nào trong thư mục gốc silver để phân tích.', 'warning');
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      return;
+    }
+
+    addTerminalLog(consoleLog, 'INFO', `Phát hiện ${silverFiles.length} tập tin. Bắt đầu phân tích qua Gemini...`, 'info');
+
+    let currentStep = 0;
+    
+    async function processNextFile() {
+      if (window.isAutoPaused) {
+        setTimeout(processNextFile, 500);
+        return;
+      }
+
+      if (currentStep >= silverFiles.length) {
+         progressBar.style.width = '100%';
+         progressText.textContent = '100%';
+         addTerminalLog(consoleLog, 'SUCCESS', 'Đã phân tích xong tất cả các file.', 'success');
+         return;
+      }
+
+      const file = silverFiles[currentStep];
+      addTerminalLog(consoleLog, 'INFO', `Đang tải file ${file.name} từ Silver...`, 'info');
+      
+      try {
+        const textRes = await fetch(file.url);
+        const textContent = await textRes.text();
+        
+        addTerminalLog(consoleLog, 'INFO', `Đang gửi ${file.name} cho Gemini băm nhỏ và tóm tắt...`, 'info');
+        
+        const prompt = `Bạn là một chuyên gia phân tích dữ liệu tài chính. Hãy đọc đoạn văn bản sau và trích xuất các thông tin quan trọng. Trả về kết quả DƯỚI DẠNG JSON với cấu trúc:
+{
+  "summary": "Tóm tắt ngắn gọn",
+  "keywords": ["từ khóa 1", "từ khóa 2"],
+  "chunks": ["đoạn trích quan trọng 1", "đoạn trích quan trọng 2"]
+}
+Nội dung văn bản:
+${textContent}`;
+        
+        const geminiResponse = await callGemini(prompt, true);
+        
+        addTerminalLog(consoleLog, 'SUCCESS', `Gemini phân tích thành công ${file.name}.`, 'success');
+        
+        // Upload JSON to silver/analyzed/
+        const jsonName = file.name.replace('.txt', '.json');
+        const base64Data = btoa(unescape(encodeURIComponent(geminiResponse)));
+        const uploadRes = await callGAS('uploadFile', {
+            fileData: base64Data,
+            fileName: jsonName,
+            mimeType: 'application/json',
+            groupKey: 'finance',
+            description: 'Analyzed by Gemini',
+            email: 'system@workhub.com',
+            folderPath: 'silver/analyzed'
+        });
+        
+        if (uploadRes && uploadRes.status === 'error') {
+            addTerminalLog(consoleLog, 'ERROR', `Lỗi lưu file JSON: ${uploadRes.message}`, 'error');
+        } else {
+            addTerminalLog(consoleLog, 'SUCCESS', `Đã lưu ${jsonName} vào silver/analyzed/`, 'success');
+            
+            // Xóa file txt gốc ở ngoài silver/
+            addTerminalLog(consoleLog, 'INFO', `Đang gọt vỏ (xóa ${file.name} ở ngoài silver)...`, 'info');
+            await callGAS('permanentDeleteFile', { fileId: file.id, groupKey: 'finance' });
+        }
+      } catch (err) {
+        addTerminalLog(consoleLog, 'ERROR', `Lỗi phân tích ${file.name}: ${err.message}`, 'error');
+      }
+
+      currentStep++;
+      const progress = Math.floor((currentStep / silverFiles.length) * 100);
+      progressBar.style.width = `${progress}%`;
+      progressText.textContent = `${progress}%`;
+      
+      setTimeout(processNextFile, 1000);
+    }
+    
+    processNextFile();
+
+  } catch (error) {
+    addTerminalLog(consoleLog, 'ERROR', `Lỗi hệ thống: ${error.message}`, 'error');
+  }
+}
+
+// ==========================================
+// E5: REPORT GEN
+// ==========================================
+window.currentDraft = "";
+window.draftSourceFiles = [];
+
+async function runE5ReportGen() {
+  const progressBar = document.getElementById('auto-progress-bar');
+  const progressText = document.getElementById('auto-progress-text');
+  const consoleLog = document.getElementById('agent-console');
+  
+  if (!progressBar || !progressText || !consoleLog) return;
+
+  progressBar.style.width = '10%';
+  progressText.textContent = '10%';
+  consoleLog.innerHTML = '';
+
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Viết Báo cáo (Report Gen)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới silver/analyzed/ để lấy tri thức...', 'info');
+
+  try {
+    const response = await callGAS('getFileList', { groupKey: 'finance' });
+    let files = [];
+    if (response && response.status === 'success') {
+      files = response.data || [];
+    } else if (Array.isArray(response)) {
+      files = response;
+    }
+    
+    const analyzedFiles = files.filter(f => f.url && f.folderPath === 'silver/analyzed/');
+    
+    if (analyzedFiles.length === 0) {
+      addTerminalLog(consoleLog, 'WARN', 'Không có tri thức nào trong silver/analyzed/ để viết báo cáo.', 'warning');
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      return;
+    }
+
+    addTerminalLog(consoleLog, 'INFO', `Thu thập được ${analyzedFiles.length} file tri thức. Đang tải nội dung...`, 'info');
+    progressBar.style.width = '30%';
+    progressText.textContent = '30%';
+
+    let allKnowledge = [];
+    for (let f of analyzedFiles) {
+        try {
+           const res = await fetch(f.url);
+           const text = await res.text();
+           allKnowledge.push(`Nguồn: ${f.name}\n${text}`);
+        } catch (e) {
+           addTerminalLog(consoleLog, 'WARN', `Không thể tải ${f.name}`, 'warning');
+        }
+    }
+
+    addTerminalLog(consoleLog, 'INFO', `Đang nhồi tri thức cho Gemini để soạn Báo Cáo Nháp...`, 'info');
+    progressBar.style.width = '60%';
+    progressText.textContent = '60%';
+
+    const prompt = `Bạn là một chuyên gia phân tích tài chính. Hãy tổng hợp các thông tin dưới đây thành một báo cáo tài chính chuyên nghiệp, trình bày dưới định dạng Markdown, bao gồm các mục: Tổng quan, Điểm nhấn quan trọng, và Khuyến nghị.
+    
+Dữ liệu đầu vào:
+${allKnowledge.join("\n\n---\n\n")}`;
+    
+    const draft = await callGemini(prompt, false);
+    
+    window.currentDraft = draft;
+    window.draftSourceFiles = analyzedFiles; // Lưu lại để E6 biết file nào cần đẩy sang Knowledge
+    
+    addTerminalLog(consoleLog, 'SUCCESS', 'Gemini đã soạn xong Báo Cáo Nháp!', 'success');
+    
+    progressBar.style.width = '100%';
+    progressText.textContent = '100%';
+
+    addTerminalLog(consoleLog, 'INFO', 'Vui lòng sang bước E6 (Approval) để kiểm duyệt báo cáo.', 'info');
+
+  } catch (error) {
+    addTerminalLog(consoleLog, 'ERROR', `Lỗi hệ thống: ${error.message}`, 'error');
+  }
+}
