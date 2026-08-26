@@ -1,5 +1,7 @@
 # Hướng dẫn Setup TrueNAS làm Storage tự host cho WorkHub
 
+> **Cập nhật 2026-08-26 — ĐÃ TRIỂN KHAI THẬT, xem mục "Thực tế đã triển khai" ở cuối file.** Máy người dùng không có sẵn hardware rời cho NAS chuyên dụng, nên phần cài đặt thực tế đi theo hướng **TrueNAS chạy dưới dạng VM (VirtualBox) trên chính máy Windows đang dùng**, khác một phần so với hướng dẫn bare-metal gốc bên dưới. Đọc mục cuối file trước khi làm theo bất kỳ bước nào ở đây nếu mục tiêu là dựng lại/khôi phục hệ thống đã có.
+
 ## Bối cảnh & mục tiêu
 
 Hiện tại 3 app WorkHub (Fin/Sci/Org) dùng Supabase cho cả Postgres lẫn Storage (file upload trong task/project, ảnh đại diện, v.v.). Supabase free/pro tier có giới hạn dung lượng Storage và có rủi ro bị khoá/hạn chế account. Mục tiêu của tài liệu này: dựng một **TrueNAS SCALE** tại nhà làm nơi lưu trữ file tự chủ, giảm phụ thuộc vào Supabase Storage, đồng thời làm nơi chứa các bản backup tự động mà app đã tạo sẵn (`local-backup.js` — xem `workhub-local-features-shipped` trong memory).
@@ -105,3 +107,44 @@ TrueNAS lưu dữ liệu quan trọng — bản thân nó cũng cần backup:
 Sau khi TrueNAS chạy ổn và checklist ở trên đã tick hết, quay lại phiên làm việc để:
 1. Sửa `local-backup.js` ở cả 3 app trỏ đích ghi file sang ổ mạng/API MinIO mới, thay vì chỉ ghi vào `AppLocalData` trên máy Windows.
 2. (Nếu chọn hướng 5b) Đánh giá có nên chuyển hẳn phần `uploadFile`/`API.file.upload` trong `api.js` sang gọi MinIO thay vì Supabase Storage — cần cân nhắc kỹ vì đây là thay đổi lớn, ảnh hưởng dữ liệu file đang có sẵn trên Supabase (cần kế hoạch di chuyển dữ liệu cũ, không chỉ đổi endpoint cho file mới).
+
+---
+
+## Thực tế đã triển khai (2026-08-26)
+
+Phần này ghi lại **chính xác những gì đã làm trên máy thật**, để phiên sau (hoặc máy khác) không phải đoán lại hay hỏi từ đầu.
+
+### Vì sao khác hướng dẫn gốc
+Khi bắt đầu, máy người dùng chỉ có: 1 ổ 930GB đang chạy Windows (không thể xoá để cài TrueNAS bare-metal) và 1 ổ cứng ngoài 500GB qua USB (Apple HDD, enclosure dùng chip Norelsys NS1068). Không có máy vật lý rời nào khác. Vì máy có CPU AMD Ryzen 5 5600 (hỗ trợ SVM/AMD-V) và 32GB RAM, quyết định chạy TrueNAS SCALE dưới dạng **VM trong VirtualBox** ngay trên máy Windows chính, thay vì bare-metal.
+
+### Các bước đã làm khác/thêm so với hướng dẫn gốc ở trên
+1. **Bật SVM Mode (AMD-V) trong BIOS** (ASUS, tab Advanced → CPU Configuration → SVM Mode → Enabled) — bắt buộc để chạy VM, máy này mặc định tắt.
+2. **Cài VirtualBox 7.2.16 + Extension Pack** (tải từ virtualbox.org) thay vì cài TrueNAS trực tiếp lên phần cứng.
+3. **Tạo VM** qua `VBoxManage` (không qua wizard GUI): tên `TrueNAS-SCALE`, ostype `Debian13_64`, 8GB RAM, 4 vCPU, firmware BIOS, ổ boot ảo `.vdi` 32GB (nằm trong ổ Windows, không đụng phân vùng có sẵn), gắn ISO TrueNAS SCALE 25.10.6 vào ổ đĩa ảo để cài.
+4. **Network**: bridge NIC của VM vào card mạng **dây (Ethernet)**, không phải WiFi — máy có cả 2 nhưng chỉ dây đang có kết nối thật ra Internet lúc setup. VM nhận IP qua DHCP (`10.0.0.61` tại thời điểm setup — **chưa đặt static/reserved IP**, cần làm nếu muốn IP không đổi).
+5. **Cài TrueNAS SCALE vào ổ ảo boot** (không phải ổ USB 500GB) qua console cài đặt text-based bình thường (Install/Upgrade → chọn ổ ảo 32GB → đặt mật khẩu root → cài).
+6. **Gắn ổ USB 500GB vào VM sau khi cài xong**: bật USB xHCI controller cho VM, ngắt ổ khỏi Windows, `VBoxManage controlvm ... usbattach` để pass-through nguyên ổ vào VM (TrueNAS nhận diện là `sdb`, 465.76 GiB).
+7. **Tạo pool `workhub-pool`** — layout **Stripe** (không phải Mirror/RAIDZ như khuyến nghị gốc, vì chỉ có đúng 1 ổ data) → chấp nhận không có dự phòng, đã thông báo rõ với người dùng.
+8. **Tạo 3 dataset** đúng như guide gốc: `wh-files`, `wh-backups`, `wh-media`.
+9. **Bật Periodic Snapshot Task** cho `wh-files` và `wh-backups` (giữ 2 tuần, chạy hàng ngày lúc 00:00) — chưa bật cho `wh-media` (chưa có nhu cầu rõ ràng, có thể thêm sau).
+10. **MinIO KHÔNG cài được qua catalog Apps** — MinIO đã bị gỡ khỏi catalog chính thức của TrueNAS (đổi giấy phép 2025, mất tính năng multi-tenant/IAM ở bản free). Giải pháp: dùng tính năng **Custom App** của TrueNAS, kéo thẳng Docker image `minio/minio:latest`:
+    - Command: `server /data --console-address :9001`
+    - Env: `MINIO_ROOT_USER=workhub-admin`, `MINIO_ROOT_PASSWORD=<người dùng tự đặt>`
+    - Port: `9000:9000` (S3 API), `9001:9001` (Console)
+    - Storage: Host Path, mount `/mnt/workhub-pool/wh-files` → `/data` trong container
+11. **Tạo 3 bucket** trong MinIO Console: `wh-fin-files`, `wh-sci-files`, `wh-org-files`.
+12. **Giới hạn phát hiện được**: bản MinIO Console hiện tại (Community Edition, sau đổi license) **không có mục Identity/Access Keys** — không tạo được access key riêng scoped theo app. Khi tích hợp `api.js`, sẽ phải dùng thẳng credential root (`workhub-admin` + password) làm access key/secret key cho S3 client. Đây là đánh đổi bảo mật cần biết (root key có toàn quyền, không giới hạn theo bucket).
+
+### Truy cập
+- TrueNAS Web UI: `http://<ip-vm>:80` (redirect sang `/ui/`), login `root` + mật khẩu đặt lúc cài.
+- MinIO Console: `http://<ip-vm>:9001`, login `workhub-admin` + mật khẩu đã đặt.
+- MinIO S3 API endpoint (dùng cho `api.js` sau này): `http://<ip-vm>:9000`.
+- IP hiện tại (`10.0.0.61`) là DHCP, có thể đổi sau khi VM/máy khởi động lại — **nên đặt DHCP reservation trên router** hoặc static IP trong TrueNAS trước khi tích hợp code phụ thuộc vào IP này.
+
+### Chưa làm (không bắt buộc, có thể làm sau)
+- Đặt IP tĩnh/reserved cho VM.
+- Bật 2FA cho TrueNAS Web UI.
+- Cấu hình Alert email.
+- Export Config Backup định kỳ.
+- Tailscale/WireGuard (chỉ cần nếu có nhu cầu truy cập NAS từ ngoài mạng LAN).
+- 2 việc tích hợp code ở mục "Bước tiếp theo" phía trên (`local-backup.js`, `api.js` upload) — vẫn đang chờ xác nhận riêng từ người dùng vì ảnh hưởng dữ liệu đang chạy.

@@ -1,6 +1,6 @@
 # WorkHub — Tình trạng tổng thể dự án
 
-> File này dành cho 1 phiên Claude Code khác (trên máy khác) đọc để nắm bối cảnh nhanh, không cần hỏi lại người dùng từ đầu. Cập nhật lần cuối: 2026-08-22.
+> File này dành cho 1 phiên Claude Code khác (trên máy khác) đọc để nắm bối cảnh nhanh, không cần hỏi lại người dùng từ đầu. Cập nhật lần cuối: 2026-08-26.
 
 ## Dự án là gì
 
@@ -55,10 +55,20 @@ Cả 3 app đã: build sạch (debug + release), khởi động không lỗi, **
 ### 1. Chạy `version-migration.sql` (đã có sẵn file, nằm cùng thư mục với file này)
 Thêm cột `version` + trigger tăng version cho bảng `projects`, `events`, `project_milestones` (mở rộng pattern optimistic-concurrency đang chỉ có ở `tasks`, để offline-sync conflict-detection hoạt động đầy đủ cho phần dự án/sự kiện). Công cụ DB tool tự động (Supabase MCP `apply_migration`) đã bị chặn 2 lần bởi bộ lọc an toàn của auto-mode — **cần người dùng tự chạy tay** trong Supabase SQL Editor (project `gqsbsqaxzpzcloaopzvv`). App vẫn chạy bình thường nếu chưa chạy — chỉ là project/event edit tạm thời last-write-wins thay vì có cảnh báo ghi đè.
 
-### 2. TrueNAS storage (xem `TrueNAS_Storage_Setup_Guide.md` cùng thư mục)
-Guide setup TrueNAS SCALE làm storage tự host, để giảm phụ thuộc Supabase Storage. **Chỉ là tài liệu hướng dẫn** — chưa có hạ tầng nào được dựng thật, người dùng sẽ tự làm ở máy khác. Sau khi xong, còn 2 việc tích hợp code chưa làm (ghi rõ ở cuối file guide):
-   - Trỏ `local-backup.js` (cả 3 app) sang ghi vào TrueNAS thay vì `AppLocalData` local.
-   - Cân nhắc (thận trọng, ảnh hưởng dữ liệu cũ) chuyển `API.file.upload` sang MinIO/S3 thay vì Supabase Storage.
+### 2. TrueNAS storage — hạ tầng ĐÃ DỰNG XONG (2026-08-26), code integration CHƯA làm
+Xem `TrueNAS_Storage_Setup_Guide.md` cùng thư mục — file đó đã được cập nhật để phản ánh đúng những gì đã làm thật (khác một phần so với hướng dẫn gốc, vì máy người dùng không có sẵn hardware rời cho NAS chuyên dụng). Tóm tắt:
+
+- **Không phải máy vật lý riêng** — TrueNAS SCALE 25.10.6 chạy dưới dạng **VM trong VirtualBox** ngay trên máy Windows chính của người dùng (CPU AMD Ryzen 5 5600, 32GB RAM). Ổ boot của VM là 1 file `.vdi` 32GB nằm trong phần dư của ổ Windows; ổ data là 1 ổ cứng ngoài 500GB (Apple HDD qua enclosure USB, chip Norelsys NS1068) pass-through thẳng vào VM.
+- **Pool**: `workhub-pool` — kiểu Stripe, 1 ổ duy nhất (465.76 GiB khả dụng), **không có RAID/dự phòng** (chấp nhận đánh đổi vì chỉ có 1 ổ data).
+- **Dataset đã tạo**: `wh-files`, `wh-backups`, `wh-media` (dưới `workhub-pool`), có Periodic Snapshot Task (giữ 2 tuần, chạy hàng ngày 00:00) cho `wh-files` và `wh-backups`.
+- **MinIO đã cài** qua tính năng "Custom App" của TrueNAS (không phải catalog chính thức — MinIO đã bị gỡ khỏi catalog TrueNAS do đổi giấy phép 2025). Image `minio/minio:latest`, port 9000 (S3 API) + 9001 (Console) map ra host, thư mục `/data` trong container mount Host Path vào `/mnt/workhub-pool/wh-files`. Root user: `workhub-admin` (mật khẩu do người dùng tự đặt, không lưu trong repo).
+- **Bucket đã tạo**: `wh-fin-files`, `wh-sci-files`, `wh-org-files` (mỗi app 1 bucket riêng).
+- **Giới hạn quan trọng**: bản MinIO Community Edition hiện tại **không có mục Identity/Access Keys** trong Console (tính năng IAM đã bị cắt khỏi bản free) — nghĩa là khi tích hợp code, `api.js` phải dùng thẳng credential root (`workhub-admin` + mật khẩu) làm Access Key/Secret Key, không tạo được key riêng scoped cho từng app.
+- **Chưa làm** (theo guide gốc, không bắt buộc): đặt IP tĩnh/reserved cho VM (hiện đang DHCP), bật 2FA cho TrueNAS Web UI, cấu hình Alert email, export Config Backup, Tailscale/WireGuard (chỉ cần nếu muốn truy cập từ ngoài mạng LAN).
+
+**2 việc tích hợp code vẫn CHƯA làm** (cố ý dừng lại chờ xác nhận riêng, vì ảnh hưởng dữ liệu đang chạy — xem chi tiết cuối file guide):
+   - Trỏ `local-backup.js` (cả 3 app) sang ghi vào TrueNAS (SMB hoặc gọi thẳng MinIO) thay vì chỉ ghi `AppLocalData` local.
+   - Cân nhắc (thận trọng, ảnh hưởng dữ liệu cũ) chuyển `API.file.upload` sang gọi MinIO thay vì Supabase Storage — cần kế hoạch di chuyển dữ liệu file cũ, không chỉ đổi endpoint.
 
 ### 3. Giới hạn xác minh UI trong phiên vừa rồi
 Công cụ điều khiển màn hình bị ngắt kết nối giữa phiên làm việc, nên 4 tính năng local-machine ở trên **chỉ được xác minh ở mức "compile sạch + app khởi động không crash"**, chưa tự bấm-thử tray icon/hotkey/toast thông báo/màn hình xung đột bằng tay. Nên tự mở app kiểm tra qua 1 lượt trước khi coi là hoàn toàn ổn định.
