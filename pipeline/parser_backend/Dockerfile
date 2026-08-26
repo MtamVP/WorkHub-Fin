@@ -17,5 +17,5 @@ COPY . .
 # Mở cổng 8080 cho Cloud Run
 EXPOSE 8080
 
-# Chạy server FastAPI bằng Uvicorn, bind vào cổng PORT (Cloud Run cấp)
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
+# Chạy server FastAPI bằng Uvicorn, bind vào cổng 8080
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
