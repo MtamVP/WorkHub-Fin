@@ -1518,6 +1518,38 @@ body.app-locked .user-profile-wrapper {
 .personal-checklist-check input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
 .personal-item-done { text-decoration: line-through; color: var(--text-muted); }
 
+.personal-item-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.personal-item-tag {
+  font-size: 11px; font-weight: 600; color: var(--gold);
+  background: rgba(201,168,76,0.14); padding: 2px 8px; border-radius: 999px;
+  cursor: pointer; transition: opacity 0.15s ease;
+}
+.personal-item-tag:hover { opacity: 0.75; }
+
+.personal-tag-filter { flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.personal-tag-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border-strong);
+  background: var(--card-bg); color: var(--text-secondary);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.personal-tag-chip:hover { color: var(--text-primary); border-color: var(--gold); }
+.personal-tag-chip.active { background: var(--gold); color: #1A1407; border-color: var(--gold); }
+.personal-tag-chip.personal-tag-clear { background: transparent; border-style: dashed; }
+
+.personal-customize-list { display: flex; flex-direction: column; gap: 6px; }
+.personal-customize-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md, 10px);
+  background: var(--card-bg); cursor: grab;
+}
+.personal-customize-row:active { cursor: grabbing; }
+.personal-customize-handle { color: var(--text-muted); font-size: 13px; }
+.personal-customize-label { flex: 1; font-size: 13.5px; font-weight: 600; }
+.personal-customize-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.personal-customize-toggle input { accent-color: var(--gold); cursor: pointer; }
+
 /* ==========================================================================
    CHAT (Trò Chuyện) — full sidebar section, realtime team chat
    ========================================================================== */
