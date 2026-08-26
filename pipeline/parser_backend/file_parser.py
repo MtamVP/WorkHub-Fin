@@ -1,15 +1,31 @@
 import io
 import traceback
+import sys
+
+missing_libs = []
 
 try:
     import pdfplumber
-    import docx
-    import pandas as pd
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    print("ALL IMPORTS SUCCESSFUL")
 except Exception as e:
-    print("IMPORT ERROR:", e)
-    traceback.print_exc()
+    missing_libs.append(f"pdfplumber ({e})")
+
+try:
+    import docx
+except Exception as e:
+    missing_libs.append(f"docx ({e})")
+
+try:
+    import pandas as pd
+except Exception as e:
+    missing_libs.append(f"pandas ({e})")
+
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except Exception as e:
+    missing_libs.append(f"langchain_text_splitters ({e})")
+
+if missing_libs:
+    print("IMPORT ERRORS DETECTED:", missing_libs)
 
 def chunk_text(text: str) -> list[str]:
     # Sử dụng Langchain để cắt văn bản thành các chunk nhỏ
