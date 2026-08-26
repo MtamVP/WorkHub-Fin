@@ -3,6 +3,72 @@
 
 window.isAutoPaused = false;
 
+// --- GEMINI AI CONFIGURATION ---
+const GEMINI_API_KEYS = [
+  "AIzaSyCxtj-tIcHY1CvIc7P56ZTPSS95W0ssLlU",
+  "AIzaSyDNFAQTDO4EmmgLKpa8uZupvMT5N9j0DO8",
+  "AIzaSyCIKmmjT8d4cAL3AhNX47Box1ArP9x0E10",
+  "AIzaSyABuiBHLYeWT-jm9jOxg5CpygkdomqM2k4",
+  "AIzaSyArWJsCc45mY6-_q5WBdX5HqeYSFXSrGVg"
+];
+let currentGeminiKeyIndex = 0;
+
+async function callGemini(prompt, isJsonMode = false) {
+  const model = "gemini-1.5-flash";
+  let maxRetries = GEMINI_API_KEYS.length;
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    const key = GEMINI_API_KEYS[currentGeminiKeyIndex];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    
+    const requestBody = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2 }
+    };
+    
+    if (isJsonMode) {
+      requestBody.generationConfig.responseMimeType = "application/json";
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (response.status === 429 || response.status === 403 || response.status === 500) {
+           console.warn(`[Gemini] Key ${currentGeminiKeyIndex} failed with ${response.status}. Switching key...`);
+           currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
+           attempt++;
+           continue;
+        }
+        throw new Error(data.error?.message || "Unknown API Error");
+      }
+      
+      if (data.candidates && data.candidates.length > 0) {
+        return data.candidates[0].content.parts[0].text;
+      } else {
+        throw new Error("No candidates returned from Gemini");
+      }
+    } catch (err) {
+      if (err.message.includes("Failed to fetch") || err.message.includes("network")) {
+        console.warn(`[Gemini] Network error with key ${currentGeminiKeyIndex}. Switching key...`);
+        currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
+        attempt++;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Tất cả các API Key Gemini đều quá tải hoặc không khả dụng lúc này.");
+}
+// ------------------------------
+
 function toggleAutoProcess() {
   window.isAutoPaused = !window.isAutoPaused;
   const btn = document.getElementById('btn-toggle-auto');
@@ -32,6 +98,18 @@ function loadPipelineStage(stageKey) {
     loadBronzeFiles(); // Auto reload table when entering E1
   } else if (stageKey === 'e6') {
     targetPanelId = 'panel-e6';
+    
+    // Đổ báo cáo nháp vào UI E6
+    const diffView = document.getElementById('qa-diff-view');
+    if (diffView) {
+       if (window.currentDraft) {
+          // Render markdown to HTML simply (or just use pre tag)
+          let htmlContent = window.currentDraft.replace(/\n/g, '<br/>');
+          diffView.innerHTML = `<div style="padding: 20px; font-family: monospace; color: var(--text-primary); text-align: left;">${htmlContent}</div>`;
+       } else {
+          diffView.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có dữ liệu báo cáo (Vui lòng chạy E5 trước)</div>`;
+       }
+    }
   }
 
   // Show the target panel
@@ -73,6 +151,24 @@ function loadPipelineStage(stageKey) {
         btn.classList.add('pipeline-btn-secondary');
       }
       runE3Cleaning();
+    } else if (stageKey === 'e4') {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
+      runE4Analysis();
+    } else if (stageKey === 'e5') {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
+      runE5ReportGen();
     } else {
       window.isAutoPaused = false;
       const btn = document.getElementById('btn-toggle-auto');
@@ -269,8 +365,8 @@ async function runE3Cleaning() {
 
     let currentStep = 0;
     
-    // Khởi tạo Web Worker
-    const parserWorker = new Worker('pipeline/parser-worker.js');
+    // API URL của Cloud Run Parser Backend
+    const PARSER_API_URL = 'https://workhub-fin-git-825025516269.us-central1.run.app/parse';
     
     function cleanNextFile() {
       if (window.isAutoPaused) {
@@ -282,7 +378,6 @@ async function runE3Cleaning() {
          progressBar.style.width = '100%';
          progressText.textContent = '100%';
          addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất quy trình làm sạch (E3). Dữ liệu được đẩy vào Silver.', 'success');
-         parserWorker.terminate();
          
          setTimeout(() => {
            if (typeof navStage === 'function') navStage(1);
@@ -300,18 +395,26 @@ async function runE3Cleaning() {
       const baseName = file.name.replace(/\.[^/.]+$/, "");
       const cleanName = `clean_${baseName}.txt`;
 
-      addTerminalLog(consoleLog, 'INFO', `Đang tải file ${file.name} từ Bronze về bộ nhớ tạm...`, 'info');
+      addTerminalLog(consoleLog, 'INFO', `Đang tải file ${file.name} từ Bronze để gửi lên Backend...`, 'info');
 
-      // Tải file và parse qua Web Worker
+      // Tải file dưới dạng Blob và gửi lên FastAPI Backend
       fetch(file.url)
-        .then(res => res.arrayBuffer())
-        .then(arrayBuffer => {
-           addTerminalLog(consoleLog, 'INFO', `Đã nạp ArrayBuffer. Kích hoạt Web Worker parse dữ liệu...`, 'info');
+        .then(res => res.blob())
+        .then(blob => {
+           addTerminalLog(consoleLog, 'INFO', `Đang gọi API Cloud Run Parser...`, 'info');
+           const formData = new FormData();
+           formData.append('file', blob, file.name);
            
-           parserWorker.onmessage = async (e) => {
-             if (e.data.success) {
+           return fetch(PARSER_API_URL, {
+               method: 'POST',
+               body: formData
+           });
+        })
+        .then(res => res.json())
+        .then(async (data) => {
+             if (data.success) {
                addTerminalLog(consoleLog, 'SUCCESS', `Parse thành công! Bắt đầu upload lên Silver...`, 'success');
-               const rawText = e.data.text;
+               const rawText = data.text;
                // Base64 encode an toàn với Unicode
                const base64Data = btoa(unescape(encodeURIComponent(rawText)));
                const email = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.email : 'unknown';
@@ -330,28 +433,34 @@ async function runE3Cleaning() {
                     addTerminalLog(consoleLog, 'ERROR', `Lỗi tải lên Silver: ${res.message}`, 'error');
                  } else {
                     addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại Silver.`, 'success');
+                    
+                    // Gọi API xóa cứng file ở thư mục Bronze
+                    addTerminalLog(consoleLog, 'INFO', `Đang gọt bỏ phần vỏ thừa (xóa file gốc ở Bronze)...`, 'info');
+                    try {
+                        const delRes = await callGAS('permanentDeleteFile', { 
+                            fileId: file.id, 
+                            groupKey: 'finance' 
+                        });
+                        if (delRes && typeof delRes === 'string' && delRes.includes('Đã xóa')) {
+                            addTerminalLog(consoleLog, 'SUCCESS', `Đã dọn dẹp file cũ ở Bronze.`, 'success');
+                        }
+                    } catch (delErr) {
+                        addTerminalLog(consoleLog, 'WARN', `Không thể xóa file Bronze: ${delErr.message}`, 'warning');
+                    }
                  }
                } catch (err) {
                  addTerminalLog(consoleLog, 'ERROR', `Lỗi kết nối khi đẩy dữ liệu sang Silver.`, 'error');
                }
              } else {
-               addTerminalLog(consoleLog, 'ERROR', `Lỗi bóc tách dữ liệu: ${e.data.error}`, 'error');
+               addTerminalLog(consoleLog, 'ERROR', `Lỗi bóc tách dữ liệu từ API: ${data.error}`, 'error');
              }
              
              // Xử lý file tiếp theo
              currentStep++;
              setTimeout(cleanNextFile, 1000);
-           };
-
-           // Gửi lệnh parse
-           parserWorker.postMessage({
-              fileBytes: arrayBuffer,
-              fileName: file.name,
-              ext: ext
-           }, [arrayBuffer]); // Transferrable object để tiết kiệm RAM
         })
         .catch(err => {
-           addTerminalLog(consoleLog, 'ERROR', `Không thể tải file ${file.name}: ${err.message}`, 'error');
+           addTerminalLog(consoleLog, 'ERROR', `Không thể tải/parse file ${file.name}: ${err.message}`, 'error');
            currentStep++;
            setTimeout(cleanNextFile, 1000);
         });
@@ -496,24 +605,86 @@ async function loadBronzeFiles() {
   }
 }
 
-function handleApprove() {
-  if (typeof Swal !== 'undefined') {
-    Swal.fire({
-      title: 'Đã duyệt báo cáo',
-      text: 'Báo cáo sẽ được xuất bản (E7)',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false
-    }).then(() => {
-      if (typeof navStage === 'function') navStage(1);
+async function handleApprove() {
+  if (!window.currentDraft) {
+     alert("Chưa có báo cáo để duyệt!");
+     return;
+  }
+  
+  const btn = document.querySelector('#panel-e6 .btn-primary');
+  let oldHtml = 'Phê duyệt';
+  if (btn) {
+      oldHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+      btn.disabled = true;
+  }
+
+  try {
+    // 1. Lưu Report vào reports/
+    const reportName = `Report_Approved_${Date.now()}.md`;
+    const base64Report = btoa(unescape(encodeURIComponent(window.currentDraft)));
+    await callGAS('uploadFile', {
+        fileData: base64Report,
+        fileName: reportName,
+        mimeType: 'text/markdown',
+        groupKey: 'finance',
+        description: 'Approved Report',
+        email: 'system@workhub.com',
+        folderPath: 'reports'
     });
-  } else {
-    alert("Đã duyệt! Chuyển sang E7");
-    if (typeof navStage === 'function') navStage(1);
+
+    // 2. Chuyển dời các file JSON sang knowledge/
+    if (window.draftSourceFiles && window.draftSourceFiles.length > 0) {
+       for (let f of window.draftSourceFiles) {
+           const res = await fetch(f.url);
+           const jsonText = await res.text();
+           const base64Json = btoa(unescape(encodeURIComponent(jsonText)));
+           
+           await callGAS('uploadFile', {
+              fileData: base64Json,
+              fileName: f.name,
+              mimeType: 'application/json',
+              groupKey: 'finance',
+              description: 'Knowledge Chunk',
+              email: 'system@workhub.com',
+              folderPath: 'knowledge'
+           });
+           
+           await callGAS('permanentDeleteFile', { fileId: f.id, groupKey: 'finance' });
+       }
+    }
+    
+    window.currentDraft = "";
+    window.draftSourceFiles = [];
+
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: 'Đã duyệt báo cáo',
+        text: 'Báo cáo đã vào Reports, JSON đã vào Knowledge!',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      }).then(() => {
+        if (typeof navStage === 'function') navStage(1);
+      });
+    } else {
+      alert("Đã duyệt! Chuyển sang E7");
+      if (typeof navStage === 'function') navStage(1);
+    }
+  } catch(e) {
+    alert("Lỗi khi duyệt: " + e.message);
+  } finally {
+    if (btn) {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+    }
   }
 }
 
 function handleReject() {
+  window.currentDraft = "";
+  window.draftSourceFiles = [];
+  
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       title: 'Đã từ chối',

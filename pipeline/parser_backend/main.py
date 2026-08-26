@@ -24,6 +24,10 @@ async def parse_file(file: UploadFile = File(...)):
     if not file:
         raise HTTPException(status_code=400, detail="Không tìm thấy file")
         
+    from file_parser import missing_libs
+    if missing_libs:
+        return {"success": False, "error": f"LỖI HỆ THỐNG: Không thể nạp các thư viện sau: {', '.join(missing_libs)}. (Chắc chắn do thiếu C library trên Linux)"}
+
     try:
         # Đọc nội dung byte của file
         file_bytes = await file.read()

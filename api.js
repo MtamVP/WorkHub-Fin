@@ -994,6 +994,22 @@ const API = {
             if (error) throw error;
             return `Đã đưa ${data.name} vào thùng rác!`;
         },
+        permanentDelete: async (fileId, groupKey) => {
+            const { data: fileData, error: fetchErr } = await sbClient.from('files').select('storage_path, name').eq('id', fileId).maybeSingle();
+            if (fetchErr || !fileData) return "Không tìm thấy file";
+            
+            if (fileData.storage_path) {
+                const parts = fileData.storage_path.split('/');
+                if (parts.length >= 2) {
+                    const bucketName = parts[0];
+                    const filePath = parts.slice(1).join('/');
+                    await sbClient.storage.from(bucketName).remove([filePath]);
+                }
+            }
+            
+            await sbClient.from('files').delete().eq('id', fileId);
+            return `Đã xóa vĩnh viễn ${fileData.name}`;
+        },
         share: async (fileId, groupKey) => {
             const { data, error } = await sbClient.from('files').update({ is_shared: true }).eq('id', fileId).select('name').maybeSingle();
             if (error) throw error;
@@ -1021,7 +1037,8 @@ const API = {
             // stamp thẳng 'admin' (cùng lý do như project.create()).
             const effectiveGroupKey = groupKey === 'admin' ? 'finance' : groupKey;
 
-            const fullStoragePath = `bronze/${folderPath ? folderPath + '/' : ''}${filePath}`;
+            // Sửa lỗi: Nếu folderPath được truyền vào, dùng luôn nó làm thư mục gốc thay vì nhét vào bronze/
+            const fullStoragePath = `${folderPath ? folderPath + '/' : 'bronze/'}${filePath}`;
 
             await storageProxyUpload(bucketName, fullStoragePath, blob, mimeType);
 
@@ -2289,6 +2306,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getRecentFilesForDashboard': result = await API.file.getRecentFilesForDashboard(params.groupKey); break;
             case 'getFileList': result = await API.file.list(params.groupKey, params); break;
             case 'deleteFile': result = await API.file.delete(params.fileId, params.groupKey); break;
+            case 'permanentDeleteFile': result = await API.file.permanentDelete(params.fileId, params.groupKey); break;
             case 'uploadFile': result = await API.file.upload(params.fileData, params.fileName, params.mimeType, params.groupKey, params.description, params.email, params.folderPath, params.projectId, params.taskId); break;
             case 'shareFile': result = await API.file.share(params.fileId, params.groupKey); break;
 
