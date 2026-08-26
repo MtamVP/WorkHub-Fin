@@ -1838,6 +1838,69 @@ const API = {
             return "Đã xoá";
         }
     },
+    // Local-folder sync bookkeeping (personal_sync_files) — one row per relative path inside
+    // the user's linked folder, RLS by auth.uid() same as personal_items. The actual file
+    // bytes live in the private 'personal_files' Storage bucket, path `${uid}/${relativePath}`.
+    // See personal-sync.js for the engine that drives this via Rust fs commands + this API.
+    personalSync: {
+        getUserId: async () => {
+            const { data } = await sbClient.auth.getUser();
+            return data && data.user ? data.user.id : null;
+        },
+        listFiles: async () => {
+            const { data, error } = await sbClient.from('personal_sync_files').select('*').eq('deleted', false);
+            if (error) throw error;
+            return data || [];
+        },
+        getFile: async (relativePath) => {
+            const { data, error } = await sbClient.from('personal_sync_files').select('*').eq('relative_path', relativePath).maybeSingle();
+            if (error) throw error;
+            return data;
+        },
+        upsertFile: async (relativePath, contentHash, size) => {
+            const { data, error } = await sbClient.from('personal_sync_files')
+                .upsert({
+                    relative_path: relativePath,
+                    content_hash: contentHash,
+                    size: size,
+                    remote_updated_at: new Date().toISOString(),
+                    deleted: false
+                }, { onConflict: 'user_id,relative_path' })
+                .select().single();
+            if (error) throw error;
+            return data;
+        },
+        markDeleted: async (relativePath) => {
+            const { error } = await sbClient.from('personal_sync_files')
+                .update({ deleted: true, remote_updated_at: new Date().toISOString() })
+                .eq('relative_path', relativePath);
+            if (error) throw error;
+        },
+        uploadBytes: async (userId, relativePath, blob) => {
+            const path = userId + '/' + relativePath;
+            const { error } = await sbClient.storage.from('personal_files').upload(path, blob, { upsert: true });
+            if (error) throw error;
+        },
+        downloadBytes: async (userId, relativePath) => {
+            const path = userId + '/' + relativePath;
+            const { data, error } = await sbClient.storage.from('personal_files').download(path);
+            if (error) throw error;
+            return data; // Blob
+        },
+        deleteBytes: async (userId, relativePath) => {
+            const path = userId + '/' + relativePath;
+            await sbClient.storage.from('personal_files').remove([path]);
+        },
+        subscribe: function (handler) {
+            if (!sbClient) return null;
+            const channel = sbClient.channel('personal-sync-files-changes');
+            channel.on('postgres_changes', { event: '*', schema: 'public', table: 'personal_sync_files' }, (payload) => {
+                try { handler(payload); } catch (err) { console.error('personalSync realtime handler error:', err); }
+            });
+            channel.subscribe();
+            return channel;
+        }
+    },
     stock: {
         getStockList: async () => {
             const { data } = await sbClient.from('finance_stock_valuations').select('symbol').order('symbol');

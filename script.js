@@ -5126,7 +5126,8 @@ const PERSONAL_TAB_META = {
   pin: { label: 'Đã ghim', icon: 'fa-thumbtack', empty: 'Chưa ghim gì — bấm biểu tượng ghim trên danh sách dự án để lưu vào đây.' },
   checklist: { label: 'Việc riêng', icon: 'fa-list-check', empty: 'Chưa có việc riêng nào.' },
   shortcut: { label: 'Lối tắt', icon: 'fa-link', empty: 'Chưa có lối tắt nào.' },
-  calendar_event: { label: 'Lịch riêng', icon: 'fa-calendar-days', empty: 'Chưa có sự kiện riêng nào.' }
+  calendar_event: { label: 'Lịch riêng', icon: 'fa-calendar-days', empty: 'Chưa có sự kiện riêng nào.' },
+  sync_folder: { label: 'Thư mục đồng bộ', icon: 'fa-folder-open', empty: '' }
 };
 const PERSONAL_TAB_DEFAULT_ORDER = Object.keys(PERSONAL_TAB_META);
 
@@ -5165,6 +5166,9 @@ async function savePersonalLayoutPref() {
 async function loadPersonalHub() {
   renderPersonalTabs();
   await refreshPersonalItems();
+  if (window.PersonalSync && window.PersonalSync.isTauri() && window.PersonalSync.getRoot()) {
+    window.PersonalSync.startWatching();
+  }
 }
 
 function renderPersonalTabs() {
@@ -5178,7 +5182,8 @@ function renderPersonalTabs() {
     </button>`;
   }).join('');
   const addBtn = document.getElementById('personal-add-btn');
-  if (addBtn) addBtn.style.display = (personalActiveTagFilter || personalActiveTab === 'pin') ? 'none' : 'inline-flex';
+  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder';
+  if (addBtn) addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
 }
 
 function renderPersonalTagFilterBar() {
@@ -5307,6 +5312,11 @@ function switchPersonalTab(type) {
 function renderPersonalItems() {
   const listEl = document.getElementById('personal-hub-list');
   if (!listEl) return;
+
+  if (!personalActiveTagFilter && personalActiveTab === 'sync_folder') {
+    renderSyncFolderPanel();
+    return;
+  }
 
   let items;
   let meta;
@@ -5517,4 +5527,132 @@ async function pinToPersonalHub(projectId, projectName) {
 function openPinnedProject(projectId) {
   switchSection('task');
   selectProjectFromManager(projectId);
+}
+
+// -------------------- Thư mục đồng bộ (local folder <-> cloud, bidirectional) --------------------
+// Only works inside the built desktop app (needs window.__TAURI__) — the plain browser dev
+// preview used for the rest of Personal Hub has no filesystem access, so this panel degrades
+// to an explanatory message there instead of throwing.
+
+let syncFolderStatusText = '';
+
+async function renderSyncFolderPanel() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (!listEl) return;
+
+  if (!window.PersonalSync || !window.PersonalSync.isTauri()) {
+    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-desktop"></i><p>Tính năng đồng bộ thư mục chỉ hoạt động trong bản desktop app (không dùng được ở chế độ xem trình duyệt).</p></div>`;
+    return;
+  }
+
+  const root = window.PersonalSync.getRoot();
+
+  if (!root) {
+    listEl.innerHTML = `
+    <div class="empty-state">
+      <i class="fa-solid fa-folder-open"></i>
+      <p>Chưa liên kết thư mục nào. Chọn 1 thư mục trên máy để làm việc trực tiếp và tự đồng bộ 2 chiều với đám mây.</p>
+      <button type="button" class="btn btn-primary" onclick="personalSyncPickAndLink()"><i class="fa-solid fa-folder-plus"></i> Chọn thư mục</button>
+    </div>`;
+    return;
+  }
+
+  listEl.innerHTML = `
+  <div class="sync-folder-panel">
+    <div class="sync-folder-header">
+      <div>
+        <div class="sync-folder-path"><i class="fa-solid fa-folder-open"></i> ${escapeHtml(root)}</div>
+        <div class="sync-folder-status" id="sync-folder-status">${escapeHtml(syncFolderStatusText || 'Đã đồng bộ')}</div>
+      </div>
+      <div class="sync-folder-actions">
+        <button type="button" class="btn btn-outline" onclick="personalSyncManualReconcile()"><i class="fa-solid fa-rotate"></i> Đồng bộ lại</button>
+        <button type="button" class="btn btn-outline" onclick="personalSyncUnlinkFolder()"><i class="fa-solid fa-link-slash"></i> Bỏ liên kết</button>
+      </div>
+    </div>
+    <div id="sync-folder-file-list" class="sync-folder-file-list"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải danh sách...</p></div></div>
+  </div>`;
+
+  renderSyncFolderFileList();
+}
+
+async function renderSyncFolderFileList() {
+  const el = document.getElementById('sync-folder-file-list');
+  if (!el) return;
+  try {
+    const files = await API.personalSync.listFiles();
+    if (files.length === 0) {
+      el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-file"></i><p>Chưa có file nào được đồng bộ.</p></div>`;
+      return;
+    }
+    el.innerHTML = files
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .map(f => `
+      <div class="sync-file-row">
+        <i class="fa-solid fa-file"></i>
+        <span class="sync-file-path">${escapeHtml(f.relative_path)}</span>
+        <span class="sync-file-size">${formatFileSize(f.size)}</span>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải danh sách: ${escapeHtml(err.message || String(err))}</p></div>`;
+  }
+}
+
+function formatFileSize(bytes) {
+  bytes = Number(bytes) || 0;
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function updateSyncFolderStatus(status, detail) {
+  const LABELS = {
+    reconciling: 'Đang đồng bộ...',
+    reconciled: 'Đã đồng bộ',
+    uploaded: 'Đã tải lên: ' + (detail || ''),
+    downloaded: 'Đã tải về: ' + (detail || ''),
+    deleted: 'Đã xoá: ' + (detail || ''),
+    'deleted-remote': 'Đã xoá (từ máy khác): ' + (detail || ''),
+    conflict: 'Phát hiện xung đột, đã giữ lại bản sao: ' + (detail && detail.relPath ? detail.relPath : detail || ''),
+    error: 'Lỗi đồng bộ'
+  };
+  syncFolderStatusText = LABELS[status] || status;
+  const statusEl = document.getElementById('sync-folder-status');
+  if (statusEl) statusEl.textContent = syncFolderStatusText;
+  if (['uploaded', 'downloaded', 'deleted', 'deleted-remote', 'reconciled'].includes(status) && personalActiveTab === 'sync_folder') {
+    renderSyncFolderFileList();
+  }
+}
+
+if (window.PersonalSync) {
+  window.PersonalSync.onStatus(updateSyncFolderStatus);
+}
+
+async function personalSyncPickAndLink() {
+  const path = await window.PersonalSync.pickFolder();
+  if (!path) return;
+  const listEl = document.getElementById('personal-hub-list');
+  if (listEl) listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang liên kết và đồng bộ lần đầu, có thể mất một lúc tuỳ số lượng file...</p></div>`;
+  try {
+    await window.PersonalSync.linkFolder(path);
+    showToast('Đã liên kết thư mục và đồng bộ xong', 'success');
+  } catch (err) {
+    showToast('Lỗi liên kết thư mục: ' + (err.message || err), 'error');
+  }
+  renderSyncFolderPanel();
+}
+
+async function personalSyncUnlinkFolder() {
+  if (!confirm('Bỏ liên kết thư mục này? File đã đồng bộ trên đám mây vẫn được giữ nguyên.')) return;
+  await window.PersonalSync.unlinkFolder();
+  renderSyncFolderPanel();
+}
+
+async function personalSyncManualReconcile() {
+  try {
+    await window.PersonalSync.fullReconcile();
+    showToast('Đã đồng bộ lại', 'success');
+  } catch (err) {
+    showToast('Lỗi đồng bộ: ' + (err.message || err), 'error');
+  }
+  renderSyncFolderFileList();
 }

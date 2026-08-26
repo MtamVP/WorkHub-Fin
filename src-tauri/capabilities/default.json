@@ -14,6 +14,7 @@
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
     "notification:default",
+    "dialog:default",
     "fs:allow-mkdir",
     "fs:allow-write-text-file",
     "fs:allow-read-dir",
