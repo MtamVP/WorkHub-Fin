@@ -1005,7 +1005,8 @@ const API = {
                     url: buildFileUrl(f.storage_path),
                     mimeType: f.mime_type,
                     isShared: f.is_shared,
-                    groupKey: f.group_key
+                    groupKey: f.group_key,
+                    storagePath: f.storage_path
                 };
             });
         },

@@ -273,7 +273,7 @@ async function runE2Validation() {
       files = response;
     }
     
-    const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
+    const bronzeFiles = files.filter(f => f.storagePath && f.storagePath.includes('/bronze/'));
     
     if (bronzeFiles.length === 0) {
       addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào trong bronze để kiểm tra.', 'warning');
@@ -354,7 +354,7 @@ async function runE3Cleaning() {
     }
     
     // Lọc lấy các file từ bronze
-    const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
+    const bronzeFiles = files.filter(f => f.storagePath && f.storagePath.includes('/bronze/'));
     
     if (bronzeFiles.length === 0) {
       addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào ở phân vùng Bronze để làm sạch.', 'warning');
@@ -516,7 +516,7 @@ async function simulateIngest(btn) {
         groupKey: 'finance',
         description: description,
         email: email,
-        folderPath: item.customFolder || ''
+        folderPath: item.customFolder ? ('bronze/' + item.customFolder) : ''
       });
       
       if (response && response.status === 'error') {
@@ -578,7 +578,7 @@ async function loadBronzeFiles() {
     }
     
     // Lọc các file có folderPath chứa 'bronze'
-    const bronzeFiles = files.filter(f => f.url && f.url.includes('/bronze/'));
+    const bronzeFiles = files.filter(f => f.storagePath && f.storagePath.includes('/bronze/'));
     
     if (bronzeFiles.length === 0) {
       tbody.innerHTML = `<tr>
@@ -620,7 +620,7 @@ async function handleApprove() {
   }
 
   try {
-    // 1. Lưu Report vào reports/
+    // 1. Lưu Report vào gold/reports/
     const reportName = `Report_Approved_${Date.now()}.md`;
     const base64Report = btoa(unescape(encodeURIComponent(window.currentDraft)));
     await callGAS('uploadFile', {
@@ -630,10 +630,10 @@ async function handleApprove() {
         groupKey: 'finance',
         description: 'Approved Report',
         email: 'system@workhub.com',
-        folderPath: 'reports'
+        folderPath: 'gold/reports'
     });
 
-    // 2. Chuyển dời các file JSON sang knowledge/
+    // 2. Chuyển dời các file JSON sang gold/knowledge/
     if (window.draftSourceFiles && window.draftSourceFiles.length > 0) {
        for (let f of window.draftSourceFiles) {
            const res = await fetch(f.url);
@@ -647,7 +647,7 @@ async function handleApprove() {
               groupKey: 'finance',
               description: 'Knowledge Chunk',
               email: 'system@workhub.com',
-              folderPath: 'knowledge'
+              folderPath: 'gold/knowledge'
            });
            
            await callGAS('permanentDeleteFile', { fileId: f.id, groupKey: 'finance' });
