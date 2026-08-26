@@ -129,13 +129,15 @@ function loadPipelineStage(stageKey) {
   }
 
   // If it's an auto-processing stage, simulate progress
-  if (['e2', 'e3', 'e4', 'e5'].includes(stageKey)) {
+  if (['e2', 'e3', 'e4', 'e5', 'e7'].includes(stageKey)) {
     const titleEl = document.querySelector('#panel-auto .pipeline-panel-title');
     if (titleEl) {
       if (stageKey === 'e2') {
         titleEl.innerHTML = 'E2: Data Integrity & Source Validation';
       } else if (stageKey === 'e3') {
         titleEl.innerHTML = 'E3: Data Standardization & Cleaning';
+      } else if (stageKey === 'e7') {
+        titleEl.innerHTML = 'E7: Publish to Gold Layer';
       } else {
         titleEl.innerHTML = 'Thiết lập Auto Process';
       }
