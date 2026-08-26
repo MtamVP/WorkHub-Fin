@@ -1003,10 +1003,14 @@ const API = {
                 if (parts.length >= 2) {
                     const bucketName = parts[0];
                     const filePath = parts.slice(1).join('/');
-                    await sbClient.storage.from(bucketName).remove([filePath]);
+                    if (NEW_MINIO_BUCKETS.has(bucketName)) {
+                        await storageProxyDelete(bucketName, filePath);
+                    } else {
+                        await sbClient.storage.from(bucketName).remove([filePath]);
+                    }
                 }
             }
-            
+
             await sbClient.from('files').delete().eq('id', fileId);
             return `Đã xóa vĩnh viễn ${fileData.name}`;
         },
