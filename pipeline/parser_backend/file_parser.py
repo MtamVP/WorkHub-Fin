@@ -1,8 +1,15 @@
 import io
-import pdfplumber
-import docx
-import pandas as pd
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import traceback
+
+try:
+    import pdfplumber
+    import docx
+    import pandas as pd
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    print("ALL IMPORTS SUCCESSFUL")
+except Exception as e:
+    print("IMPORT ERROR:", e)
+    traceback.print_exc()
 
 def chunk_text(text: str) -> list[str]:
     # Sử dụng Langchain để cắt văn bản thành các chunk nhỏ
