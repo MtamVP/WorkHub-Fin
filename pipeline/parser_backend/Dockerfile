@@ -14,8 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Ngăn Python giữ log trong bộ đệm (rất quan trọng để xem được lỗi)
+ENV PYTHONUNBUFFERED=True
+
 # Mở cổng 8080 cho Cloud Run
 EXPOSE 8080
 
-# Chạy server FastAPI bằng Uvicorn, bind vào cổng 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Chạy server FastAPI bằng python -m uvicorn
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
