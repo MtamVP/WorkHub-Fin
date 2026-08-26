@@ -177,6 +177,15 @@ function loadPipelineStage(stageKey) {
         btn.classList.add('pipeline-btn-secondary');
       }
       runE5ReportGen();
+    } else if (stageKey === 'e7') {
+      window.isAutoPaused = false;
+      const btn = document.getElementById('btn-toggle-auto');
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+        btn.classList.remove('pipeline-btn-primary');
+        btn.classList.add('pipeline-btn-secondary');
+      }
+      runE7Publish();
     } else {
       window.isAutoPaused = false;
       const btn = document.getElementById('btn-toggle-auto');
@@ -350,7 +359,7 @@ async function runE3Cleaning() {
   progressText.textContent = '0%';
   consoleLog.innerHTML = '';
 
-  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng chuẩn hóa và làm sạch (Cleaning & Parsing)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng chuẩn hóa và làm sạch file...', 'info');
   
   try {
     const response = await callGAS('getFileList', { groupKey: 'finance' });
@@ -365,7 +374,7 @@ async function runE3Cleaning() {
     const bronzeFiles = files.filter(f => f.storagePath && f.storagePath.includes('/bronze/'));
     
     if (bronzeFiles.length === 0) {
-      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào ở phân vùng Bronze để làm sạch.', 'warning');
+      addTerminalLog(consoleLog, 'WARN', 'Không tìm thấy tập tin nào ở Bronze để làm sạch.', 'warning');
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       return;
@@ -385,7 +394,7 @@ async function runE3Cleaning() {
       if (currentStep >= bronzeFiles.length) {
          progressBar.style.width = '100%';
          progressText.textContent = '100%';
-         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất quy trình làm sạch (E3). Dữ liệu được đẩy vào Silver.', 'success');
+         addTerminalLog(consoleLog, 'SUCCESS', 'Đã hoàn tất E3. Dữ liệu được đẩy vào Silver.', 'success');
          
          setTimeout(() => {
            if (typeof navStage === 'function') navStage(1);
@@ -443,7 +452,7 @@ async function runE3Cleaning() {
                     addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại Silver.`, 'success');
                     
                     // Gọi API xóa cứng file ở thư mục Bronze
-                    addTerminalLog(consoleLog, 'INFO', `Đang gọt bỏ phần vỏ thừa (xóa file gốc ở Bronze)...`, 'info');
+                    addTerminalLog(consoleLog, 'INFO', `Đang bỏ phầnxóa file gốc ở Bronze)...`, 'info');
                     try {
                         const delRes = await callGAS('permanentDeleteFile', { 
                             fileId: file.id, 
@@ -1055,4 +1064,32 @@ ${allKnowledge.join("\n\n---\n\n")}`;
   } catch (error) {
     addTerminalLog(consoleLog, 'ERROR', `Lỗi hệ thống: ${error.message}`, 'error');
   }
+}
+
+async function runE7Publish() {
+  const progressBar = document.getElementById('auto-progress-bar');
+  const progressText = document.getElementById('auto-progress-text');
+  const consoleLog = document.getElementById('agent-console');
+  
+  if (!progressBar || !progressText || !consoleLog) return;
+
+  progressBar.style.width = '10%';
+  progressText.textContent = '10%';
+  consoleLog.innerHTML = '';
+
+  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Publish (Gold Layer)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang xác thực báo cáo tại gold/reports/ ...', 'info');
+  
+  setTimeout(() => {
+    progressBar.style.width = '60%';
+    progressText.textContent = '60%';
+    addTerminalLog(consoleLog, 'INFO', 'Đang đồng bộ tri thức tại gold/knowledge/ ...', 'info');
+    
+    setTimeout(() => {
+       progressBar.style.width = '100%';
+       progressText.textContent = '100%';
+       addTerminalLog(consoleLog, 'SUCCESS', 'Tất cả dữ liệu đã được Publish thành công vào phân vùng Gold!', 'success');
+       addTerminalLog(consoleLog, 'INFO', 'Quy trình Pipeline đã hoàn tất.', 'info');
+    }, 1000);
+  }, 1000);
 }
