@@ -452,7 +452,7 @@ async function runE3Cleaning() {
                     addTerminalLog(consoleLog, 'SUCCESS', `Tạo thành công file ${cleanName} tại Silver.`, 'success');
                     
                     // Gọi API xóa cứng file ở thư mục Bronze
-                    addTerminalLog(consoleLog, 'INFO', `Đang bỏ phầnxóa file gốc ở Bronze)...`, 'info');
+                    addTerminalLog(consoleLog, 'INFO', `Đang dọn dẹp file gốc ở Bronze...`, 'info');
                     try {
                         const delRes = await callGAS('permanentDeleteFile', { 
                             fileId: file.id, 
@@ -469,7 +469,7 @@ async function runE3Cleaning() {
                  addTerminalLog(consoleLog, 'ERROR', `Lỗi kết nối khi đẩy dữ liệu sang Silver.`, 'error');
                }
              } else {
-               addTerminalLog(consoleLog, 'ERROR', `Lỗi bóc tách dữ liệu từ API: ${data.error}`, 'error');
+               addTerminalLog(consoleLog, 'ERROR', `Lỗi parse dữ liệu từ API: ${data.error}`, 'error');
              }
              
              // Xử lý file tiếp theo
@@ -885,7 +885,7 @@ async function runE4Analysis() {
   progressText.textContent = '0%';
   consoleLog.innerHTML = '';
 
-  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Phân tích & Băm dữ liệu (Analysis)...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang phân tích dữ liệu...', 'info');
   addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới phân vùng Silver...', 'info');
 
   try {
@@ -931,7 +931,7 @@ async function runE4Analysis() {
         const textRes = await fetch(file.url);
         const textContent = await textRes.text();
         
-        addTerminalLog(consoleLog, 'INFO', `Đang gửi ${file.name} cho Gemini băm nhỏ và tóm tắt...`, 'info');
+        addTerminalLog(consoleLog, 'INFO', `Đang gửi ${file.name} cho Gemini phân tích và tóm tắt...`, 'info');
         
         const prompt = `Bạn là một chuyên gia phân tích dữ liệu tài chính. Hãy đọc đoạn văn bản sau và trích xuất các thông tin quan trọng. Trả về kết quả DƯỚI DẠNG JSON với cấu trúc:
 {
@@ -1004,8 +1004,8 @@ async function runE5ReportGen() {
   progressText.textContent = '10%';
   consoleLog.innerHTML = '';
 
-  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Viết Báo cáo (Report Gen)...', 'info');
-  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới silver/analyzed/ để lấy tri thức...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang viết báo cáo...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang kết nối tới silver/analyzed/ để lấy dữ liệu...', 'info');
 
   try {
     const response = await callGAS('getFileList', { groupKey: 'finance' });
@@ -1019,13 +1019,13 @@ async function runE5ReportGen() {
     const analyzedFiles = files.filter(f => f.url && f.folderPath === 'silver/analyzed/');
     
     if (analyzedFiles.length === 0) {
-      addTerminalLog(consoleLog, 'WARN', 'Không có tri thức nào trong silver/analyzed/ để viết báo cáo.', 'warning');
+      addTerminalLog(consoleLog, 'WARN', 'Không có dữ liệu nào trong silver/analyzed/ để viết báo cáo.', 'warning');
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       return;
     }
 
-    addTerminalLog(consoleLog, 'INFO', `Thu thập được ${analyzedFiles.length} file tri thức. Đang tải nội dung...`, 'info');
+    addTerminalLog(consoleLog, 'INFO', `Thu thập được ${analyzedFiles.length} file. Đang tải nội dung...`, 'info');
     progressBar.style.width = '30%';
     progressText.textContent = '30%';
 
@@ -1040,7 +1040,7 @@ async function runE5ReportGen() {
         }
     }
 
-    addTerminalLog(consoleLog, 'INFO', `Đang nhồi tri thức cho Gemini để soạn Báo Cáo Nháp...`, 'info');
+    addTerminalLog(consoleLog, 'INFO', `Đang input data cho Gemini để soạn báo cáo...`, 'info');
     progressBar.style.width = '60%';
     progressText.textContent = '60%';
 
@@ -1054,7 +1054,7 @@ ${allKnowledge.join("\n\n---\n\n")}`;
     window.currentDraft = draft;
     window.draftSourceFiles = analyzedFiles; // Lưu lại để E6 biết file nào cần đẩy sang Knowledge
     
-    addTerminalLog(consoleLog, 'SUCCESS', 'Gemini đã soạn xong Báo Cáo Nháp!', 'success');
+    addTerminalLog(consoleLog, 'SUCCESS', 'Gemini đã soạn xong báo cáo', 'success');
     
     progressBar.style.width = '100%';
     progressText.textContent = '100%';
@@ -1077,18 +1077,18 @@ async function runE7Publish() {
   progressText.textContent = '10%';
   consoleLog.innerHTML = '';
 
-  addTerminalLog(consoleLog, 'INFO', 'Khởi chạy luồng Publish (Gold Layer)...', 'info');
-  addTerminalLog(consoleLog, 'INFO', 'Đang xác thực báo cáo tại gold/reports/ ...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang publish báo cáo...', 'info');
+  addTerminalLog(consoleLog, 'INFO', 'Đang đẩy báo cáo vào gold/reports/ ...', 'info');
   
   setTimeout(() => {
     progressBar.style.width = '60%';
     progressText.textContent = '60%';
-    addTerminalLog(consoleLog, 'INFO', 'Đang đồng bộ tri thức tại gold/knowledge/ ...', 'info');
+    addTerminalLog(consoleLog, 'INFO', 'Đang đẩy dữ liệu json vào gold/knowledge/ ...', 'info');
     
     setTimeout(() => {
        progressBar.style.width = '100%';
        progressText.textContent = '100%';
-       addTerminalLog(consoleLog, 'SUCCESS', 'Tất cả dữ liệu đã được Publish thành công vào phân vùng Gold!', 'success');
+       addTerminalLog(consoleLog, 'SUCCESS', 'Tất cả dữ liệu đã được Publish thành công vào Gold!', 'success');
        addTerminalLog(consoleLog, 'INFO', 'Quy trình Pipeline đã hoàn tất.', 'info');
     }, 1000);
   }, 1000);
