@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
-from parser import extract_text, chunk_text
+from file_parser import extract_text, chunk_text
 
 app = FastAPI(title="WorkHub Finance Parser Backend")
 
