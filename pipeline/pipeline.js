@@ -638,7 +638,12 @@ async function handleApprove() {
 
   try {
     // 1. Lưu Report vào gold/reports/
-    const reportName = `Report_Approved_${Date.now()}.md`;
+    const filenameInput = document.getElementById('e6-report-filename');
+    let customName = filenameInput && filenameInput.value.trim() ? filenameInput.value.trim() : `Report_Approved_${Date.now()}.md`;
+    if (!customName.toLowerCase().endsWith('.md')) {
+        customName += '.md';
+    }
+    const reportName = customName;
     const base64Report = btoa(unescape(encodeURIComponent(window.currentDraft)));
     await callGAS('uploadFile', {
         fileData: base64Report,
