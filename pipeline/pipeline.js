@@ -13,8 +13,8 @@ const GEMINI_API_KEYS = [
 ];
 let currentGeminiKeyIndex = 0;
 
-async function callGemini(prompt, isJsonMode = false) {
-  const model = "gemini-2.5-flash";
+async function callGemini(prompt, isJsonMode = false, modelFallback = null) {
+  const model = modelFallback || "gemini-2.5-flash";
   let maxRetries = GEMINI_API_KEYS.length;
   let attempt = 0;
   
@@ -41,7 +41,7 @@ async function callGemini(prompt, isJsonMode = false) {
       const data = await response.json();
       
       if (!response.ok) {
-        if (response.status === 429 || response.status === 403 || response.status === 500) {
+        if (response.status === 429 || response.status === 403 || response.status >= 500) {
            console.warn(`[Gemini] Key ${currentGeminiKeyIndex} failed with ${response.status}. Switching key...`);
            currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
            attempt++;
@@ -62,10 +62,18 @@ async function callGemini(prompt, isJsonMode = false) {
         attempt++;
         continue;
       }
+      // Ném lỗi ra ngoài vòng lặp nếu là lỗi khác (nhưng nếu là lỗi 503/429 nó đã continue ở trên)
       throw err;
     }
   }
-  throw new Error("Tất cả các API Key Gemini đều quá tải hoặc không khả dụng lúc này.");
+  
+  // Nếu quét hết các key cho gemini-2.5-flash mà vẫn xịt (tức là model sập chung)
+  if (!modelFallback) {
+      console.warn(`[Gemini] All keys failed for gemini-2.5-flash. Falling back to gemini-1.5-flash...`);
+      return callGemini(prompt, isJsonMode, "gemini-1.5-flash");
+  }
+  
+  throw new Error("Tất cả API keys và Models đều bị quá tải. Vui lòng thử lại sau.");
 }
 // ------------------------------
 
