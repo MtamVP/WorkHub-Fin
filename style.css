@@ -294,15 +294,16 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border-right: 1px solid var(--border-color);
   padding-top: 15px; flex-shrink: 0; height: 100%;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex; flex-direction: column; overflow-x: hidden;
+  display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto;
 }
 #app-sidebar.expanded { width: var(--sidebar-width); }
-#app-sidebar ul { list-style: none; padding: 0 10px; margin: 0; }
+#app-sidebar ul { list-style: none; padding: 0 10px; margin: 0; flex-shrink: 0; }
 
 #hamburger-menu {
   text-align: center; padding: 10px; margin-bottom: 10px; cursor: pointer;
   font-size: 18px; color: var(--text-muted);
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 #hamburger-menu:hover { color: var(--text-primary); }
 
@@ -312,7 +313,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .nav-group-label {
   padding: 14px 12px 6px; margin: 0;
   font-size: 10px; font-weight: 400; letter-spacing: 1.4px; text-transform: uppercase;
-  color: var(--text-muted); white-space: nowrap; overflow: hidden;
+  color: var(--text-muted); white-space: nowrap; overflow: hidden; flex-shrink: 0;
 }
 #app-sidebar:not(.expanded) .nav-group-label {
   padding: 10px 16px; margin: 6px 0 2px;
