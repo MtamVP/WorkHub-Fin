@@ -14,7 +14,7 @@ const GEMINI_API_KEYS = [
 let currentGeminiKeyIndex = 0;
 
 async function callGemini(prompt, isJsonMode = false) {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.5-flash";
   let maxRetries = GEMINI_API_KEYS.length;
   let attempt = 0;
   
