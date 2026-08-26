@@ -27,6 +27,7 @@
     }
   },
   "bundle": {
+    "resources": ["WebView2Loader.dll"],
     "active": true,
     "targets": "all",
     "icon": [

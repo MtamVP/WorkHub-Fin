@@ -17,6 +17,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <link rel="stylesheet" href="style.css?v=3.3.0">
+  <link rel="stylesheet" href="pipeline/pipeline.css">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="manifest" href="/manifest.json">
@@ -142,6 +143,13 @@
         </li>
         <li class="nav-item" data-section="calendar" onclick="switchSection('calendar')" title="Lịch">
           <i class="fa-solid fa-calendar-days"></i><span> Lịch</span>
+        </li>
+      </ul>
+
+      <div class="nav-group-label nav-group-label-personal"><span>Cá Nhân</span></div>
+      <ul class="nav-group nav-group-personal">
+        <li class="nav-item" data-section="personal" onclick="switchSection('personal')" title="Không gian cá nhân">
+          <i class="fa-solid fa-user-lock"></i><span> Không Gian Riêng</span>
         </li>
       </ul>
 
@@ -291,8 +299,8 @@
       </div>
     </section>
 
-    <section class="card" id="stage-detail-card" style="margin-top: 24px; padding: 28px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <section class="card" id="stage-detail-card" style="margin-top: 24px; padding: 28px; background: #151521; border-color: #323248;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid #323248; padding-bottom: 20px;">
         <div>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
             <span class="status-pill pill-info" id="stage-badge-layer" style="font-size: 13px; font-weight: 700;">Lớp Bronze</span>
@@ -309,18 +317,177 @@
         </div>
       </div>
 
-      <div class="grid-3" style="margin-top: 24px;">
-        <div class="metric-box">
-          <div class="label">Vị trí lưu trữ dữ liệu</div>
-          <div class="value" id="stage-storage-tier" style="font-size: 1.1rem; color: var(--gold);">WorkHub Storage (Bronze)</div>
-          <div class="desc">Storage Tier</div>
+      <div style="display: none;">
+        <span id="stage-storage-tier"></span>
+      </div>
+
+      <div id="pipeline-dynamic-panel" class="pipeline-dynamic-panel">
+        
+        <!--  STAGE E1: INGEST -->
+        <div id="panel-e1" class="pipeline-stage-panel active" style="display: flex; gap: 24px; width: 100%;">
+          <div class="pipeline-col-left">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title">Tải dữ liệu lên Bronze Layer</div>
+              </div>
+              <div class="drag-drop-zone" id="pipeline-drop-zone" onclick="triggerPipelineUpload()">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <div class="drag-drop-text" id="pipeline-drop-text">Kéo thả file hoặc click để tải lên</div>
+                <div class="drag-drop-subtext">Hỗ trợ: docx, pdf, txt, csv, tsv, json, xlsx (Max 50MB)</div>
+              </div>
+
+              <div class="pipeline-form-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                <div style="flex: 1;">
+                  <label class="pipeline-form-label">Thư mục chung (Tùy chọn)</label>
+                  <input type="text" id="pipeline-bulk-folder" class="pipeline-input" placeholder="Nhập tên thư mục...">
+                </div>
+                <button class="btn btn-outline" onclick="applyBulkFolder()" style="height: 38px; padding: 0 16px;">Áp dụng</button>
+              </div>
+              <div class="pipeline-form-group">
+                <label class="pipeline-form-label">Phân loại (Category)</label>
+                <input type="text" id="pipeline-meta-category" list="pipeline-category-list" class="pipeline-input" placeholder="Chọn hoặc tự nhập loại mới...">
+                <datalist id="pipeline-category-list">
+                  <option value="Báo cáo tài chính"></option>
+                  <option value="Báo cáo thị trường"></option>
+                  <option value="Dữ liệu giao dịch"></option>
+                  <option value="Tài liệu nội bộ"></option>
+                </datalist>
+              </div>
+              <div class="pipeline-form-group" style="margin-top: 16px; display: flex; gap: 16px; font-size: 13px; color: var(--text-primary);">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="radio" name="pipelineUploadType" value="file" checked onchange="togglePipelineUploadMode()"> Tải file
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="radio" name="pipelineUploadType" value="folder" onchange="togglePipelineUploadMode()"> Tải thư mục
+                </label>
+              </div>
+
+              <input type="file" id="pipeline-file-input" multiple style="display: none;" onchange="handlePipelineFileSelect(event)">
+              <input type="file" id="pipeline-folder-input" webkitdirectory directory multiple style="display: none;" onchange="handlePipelineFileSelect(event)">
+
+              <div id="pipeline-selected-files" style="font-size: 13px; margin-bottom: 8px;"></div>
+              
+              <div class="table-compact-wrapper" id="pipeline-staging-area" style="display: none; max-height: 250px; overflow-y: auto; margin-bottom: 16px;">
+                <table class="table-compact">
+                  <thead>
+                    <tr>
+                      <th style="width: 5%;"></th>
+                      <th style="width: 45%;">Tên file mới</th>
+                      <th style="width: 50%;">Thư mục đích (Bronze)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pipeline-staging-body">
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: auto; display: flex; justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="simulateIngest(this)"><i class="fa-solid fa-play"></i> Bắt đầu tải </button>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-col-right">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title"><i class="fa-solid fa-bucket"></i> finance_bucket/bronze/</div>
+              </div>
+              <div class="table-compact-wrapper" style="overflow-y: auto; max-height: 400px;">
+                <table class="table-compact">
+                  <thead>
+                    <tr>
+                      <th>Tên file</th>
+                      <th>Ngày tải</th>
+                      <th>Kích thước</th>
+                      <th>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pipeline-bronze-table-body">
+                    <tr>
+                      <td colspan="4" style="text-align: center; padding: 20px; border-bottom: none;">
+                        <div class="empty-state" style="color: var(--text-muted);">Chưa có file nào trong thư mục này</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- STAGE E2-E5: AUTO PROCESSING -->
+        <div id="panel-auto" class="pipeline-stage-panel" style="display: none; gap: 24px; width: 100%;">
+          <div class="pipeline-col-left">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title">Thiết lập Auto Process</div>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14px;">Giai đoạn này tự động chạy nền. Các rules sẽ kiểm tra dữ liệu rỗng, sai định dạng hoặc bất thường trước khi xử lý.</p>
+              
+              <div style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>Tiến độ xử lý</span>
+                    <button id="btn-toggle-auto" class="pipeline-btn pipeline-btn-secondary" style="padding: 2px 8px; font-size: 11px; height: 24px;" onclick="toggleAutoProcess()">
+                      <i class="fa-solid fa-pause"></i> Tạm dừng
+                    </button>
+                  </div>
+                  <span style="color: var(--gold);" id="auto-progress-text">0%</span>
+                </div>
+                <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 4px; height: 6px; overflow: hidden;">
+                  <div id="auto-progress-bar" style="width: 0%; background: var(--gold); height: 100%; border-radius: 4px; transition: width 0.3s;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-col-right">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title"><i class="fa-solid fa-terminal"></i> Agent Console Log</div>
+              </div>
+              <div class="terminal-window" id="agent-console">
+                <!-- terminal logs will be injected here -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!--  STAGE E6: HUMAN QA  -->
+        <div id="panel-e6" class="pipeline-stage-panel" style="display: none; gap: 24px; width: 100%;">
+          <div class="pipeline-col-left">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title">Kiểm duyệt Báo cáo (Review Gate)</div>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Kiểm tra các chỉ số tài chính quan trọng trước khi xuất bản lên Gold Layer.</p>
+              
+              <div class="pipeline-form-group">
+                <label class="pipeline-form-label">Ghi chú phê duyệt / từ chối (bắt buộc khi Reject)</label>
+                <textarea class="pipeline-input" rows="3" placeholder="Nhập lý do..."></textarea>
+              </div>
+              
+              <div style="margin-top: auto; display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="btn btn-outline" style="color: #f85149; border-color: #f85149;" onclick="handleReject()"><i class="fa-solid fa-xmark"></i> Từ chối (Reject)</button>
+                <button class="btn btn-primary" style="background: #238636; border-color: #238636; color: white;" onclick="handleApprove()"><i class="fa-solid fa-check"></i> Phê duyệt (Approve)</button>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-col-right">
+            <div class="pipeline-panel-card">
+              <div class="pipeline-panel-header">
+                <div class="pipeline-panel-title"><i class="fa-solid fa-code-compare"></i> Diff View & Summary</div>
+              </div>
+              <div class="diff-view" id="qa-diff-view">
+                <div style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có dữ liệu báo cáo</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
     </section>
 
-    <!-- ================= TASK SECTION ("Nhiệm Vụ") ================= -->
+    <!-- TASK SECTION ("Nhiệm Vụ") -->
     <section class="app-section" id="task-section">
       <div class="section-hero-card card">
         <div class="section-hero-info">
@@ -787,6 +954,21 @@
       </div>
     </section>
 
+    <section class="app-section personal-hub-section" id="personal-section">
+      <div class="section-hero-card card personal-hub-hero">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Không Gian Riêng</h3>
+          <p>Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="personal-add-btn" onclick="openPersonalItemModal(null)">
+          <i class="fa-solid fa-plus"></i> Thêm mới
+        </button>
+      </div>
+
+      <div id="personal-hub-tabs" class="personal-hub-tabs"></div>
+      <div id="personal-hub-list" class="personal-hub-list"></div>
+    </section>
+
     <section class="app-section" id="chat-section">
       <div class="section-hero-card card">
         <div class="section-hero-info">
@@ -1014,6 +1196,41 @@
   </div>
 
   <!-- Task Activity Modal: Bình luận / Danh sách kiểm / Tệp đính kèm / Lịch sử -->
+  <div class="modal-overlay" id="personal-item-modal">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="personal-item-modal-title"><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Thêm mục cá nhân</h3>
+        <button class="header-btn" onclick="closeAppModal('personal-item-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="personal-item-form" onsubmit="submitPersonalItemForm(event)">
+          <input type="hidden" id="personal-item-id">
+          <input type="hidden" id="personal-item-type">
+
+          <div class="form-group">
+            <label class="form-label">Tiêu đề</label>
+            <input type="text" id="personal-item-title" class="form-control" placeholder="Ví dụ: Ghi chú họp sáng nay" required>
+          </div>
+
+          <div class="form-group" id="personal-item-body-field">
+            <label class="form-label">Nội dung</label>
+            <textarea id="personal-item-body" class="form-control" rows="4" placeholder="Nội dung ghi chú..."></textarea>
+          </div>
+
+          <div class="form-group" id="personal-item-url-field" style="display:none;">
+            <label class="form-label">Đường dẫn</label>
+            <input type="text" id="personal-item-url" class="form-control" placeholder="https://...">
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+            <button type="button" class="btn btn-outline" onclick="closeAppModal('personal-item-modal')">Huỷ</button>
+            <button type="submit" class="btn btn-primary">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="task-activity-modal">
     <div class="modal-card" style="max-width: 560px;">
       <div class="modal-header">
@@ -1265,15 +1482,15 @@
     </div>
   </div>
 
-  <script src="api.js?v=16"></script>
-  <script src="sync-config.js?v=1"></script>
+  <script src="api.js?v=17"></script>
+  <script src="sync-config.js?v=2"></script>
   <script src="sync-engine.js?v=1"></script>
-
-  <script src="script.js?v=16"></script>
+  <script src="pipeline/pipeline.js?t=999"></script>
+  <script src="script.js?v=17"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=1"></script>
-  <script src="backup-config.js?v=1"></script>
+  <script src="backup-config.js?v=2"></script>
   <script src="local-backup.js?v=1"></script>
 </body>
 </html>

@@ -100,9 +100,9 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Tổng Quan / Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks'];
+const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'personal'];
 let currentSectionKey = 'dashboard';
-const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false };
+const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false, personal: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -687,6 +687,11 @@ function updateStageUI(stageKey) {
     badgeEl.className = `status-pill ${meta.layerClass}`;
   }
   if (storageTierEl) storageTierEl.textContent = meta.storageTier;
+
+  // Render layout for the dynamic panel
+  if (typeof window.loadPipelineStage === 'function') {
+    window.loadPipelineStage(stageKey);
+  }
 }
 
 // ==========================================
@@ -742,6 +747,11 @@ function switchSection(sectionKey) {
   if (sectionKey === 'chat' && !SECTION_LOADED.chat) {
     SECTION_LOADED.chat = true;
     loadChatMessages();
+  }
+
+  if (sectionKey === 'personal' && !SECTION_LOADED.personal) {
+    SECTION_LOADED.personal = true;
+    loadPersonalHub();
   }
 }
 
@@ -1897,6 +1907,9 @@ function renderProjectManagerList() {
       <td style="text-align:center;">
         <button type="button" class="btn ${isSelected ? 'btn-secondary' : 'btn-outline'}" style="padding: 4px 10px; font-size:12px;" onclick="selectProjectFromManager('${safeIdArg}')">
           ${isSelected ? 'Đang xem' : 'Chọn'}
+        </button>
+        <button type="button" class="btn btn-outline" title="Ghim vào Cá Nhân" style="padding: 4px 8px; font-size:12px; margin-left:4px;" onclick="pinToPersonalHub('${safeIdArg}', '${escapeHtml(escapeJs(p.name))}')">
+          <i class="fa-solid fa-thumbtack"></i>
         </button>
       </td>
     </tr>`;
@@ -3669,7 +3682,7 @@ function renderFileTable(fileData) {
 
   if (!fileData || fileData.length === 0) {
     const colCount = fileTableHeadRow.children.length;
-    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
+    fileTableBody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state" style="text-align: center; color: var(--text-muted); padding: 20px;">Không tìm thấy tài liệu nào phù hợp.</td></tr>`;
     return;
   }
 
@@ -5088,3 +5101,212 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
 });
+
+// ==========================================
+// PERSONAL HUB (Cá Nhân) — private per-user workspace, shared across Fin/Sci/Org.
+// Backed by personal_items (type-discriminated, RLS by auth.uid(), NOT group_key).
+// ==========================================
+
+let personalItemsCache = [];
+let personalActiveTab = 'note';
+
+const PERSONAL_TAB_META = {
+  note: { label: 'Ghi chú', icon: 'fa-note-sticky', empty: 'Chưa có ghi chú nào.' },
+  pin: { label: 'Đã ghim', icon: 'fa-thumbtack', empty: 'Chưa ghim gì — bấm biểu tượng ghim trên danh sách dự án để lưu vào đây.' },
+  checklist: { label: 'Việc riêng', icon: 'fa-list-check', empty: 'Chưa có việc riêng nào.' },
+  shortcut: { label: 'Lối tắt', icon: 'fa-link', empty: 'Chưa có lối tắt nào.' }
+};
+
+async function loadPersonalHub() {
+  renderPersonalTabs();
+  await refreshPersonalItems();
+}
+
+function renderPersonalTabs() {
+  const bar = document.getElementById('personal-hub-tabs');
+  if (!bar) return;
+  bar.innerHTML = Object.keys(PERSONAL_TAB_META).map(type => {
+    const meta = PERSONAL_TAB_META[type];
+    return `<button type="button" class="personal-tab ${type === personalActiveTab ? 'active' : ''}" data-type="${type}" onclick="switchPersonalTab('${type}')">
+      <i class="fa-solid ${meta.icon}"></i><span> ${meta.label}</span>
+    </button>`;
+  }).join('');
+  const addBtn = document.getElementById('personal-add-btn');
+  if (addBtn) addBtn.style.display = personalActiveTab === 'pin' ? 'none' : 'inline-flex';
+}
+
+async function refreshPersonalItems() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (listEl) listEl.innerHTML = skeletonListItems(3);
+  try {
+    const res = await window.callGAS('getPersonalItems', {});
+    personalItemsCache = (res && res.status === 'success') ? (res.data || []) : [];
+  } catch (err) {
+    console.error('Lỗi tải Personal Hub:', err);
+    personalItemsCache = [];
+  }
+  renderPersonalItems();
+}
+
+function switchPersonalTab(type) {
+  personalActiveTab = type;
+  document.querySelectorAll('#personal-hub-tabs .personal-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-type') === type);
+  });
+  const addBtn = document.getElementById('personal-add-btn');
+  if (addBtn) addBtn.style.display = type === 'pin' ? 'none' : 'inline-flex';
+  renderPersonalItems();
+}
+
+function renderPersonalItems() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (!listEl) return;
+  const items = personalItemsCache.filter(i => i.type === personalActiveTab);
+  const meta = PERSONAL_TAB_META[personalActiveTab];
+
+  if (items.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid ${meta.icon}"></i><p>${meta.empty}</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(item => renderPersonalItemCard(item)).join('');
+}
+
+function renderPersonalItemCard(item) {
+  const data = item.data || {};
+  const safeId = escapeHtml(escapeJs(item.id));
+
+  if (item.type === 'checklist') {
+    return `
+    <div class="personal-item-card personal-checklist-row">
+      <label class="personal-checklist-check">
+        <input type="checkbox" ${data.done ? 'checked' : ''} onchange="togglePersonalChecklist('${safeId}', this.checked)">
+        <span class="${data.done ? 'personal-item-done' : ''}">${escapeHtml(item.title || '')}</span>
+      </label>
+      <button type="button" class="personal-item-delete" title="Xoá" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+  }
+
+  if (item.type === 'pin') {
+    return `
+    <div class="personal-item-card">
+      <div class="personal-item-body" ${data.projectId ? `onclick="openPinnedProject('${escapeHtml(escapeJs(data.projectId))}')" style="cursor:pointer;"` : ''}>
+        <i class="fa-solid fa-thumbtack" style="color: var(--gold);"></i>
+        <span>${escapeHtml(item.title || '')}</span>
+      </div>
+      <button type="button" class="personal-item-delete" title="Bỏ ghim" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+  }
+
+  if (item.type === 'shortcut') {
+    return `
+    <div class="personal-item-card">
+      <div class="personal-item-body" onclick="openExternalUrl('${escapeHtml(escapeJs(data.url || '#'))}')" style="cursor:pointer;">
+        <i class="fa-solid fa-link" style="color: var(--gold);"></i>
+        <span>${escapeHtml(item.title || data.url || '')}</span>
+      </div>
+      <div class="personal-item-actions">
+        <button type="button" class="personal-item-delete" title="Sửa" onclick="openPersonalItemModal('${safeId}')"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="personal-item-delete" title="Xoá" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </div>`;
+  }
+
+  // note
+  return `
+  <div class="personal-item-card personal-note-card" onclick="openPersonalItemModal('${safeId}')">
+    <div class="personal-item-body">
+      <strong>${escapeHtml(item.title || 'Không tiêu đề')}</strong>
+      <p>${escapeHtml((data.text || '').slice(0, 140))}</p>
+    </div>
+    <button type="button" class="personal-item-delete" title="Xoá" onclick="event.stopPropagation(); deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+  </div>`;
+}
+
+function openPersonalItemModal(existingId) {
+  const type = personalActiveTab;
+  if (type === 'pin') return; // pins are only created via the "Ghim" affordance on shared lists
+  const item = existingId ? personalItemsCache.find(i => i.id === existingId) : null;
+
+  document.getElementById('personal-item-id').value = existingId || '';
+  document.getElementById('personal-item-type').value = type;
+  document.getElementById('personal-item-title').value = item ? (item.title || '') : '';
+
+  const urlField = document.getElementById('personal-item-url-field');
+  const bodyField = document.getElementById('personal-item-body-field');
+  if (type === 'shortcut') {
+    urlField.style.display = 'block';
+    bodyField.style.display = 'none';
+    document.getElementById('personal-item-url').value = item && item.data ? (item.data.url || '') : '';
+  } else {
+    urlField.style.display = 'none';
+    bodyField.style.display = type === 'note' ? 'block' : 'none';
+    document.getElementById('personal-item-body').value = item && item.data ? (item.data.text || '') : '';
+  }
+
+  document.getElementById('personal-item-modal-title').textContent = existingId ? 'Sửa mục cá nhân' : 'Thêm ' + PERSONAL_TAB_META[type].label.toLowerCase();
+  openAppModal('personal-item-modal');
+}
+
+async function submitPersonalItemForm(event) {
+  event.preventDefault();
+  const idRaw = document.getElementById('personal-item-id').value;
+  const id = idRaw || null;
+  const type = document.getElementById('personal-item-type').value;
+  const title = document.getElementById('personal-item-title').value.trim();
+  if (!title) { showToast('Nhập tiêu đề trước đã', 'warning'); return; }
+
+  let data = {};
+  if (type === 'shortcut') {
+    data = { url: document.getElementById('personal-item-url').value.trim() };
+  } else if (type === 'note') {
+    data = { text: document.getElementById('personal-item-body').value };
+  } else if (type === 'checklist') {
+    const existing = id ? personalItemsCache.find(i => i.id === id) : null;
+    data = { done: existing && existing.data ? !!existing.data.done : false };
+  }
+
+  const payload = { type, title, data };
+  if (id) payload.id = id;
+  const res = await window.callGAS('savePersonalItem', payload);
+  if (res.status === 'success') {
+    closeAppModal('personal-item-modal');
+    showToast('Đã lưu', 'success');
+    await refreshPersonalItems();
+  } else {
+    showToast('Lỗi: ' + res.message, 'error');
+  }
+}
+
+async function togglePersonalChecklist(id, done) {
+  const item = personalItemsCache.find(i => i.id === id);
+  if (!item) return;
+  item.data = Object.assign({}, item.data, { done });
+  await window.callGAS('savePersonalItem', { id, type: 'checklist', title: item.title, data: item.data });
+  renderPersonalItems();
+}
+
+async function deletePersonalItem(id) {
+  if (!confirm('Xoá mục này khỏi Cá Nhân?')) return;
+  await window.callGAS('deletePersonalItem', { id });
+  await refreshPersonalItems();
+}
+
+async function pinToPersonalHub(projectId, projectName) {
+  const already = personalItemsCache.some(i => i.type === 'pin' && i.data && i.data.projectId === projectId);
+  if (already) { showToast('Đã ghim dự án này rồi', 'info'); return; }
+  const res = await window.callGAS('savePersonalItem', {
+    type: 'pin',
+    title: projectName,
+    data: { projectId, refType: 'project' }
+  });
+  if (res.status === 'success') {
+    showToast('Đã ghim "' + projectName + '" vào Cá Nhân', 'success');
+    if (SECTION_LOADED.personal) await refreshPersonalItems();
+  }
+}
+
+function openPinnedProject(projectId) {
+  switchSection('task');
+  selectProjectFromManager(projectId);
+}

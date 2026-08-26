@@ -1,19 +1,21 @@
 
 :root {
 
-  --bg-color: #0A0A0F;
-  --bg-color-2: #14141E;
-  --card-bg: #111118;
-  --card-bg-elevated: #181824;
-  --text-primary: #F0EDE8;
-  --text-secondary: #B9B7B4;
-  --text-muted: #8F8E8D;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-light: rgba(255, 255, 255, 0.05);
-  --hover-bg: #1D1D2B;
+  --bg-color: #0D0B08;
+  --bg-color-2: #16130D;
+  --card-bg: #19150F;
+  --card-bg-elevated: #221C13;
+  --text-primary: #F3EFE6;
+  --text-secondary: rgba(243, 239, 230, 0.68);
+  --text-muted: rgba(243, 239, 230, 0.48);
+  --border-color: rgba(243, 239, 230, 0.10);
+  --border-light: rgba(243, 239, 230, 0.06);
+  --border-strong: rgba(243, 239, 230, 0.18);
+  --hover-bg: #241D13;
 
   --gold: #C9A84C;
   --gold-light: #E8C87A;
+  --gold-deep: #8A6A2E;
   --gold-glow: rgba(201, 168, 76, 0.25);
   --gold-dim: rgba(201, 168, 76, 0.12);
   --on-gold: #1A1407;
@@ -38,19 +40,33 @@
   --info-color: #5B8FF9;
   --info-bg: rgba(91, 143, 249, 0.12);
 
-  --shadow-soft: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.5);
-  --shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-sm: 0 1px 3px rgba(20, 14, 4, 0.35);
+  --shadow-md: 0 8px 24px rgba(20, 14, 4, 0.45);
+  --shadow-lg: 0 24px 60px rgba(15, 10, 3, 0.55);
+  --shadow-soft: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 6px rgba(20, 14, 4, 0.45);
+  --shadow-hover: 0 16px 40px rgba(15, 10, 3, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --shadow-gold: 0 8px 24px rgba(201, 168, 76, 0.25);
-  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.7);
+  --shadow-modal: 0 24px 60px rgba(15, 10, 3, 0.65);
 
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'DM Mono', monospace;
+  --font-display: 'DM Serif Display', Georgia, serif;
 
   /* Dùng bởi các trang auth (đổi biệt danh / quên & đổi mật khẩu). Trước đây chỉ
      được định nghĩa trong finance-shared.css -- file mà những trang đó không nạp --
@@ -63,29 +79,49 @@
   --sidebar-collapsed: 72px;
 }
 
+/* Snapshot của light theme, không phản ứng theo data-theme -- dùng cho finance-shared.css
+   (các trang tài chính luôn hiển thị sáng bất kể theme toàn app) để tránh lặp lại giá trị hex. */
+:root {
+  --wh-static-light-bg: #F4F1EA;
+  --wh-static-light-bg-2: #F8F6F0;
+  --wh-static-light-card: #FFFFFF;
+  --wh-static-light-text: #1C1710;
+  --wh-static-light-text-secondary: rgba(28, 23, 16, 0.68);
+  --wh-static-light-text-muted: rgba(28, 23, 16, 0.50);
+  --wh-static-light-border: rgba(28, 23, 16, 0.10);
+  --wh-static-light-gold: #B0892A;
+  --wh-static-light-gold-light: #8A6A17;
+  --wh-static-light-gold-dim: rgba(176, 137, 42, 0.14);
+}
+
 [data-theme="light"] {
-  --bg-color: #ECEEF2;
-  --bg-color-2: #F3F4F7;
+  --bg-color: #F4F1EA;
+  --bg-color-2: #F8F6F0;
   --card-bg: #FFFFFF;
-  --card-bg-elevated: #F8F9FB;
-  --text-primary: #15181E;
-  --text-secondary: #575A60;
-  --text-muted: #696B6F;
-  --border-color: rgba(20, 24, 33, 0.10);
-  --border-light: rgba(20, 24, 33, 0.06);
-  --hover-bg: #E8EAEF;
+  --card-bg-elevated: #FBF9F4;
+  --text-primary: #1C1710;
+  --text-secondary: rgba(28, 23, 16, 0.68);
+  --text-muted: rgba(28, 23, 16, 0.50);
+  --border-color: rgba(28, 23, 16, 0.10);
+  --border-light: rgba(28, 23, 16, 0.06);
+  --border-strong: rgba(28, 23, 16, 0.18);
+  --hover-bg: #ECE7DB;
 
   --gold: #B0892A;
   --gold-light: #8A6A17;
+  --gold-deep: #6E5320;
   --gold-glow: rgba(176, 137, 42, 0.18);
   --gold-dim: rgba(176, 137, 42, 0.14);
   --finance-accent: #9A6B0D;
   --finance-accent-subtle: rgba(154, 107, 13, 0.10);
 
-  --shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --shadow-hover: 0 16px 36px rgba(15, 23, 42, 0.14);
+  --shadow-sm: 0 1px 3px rgba(28, 23, 16, 0.10);
+  --shadow-md: 0 8px 20px rgba(28, 23, 16, 0.12);
+  --shadow-lg: 0 24px 50px rgba(28, 23, 16, 0.16);
+  --shadow-soft: 0 1px 3px rgba(28, 23, 16, 0.08);
+  --shadow-hover: 0 16px 36px rgba(28, 23, 16, 0.14);
   --shadow-gold: 0 8px 20px rgba(176, 137, 42, 0.18);
-  --shadow-modal: 0 24px 50px rgba(15, 23, 42, 0.20);
+  --shadow-modal: 0 24px 50px rgba(28, 23, 16, 0.20);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -101,6 +137,21 @@ body {
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s ease, color 0.3s ease;
+  position: relative;
+}
+
+/* Grain rất mảnh phá vỡ nền phẳng tuyệt đối -- cố định (không cuộn theo nội dung),
+   pointer-events: none để không cản tương tác, opacity cực thấp để chỉ cảm nhận được
+   như một lớp vải chứ không phải hoạ tiết rõ ràng. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -216,7 +267,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), #553A0A);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--on-gold);
   display: flex;
   align-items: center;
@@ -507,6 +558,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   gap: 16px;
   padding: 20px 24px;
   border-left: 4px solid var(--gold);
+  border-radius: var(--radius-xl);
 }
 
 .section-hero-info h3 {
@@ -544,7 +596,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold), #936F17);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--on-gold);
   box-shadow: var(--shadow-gold);
 }
@@ -553,6 +605,8 @@ button { font-family: inherit; cursor: pointer; border: none; }
   filter: brightness(1.1);
   transform: translateY(-1px);
 }
+
+.btn:active { transform: translateY(1px) scale(0.98); }
 
 .btn-secondary {
   background: var(--hover-bg);
@@ -998,7 +1052,7 @@ body.app-locked .user-profile-wrapper {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), #7A5812);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--on-gold);
   display: flex;
   align-items: center;
@@ -1263,7 +1317,7 @@ body.app-locked .user-profile-wrapper {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), #7A5812);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--on-gold);
   font-size: 15px;
   font-weight: 800;
@@ -1317,7 +1371,7 @@ body.app-locked .user-profile-wrapper {
 }
 
 [data-theme="light"] .member-email-title {
-  color: #15181E;
+  color: #1C1710;
 }
 
 .member-nickname-sub {
@@ -1396,6 +1450,72 @@ body.app-locked .user-profile-wrapper {
   font-size: 24px;
   color: var(--gold);
 }
+
+/* ==========================================================================
+   PERSONAL HUB (Cá Nhân) — private, per-user workspace shared across
+   Fin/Sci/Org. Visually distinct from group/team sections on purpose: dashed
+   borders + neutral tint instead of the gold-accented team surfaces, so it
+   reads as "just yours", not a new tier above group data.
+   ========================================================================== */
+
+.nav-group-personal .nav-item.active {
+  background: var(--card-bg-elevated);
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 var(--text-secondary);
+}
+
+.personal-hub-hero { border-left-color: var(--text-muted); }
+
+.personal-hub-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 14px;
+}
+.personal-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.personal-tab:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+.personal-tab.active {
+  background: var(--card-bg-elevated); color: var(--text-primary);
+  border-style: solid; border-color: var(--border-strong);
+}
+
+.personal-hub-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.personal-hub-list .empty-state { grid-column: 1 / -1; }
+
+.personal-item-card {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  background: var(--card-bg); border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg); padding: 14px 16px;
+  transition: border-color 0.2s ease;
+}
+.personal-item-card:hover { border-color: var(--gold); border-style: solid; }
+.personal-note-card { cursor: pointer; }
+.personal-item-body { flex: 1; min-width: 0; }
+.personal-item-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.personal-item-body p {
+  font-size: 12.5px; color: var(--text-secondary); margin: 0;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+  -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.personal-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.personal-item-delete {
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius-sm);
+  flex-shrink: 0; transition: color 0.15s ease, background-color 0.15s ease;
+}
+.personal-item-delete:hover { color: var(--danger-color); background: var(--hover-bg); }
+
+.personal-checklist-row { align-items: center; padding: 10px 16px; }
+.personal-checklist-check { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13.5px; flex: 1; }
+.personal-checklist-check input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
+.personal-item-done { text-decoration: line-through; color: var(--text-muted); }
 
 /* ==========================================================================
    CHAT (Trò Chuyện) — full sidebar section, realtime team chat
@@ -1666,7 +1786,7 @@ body.app-locked .user-profile-wrapper {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), #7A5812);
+  background: linear-gradient(135deg, var(--gold), var(--gold-deep));
   color: var(--on-gold);
   font-size: 12px;
   font-weight: 700;
@@ -2267,3 +2387,5 @@ body.auth-page .text-muted { color: var(--text-muted) !important; }
 
 /* Extras */
 body.auth-page #toast-container { left: 50%; right: auto; top: 24px; transform: translateX(-50%); }
+.swal2-container { z-index: 9999 !important; }
+

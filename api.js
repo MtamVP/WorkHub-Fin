@@ -944,7 +944,11 @@ const API = {
 
             const blob = b64toBlob(fileData, mimeType);
             const fileId = "F_" + Date.now() + Math.floor(Math.random()*1000);
-            const safeFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            
+            // Xử lý giữ nguyên chữ tiếng Việt không dấu thay vì xóa trắng
+            let normalizedName = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+            const safeFileName = normalizedName.replace(/[^a-zA-Z0-9.\-_ ]/g, '_').replace(/\s+/g, '_');
+            
             const filePath = `${fileId}_${safeFileName}`;
             const bucketName = groupKey === 'finance' ? 'finance_bucket' :
                 (groupKey === 'science' ? 'science_bucket' : 'general_bucket');
@@ -1689,6 +1693,42 @@ const API = {
             return "Đã xóa note thành công!";
         }
     },
+    // Personal Hub: single flexible table (personal_items), scoped by auth.uid() via RLS —
+    // not group_key. Same table/rows are shared across wh-fin/wh-sci/wh-org (one Supabase
+    // project), so this is intentionally app-agnostic: never filter by source_app, it's
+    // display metadata only.
+    personal: {
+        list: async (type) => {
+            let query = sbClient.from('personal_items').select('*').eq('archived', false)
+                .order('pinned', { ascending: false }).order('updated_at', { ascending: false });
+            if (type) query = query.eq('type', type);
+            const { data, error } = await query;
+            if (error) throw error;
+            return data || [];
+        },
+        upsert: async (item) => {
+            const row = {
+                type: item.type,
+                title: item.title || null,
+                data: item.data || {},
+                pinned: !!item.pinned,
+                source_app: 'fin'
+            };
+            if (item.id) {
+                const { data, error } = await sbClient.from('personal_items').update(row).eq('id', item.id).select().single();
+                if (error) throw error;
+                return data;
+            }
+            const { data, error } = await sbClient.from('personal_items').insert(row).select().single();
+            if (error) throw error;
+            return data;
+        },
+        remove: async (id) => {
+            const { error } = await sbClient.from('personal_items').delete().eq('id', id);
+            if (error) throw error;
+            return "Đã xoá";
+        }
+    },
     stock: {
         getStockList: async () => {
             const { data } = await sbClient.from('finance_stock_valuations').select('symbol').order('symbol');
@@ -2134,7 +2174,8 @@ const MUTATING_ACTIONS = new Set([
     'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole',
-    'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice'
+    'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'savePersonalItem', 'deletePersonalItem'
 ]);
 window.MUTATING_ACTIONS = MUTATING_ACTIONS;
 
@@ -2260,6 +2301,10 @@ async function _dispatchAction(action, params = {}) {
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;
+
+            case 'getPersonalItems': result = await API.personal.list(params.type); break;
+            case 'savePersonalItem': result = await API.personal.upsert(params); break;
+            case 'deletePersonalItem': result = await API.personal.remove(params.id); break;
 
             default:
                 console.warn(`Supabase chưa hỗ trợ action: ${action}`);
