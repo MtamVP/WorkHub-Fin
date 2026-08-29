@@ -204,6 +204,37 @@ fn sync_stop_watch(state: State<SyncWatcherState>) -> Result<(), String> {
     Ok(())
 }
 
+// -------------------- Personal Hub: quick-capture popup --------------------
+// A tiny always-on-top, undecorated window (not the full main window) opened by a
+// second global shortcut, so "jot a note" never means reopening the whole app.
+// Reused/shown again on repeat presses instead of rebuilt, matching how the tray
+// icon reuses the main window rather than recreating it.
+
+fn show_quick_capture_window(app: &tauri::AppHandle) {
+  if let Some(win) = app.get_webview_window("quick-capture") {
+    let _ = win.show();
+    let _ = win.set_focus();
+    let _ = win.emit("quick-capture-reset", ());
+    return;
+  }
+  if let Err(e) = tauri::WebviewWindowBuilder::new(
+    app,
+    "quick-capture",
+    tauri::WebviewUrl::App("quick-capture.html".into()),
+  )
+  .title("Ghi chú nhanh")
+  .inner_size(420.0, 260.0)
+  .resizable(false)
+  .decorations(false)
+  .always_on_top(true)
+  .skip_taskbar(true)
+  .center()
+  .build()
+  {
+    log::warn!("Không mở được cửa sổ ghi chú nhanh: {e}");
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![Migration {
@@ -256,12 +287,19 @@ pub fn run() {
                 .with_handler(|app, shortcut, event| {
                     let quick_add =
                         Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN);
-                    if event.state() == ShortcutState::Pressed && shortcut == &quick_add {
+                    let quick_capture =
+                        Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    if shortcut == &quick_add {
                         if let Some(win) = app.get_webview_window("main") {
                             let _ = win.show();
                             let _ = win.set_focus();
                             let _ = win.emit("quick-add-task", ());
                         }
+                    } else if shortcut == &quick_capture {
+                        show_quick_capture_window(app);
                     }
                 })
                 .build(),
@@ -294,12 +332,23 @@ pub fn run() {
                     "Không đăng ký được phím tắt Ctrl+Shift+N (có thể đã bị app khác dùng): {e}"
                 );
             }
+            if let Err(e) = app.global_shortcut().register(Shortcut::new(
+                Some(Modifiers::CONTROL | Modifiers::SHIFT),
+                Code::Space,
+            )) {
+                log::warn!(
+                    "Không đăng ký được phím tắt Ctrl+Shift+Space (có thể đã bị app khác dùng): {e}"
+                );
+            }
 
             let show_i = MenuItem::with_id(app, "show", "Mở WorkHub", true, None::<&str>)?;
             let quick_add_i =
                 MenuItem::with_id(app, "quick_add", "Thêm nhanh...", true, None::<&str>)?;
+            let quick_capture_i =
+                MenuItem::with_id(app, "quick_capture", "Ghi chú nhanh...", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Thoát", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quick_add_i, &quit_i])?;
+            let menu =
+                Menu::with_items(app, &[&show_i, &quick_add_i, &quick_capture_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -319,6 +368,7 @@ pub fn run() {
                             let _ = w.emit("quick-add-task", ());
                         }
                     }
+                    "quick_capture" => show_quick_capture_window(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })

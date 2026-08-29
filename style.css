@@ -1569,6 +1569,12 @@ body.app-locked .user-profile-wrapper {
 .sync-file-row i { color: var(--text-muted); }
 .sync-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-file-size { color: var(--text-muted); flex-shrink: 0; }
+.sync-file-push {
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius-sm);
+  flex-shrink: 0; transition: color 0.15s ease, background-color 0.15s ease;
+}
+.sync-file-push:hover { color: var(--gold); background: var(--hover-bg); }
 
 /* ==========================================================================
    CHAT (Trò Chuyện) — full sidebar section, realtime team chat

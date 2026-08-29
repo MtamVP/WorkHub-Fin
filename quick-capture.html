@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Ghi chú nhanh</title>
+<style>
+  :root {
+    --bg-color: #0D0B08;
+    --card-bg: #19150F;
+    --text-primary: #F3EFE6;
+    --text-muted: rgba(243, 239, 230, 0.48);
+    --border-color: rgba(243, 239, 230, 0.14);
+    --gold: #C9A84C;
+    --gold-deep: #8A6A2E;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg-color); color: var(--text-primary);
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+  .drag-bar {
+    height: 30px; display: flex; align-items: center; padding: 0 12px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+    -webkit-app-region: drag;
+  }
+  form { display: flex; flex-direction: column; height: calc(100% - 30px); padding: 0 14px 14px; }
+  textarea {
+    flex: 1; resize: none; background: var(--card-bg); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px;
+    font-size: 14px; font-family: inherit; outline: none;
+  }
+  textarea:focus { border-color: var(--gold); }
+  .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .hint { font-size: 11px; color: var(--text-muted); }
+  button {
+    border: none; border-radius: 999px; padding: 7px 16px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer;
+  }
+  button[type="submit"] { background: linear-gradient(135deg, var(--gold), var(--gold-deep)); color: #1A1407; }
+  button[type="button"] { background: transparent; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="drag-bar" data-tauri-drag-region>Ghi chú nhanh</div>
+  <form id="qc-form">
+    <textarea id="qc-text" placeholder="Gõ ghi chú rồi Enter để lưu..."></textarea>
+    <div class="actions">
+      <span class="hint">Esc để huỷ</span>
+      <div>
+        <button type="button" id="qc-cancel">Huỷ</button>
+        <button type="submit">Lưu (Enter)</button>
+      </div>
+    </div>
+  </form>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="api.js"></script>
+  <script>
+    const textEl = document.getElementById('qc-text');
+    const formEl = document.getElementById('qc-form');
+
+    function closeWin() {
+      textEl.value = '';
+      if (window.__TAURI__ && window.__TAURI__.window) {
+        window.__TAURI__.window.getCurrentWindow().hide();
+      }
+    }
+
+    formEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        formEl.requestSubmit();
+      }
+    });
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = textEl.value.trim();
+      if (!text) return;
+      const title = text.length > 60 ? text.slice(0, 60) + '…' : text;
+      try {
+        await API.personal.upsert({ type: 'note', title: title, data: { text: text }, tags: [] });
+        closeWin();
+      } catch (err) {
+        alert('Lỗi lưu ghi chú: ' + (err.message || err));
+      }
+    });
+
+    document.getElementById('qc-cancel').addEventListener('click', closeWin);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeWin(); });
+
+    if (window.__TAURI__ && window.__TAURI__.event) {
+      window.__TAURI__.event.listen('quick-capture-reset', () => {
+        textEl.value = '';
+        textEl.focus();
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => textEl.focus());
+  </script>
+</body>
+</html>

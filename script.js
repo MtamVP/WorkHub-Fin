@@ -5122,6 +5122,7 @@ let personalActiveTab = 'note';
 let personalActiveTagFilter = null;
 
 const PERSONAL_TAB_META = {
+  related: { label: 'Liên quan đến bạn', icon: 'fa-inbox', empty: '' },
   note: { label: 'Ghi chú', icon: 'fa-note-sticky', empty: 'Chưa có ghi chú nào.' },
   pin: { label: 'Đã ghim', icon: 'fa-thumbtack', empty: 'Chưa ghim gì — bấm biểu tượng ghim trên danh sách dự án để lưu vào đây.' },
   checklist: { label: 'Việc riêng', icon: 'fa-list-check', empty: 'Chưa có việc riêng nào.' },
@@ -5182,7 +5183,7 @@ function renderPersonalTabs() {
     </button>`;
   }).join('');
   const addBtn = document.getElementById('personal-add-btn');
-  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder';
+  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder' || personalActiveTab === 'related';
   if (addBtn) addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
 }
 
@@ -5315,6 +5316,10 @@ function renderPersonalItems() {
 
   if (!personalActiveTagFilter && personalActiveTab === 'sync_folder') {
     renderSyncFolderPanel();
+    return;
+  }
+  if (!personalActiveTagFilter && personalActiveTab === 'related') {
+    renderRelatedPanel();
     return;
   }
 
@@ -5591,6 +5596,9 @@ async function renderSyncFolderFileList() {
         <i class="fa-solid fa-file"></i>
         <span class="sync-file-path">${escapeHtml(f.relative_path)}</span>
         <span class="sync-file-size">${formatFileSize(f.size)}</span>
+        <button type="button" class="sync-file-push" title="Đẩy lên khu chung của nhóm" onclick="personalSyncPushToTeam('${escapeHtml(escapeJs(f.relative_path))}')">
+          <i class="fa-solid fa-share-from-square"></i>
+        </button>
       </div>`).join('');
   } catch (err) {
     el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải danh sách: ${escapeHtml(err.message || String(err))}</p></div>`;
@@ -5655,4 +5663,81 @@ async function personalSyncManualReconcile() {
     showToast('Lỗi đồng bộ: ' + (err.message || err), 'error');
   }
   renderSyncFolderFileList();
+}
+
+function personalSyncBlobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Một chiều: đẩy 1 file đã đồng bộ trong Không Gian Riêng lên khu file chung của nhóm
+// (không có chiều ngược lại — file nhóm không tự động chảy vào Không Gian Riêng).
+async function personalSyncPushToTeam(relativePath) {
+  if (!confirm('Đẩy "' + relativePath + '" lên khu file chung của nhóm?')) return;
+  try {
+    const uid = await API.personalSync.getUserId();
+    const blob = await API.personalSync.downloadBytes(uid, relativePath);
+    const dataUrl = await personalSyncBlobToBase64(blob);
+    const fileName = relativePath.split('/').pop();
+    const res = await window.callGAS('uploadFile', {
+      fileData: dataUrl,
+      fileName: fileName,
+      mimeType: blob.type || 'application/octet-stream',
+      groupKey: activeGroup,
+      description: 'Đẩy từ Không Gian Riêng',
+      email: CURRENT_USER.email
+    });
+    if (res.status === 'success') {
+      showToast('Đã đẩy "' + fileName + '" lên nhóm', 'success');
+    } else {
+      showToast('Lỗi: ' + res.message, 'error');
+    }
+  } catch (err) {
+    showToast('Lỗi: ' + (err.message || err), 'error');
+  }
+}
+
+// -------------------- Liên quan đến bạn (một chiều: nhóm -> cá nhân, chỉ đọc) --------------------
+// Không phải personal_items — kéo trực tiếp từ dữ liệu nhóm (API.task.listMine, đúng
+// nguồn "Việc của tôi" đang dùng) để "việc đang giao cho bạn" có mặt ngay trong Không
+// Gian Riêng mà không cần đổi section. Không ghi gì ngược lại khu chung.
+async function renderRelatedPanel() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (!listEl) return;
+  listEl.innerHTML = skeletonListItems(3);
+
+  if (!CURRENT_USER.email) {
+    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Chưa đăng nhập.</p></div>`;
+    return;
+  }
+
+  try {
+    const tasks = await API.task.listMine(CURRENT_USER.email, CURRENT_USER.groupKey);
+    if (!tasks || tasks.length === 0) {
+      listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Không có việc nào của nhóm đang giao cho bạn.</p></div>`;
+      return;
+    }
+    const sorted = tasks.slice().sort((a, b) => {
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return da - db;
+    }).slice(0, 8);
+
+    listEl.innerHTML = sorted.map(t => `
+      <div class="personal-item-card personal-note-card" onclick="goToTaskInProject('${escapeHtml(escapeJs(t.project_id))}')">
+        <div class="personal-item-body">
+          <strong>${escapeHtml(t.name)}</strong>
+          <p>${escapeHtml(t.projectName || '')}${t.dueDate ? ' · Hạn: ' + escapeHtml(t.dueDate) : ''}</p>
+        </div>
+      </div>`).join('') +
+      `<div style="grid-column:1/-1; text-align:center; padding-top:10px;">
+        <button type="button" class="btn btn-outline" onclick="switchSection('mytasks')"><i class="fa-solid fa-arrow-right"></i> Xem tất cả trong Việc của tôi</button>
+      </div>`;
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ${escapeHtml(err.message || String(err))}</p></div>`;
+  }
 }
