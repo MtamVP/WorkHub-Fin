@@ -235,6 +235,117 @@ fn show_quick_capture_window(app: &tauri::AppHandle) {
   }
 }
 
+// -------------------- SSO / Calendar OAuth: shared loopback catcher --------------------
+// One fixed local HTTP port catches BOTH Supabase SSO's SAML redirect and Google
+// Calendar's OAuth redirect (native desktop apps can't complete an external
+// redirect in-webview -- production builds serve locally-bundled assets, not the
+// real deployed URL). Per RFC 8252, loopback redirects are the standard native-app
+// pattern; this fixed port (per app, wh-fin=43781/wh-sci=43782/wh-org=43783) is
+// what gets registered in Supabase's redirect-URL allowlist / Google's OAuth client.
+
+const OAUTH_LOOPBACK_PORT: u16 = 43781;
+
+struct OAuthListenerState(Mutex<Option<std::sync::mpsc::Sender<()>>>);
+
+fn oauth_response_body() -> &'static str {
+    "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>WorkHub</title></head>\
+     <body style=\"font-family:sans-serif;text-align:center;padding-top:80px;\">\
+     <h2>Bạn có thể đóng tab này và quay lại WorkHub.</h2></body></html>"
+}
+
+fn parse_request_line_query(raw: &str) -> Option<String> {
+    let first_line = raw.lines().next()?;
+    let path_and_query = first_line.split_whitespace().nth(1)?;
+    let q = path_and_query.find('?')?;
+    Some(path_and_query[q + 1..].to_string())
+}
+
+#[tauri::command]
+fn start_oauth_loopback(app: AppHandle, state: State<OAuthListenerState>) -> Result<(), String> {
+    use std::io::{BufRead, BufReader, Write as _};
+    use std::net::TcpListener;
+
+    {
+        let mut g = state.0.lock().map_err(|e| e.to_string())?;
+        *g = None;
+    }
+
+    let listener = TcpListener::bind(("127.0.0.1", OAUTH_LOOPBACK_PORT))
+        .map_err(|e| format!("Không mở được cổng {}: {}", OAUTH_LOOPBACK_PORT, e))?;
+
+    let (cancel_tx, cancel_rx) = std::sync::mpsc::channel::<()>();
+    {
+        let mut g = state.0.lock().map_err(|e| e.to_string())?;
+        *g = Some(cancel_tx);
+    }
+
+    let app_for_thread = app.clone();
+    thread::spawn(move || {
+        listener.set_nonblocking(true).ok();
+        let start = std::time::Instant::now();
+        let stream = loop {
+            if cancel_rx.try_recv().is_ok() {
+                return;
+            }
+            if start.elapsed() > Duration::from_secs(300) {
+                let _ = app_for_thread.emit("oauth-loopback-timeout", ());
+                return;
+            }
+            match listener.accept() {
+                Ok((s, _)) => break s,
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(150));
+                    continue;
+                }
+                Err(_) => {
+                    thread::sleep(Duration::from_millis(150));
+                    continue;
+                }
+            }
+        };
+        stream.set_nonblocking(false).ok();
+
+        let mut reader = BufReader::new(&stream);
+        let mut raw_request = String::new();
+        loop {
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {
+                    let blank = line == "\r\n" || line == "\n";
+                    raw_request.push_str(&line);
+                    if blank {
+                        break;
+                    }
+                }
+            }
+        }
+        let query = parse_request_line_query(&raw_request).unwrap_or_default();
+
+        let mut stream = stream;
+        let body = oauth_response_body();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let _ = stream.write_all(response.as_bytes());
+        let _ = stream.flush();
+        let _ = app_for_thread.emit("oauth-loopback-callback", query);
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_oauth_loopback(state: State<OAuthListenerState>) -> Result<(), String> {
+    let mut g = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(tx) = g.take() {
+        let _ = tx.send(());
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![Migration {
@@ -305,6 +416,7 @@ pub fn run() {
                 .build(),
         )
         .manage(SyncWatcherState(Mutex::new(None)))
+        .manage(OAuthListenerState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             sync_list_folder,
             sync_read_file,
@@ -313,7 +425,9 @@ pub fn run() {
             sync_delete_file,
             sync_hash_file,
             sync_start_watch,
-            sync_stop_watch
+            sync_stop_watch,
+            start_oauth_loopback,
+            stop_oauth_loopback
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

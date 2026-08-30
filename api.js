@@ -2306,6 +2306,38 @@ const API = {
             return `Đã cập nhật vai trò thành "${role}"`;
         }
     },
+    calendarConnection: {
+        get: async () => {
+            if (!sbClient) return null;
+            const { data, error } = await sbClient.from('calendar_connections')
+                .select('*').eq('provider', 'google').maybeSingle();
+            if (error) { console.error('calendarConnection.get lỗi', error); return null; }
+            return data || null;
+        },
+        save: async (tokens) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const { data: userRes } = await sbClient.auth.getUser();
+            const uid = userRes && userRes.user ? userRes.user.id : undefined;
+            const row = {
+                user_id: uid,
+                provider: 'google',
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token || null,
+                expires_at: tokens.expires_at || null,
+                scope: tokens.scope || null
+            };
+            const { error } = await sbClient.from('calendar_connections')
+                .upsert(row, { onConflict: 'user_id,provider' });
+            if (error) throw error;
+            return 'Đã lưu kết nối Google Calendar';
+        },
+        disconnect: async () => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const { error } = await sbClient.from('calendar_connections').delete().eq('provider', 'google');
+            if (error) throw error;
+            return 'Đã ngắt kết nối Google Calendar';
+        }
+    },
     lounge: {
         sync: async (payload) => {
             if (!sbClient) return [];
@@ -2535,7 +2567,8 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'savePersonalItem', 'deletePersonalItem'
+    'savePersonalItem', 'deletePersonalItem',
+    'saveCalendarConnection', 'disconnectCalendarConnection'
 ]);
 window.MUTATING_ACTIONS = MUTATING_ACTIONS;
 
@@ -2668,6 +2701,10 @@ async function _dispatchAction(action, params = {}) {
             case 'getMyRole': result = await API.auth.getMyRole(params.groupKey); break;
             case 'listMemberRoles': result = await API.roles.listAll(); break;
             case 'updateMemberRole': result = await API.roles.update(params.userId, params.groupKey, params.role); break;
+
+            case 'getCalendarConnection': result = await API.calendarConnection.get(); break;
+            case 'saveCalendarConnection': result = await API.calendarConnection.save(params); break;
+            case 'disconnectCalendarConnection': result = await API.calendarConnection.disconnect(); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;

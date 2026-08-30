@@ -315,6 +315,41 @@ async function handleAuthSubmit(e) {
   }
 }
 
+async function handleSsoLoginClick(e) {
+  e.preventDefault();
+  if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) {
+    showToast('SSO doanh nghiệp chỉ khả dụng trên bản desktop app.', 'warning');
+    return;
+  }
+  const { value: domain } = await Swal.fire({
+    title: 'Đăng nhập SSO doanh nghiệp', input: 'text',
+    inputLabel: 'Tên miền công ty (vd: yourcompany.com)',
+    showCancelButton: true, confirmButtonText: 'Tiếp tục', cancelButtonText: 'Hủy'
+  });
+  if (!domain) return;
+  try {
+    const { data, error } = await auth.signInWithSSO({
+      domain: domain.trim(), options: { redirectTo: window.OAuthLoopback.OAUTH_CALLBACK_URL }
+    });
+    if (error) throw error;
+    if (!data || !data.url) throw new Error('Không nhận được URL đăng nhập SSO.');
+    const queryString = await window.OAuthLoopback.awaitRedirect(data.url);
+    const params = window.OAuthLoopback.parseQueryString(queryString);
+    if (params.error) throw new Error(params.error_description || params.error);
+    if (!params.code) throw new Error('Không nhận được mã xác thực từ SSO.');
+    const { error: exErr } = await auth.exchangeCodeForSession(params.code);
+    if (exErr) throw exErr;
+    // auth.onAuthStateChange picks up the SIGNED_IN event and finishes the flow
+  } catch (err) {
+    const msg = err.message || String(err);
+    if (/sso|saml|provider not found/i.test(msg)) {
+      showToast('SSO chưa được bật cho tổ chức này.', 'warning');
+    } else {
+      showToast('Đăng nhập SSO thất bại: ' + msg, 'error');
+    }
+  }
+}
+
 async function switchAccount() {
   if (auth) await auth.signOut();
   openAuthModal(true);
@@ -5406,7 +5441,8 @@ const PERSONAL_TAB_META = {
   checklist: { label: 'Việc riêng', icon: 'fa-list-check', empty: 'Chưa có việc riêng nào.' },
   shortcut: { label: 'Lối tắt', icon: 'fa-link', empty: 'Chưa có lối tắt nào.' },
   calendar_event: { label: 'Lịch riêng', icon: 'fa-calendar-days', empty: 'Chưa có sự kiện riêng nào.' },
-  sync_folder: { label: 'Thư mục đồng bộ', icon: 'fa-folder-open', empty: '' }
+  sync_folder: { label: 'Thư mục đồng bộ', icon: 'fa-folder-open', empty: '' },
+  calendar_connect: { label: 'Kết nối Calendar', icon: 'fa-calendar-plus', empty: '' }
 };
 const PERSONAL_TAB_DEFAULT_ORDER = Object.keys(PERSONAL_TAB_META);
 
@@ -5461,7 +5497,7 @@ function renderPersonalTabs() {
     </button>`;
   }).join('');
   const addBtn = document.getElementById('personal-add-btn');
-  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder' || personalActiveTab === 'related';
+  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder' || personalActiveTab === 'related' || personalActiveTab === 'calendar_connect';
   if (addBtn) addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
 }
 
@@ -5594,6 +5630,10 @@ function renderPersonalItems() {
 
   if (!personalActiveTagFilter && personalActiveTab === 'sync_folder') {
     renderSyncFolderPanel();
+    return;
+  }
+  if (!personalActiveTagFilter && personalActiveTab === 'calendar_connect') {
+    renderCalendarConnectionPanel();
     return;
   }
   if (!personalActiveTagFilter && personalActiveTab === 'related') {
