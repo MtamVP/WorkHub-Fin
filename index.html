@@ -69,6 +69,10 @@
         <i class="fa-solid fa-chart-pie"></i>
       </button>
 
+      <button class="header-btn" id="role-mgmt-toggle-btn" title="Phân quyền thành viên" onclick="openRoleMgmtModal()" style="display:none;">
+        <i class="fa-solid fa-user-shield"></i>
+      </button>
+
       <div class="user-profile-wrapper" id="user-profile-wrapper">
         <div class="user-profile-badge" id="user-badge" title="Tài khoản cá nhân" onclick="toggleUserDropdown(event)">
           <div class="user-avatar" id="user-avatar-text">US</div>
@@ -508,7 +512,7 @@
           <p>Danh sách công việc theo từng dự án của nhóm Finance.</p>
         </div>
         <div class="section-actions">
-          <button class="btn btn-primary" onclick="openAddTask()"><i class="fa-solid fa-plus"></i> Công việc mới</button>
+          <button class="btn btn-primary" id="new-task-btn" onclick="openAddTask()"><i class="fa-solid fa-plus"></i> Công việc mới</button>
         </div>
       </div>
 
@@ -1458,6 +1462,37 @@
     </div>
   </div>
 
+  <!-- Role Management Modal (admin-only; the header-button visibility is cosmetic — real
+       enforcement is the member_roles RLS policies, a non-admin session's updateMemberRole
+       call gets rejected by RLS regardless) -->
+  <div class="modal-overlay" id="role-mgmt-modal">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-shield" style="color: var(--gold);"></i> Phân quyền thành viên</h3>
+        <button class="header-btn" onclick="closeAppModal('role-mgmt-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Biệt danh</th>
+                <th style="width: 160px;">Vai trò</th>
+              </tr>
+            </thead>
+            <tbody id="role-mgmt-table-body">
+              <tr><td colspan="3" style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('role-mgmt-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Milestones Modal -->
   <div class="modal-overlay" id="task-files-modal">
     <div class="modal-card" style="max-width: 520px;">
@@ -1613,7 +1648,7 @@
   <script src="sync-engine.js?v=1"></script>
   <script src="personal-sync.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=23"></script>
+  <script src="script.js?v=24"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

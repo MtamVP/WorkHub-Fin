@@ -174,7 +174,7 @@ const API = {
         },
         getAllUsers: async (groupKey) => {
             if (!sbClient) return [];
-            let query = sbClient.from('users').select('email, name:nickname');
+            let query = sbClient.from('users').select('id, email, name:nickname');
             if (groupKey && groupKey !== 'all' && groupKey !== 'admin') query = query.eq('group_key', groupKey);
             const { data } = await query;
             return data || [];
@@ -184,6 +184,17 @@ const API = {
             const { data, error } = await sbClient.from('users').select('name:nickname, group:group_key').eq('email', email).maybeSingle();
             if (error || !data) return { group: 'guest', name: '' };
             return data;
+        },
+        // Phase B RBAC: resolves the caller's effective role (viewer/editor/admin) for a
+        // group via the DB function current_user_role() -- cosmetic-only on the client
+        // (used to hide/disable UI), RLS is the real backstop regardless of what this
+        // returns. Fails open to 'editor' (today's default behavior) on any error, since a
+        // false negative here never grants more access than RLS itself would allow.
+        getMyRole: async (groupKey) => {
+            if (!sbClient) return 'editor';
+            const { data, error } = await sbClient.rpc('current_user_role', { p_group_key: groupKey });
+            if (error) { console.warn('getMyRole thất bại, mặc định Editor:', error); return 'editor'; }
+            return data || 'editor';
         },
         updateNickname: async (email, newNickname) => {
             const { error } = await sbClient.from('users').update({ nickname: newNickname }).eq('email', email);
@@ -2278,6 +2289,23 @@ const API = {
             });
         }
     },
+    // Phase B RBAC: role-management CRUD on member_roles. Table is shared verbatim
+    // across all 3 apps (same DB) -- this module is identical in each app's api.js.
+    roles: {
+        listAll: async () => {
+            if (!sbClient) return [];
+            const { data, error } = await sbClient.from('member_roles').select('user_id, group_key, role');
+            if (error) { console.error('roles.listAll lỗi', error); return []; }
+            return data || [];
+        },
+        update: async (userId, groupKey, role) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const { error } = await sbClient.from('member_roles')
+                .upsert({ user_id: userId, group_key: groupKey, role }, { onConflict: 'user_id,group_key' });
+            if (error) throw error;
+            return `Đã cập nhật vai trò thành "${role}"`;
+        }
+    },
     lounge: {
         sync: async (payload) => {
             if (!sbClient) return [];
@@ -2505,7 +2533,7 @@ const MUTATING_ACTIONS = new Set([
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
-    'grantFinRole', 'revokeFinRole',
+    'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem'
 ]);
@@ -2636,6 +2664,10 @@ async function _dispatchAction(action, params = {}) {
 
             case 'getReportSummary': result = await API.reporting.summary(params); break;
             case 'getReportProjects': result = await API.reporting.projects(params); break;
+
+            case 'getMyRole': result = await API.auth.getMyRole(params.groupKey); break;
+            case 'listMemberRoles': result = await API.roles.listAll(); break;
+            case 'updateMemberRole': result = await API.roles.update(params.userId, params.groupKey, params.role); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;
