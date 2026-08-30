@@ -61,6 +61,10 @@
         <i class="fa-solid fa-trash-can"></i>
       </button>
 
+      <button class="header-btn" id="audit-log-toggle-btn" title="Nhật ký kiểm toán" onclick="openAuditLogModal()" style="display:none;">
+        <i class="fa-solid fa-clipboard-list"></i>
+      </button>
+
       <div class="user-profile-wrapper" id="user-profile-wrapper">
         <div class="user-profile-badge" id="user-badge" title="Tài khoản cá nhân" onclick="toggleUserDropdown(event)">
           <div class="user-avatar" id="user-avatar-text">US</div>
@@ -1378,6 +1382,56 @@
     </div>
   </div>
 
+  <!-- Audit Log Modal (admin-only; the check below is cosmetic — real enforcement is the
+       audit_log RLS policy, a non-admin session gets zero rows back from getAuditLog regardless) -->
+  <div class="modal-overlay" id="audit-log-modal">
+    <div class="modal-card" style="max-width: 920px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-clipboard-list" style="color: var(--gold);"></i> Nhật ký kiểm toán</h3>
+        <button class="header-btn" onclick="closeAppModal('audit-log-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="audit-log-guard"></div>
+        <div id="audit-log-body">
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <input type="text" id="audit-log-filter-email" class="form-input" placeholder="Email người thực hiện" style="max-width:220px;">
+            <select id="audit-log-filter-entity" class="form-select" style="max-width:180px;">
+              <option value="">Tất cả đối tượng</option>
+              <option value="tasks">Công việc</option>
+              <option value="projects">Dự án</option>
+              <option value="events">Sự kiện</option>
+              <option value="project_milestones">Cột mốc</option>
+              <option value="messages">Tin nhắn</option>
+              <option value="users">Người dùng</option>
+              <option value="fin_roles">Vai trò Finance</option>
+              <option value="finance_transactions">Giao dịch</option>
+              <option value="finance_cash_flows">Dòng tiền</option>
+              <option value="finance_corporate_actions">Hành động doanh nghiệp</option>
+            </select>
+            <select id="audit-log-filter-group" class="form-select" style="max-width:160px;">
+              <option value="">Tất cả nhóm</option>
+              <option value="finance">Finance</option>
+              <option value="science">Science</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input type="date" id="audit-log-filter-from" class="form-input" style="max-width:150px;">
+            <input type="date" id="audit-log-filter-to" class="form-input" style="max-width:150px;">
+            <button type="button" class="btn btn-outline" onclick="loadAuditLog()"><i class="fa-solid fa-filter"></i> Lọc</button>
+          </div>
+          <div id="audit-log-list" class="trash-list">
+            <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
+          </div>
+          <div style="text-align:center; margin-top:10px;">
+            <button type="button" class="btn btn-outline btn-sm" id="audit-log-load-more-btn" onclick="loadMoreAuditLog()" style="display:none;">Tải thêm</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('audit-log-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Milestones Modal -->
   <div class="modal-overlay" id="task-files-modal">
     <div class="modal-card" style="max-width: 520px;">
@@ -1533,7 +1587,7 @@
   <script src="sync-engine.js?v=1"></script>
   <script src="personal-sync.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=21"></script>
+  <script src="script.js?v=22"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

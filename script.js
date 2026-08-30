@@ -121,6 +121,7 @@ function unlockApp() {
 async function resolveUserProfile(user) {
   CURRENT_USER.email = user.email;
   CURRENT_USER.id = user.id;
+  window.__currentUserId = user.id; // real auth.uid(), used by client-driven audit-log writes
   // localStorage.getItem('userEmail') is read as a "who am I" fallback in many places across
   // this app family (api.js's callGAS, mastersheet/, mastersheet/assets/, note/, observation
   // logs) but nothing ever wrote it — it only ever existed as an in-memory variable here. Any
@@ -164,6 +165,7 @@ async function resolveUserProfile(user) {
 
   unlockApp();
   updateUserProfileUI();
+  updateAuditLogButtonVisibility();
   startPresenceSystem();
   if (typeof initRealtimeSync === 'function') initRealtimeSync();
 
@@ -192,9 +194,11 @@ async function initAuth() {
       }
     } else {
       CURRENT_USER = { email: '', nickname: '', groupKey: '', id: '' };
+      window.__currentUserId = null;
       try { localStorage.removeItem('userEmail'); } catch (e) {}
       if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
       if (chatChannel && sbClient) { sbClient.removeChannel(chatChannel); chatChannel = null; }
+      updateAuditLogButtonVisibility();
       lockApp();
     }
   });
@@ -4888,6 +4892,111 @@ async function purgeOldTrash(category, idsJoined) {
   }
   showToast(fail === 0 ? `Đã dọn ${ok} mục.` : `Đã dọn ${ok} mục, ${fail} mục lỗi.`, fail === 0 ? 'success' : 'error');
   loadTrashItems({ quiet: true });
+}
+
+// -------------------- Audit log (compliance) --------------------
+// Nav-button visibility here is a UX nicety, not the enforcement — call this once
+// CURRENT_USER.groupKey is known (see resolveUserProfile). Real enforcement is the
+// audit_log RLS policy (current_user_group() = 'admin'); a non-admin session gets
+// zero rows back from getAuditLog regardless of whether this button is shown.
+function updateAuditLogButtonVisibility() {
+  const btn = document.getElementById('audit-log-toggle-btn');
+  if (btn) btn.style.display = CURRENT_USER.groupKey === 'admin' ? '' : 'none';
+}
+
+let auditLogOffset = 0;
+const AUDIT_LOG_PAGE_SIZE = 50;
+
+function openAuditLogModal() {
+  openAppModal('audit-log-modal');
+  loadAuditLog();
+}
+
+function getAuditLogFilters() {
+  return {
+    actorEmail: (document.getElementById('audit-log-filter-email')?.value || '').trim(),
+    entityType: document.getElementById('audit-log-filter-entity')?.value || '',
+    groupKey: document.getElementById('audit-log-filter-group')?.value || '',
+    from: document.getElementById('audit-log-filter-from')?.value || '',
+    to: document.getElementById('audit-log-filter-to')?.value || ''
+  };
+}
+
+async function loadAuditLog() {
+  const guard = document.getElementById('audit-log-guard');
+  const body = document.getElementById('audit-log-body');
+  const list = document.getElementById('audit-log-list');
+  if (!guard || !body || !list) return;
+
+  // Cosmetic gate only, mirrors the same pattern wh-org uses for its admin-users panel.
+  if (CURRENT_USER.groupKey !== 'admin') {
+    guard.innerHTML = '<div style="padding:20px; text-align:center; color:var(--danger-color);">Bạn không có quyền truy cập trang này.</div>';
+    body.style.display = 'none';
+    return;
+  }
+  guard.innerHTML = '';
+  body.style.display = 'block';
+
+  auditLogOffset = 0;
+  list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+  await fetchAuditLogPage({ reset: true });
+}
+
+async function loadMoreAuditLog() {
+  await fetchAuditLogPage({ reset: false });
+}
+
+async function fetchAuditLogPage({ reset }) {
+  const list = document.getElementById('audit-log-list');
+  const moreBtn = document.getElementById('audit-log-load-more-btn');
+  if (!list) return;
+  try {
+    const filters = { ...getAuditLogFilters(), limit: AUDIT_LOG_PAGE_SIZE, offset: auditLogOffset };
+    const response = await callGAS('getAuditLog', filters);
+    if (response.status !== 'success') throw new Error(response.message);
+    const rows = response.data || [];
+
+    if (reset) list.innerHTML = '';
+    if (rows.length === 0 && reset) {
+      list.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Không có bản ghi nào.</div>';
+    } else {
+      list.insertAdjacentHTML('beforeend', rows.map(renderAuditLogRow).join(''));
+    }
+
+    auditLogOffset += rows.length;
+    if (moreBtn) moreBtn.style.display = rows.length === AUDIT_LOG_PAGE_SIZE ? '' : 'none';
+  } catch (err) {
+    if (reset) list.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+    else showToast('Lỗi: ' + err.message, 'error');
+  }
+}
+
+const AUDIT_LOG_ENTITY_LABELS = {
+  tasks: 'Công việc', projects: 'Dự án', events: 'Sự kiện', project_milestones: 'Cột mốc',
+  messages: 'Tin nhắn', users: 'Người dùng', fin_roles: 'Vai trò Finance',
+  finance_transactions: 'Giao dịch', finance_cash_flows: 'Dòng tiền',
+  finance_corporate_actions: 'Hành động doanh nghiệp'
+};
+const AUDIT_LOG_OP_LABELS = { INSERT: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
+
+function renderAuditLogRow(row) {
+  const entityLabel = AUDIT_LOG_ENTITY_LABELS[row.entity_type] || row.entity_type;
+  const opLabel = AUDIT_LOG_OP_LABELS[row.operation] || row.operation;
+  const opClass = row.operation === 'DELETE' ? 'trash-age is-old' : '';
+  const when = row.occurred_at ? new Date(row.occurred_at).toLocaleString('vi-VN') : '';
+  const changed = (row.changed_fields || []).map(f => `<span class="trash-age">${escapeHtml(f)}</span>`).join(' ');
+  const detailId = 'audit-log-detail-' + row.id;
+  const hasDetail = row.before_data || row.after_data;
+  return `<div class="trash-item" style="flex-direction:column; align-items:stretch;">
+    <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; ${hasDetail ? 'cursor:pointer;' : ''}" ${hasDetail ? `onclick="document.getElementById('${detailId}').style.display = document.getElementById('${detailId}').style.display === 'none' ? 'block' : 'none';"` : ''}>
+      <div class="trash-item-info">
+        <div class="trash-item-name">${escapeHtml(row.actor_email || 'unknown')} · <span class="${opClass}">${escapeHtml(opLabel)}</span> ${escapeHtml(entityLabel)}${row.entity_id ? ' #' + escapeHtml(row.entity_id) : ''}</div>
+        <div class="trash-item-sub">${escapeHtml(when)} ${row.actor_group_key ? '· ' + escapeHtml(row.actor_group_key) : ''} ${row.result === 'error' ? '· <span class="trash-age is-old">lỗi</span>' : ''} ${changed}</div>
+      </div>
+      ${hasDetail ? '<i class="fa-solid fa-chevron-down" style="color:var(--text-muted);"></i>' : ''}
+    </div>
+    ${hasDetail ? `<div id="${detailId}" style="display:none; margin-top:8px; font-size:11.5px; font-family:monospace; background:var(--bg-secondary); padding:8px; border-radius:6px; max-height:220px; overflow:auto; white-space:pre-wrap;">${escapeHtml(JSON.stringify({ before: row.before_data, after: row.after_data }, null, 2))}</div>` : ''}
+  </div>`;
 }
 
 // ==========================================

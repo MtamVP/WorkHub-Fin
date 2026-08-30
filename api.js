@@ -2147,6 +2147,43 @@ const API = {
             return [...logItems, ...mentionItems].sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
         }
     },
+    // Compliance-grade audit trail. Most rows are written server-side by Postgres
+    // triggers (fn_audit_row_change) on the mutated tables directly — this module is
+    // only the read path plus a narrow client-driven fallback for actions with no
+    // single mutated row (nothing currently needs the fallback, kept for completeness).
+    audit: {
+        log: async (entityType, entityId, action, summary, actorId, actorEmail, groupKey, traceId, result = 'success') => {
+            if (!sbClient) return;
+            const { error } = await sbClient.from('audit_log').insert({
+                actor_id: actorId || null,
+                actor_email: actorEmail || null,
+                entity_type: entityType,
+                entity_id: entityId || null,
+                operation: 'UPDATE',
+                action,
+                source: 'client',
+                summary,
+                group_key: groupKey || null,
+                trace_id: traceId,
+                result
+            });
+            if (error) console.error('Audit log error', error);
+        },
+        list: async (filters = {}) => {
+            if (!sbClient) return [];
+            const limit = filters.limit || 50;
+            const offset = filters.offset || 0;
+            let q = sbClient.from('audit_log').select('*').order('occurred_at', { ascending: false }).range(offset, offset + limit - 1);
+            if (filters.actorEmail) q = q.ilike('actor_email', `%${filters.actorEmail}%`);
+            if (filters.entityType) q = q.eq('entity_type', filters.entityType);
+            if (filters.groupKey) q = q.eq('group_key', filters.groupKey);
+            if (filters.from) q = q.gte('occurred_at', filters.from);
+            if (filters.to) q = q.lte('occurred_at', filters.to);
+            const { data, error } = await q;
+            if (error) throw error;
+            return data;
+        }
+    },
     lounge: {
         sync: async (payload) => {
             if (!sbClient) return [];
@@ -2500,6 +2537,8 @@ async function _dispatchAction(action, params = {}) {
             case 'getDeletedItems': result = await API.system.getDeletedItems(params.tableName, params.groupKey); break;
             case 'restoreItem': result = await API.system.restoreItem(params.tableName, params.id); break;
             case 'hardDeleteItem': result = await API.system.hardDeleteItem(params.tableName, params.id); break;
+
+            case 'getAuditLog': result = await API.audit.list(params); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;
