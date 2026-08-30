@@ -4999,6 +4999,78 @@ function renderAuditLogRow(row) {
   </div>`;
 }
 
+// -------------------- Team status (light KPI strip, no admin gate — own-team data) --------------------
+function openTeamStatusModal() {
+  openAppModal('team-status-modal');
+  loadTeamStatus();
+}
+
+async function loadTeamStatus() {
+  const kpiRow = document.getElementById('team-status-kpi-row');
+  const table = document.getElementById('team-status-project-table');
+  if (!kpiRow || !table) return;
+  kpiRow.innerHTML = '';
+  table.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>';
+  try {
+    const [summaryResp, projectsResp] = await Promise.all([
+      callGAS('getReportSummary', { groupKey: activeGroup }),
+      callGAS('getReportProjects', { groupKey: activeGroup })
+    ]);
+    if (summaryResp.status !== 'success') throw new Error(summaryResp.message);
+    if (projectsResp.status !== 'success') throw new Error(projectsResp.message);
+    window.__lastTeamStatusProjects = projectsResp.data || [];
+    renderTeamStatusKpis(summaryResp.data);
+    renderTeamStatusProjectTable(projectsResp.data || []);
+  } catch (err) {
+    table.innerHTML = `<div style="color:var(--danger-color); font-size:12.5px; padding:8px;">Lỗi: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderTeamStatusKpis(summary) {
+  const row = document.getElementById('team-status-kpi-row');
+  if (!row || !summary) return;
+  const t = summary.totals || {};
+  const tiles = [
+    { label: 'Dự án hoạt động', value: t.activeProjects || 0, icon: 'fa-diagram-project' },
+    { label: 'Tổng công việc', value: t.totalTasks || 0, icon: 'fa-list-check' },
+    { label: 'Đã hoàn thành', value: t.done || 0, icon: 'fa-circle-check' },
+    { label: 'Quá hạn', value: t.overdue || 0, icon: 'fa-triangle-exclamation', danger: true },
+    { label: 'Thành viên', value: t.members || 0, icon: 'fa-users' }
+  ];
+  row.innerHTML = tiles.map(tile => `
+    <div class="card" style="flex:1; min-width:130px; padding:14px; text-align:center;">
+      <i class="fa-solid ${tile.icon}" style="color:${tile.danger ? 'var(--danger-color)' : 'var(--gold)'}; font-size:20px;"></i>
+      <div style="font-size:22px; font-weight:700; margin-top:6px;">${tile.value}</div>
+      <div style="font-size:11.5px; color:var(--text-muted);">${escapeHtml(tile.label)}</div>
+    </div>`).join('');
+}
+
+function renderTeamStatusProjectTable(projects) {
+  const el = document.getElementById('team-status-project-table');
+  if (!el) return;
+  if (!projects || projects.length === 0) {
+    el.innerHTML = '<div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Không có dự án nào.</div>';
+    return;
+  }
+  el.innerHTML = projects.map(p => `
+    <div class="trash-item">
+      <div class="trash-item-info">
+        <div class="trash-item-name">${escapeHtml(p.name)}</div>
+        <div class="trash-item-sub">${escapeHtml(p.status || '')} · ${p.percent}% · Done ${p.taskStats.done}/Đang làm ${p.taskStats.working}/Bị chặn ${p.taskStats.stuck}/Chưa bắt đầu ${p.taskStats.notStarted} · Chủ dự án: ${escapeHtml(p.owner || '')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function exportTeamStatusCsv() {
+  const projects = window.__lastTeamStatusProjects || [];
+  const rows = [['Tên dự án', 'Trạng thái', '% Hoàn thành', 'Done', 'Đang làm', 'Bị chặn', 'Chưa bắt đầu', 'Chủ dự án', 'Cập nhật']];
+  projects.forEach(p => rows.push([
+    p.name, p.status, p.percent, p.taskStats.done, p.taskStats.working, p.taskStats.stuck, p.taskStats.notStarted,
+    p.owner, p.updatedAt ? new Date(p.updatedAt).toLocaleString('vi-VN') : ''
+  ]));
+  downloadCsv(`tinh-hinh-doi-nhom-${stamp()}.csv`, rows);
+}
+
 // ==========================================
 // 6. INITIALIZATION
 // ==========================================

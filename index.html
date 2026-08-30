@@ -65,6 +65,10 @@
         <i class="fa-solid fa-clipboard-list"></i>
       </button>
 
+      <button class="header-btn" id="team-status-toggle-btn" title="Tình hình đội nhóm" onclick="openTeamStatusModal()">
+        <i class="fa-solid fa-chart-pie"></i>
+      </button>
+
       <div class="user-profile-wrapper" id="user-profile-wrapper">
         <div class="user-profile-badge" id="user-badge" title="Tài khoản cá nhân" onclick="toggleUserDropdown(event)">
           <div class="user-avatar" id="user-avatar-text">US</div>
@@ -1432,6 +1436,28 @@
     </div>
   </div>
 
+  <!-- Team Status Modal (light KPI strip, no admin gate — own-team data) -->
+  <div class="modal-overlay" id="team-status-modal">
+    <div class="modal-card" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-chart-pie" style="color: var(--gold);"></i> Tình hình đội nhóm</h3>
+        <button class="header-btn" onclick="closeAppModal('team-status-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="exportTeamStatusCsv()"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+        </div>
+        <div id="team-status-kpi-row" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;"></div>
+        <div id="team-status-project-table" class="trash-list">
+          <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('team-status-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Milestones Modal -->
   <div class="modal-overlay" id="task-files-modal">
     <div class="modal-card" style="max-width: 520px;">
@@ -1587,7 +1613,7 @@
   <script src="sync-engine.js?v=1"></script>
   <script src="personal-sync.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=22"></script>
+  <script src="script.js?v=23"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

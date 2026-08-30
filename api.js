@@ -2184,6 +2184,100 @@ const API = {
             return data;
         }
     },
+    // Light "team status" KPI strip — ported from wh-org's admin-only cross-group BI
+    // dashboard (Phase 2), but this app is single-group so it's always called with
+    // filters.groupKey = 'finance' fixed, visible to any logged-in user (their own
+    // team's own data, nothing cross-group to protect here). No charts, no xlsx/pdf —
+    // just the two data functions plus the existing downloadCsv() for export.
+    reporting: {
+        summary: async (filters = {}) => {
+            if (!sbClient) return null;
+            let pq = sbClient.from('projects').select('id, group_key, status, archived_at').is('deleted_at', null);
+            if (filters.groupKey) pq = pq.eq('group_key', filters.groupKey);
+            const { data: projects, error: pErr } = await pq;
+            if (pErr) throw pErr;
+
+            const activeProjects = (projects || []).filter(p => !p.archived_at);
+            const projectIds = (projects || []).map(p => p.id);
+            const projectGroupMap = {};
+            (projects || []).forEach(p => { projectGroupMap[p.id] = p.group_key || 'unknown'; });
+
+            let tasks = [];
+            if (projectIds.length > 0) {
+                const { data, error } = await sbClient.from('tasks')
+                    .select('id, project_id, status, due_date, updated_at')
+                    .is('deleted_at', null).in('project_id', projectIds);
+                if (error) throw error;
+                tasks = data || [];
+            }
+
+            const { data: users, error: uErr } = await sbClient.from('users').select('email, group_key');
+            if (uErr) throw uErr;
+
+            const byGroup = {};
+            const ensure = (g) => byGroup[g] || (byGroup[g] = {
+                activeProjects: 0, totalTasks: 0, done: 0, working: 0, stuck: 0, notStarted: 0,
+                overdue: 0, members: 0
+            });
+
+            activeProjects.forEach(p => { ensure(p.group_key || 'unknown').activeProjects++; });
+
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            tasks.forEach(t => {
+                const g = projectGroupMap[t.project_id] || 'unknown';
+                const b = ensure(g);
+                b.totalTasks++;
+                const st = String(t.status || '').toLowerCase();
+                if (st === 'done') b.done++;
+                else if (st === 'working on it') b.working++;
+                else if (st === 'stuck') b.stuck++;
+                else b.notStarted++;
+                if (st !== 'done' && t.due_date) {
+                    const due = new Date(String(t.due_date).slice(0, 10) + 'T00:00:00');
+                    if (due < today) b.overdue++;
+                }
+            });
+            (users || []).filter(u => !filters.groupKey || u.group_key === filters.groupKey)
+                .forEach(u => { ensure(u.group_key || 'unknown').members++; });
+
+            const totals = Object.values(byGroup).reduce((acc, b) => {
+                Object.keys(b).forEach(k => { acc[k] = (acc[k] || 0) + b[k]; });
+                return acc;
+            }, {});
+
+            return { byGroup, totals, generatedAt: new Date().toISOString() };
+        },
+        projects: async (filters = {}) => {
+            if (!sbClient) return [];
+            let q = sbClient.from('projects').select('*, users!owner_id(nickname)').is('deleted_at', null)
+                .order('updated_at', { ascending: false }).limit(500);
+            if (filters.groupKey) q = q.eq('group_key', filters.groupKey);
+            const { data: projects, error } = await q;
+            if (error) throw error;
+            if (!projects || projects.length === 0) return [];
+
+            const ids = projects.map(p => p.id);
+            const { data: tasks } = await sbClient.from('tasks').select('project_id, status').is('deleted_at', null).in('project_id', ids);
+
+            return projects.map(p => {
+                const pTasks = (tasks || []).filter(t => t.project_id === p.id);
+                const stats = { done: 0, working: 0, stuck: 0, notStarted: 0 };
+                pTasks.forEach(t => {
+                    const st = String(t.status).toLowerCase();
+                    if (st === 'done') stats.done++;
+                    else if (st === 'working on it') stats.working++;
+                    else if (st === 'stuck') stats.stuck++;
+                    else stats.notStarted++;
+                });
+                return {
+                    id: p.id, name: p.name, groupKey: p.group_key, status: p.status,
+                    owner: p.users ? p.users.nickname : 'Unknown',
+                    percent: pTasks.length ? Math.round(stats.done / pTasks.length * 100) : (p.percent || 0),
+                    taskStats: stats, isShared: p.is_shared, updatedAt: p.updated_at
+                };
+            });
+        }
+    },
     lounge: {
         sync: async (payload) => {
             if (!sbClient) return [];
@@ -2539,6 +2633,9 @@ async function _dispatchAction(action, params = {}) {
             case 'hardDeleteItem': result = await API.system.hardDeleteItem(params.tableName, params.id); break;
 
             case 'getAuditLog': result = await API.audit.list(params); break;
+
+            case 'getReportSummary': result = await API.reporting.summary(params); break;
+            case 'getReportProjects': result = await API.reporting.projects(params); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;
