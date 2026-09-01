@@ -4,7 +4,7 @@
 // Depends on oauth-loopback.js (PKCE + loopback redirect) and api.js
 // (API.calendarConnection / callGAS('saveCalendarConnection', ...)).
 
-const GOOGLE_CLIENT_ID = ''; // <-- fill in once the Desktop-app OAuth client is registered
+const GOOGLE_CLIENT_ID = '825025516269-gmictbckj5c8ameatht1bbj6tqct6tqq.apps.googleusercontent.com';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
