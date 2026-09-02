@@ -16,7 +16,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=3.3.0">
+  <link rel="stylesheet" href="style.css?v=3.3.1">
   <link rel="stylesheet" href="pipeline/pipeline.css">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-512.png">
@@ -986,6 +986,12 @@
           <p>Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.</p>
         </div>
         <div class="section-actions">
+        <button type="button" class="btn btn-outline" id="personal-integrations-btn" onclick="openPersonalIntegrationsModal()" title="Thư mục đồng bộ & Google Calendar">
+          <i class="fa-solid fa-gear"></i> Tích hợp
+        </button>
+        <button type="button" class="btn btn-outline personal-archive-toggle" id="personal-archive-toggle" onclick="togglePersonalArchivedView()" title="Xem các mục đã lưu trữ">
+          <i class="fa-solid fa-box-archive"></i> Lưu trữ
+        </button>
           <button type="button" class="btn btn-outline" onclick="openPersonalCustomizeModal()" title="Sắp xếp / ẩn hiện các mục">
             <i class="fa-solid fa-sliders"></i> Tuỳ chỉnh
           </button>
@@ -1423,6 +1429,32 @@
     </div>
   </div>
 
+  <!-- Tích hợp: gom "Thư mục đồng bộ" + "Kết nối Calendar" — trước là 2 tab nội dung, nhưng
+       chúng là bảng cấu hình chứ không phải nội dung, để lẫn trong hàng tab gây hiểu nhầm. -->
+  <div class="modal-overlay" id="personal-integrations-modal">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-gear" style="color: var(--gold);"></i> Tích hợp</h3>
+        <button class="header-btn" onclick="closeAppModal('personal-integrations-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+      <div class="personal-integrations-body">
+        <section class="personal-integrations-section">
+          <h4><i class="fa-solid fa-folder-open"></i> Thư mục đồng bộ</h4>
+          <div id="personal-sync-folder-panel"></div>
+        </section>
+        <section class="personal-integrations-section">
+          <h4><i class="fa-brands fa-google"></i> Google Calendar</h4>
+          <div id="personal-calendar-connect-panel"></div>
+        </section>
+      </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('personal-integrations-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="task-activity-modal">
     <div class="modal-card" style="max-width: 560px;">
       <div class="modal-header">
@@ -1756,14 +1788,14 @@
     </div>
   </div>
 
-  <script src="api.js?v=21"></script>
+  <script src="api.js?v=22"></script>
   <script src="oauth-loopback.js?v=1"></script>
   <script src="sync-config.js?v=2"></script>
   <script src="sync-engine.js?v=1"></script>
   <script src="personal-sync.js?v=1"></script>
-  <script src="calendar-connect.js?v=1"></script>
+  <script src="calendar-connect.js?v=2"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=27"></script>
+  <script src="script.js?v=28"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

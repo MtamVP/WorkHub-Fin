@@ -1827,15 +1827,31 @@ const API = {
             if (error) throw error;
             return data || [];
         },
+        // Kho lưu trữ. Xếp theo updated_at desc = mục vừa lưu trữ gần đây nhất lên đầu
+        // (trigger personal_items_touch_updated_at chạm updated_at ở mọi UPDATE, nên đó
+        // chính là thời điểm lưu trữ). Không xếp pinned lên đầu — trong kho thì vô nghĩa.
+        listArchived: async () => {
+            const { data, error } = await sbClient.from('personal_items').select('*')
+                .eq('archived', true)
+                .order('updated_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
         upsert: async (item) => {
             const row = {
                 type: item.type,
                 title: item.title || null,
                 data: item.data || {},
-                pinned: !!item.pinned,
                 tags: Array.isArray(item.tags) ? item.tags : [],
                 source_app: 'fin'
             };
+            // pinned/archived CỐ TÌNH không nằm trong row mặc định. Trước đây row luôn ghi
+            // `pinned: !!item.pinned`, trong khi MỌI caller (togglePersonalChecklist,
+            // submitPersonalItemForm, savePersonalLayoutPref) đều không truyền pinned —
+            // nghĩa là mỗi lần tick 1 checkbox là âm thầm bỏ ghim mục đó. Khi INSERT mà
+            // thiếu 2 cột này thì DB tự dùng default (đều là false).
+            if ('pinned' in item) row.pinned = !!item.pinned;
+            if ('archived' in item) row.archived = !!item.archived;
             if (item.id) {
                 const { data, error } = await sbClient.from('personal_items').update(row).eq('id', item.id).select().single();
                 if (error) throw error;
@@ -1845,6 +1861,21 @@ const API = {
             if (error) throw error;
             return data;
         },
+        // Patch hẹp: chỉ đụng đúng cờ được truyền vào, không bao giờ ghi đè title/data/tags.
+        // Cố ý KHÔNG nhét archived qua upsert() — upsert dựng nguyên hàng, quên 1 trường là
+        // xoá trắng title/data. Trả về nguyên hàng đã cập nhật để caller nhét thẳng vào
+        // personalItemsCache (updated_at đã bị trigger đổi, đọc lại từ server là chính xác).
+        setFlags: async (id, patch) => {
+            const row = {};
+            if (patch && 'pinned' in patch) row.pinned = !!patch.pinned;
+            if (patch && 'archived' in patch) row.archived = !!patch.archived;
+            if (Object.keys(row).length === 0) throw new Error('setFlags: không có cờ nào để cập nhật.');
+            const { data, error } = await sbClient.from('personal_items').update(row).eq('id', id).select().single();
+            if (error) throw error;
+            return data;
+        },
+        // Giữ nguyên: giờ là đường 'Xoá vĩnh viễn' trong kho lưu trữ, không còn là nút xoá
+        // trên thẻ (nút đó đã đổi thành Lưu trữ).
         remove: async (id) => {
             const { error } = await sbClient.from('personal_items').delete().eq('id', id);
             if (error) throw error;
@@ -2688,7 +2719,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'savePersonalItem', 'deletePersonalItem',
+    'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection',
     'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit',
     'restoreFromBackup'
@@ -2853,6 +2884,8 @@ async function _dispatchAction(action, params = {}) {
             case 'getPersonalItems': result = await API.personal.list(params.type); break;
             case 'savePersonalItem': result = await API.personal.upsert(params); break;
             case 'deletePersonalItem': result = await API.personal.remove(params.id); break;
+            case 'getArchivedPersonalItems': result = await API.personal.listArchived(); break;
+            case 'setPersonalItemFlags': result = await API.personal.setFlags(params.id, params); break;
 
             default:
                 console.warn(`Supabase chưa hỗ trợ action: ${action}`);

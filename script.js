@@ -5653,18 +5653,298 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==========================================
 
 let personalItemsCache = [];
-let personalActiveTab = 'note';
+let personalActiveTab = 'overview';
 let personalActiveTagFilter = null;
 
+// ==================== Không Gian Riêng v3 — Tổng quan / Ghim / Lưu trữ ====================
+// PERSONAL_SHIM là chỗ DUY NHẤT khác nhau giữa 3 app trong toàn bộ khối này. Mọi hàm mới
+// bên dưới chỉ đi qua nó, nhờ vậy chúng giống hệt nhau ở wh-fin/wh-sci/wh-org — kể cả mức
+// thụt đầu dòng (2 space), để còn diff chéo 3 app mà soát trôi lệch. Các hàm CŨ giữ nguyên.
+const PERSONAL_SHIM = {
+  openModal: (id) => openAppModal(id),
+  closeModal: (id) => closeAppModal(id),
+  accent: 'var(--gold)',
+  me: () => ({ email: CURRENT_USER.email, groupKey: CURRENT_USER.groupKey }),
+  goToMyTasks: () => switchSection('mytasks')
+};
+
+let personalArchivedMode = false;          // chế độ xem kho lưu trữ (đè lên toàn khu vực)
+let personalArchivedCache = [];
+let personalOverviewTasksCache = null;     // null = chưa nạp; [] = đã nạp và rỗng
+let personalRenderToken = 0;               // huỷ hiệu lực fetch async khi người dùng đổi tab
+
+// KHÔNG tái dùng timeAgoVietnamese: hàm đó nhét sẵn tiền tố 'Hoạt động ' vào kết quả và
+// dừng ở đơn vị ngày; các chỗ gọi nó đang phụ thuộc đúng tiền tố ấy. Hàm này trả cụm trần
+// ("2 giờ trước") để chỗ gọi tự ghép ("sửa …", "lưu trữ …").
+function formatPersonalTimeAgo(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (sec < 60) return 'vừa xong';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return min + ' phút trước';
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return hour + ' giờ trước';
+  const day = Math.floor(hour / 24);
+  if (day < 30) return day + ' ngày trước';
+  const month = Math.floor(day / 30);
+  if (month < 12) return month + ' tháng trước';
+  return Math.floor(month / 12) + ' năm trước';
+}
+
+// Giữ personalItemsCache đúng thứ tự mà API.personal.list trả về (pinned desc, updated_at
+// desc) sau khi ghim/bỏ ghim tại chỗ, khỏi phải fetch lại cả danh sách.
+function sortPersonalItemsCache(items) {
+  return items.slice().sort((a, b) => {
+    if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+  });
+}
+
+// Hộp xác nhận dùng chung, thay cho confirm() gốc. Đọc data-theme để không bị chữ trắng
+// trên nền trắng ở dark mode.
+async function personalConfirm(opts) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const res = await Swal.fire({
+    title: opts.title,
+    html: opts.html || '',
+    icon: opts.icon || 'warning',
+    showCancelButton: true,
+    confirmButtonColor: opts.danger === false ? PERSONAL_SHIM.accent : 'var(--danger-color)',
+    cancelButtonColor: 'var(--text-muted)',
+    confirmButtonText: opts.confirmText || 'Đồng ý',
+    cancelButtonText: opts.cancelText || 'Huỷ',
+    background: isDark ? '#1e1e1e' : '#fff',
+    color: isDark ? '#e0e0e0' : '#545454'
+  });
+  return !!res.isConfirmed;
+}
+
+// -------------------- Tab Tổng quan (mặc định) --------------------
+// Gom 4 khối lên 1 màn. 3 khối đầu đọc thẳng personalItemsCache (đã có sẵn mọi type vì
+// getPersonalItems gọi với {}), khối 4 là tab "Liên quan đến bạn" cũ gộp vào đây.
+function renderPersonalOverview() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (!listEl) return;
+  const token = personalRenderToken;
+
+  const now = Date.now();
+  const undone = personalItemsCache.filter(i => i.type === 'checklist' && !(i.data || {}).done).slice(0, 6);
+  const upcoming = personalItemsCache
+    .filter(i => i.type === 'calendar_event' && (i.data || {}).start && new Date(i.data.start).getTime() >= now)
+    .sort((a, b) => new Date(a.data.start) - new Date(b.data.start))
+    .slice(0, 5);
+  const recentNotes = personalItemsCache
+    .filter(i => i.type === 'note')
+    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+    .slice(0, 5);
+
+  listEl.innerHTML = '<div class="personal-overview">'
+    + personalOverviewBlock('checklist', PERSONAL_TAB_META.checklist.label, PERSONAL_TAB_META.checklist.icon,
+        "switchPersonalTab('checklist')",
+        undone.length ? undone.map(i =>
+          '<label class="personal-overview-row personal-overview-check">'
+          + '<input type="checkbox" onchange="event.stopPropagation(); togglePersonalChecklist(\'' + escapeHtml(escapeJs(i.id)) + '\', this.checked)">'
+          + '<span>' + escapeHtml(i.title || '') + '</span></label>').join('')
+          : '<div class="personal-overview-empty">Không còn việc riêng nào chưa xong.</div>')
+    + personalOverviewBlock('calendar_event', PERSONAL_TAB_META.calendar_event.label, PERSONAL_TAB_META.calendar_event.icon,
+        "switchPersonalTab('calendar_event')",
+        upcoming.length ? upcoming.map(i => {
+          const when = new Date(i.data.start).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          return '<div class="personal-overview-row" onclick="openPersonalItemModal(\'' + escapeHtml(escapeJs(i.id)) + '\')">'
+            + '<span>' + escapeHtml(i.title || '') + '</span><span class="meta">' + escapeHtml(when) + '</span></div>';
+        }).join('')
+          : '<div class="personal-overview-empty">Không có sự kiện nào sắp tới.</div>')
+    + personalOverviewBlock('note', PERSONAL_TAB_META.note.label, PERSONAL_TAB_META.note.icon,
+        "switchPersonalTab('note')",
+        recentNotes.length ? recentNotes.map(i =>
+          '<div class="personal-overview-row" onclick="openPersonalItemModal(\'' + escapeHtml(escapeJs(i.id)) + '\')">'
+          + '<span>' + escapeHtml(i.title || 'Không tiêu đề') + '</span>'
+          + '<span class="meta">sửa ' + escapeHtml(formatPersonalTimeAgo(i.updated_at)) + '</span></div>').join('')
+          : '<div class="personal-overview-empty">Chưa có ghi chú nào.</div>')
+    + personalOverviewBlock('related', 'Việc nhóm giao cho bạn', 'fa-inbox',
+        null, '<div id="personal-overview-tasks">' + skeletonListItems(3) + '</div>')
+    + '</div>';
+
+  renderPersonalOverviewTasks(token);
+}
+
+function personalOverviewBlock(key, label, icon, jumpExpr, innerHtml) {
+  const jump = jumpExpr
+    ? '<button type="button" class="personal-overview-jump" onclick="' + jumpExpr + '">Xem tất cả <i class="fa-solid fa-arrow-right"></i></button>'
+    : '';
+  return '<section class="personal-overview-block" data-block="' + key + '">'
+    + '<div class="personal-overview-head">'
+    + '<h4><i class="fa-solid ' + icon + '"></i> ' + escapeHtml(label) + '</h4>' + jump
+    + '</div>'
+    + '<div class="personal-overview-rows">' + innerHtml + '</div>'
+    + '</section>';
+}
+
+// Khối 4 — thay cho renderRelatedPanel cũ. CỐ TÌNH đi qua callGAS('listMyTasks') chứ không
+// gọi thẳng API.task.listMine, để khối này giống hệt nhau ở cả 3 app và đi qua lớp
+// cache/hàng đợi ngoại tuyến của sync-engine như mọi read khác.
+async function renderPersonalOverviewTasks(token) {
+  const fill = (html) => {
+    if (token !== personalRenderToken) return;   // người dùng đã đổi tab, bỏ kết quả cũ
+    const el = document.getElementById('personal-overview-tasks');
+    if (el) el.innerHTML = html;
+  };
+  const jumpHtml = '<button type="button" class="personal-overview-jump" onclick="PERSONAL_SHIM.goToMyTasks()">Mở Việc của tôi <i class="fa-solid fa-arrow-right"></i></button>';
+
+  if (personalOverviewTasksCache) { fill(personalOverviewTasksHtml(personalOverviewTasksCache) + jumpHtml); return; }
+
+  const me = PERSONAL_SHIM.me();
+  if (!me.email) { fill('<div class="personal-overview-empty">Chưa đăng nhập.</div>'); return; }
+  try {
+    const res = await window.callGAS('listMyTasks', { email: me.email, groupKey: me.groupKey });
+    if (res.status !== 'success') throw new Error(res.message);
+    personalOverviewTasksCache = res.data || [];
+    fill(personalOverviewTasksHtml(personalOverviewTasksCache) + jumpHtml);
+  } catch (err) {
+    fill('<div class="personal-overview-empty">Lỗi: ' + escapeHtml(err.message || String(err)) + '</div>');
+  }
+}
+
+function personalOverviewTasksHtml(tasks) {
+  if (!tasks.length) return '<div class="personal-overview-empty">Không có việc nào của nhóm đang giao cho bạn.</div>';
+  return tasks.slice().sort((a, b) => {
+    const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+    const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+    return da - db;
+  }).slice(0, 5).map(t =>
+    '<div class="personal-overview-row" onclick="goToTaskInProject(\'' + escapeHtml(escapeJs(t.project_id)) + '\')">'
+    + '<span>' + escapeHtml(t.name) + '</span>'
+    + '<span class="meta">' + escapeHtml(t.projectName || '') + (t.dueDate ? ' · ' + escapeHtml(t.dueDate) : '') + '</span>'
+    + '</div>').join('');
+}
+
+// -------------------- Ghim lên đầu --------------------
+// 'Ghim lên đầu' (cột pinned) KHÁC với type:'pin' / tab 'Đã ghim' (ghim 1 dự án của nhóm).
+// Cố ý không dùng lại chữ "Đã ghim" ở đây để người dùng không đi tìm ghi chú vừa ghim
+// trong tab đó. Cũng vì vậy, thẻ type:'pin' không có nút này.
+function renderPersonalPinBtnHtml(item) {
+  if (item.type === 'pin') return '';
+  const on = !!item.pinned;
+  return '<button type="button" class="personal-item-pin ' + (on ? 'active' : '') + '"'
+    + ' title="' + (on ? 'Bỏ ghim lên đầu' : 'Ghim lên đầu') + '"'
+    + ' onclick="event.stopPropagation(); togglePersonalPinned(\'' + escapeHtml(escapeJs(item.id)) + '\')">'
+    + '<i class="fa-solid fa-thumbtack"></i></button>';
+}
+
+async function togglePersonalPinned(id) {
+  const item = personalItemsCache.find(i => i.id === id);
+  if (!item) return;
+  const res = await window.callGAS('setPersonalItemFlags', { id, pinned: !item.pinned });
+  if (res.status !== 'success') { showToast('Lỗi: ' + res.message, 'error'); return; }
+  // setFlags trả về nguyên hàng đã cập nhật — nhét thẳng vào cache để updated_at (đã bị
+  // trigger personal_items_touch_updated_at chạm) khớp server, rồi xếp lại đúng thứ tự
+  // mà API.personal.list dùng.
+  Object.assign(item, res.data || { pinned: !item.pinned });
+  personalItemsCache = sortPersonalItemsCache(personalItemsCache);
+  showToast(item.pinned ? 'Đã ghim lên đầu' : 'Đã bỏ ghim', 'success');
+  renderPersonalItems();
+}
+
+// -------------------- Lưu trữ thay cho xoá cứng --------------------
+// Không hỏi lại: lưu trữ là hành động ĐẢO NGƯỢC ĐƯỢC, dựng hộp thoại cho nó chỉ tạo ma sát.
+// Toast chỉ luôn đường quay lại. Chỉ 'Xoá vĩnh viễn' bên dưới mới hỏi.
+async function archivePersonalItem(id) {
+  const res = await window.callGAS('setPersonalItemFlags', { id, archived: true });
+  if (res.status !== 'success') { showToast('Lỗi: ' + res.message, 'error'); return; }
+  showToast('Đã đưa vào lưu trữ — mở "Lưu trữ" để khôi phục.', 'success');
+  await refreshPersonalItems();
+}
+
+async function restorePersonalItem(id) {
+  const res = await window.callGAS('setPersonalItemFlags', { id, archived: false });
+  if (res.status !== 'success') { showToast('Lỗi: ' + res.message, 'error'); return; }
+  showToast('Đã khôi phục', 'success');
+  await refreshPersonalItems();
+  await loadPersonalArchived();          // vì personalArchivedMode vẫn đang bật
+}
+
+async function hardDeletePersonalItem(id) {
+  const item = personalArchivedCache.find(i => i.id === id);
+  const ok = await personalConfirm({
+    title: 'Xoá vĩnh viễn?',
+    html: 'Mục <b>' + escapeHtml((item && item.title) || '') + '</b> sẽ bị xoá khỏi máy chủ.<br><b>Không thể hoàn tác.</b>',
+    icon: 'warning',
+    confirmText: 'Xoá vĩnh viễn'
+  });
+  if (!ok) return;
+  const res = await window.callGAS('deletePersonalItem', { id });
+  if (res.status !== 'success') { showToast('Lỗi: ' + res.message, 'error'); return; }
+  showToast('Đã xoá vĩnh viễn', 'success');
+  await loadPersonalArchived();
+}
+
+// -------------------- Chế độ xem Lưu trữ --------------------
+// Không phải 1 tab: là 1 chế độ đè lên toàn khu vực, bật/tắt từ nút trong section hero.
+// Khi bật thì thanh tab, thanh lọc thẻ và nút "Thêm mới" đều ẩn.
+function togglePersonalArchivedView() {
+  personalArchivedMode = !personalArchivedMode;
+  personalActiveTagFilter = null;
+  renderPersonalTabs();
+  renderPersonalTagFilterBar();
+  renderPersonalItems();
+  if (personalArchivedMode) loadPersonalArchived();
+}
+
+async function loadPersonalArchived() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (listEl) listEl.innerHTML = skeletonListItems(3);
+  const token = ++personalRenderToken;
+  try {
+    const res = await window.callGAS('getArchivedPersonalItems', {});
+    personalArchivedCache = (res && res.status === 'success') ? (res.data || []) : [];
+  } catch (err) {
+    console.error('Lỗi tải kho lưu trữ:', err);
+    personalArchivedCache = [];
+  }
+  if (token !== personalRenderToken) return;
+  renderPersonalArchivedList();
+}
+
+function renderPersonalArchivedList() {
+  const listEl = document.getElementById('personal-hub-list');
+  if (!listEl) return;
+  if (personalArchivedCache.length === 0) {
+    listEl.innerHTML = '<div class="empty-state"><i class="fa-solid fa-box-archive"></i><p>Kho lưu trữ đang trống.</p></div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="personal-dense-list">' + personalArchivedCache.map(item => {
+    const safeId = escapeHtml(escapeJs(item.id));
+    const meta = PERSONAL_TAB_META[item.type];
+    return '<div class="personal-item-card personal-archived-row">'
+      + '<span class="personal-archived-type"><i class="fa-solid ' + (meta ? meta.icon : 'fa-file') + '"></i> ' + escapeHtml(meta ? meta.label : item.type) + '</span>'
+      + '<span class="personal-archived-title">' + escapeHtml(item.title || 'Không tiêu đề') + '</span>'
+      + '<span class="personal-archived-when">lưu trữ ' + escapeHtml(formatPersonalTimeAgo(item.updated_at)) + '</span>'
+      + '<div class="personal-item-actions">'
+      + '<button type="button" class="btn btn-outline" onclick="restorePersonalItem(\'' + safeId + '\')"><i class="fa-solid fa-rotate-left"></i> Khôi phục</button>'
+      + '<button type="button" class="personal-item-delete" title="Xoá vĩnh viễn" onclick="hardDeletePersonalItem(\'' + safeId + '\')"><i class="fa-solid fa-trash"></i></button>'
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+
+// -------------------- Modal Tích hợp (Thư mục đồng bộ + Google Calendar) --------------------
+function openPersonalIntegrationsModal() {
+  // Mở modal TRƯỚC rồi mới vẽ: showModal của wh-org chụp danh sách phần tử focus được ngay
+  // lúc gọi, nên nội dung vẽ sau không nằm trong danh sách đó — vỏ modal tĩnh tự có nút đóng.
+  PERSONAL_SHIM.openModal('personal-integrations-modal');
+  renderSyncFolderPanel();
+  renderCalendarConnectionPanel();
+}
+
+
 const PERSONAL_TAB_META = {
-  related: { label: 'Liên quan đến bạn', icon: 'fa-inbox', empty: '' },
+  overview: { label: 'Tổng quan', icon: 'fa-table-columns', empty: '' },
   note: { label: 'Ghi chú', icon: 'fa-note-sticky', empty: 'Chưa có ghi chú nào.' },
   pin: { label: 'Đã ghim', icon: 'fa-thumbtack', empty: 'Chưa ghim gì — bấm biểu tượng ghim trên danh sách dự án để lưu vào đây.' },
   checklist: { label: 'Việc riêng', icon: 'fa-list-check', empty: 'Chưa có việc riêng nào.' },
   shortcut: { label: 'Lối tắt', icon: 'fa-link', empty: 'Chưa có lối tắt nào.' },
-  calendar_event: { label: 'Lịch riêng', icon: 'fa-calendar-days', empty: 'Chưa có sự kiện riêng nào.' },
-  sync_folder: { label: 'Thư mục đồng bộ', icon: 'fa-folder-open', empty: '' },
-  calendar_connect: { label: 'Kết nối Calendar', icon: 'fa-calendar-plus', empty: '' }
+  calendar_event: { label: 'Lịch riêng', icon: 'fa-calendar-days', empty: 'Chưa có sự kiện riêng nào.' }
 };
 const PERSONAL_TAB_DEFAULT_ORDER = Object.keys(PERSONAL_TAB_META);
 
@@ -5681,7 +5961,16 @@ function applyPersonalLayoutPref() {
   const data = prefItem && prefItem.data ? prefItem.data : {};
   const savedOrder = Array.isArray(data.order) ? data.order.filter(k => PERSONAL_TAB_META[k]) : [];
   const missing = PERSONAL_TAB_DEFAULT_ORDER.filter(k => !savedOrder.includes(k));
+  // Bố cục lưu từ TRƯỚC khi có tab 'overview' thì trong data.order không hề có khoá đó;
+  // concat thuần sẽ đẩy tab mặc định mới xuống cuối. Chính điều kiện "order đã lưu, khác
+  // rỗng, mà thiếu overview" ĐÃ là dấu hiệu pref cũ — không cần thêm trường version. Và nó
+  // tự lành: ngay khi người dùng bấm Lưu bố cục 1 lần, overview có mặt trong savedOrder nên
+  // từ đó thứ tự do họ chọn (kể cả kéo overview xuống cuối) được tôn trọng tuyệt đối.
+  const isPreOverviewPref = savedOrder.length > 0 && !savedOrder.includes('overview');
   personalLayoutOrder = savedOrder.concat(missing);
+  if (isPreOverviewPref) {
+    personalLayoutOrder = ['overview'].concat(personalLayoutOrder.filter(k => k !== 'overview'));
+  }
   personalLayoutHidden = Array.isArray(data.hidden) ? data.hidden.filter(k => PERSONAL_TAB_META[k]) : [];
   if (personalLayoutHidden.includes(personalActiveTab)) {
     const firstVisible = personalLayoutOrder.find(k => !personalLayoutHidden.includes(k));
@@ -5711,21 +6000,34 @@ async function loadPersonalHub() {
 function renderPersonalTabs() {
   const bar = document.getElementById('personal-hub-tabs');
   if (!bar) return;
-  bar.innerHTML = personalLayoutOrder.filter(type => !personalLayoutHidden.includes(type)).map(type => {
-    const meta = PERSONAL_TAB_META[type];
-    if (!meta) return '';
-    return `<button type="button" class="personal-tab ${!personalActiveTagFilter && type === personalActiveTab ? 'active' : ''}" data-type="${type}" onclick="switchPersonalTab('${type}')">
+  if (personalArchivedMode) {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+    bar.innerHTML = personalLayoutOrder.filter(type => !personalLayoutHidden.includes(type)).map(type => {
+      const meta = PERSONAL_TAB_META[type];
+      if (!meta) return '';
+      return `<button type="button" class="personal-tab ${!personalActiveTagFilter && type === personalActiveTab ? 'active' : ''}" data-type="${type}" onclick="switchPersonalTab('${type}')">
       <i class="fa-solid ${meta.icon}"></i><span> ${meta.label}</span>
     </button>`;
-  }).join('');
+    }).join('');
+  }
   const addBtn = document.getElementById('personal-add-btn');
-  const hideAdd = personalActiveTagFilter || personalActiveTab === 'pin' || personalActiveTab === 'sync_folder' || personalActiveTab === 'related' || personalActiveTab === 'calendar_connect';
+  // 'overview' là bảng tổng hợp nhiều loại nên "Thêm mới" trống nghĩa — ẩn đi.
+  const hideAdd = personalArchivedMode || personalActiveTagFilter
+    || personalActiveTab === 'pin' || personalActiveTab === 'overview';
   if (addBtn) addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
+  const archBtn = document.getElementById('personal-archive-toggle');
+  if (archBtn) archBtn.classList.toggle('active', personalArchivedMode);
+  const integBtn = document.getElementById('personal-integrations-btn');
+  if (integBtn) integBtn.style.display = personalArchivedMode ? 'none' : 'inline-flex';
 }
 
 function renderPersonalTagFilterBar() {
   const bar = document.getElementById('personal-tag-filter');
   if (!bar) return;
+  if (personalArchivedMode) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
   const allTags = new Set();
   personalItemsCache.forEach(i => (i.tags || []).forEach(t => allTags.add(t)));
 
@@ -5832,6 +6134,7 @@ async function refreshPersonalItems() {
     console.error('Lỗi tải Personal Hub:', err);
     personalItemsCache = [];
   }
+  personalOverviewTasksCache = null;
   applyPersonalLayoutPref();
   renderPersonalTabs();
   renderPersonalTagFilterBar();
@@ -5841,6 +6144,9 @@ async function refreshPersonalItems() {
 function switchPersonalTab(type) {
   personalActiveTab = type;
   personalActiveTagFilter = null;
+  personalArchivedMode = false;
+  // Vào lại Tổng quan thì nạp lại khối việc nhóm (dữ liệu nhóm có thể đã đổi).
+  if (type === 'overview') personalOverviewTasksCache = null;
   renderPersonalTabs();
   renderPersonalTagFilterBar();
   renderPersonalItems();
@@ -5849,19 +6155,10 @@ function switchPersonalTab(type) {
 function renderPersonalItems() {
   const listEl = document.getElementById('personal-hub-list');
   if (!listEl) return;
+  personalRenderToken++;                       // huỷ hiệu lực mọi fetch async đang bay
 
-  if (!personalActiveTagFilter && personalActiveTab === 'sync_folder') {
-    renderSyncFolderPanel();
-    return;
-  }
-  if (!personalActiveTagFilter && personalActiveTab === 'calendar_connect') {
-    renderCalendarConnectionPanel();
-    return;
-  }
-  if (!personalActiveTagFilter && personalActiveTab === 'related') {
-    renderRelatedPanel();
-    return;
-  }
+  if (personalArchivedMode) { renderPersonalArchivedList(); return; }
+  if (!personalActiveTagFilter && personalActiveTab === 'overview') { renderPersonalOverview(); return; }
 
   let items;
   let meta;
@@ -5881,7 +6178,12 @@ function renderPersonalItems() {
     return;
   }
 
-  listEl.innerHTML = items.map(item => renderPersonalItemCard(item)).join('');
+  // "Việc riêng" là dòng 1 checkbox + 1 câu, nhét vào lưới thẻ 260px thì phí chỗ:
+  // bọc trong .personal-dense-list (grid-column: 1/-1) để thành danh sách dày full-width.
+  const cards = items.map(item => renderPersonalItemCard(item)).join('');
+  listEl.innerHTML = (!personalActiveTagFilter && personalActiveTab === 'checklist')
+    ? `<div class="personal-dense-list">${cards}</div>`
+    : cards;
 }
 
 function renderPersonalItemTagsHtml(item) {
@@ -5895,6 +6197,9 @@ function renderPersonalItemTagsHtml(item) {
 function renderPersonalItemCard(item) {
   const data = item.data || {};
   const safeId = escapeHtml(escapeJs(item.id));
+  // Nút cũ là Xoá cứng (không cứu lại được). Giờ là Lưu trữ — đảo ngược được, xem lại
+  // trong nút "Lưu trữ" ở đầu khu vực. Xoá vĩnh viễn chỉ có trong kho lưu trữ.
+  const archiveBtn = `<button type="button" class="personal-item-delete" title="Lưu trữ" onclick="event.stopPropagation(); archivePersonalItem('${safeId}')"><i class="fa-solid fa-box-archive"></i></button>`;
 
   if (item.type === 'calendar_event') {
     const start = data.start ? new Date(data.start) : null;
@@ -5906,7 +6211,7 @@ function renderPersonalItemCard(item) {
         <p>${escapeHtml(dateStr)}</p>
         ${renderPersonalItemTagsHtml(item)}
       </div>
-      <button type="button" class="personal-item-delete" title="Xoá" onclick="event.stopPropagation(); deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+      <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
     </div>`;
   }
 
@@ -5918,11 +6223,14 @@ function renderPersonalItemCard(item) {
         <span class="${data.done ? 'personal-item-done' : ''}">${escapeHtml(item.title || '')}</span>
       </label>
       ${renderPersonalItemTagsHtml(item)}
-      <button type="button" class="personal-item-delete" title="Xoá" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+      <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
     </div>`;
   }
 
   if (item.type === 'pin') {
+    // Thẻ ghim-dự-án: giữ nguyên nhãn "Bỏ ghim" + icon X vì người dùng đọc nó là "gỡ lối
+    // tắt này đi", không phải "cho vào thùng". Hành vi bên dưới giờ là lưu trữ (cứu lại
+    // được). Cũng không có nút ghim-lên-đầu ở đây để tránh lẫn 2 khái niệm ghim.
     return `
     <div class="personal-item-card">
       <div class="personal-item-body" ${data.projectId ? `onclick="openPinnedProject('${escapeHtml(escapeJs(data.projectId))}')" style="cursor:pointer;"` : ''}>
@@ -5930,7 +6238,7 @@ function renderPersonalItemCard(item) {
         <span>${escapeHtml(item.title || '')}</span>
         ${renderPersonalItemTagsHtml(item)}
       </div>
-      <button type="button" class="personal-item-delete" title="Bỏ ghim" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="personal-item-delete" title="Bỏ ghim" onclick="archivePersonalItem('${safeId}')"><i class="fa-solid fa-xmark"></i></button>
     </div>`;
   }
 
@@ -5943,8 +6251,9 @@ function renderPersonalItemCard(item) {
         ${renderPersonalItemTagsHtml(item)}
       </div>
       <div class="personal-item-actions">
+        ${renderPersonalPinBtnHtml(item)}
         <button type="button" class="personal-item-delete" title="Sửa" onclick="openPersonalItemModal('${safeId}')"><i class="fa-solid fa-pen"></i></button>
-        <button type="button" class="personal-item-delete" title="Xoá" onclick="deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+        ${archiveBtn}
       </div>
     </div>`;
   }
@@ -5957,7 +6266,7 @@ function renderPersonalItemCard(item) {
       <p>${escapeHtml((data.text || '').slice(0, 140))}</p>
       ${renderPersonalItemTagsHtml(item)}
     </div>
-    <button type="button" class="personal-item-delete" title="Xoá" onclick="event.stopPropagation(); deletePersonalItem('${safeId}')"><i class="fa-solid fa-trash"></i></button>
+    <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
   </div>`;
 }
 
@@ -6049,11 +6358,6 @@ async function togglePersonalChecklist(id, done) {
   renderPersonalItems();
 }
 
-async function deletePersonalItem(id) {
-  if (!confirm('Xoá mục này khỏi Cá Nhân?')) return;
-  await window.callGAS('deletePersonalItem', { id });
-  await refreshPersonalItems();
-}
 
 async function pinToPersonalHub(projectId, projectName) {
   const already = personalItemsCache.some(i => i.type === 'pin' && i.data && i.data.projectId === projectId);
@@ -6082,7 +6386,7 @@ function openPinnedProject(projectId) {
 let syncFolderStatusText = '';
 
 async function renderSyncFolderPanel() {
-  const listEl = document.getElementById('personal-hub-list');
+  const listEl = document.getElementById('personal-sync-folder-panel');
   if (!listEl) return;
 
   if (!window.PersonalSync || !window.PersonalSync.isTauri()) {
@@ -6166,7 +6470,10 @@ function updateSyncFolderStatus(status, detail) {
   syncFolderStatusText = LABELS[status] || status;
   const statusEl = document.getElementById('sync-folder-status');
   if (statusEl) statusEl.textContent = syncFolderStatusText;
-  if (['uploaded', 'downloaded', 'deleted', 'deleted-remote', 'reconciled'].includes(status) && personalActiveTab === 'sync_folder') {
+  // Trước kiểm tra personalActiveTab === 'sync_folder'; sync_folder không còn là tab.
+  // Kiểm tra chính phần tử đích có trong DOM mới là điều kiện đúng (modal đang mở).
+  if (['uploaded', 'downloaded', 'deleted', 'deleted-remote', 'reconciled'].includes(status)
+      && document.getElementById('sync-folder-file-list')) {
     renderSyncFolderFileList();
   }
 }
@@ -6178,7 +6485,7 @@ if (window.PersonalSync) {
 async function personalSyncPickAndLink() {
   const path = await window.PersonalSync.pickFolder();
   if (!path) return;
-  const listEl = document.getElementById('personal-hub-list');
+  const listEl = document.getElementById('personal-sync-folder-panel');
   if (listEl) listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang liên kết và đồng bộ lần đầu, có thể mất một lúc tuỳ số lượng file...</p></div>`;
   try {
     await window.PersonalSync.linkFolder(path);
@@ -6190,7 +6497,7 @@ async function personalSyncPickAndLink() {
 }
 
 async function personalSyncUnlinkFolder() {
-  if (!confirm('Bỏ liên kết thư mục này? File đã đồng bộ trên đám mây vẫn được giữ nguyên.')) return;
+  if (!await personalConfirm({ title: 'Bỏ liên kết thư mục này?', html: 'File đã đồng bộ trên đám mây vẫn được giữ nguyên.', confirmText: 'Bỏ liên kết' })) return;
   await window.PersonalSync.unlinkFolder();
   renderSyncFolderPanel();
 }
@@ -6217,7 +6524,7 @@ function personalSyncBlobToBase64(blob) {
 // Một chiều: đẩy 1 file đã đồng bộ trong Không Gian Riêng lên khu file chung của nhóm
 // (không có chiều ngược lại — file nhóm không tự động chảy vào Không Gian Riêng).
 async function personalSyncPushToTeam(relativePath) {
-  if (!confirm('Đẩy "' + relativePath + '" lên khu file chung của nhóm?')) return;
+  if (!await personalConfirm({ title: 'Đẩy lên khu file chung?', html: '<b>' + escapeHtml(relativePath) + '</b> sẽ hiện với cả nhóm.', icon: 'question', danger: false, confirmText: 'Đẩy lên' })) return;
   try {
     const uid = await API.personalSync.getUserId();
     const blob = await API.personalSync.downloadBytes(uid, relativePath);
@@ -6238,47 +6545,6 @@ async function personalSyncPushToTeam(relativePath) {
     }
   } catch (err) {
     showToast('Lỗi: ' + (err.message || err), 'error');
-  }
-}
-
-// -------------------- Liên quan đến bạn (một chiều: nhóm -> cá nhân, chỉ đọc) --------------------
-// Không phải personal_items — kéo trực tiếp từ dữ liệu nhóm (API.task.listMine, đúng
-// nguồn "Việc của tôi" đang dùng) để "việc đang giao cho bạn" có mặt ngay trong Không
-// Gian Riêng mà không cần đổi section. Không ghi gì ngược lại khu chung.
-async function renderRelatedPanel() {
-  const listEl = document.getElementById('personal-hub-list');
-  if (!listEl) return;
-  listEl.innerHTML = skeletonListItems(3);
-
-  if (!CURRENT_USER.email) {
-    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Chưa đăng nhập.</p></div>`;
-    return;
-  }
-
-  try {
-    const tasks = await API.task.listMine(CURRENT_USER.email, CURRENT_USER.groupKey);
-    if (!tasks || tasks.length === 0) {
-      listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Không có việc nào của nhóm đang giao cho bạn.</p></div>`;
-      return;
-    }
-    const sorted = tasks.slice().sort((a, b) => {
-      const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-      const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-      return da - db;
-    }).slice(0, 8);
-
-    listEl.innerHTML = sorted.map(t => `
-      <div class="personal-item-card personal-note-card" onclick="goToTaskInProject('${escapeHtml(escapeJs(t.project_id))}')">
-        <div class="personal-item-body">
-          <strong>${escapeHtml(t.name)}</strong>
-          <p>${escapeHtml(t.projectName || '')}${t.dueDate ? ' · Hạn: ' + escapeHtml(t.dueDate) : ''}</p>
-        </div>
-      </div>`).join('') +
-      `<div style="grid-column:1/-1; text-align:center; padding-top:10px;">
-        <button type="button" class="btn btn-outline" onclick="switchSection('mytasks')"><i class="fa-solid fa-arrow-right"></i> Xem tất cả trong Việc của tôi</button>
-      </div>`;
-  } catch (err) {
-    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ${escapeHtml(err.message || String(err))}</p></div>`;
   }
 }
 

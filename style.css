@@ -1550,6 +1550,59 @@ body.app-locked .user-profile-wrapper {
 .personal-customize-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
 .personal-customize-toggle input { accent-color: var(--gold); cursor: pointer; }
 
+
+/* --- Không Gian Riêng v3: Tổng quan / danh sách dày / ghim / kho lưu trữ --- */
+/* Bọc để thoát khỏi lưới minmax(260px) của .personal-hub-list — lưới đó không tự cho con
+   full-width, phải khai báo grid-column: 1/-1 (giống cách .empty-state đang làm). */
+.personal-dense-list { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+
+.personal-overview { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.personal-overview-block {
+  background: var(--card-bg); border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg); padding: 14px 16px;
+}
+.personal-overview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.personal-overview-head h4 { margin: 0; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+.personal-overview-head h4 i { color: var(--gold); }
+.personal-overview-jump {
+  background: transparent; border: none; color: var(--gold);
+  font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap;
+}
+.personal-overview-rows { display: flex; flex-direction: column; gap: 6px; }
+.personal-overview-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  font-size: 12.5px; cursor: pointer;
+}
+.personal-overview-row:hover { border-color: var(--gold); }
+.personal-overview-row > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.personal-overview-row .meta { color: var(--text-muted); font-size: 11.5px; flex-shrink: 0; }
+.personal-overview-check input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; }
+.personal-overview-empty { font-size: 12px; color: var(--text-muted); padding: 6px 2px; }
+
+.personal-item-pin {
+  background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+  padding: 4px 6px; border-radius: var(--radius-sm); flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.personal-item-pin:hover { color: var(--gold); background: var(--hover-bg); }
+.personal-item-pin.active { color: var(--gold); transform: rotate(-30deg); }
+
+/* .btn-outline.active không tồn tại ở wh-fin nên khai báo riêng ở đây để cả 3 app giống nhau. */
+.personal-archive-toggle.active { border-color: var(--gold); color: var(--gold); }
+
+.personal-archived-row { align-items: center; padding: 9px 14px; }
+.personal-archived-type {
+  font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--hover-bg);
+  padding: 2px 8px; border-radius: 999px; flex-shrink: 0;
+}
+.personal-archived-title { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.personal-archived-when { font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
+
+.personal-integrations-body { display: flex; flex-direction: column; gap: 22px; }
+.personal-integrations-section h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.personal-integrations-section h4 i { color: var(--gold); }
+
 .sync-folder-panel { display: flex; flex-direction: column; gap: 16px; }
 .sync-folder-header {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;

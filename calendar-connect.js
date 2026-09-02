@@ -10,7 +10,7 @@ const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
 async function renderCalendarConnectionPanel() {
-  const listEl = document.getElementById('personal-hub-list');
+  const listEl = document.getElementById('personal-calendar-connect-panel');
   if (!listEl) return;
 
   listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải...</p></div>`;
