@@ -554,22 +554,8 @@ function updateMemberCounts() {
   if (badgeOnlineEl) badgeOnlineEl.textContent = `${online} online`;
 }
 
-function timeAgoVietnamese(dateInput) {
-  if (!dateInput) return 'Chưa hoạt động';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return 'Chưa hoạt động';
-
-  const diffMs = Date.now() - d.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffSec < 45) return 'Vừa mới đây';
-  if (diffMin < 60) return `Hoạt động ${diffMin} phút trước`;
-  if (diffHour < 24) return `Hoạt động ${diffHour} giờ trước`;
-  return `Hoạt động ${diffDay} ngày trước`;
-}
+// timeAgoVietnamese chuyển sang lib/pure-helpers.js (tách hàm logic thuần cho Vitest,
+// enterprise-readiness mục 4) -- vẫn là global vì file đó nạp trước script.js.
 
 function setMemberFilter(filter, btn) {
   CURRENT_MEMBER_FILTER = filter;
@@ -1543,12 +1529,7 @@ async function loadProgressList(options) {
   return loadProjectOverview(options);
 }
 
-function getProgressBarColor(percent) {
-  if (percent == 100) return 'var(--success-color)';
-  if (percent >= 50) return 'var(--gold)';
-  if (percent > 0) return 'var(--warning-color)';
-  return 'var(--border-color)';
-}
+// getProgressBarColor chuyển sang lib/pure-helpers.js -- vẫn là global.
 
 function exportProjectsCsv() {
   const projects = globalAllProjects || [];
@@ -1858,21 +1839,7 @@ async function handleProjectCreationOrUpdate() {
 // only needs to offer the picker on its own project form -- activeGroup is always
 // 'finance' here, so no cross-group complexity like wh-org's admin table.
 
-function orgUnitDepth(unitId, unitsById) {
-  let depth = 0;
-  let cursor = unitsById.get(unitId);
-  const seen = new Set();
-  while (cursor && cursor.parent_id && !seen.has(cursor.id)) {
-    seen.add(cursor.id);
-    depth++;
-    cursor = unitsById.get(cursor.parent_id);
-  }
-  return depth;
-}
-
-function orgUnitLabel(unit, unitsById) {
-  return '— '.repeat(orgUnitDepth(unit.id, unitsById)) + unit.name;
-}
+// orgUnitDepth/orgUnitLabel chuyển sang lib/pure-helpers.js -- vẫn là global.
 
 async function populateProgressOrgUnitSelect() {
   const sel = document.getElementById('progress-org-unit-select');
@@ -5694,34 +5661,8 @@ let personalArchivedCache = [];
 let personalOverviewTasksCache = null;     // null = chưa nạp; [] = đã nạp và rỗng
 let personalRenderToken = 0;               // huỷ hiệu lực fetch async khi người dùng đổi tab
 
-// KHÔNG tái dùng timeAgoVietnamese: hàm đó nhét sẵn tiền tố 'Hoạt động ' vào kết quả và
-// dừng ở đơn vị ngày; các chỗ gọi nó đang phụ thuộc đúng tiền tố ấy. Hàm này trả cụm trần
-// ("2 giờ trước") để chỗ gọi tự ghép ("sửa …", "lưu trữ …").
-function formatPersonalTimeAgo(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return '';
-  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 60) return 'vừa xong';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return min + ' phút trước';
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return hour + ' giờ trước';
-  const day = Math.floor(hour / 24);
-  if (day < 30) return day + ' ngày trước';
-  const month = Math.floor(day / 30);
-  if (month < 12) return month + ' tháng trước';
-  return Math.floor(month / 12) + ' năm trước';
-}
-
-// Giữ personalItemsCache đúng thứ tự mà API.personal.list trả về (pinned desc, updated_at
-// desc) sau khi ghim/bỏ ghim tại chỗ, khỏi phải fetch lại cả danh sách.
-function sortPersonalItemsCache(items) {
-  return items.slice().sort((a, b) => {
-    if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
-  });
-}
+// formatPersonalTimeAgo/sortPersonalItemsCache chuyển sang lib/pure-helpers.js -- vẫn là
+// global (nạp trước script.js trong index.html).
 
 // Hộp xác nhận dùng chung, thay cho confirm() gốc. Đọc data-theme để không bị chữ trắng
 // trên nền trắng ở dark mode.
