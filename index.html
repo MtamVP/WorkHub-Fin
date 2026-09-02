@@ -65,6 +65,10 @@
         <i class="fa-solid fa-clipboard-list"></i>
       </button>
 
+      <button class="header-btn" id="backup-restore-toggle-btn" title="Sao lưu & Phục hồi" onclick="openBackupRestoreModal()" style="display:none;">
+        <i class="fa-solid fa-database"></i>
+      </button>
+
       <button class="header-btn" id="team-status-toggle-btn" title="Tình hình đội nhóm" onclick="openTeamStatusModal()">
         <i class="fa-solid fa-chart-pie"></i>
       </button>
@@ -1451,6 +1455,56 @@
     </div>
   </div>
 
+  <!-- Backup & Restore Modal (admin-only; the guard below is cosmetic — backups are
+       scoped by whatever the logged-in user's own RLS can already see) -->
+  <div class="modal-overlay" id="backup-restore-modal">
+    <div class="modal-card" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-database" style="color: var(--gold);"></i> Sao lưu & Phục hồi</h3>
+        <button class="header-btn" onclick="closeAppModal('backup-restore-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="backup-restore-guard"></div>
+        <div id="backup-restore-body">
+          <div class="small text-muted" style="margin-bottom:12px;">
+            Bản sao lưu là ảnh chụp JSON các bảng dữ liệu, lưu trên máy này (và bản sao thứ hai trên thư mục mạng nếu đã cấu hình).
+            Bản sao lưu phụ thuộc quyền của tài khoản đang đăng nhập — tài khoản không phải admin sẽ không sao lưu được các bảng quản trị.
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+            <button type="button" class="btn btn-primary" id="run-backup-now-btn" onclick="runManualBackupAction()">
+              <i class="fa-solid fa-download"></i> Sao lưu ngay
+            </button>
+            <button type="button" class="btn btn-outline" onclick="pickBackupNetworkPathAction()">
+              <i class="fa-solid fa-folder-tree"></i> Chọn thư mục mạng
+            </button>
+            <span id="backup-network-path-label" class="small text-muted" style="align-self:center;"></span>
+          </div>
+          <hr>
+          <h5 class="mb-2">Khôi phục từ bản sao lưu</h5>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+            <select id="backup-restore-file-select" class="form-select" style="max-width:320px;">
+              <option value="">-- Chọn bản sao lưu --</option>
+            </select>
+            <button type="button" class="btn btn-outline" onclick="previewRestoreDiffAction()">
+              <i class="fa-solid fa-magnifying-glass"></i> Xem trước thay đổi
+            </button>
+          </div>
+          <div id="backup-restore-diff" style="margin-bottom:12px;"></div>
+          <div id="backup-restore-confirm-row" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+            <input type="text" id="backup-restore-confirm-input" class="form-control" style="max-width:320px;" placeholder="Nhập chính xác tên file để xác nhận">
+            <button type="button" class="btn btn-danger" id="backup-restore-confirm-btn" onclick="restoreFromBackupAction()" disabled>
+              <i class="fa-solid fa-triangle-exclamation"></i> Khôi phục
+            </button>
+          </div>
+          <div id="backup-restore-result"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('backup-restore-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Team Status Modal (light KPI strip, no admin gate — own-team data) -->
   <div class="modal-overlay" id="team-status-modal">
     <div class="modal-card" style="max-width: 760px;">
@@ -1654,19 +1708,19 @@
     </div>
   </div>
 
-  <script src="api.js?v=20"></script>
+  <script src="api.js?v=21"></script>
   <script src="oauth-loopback.js?v=1"></script>
   <script src="sync-config.js?v=2"></script>
   <script src="sync-engine.js?v=1"></script>
   <script src="personal-sync.js?v=1"></script>
   <script src="calendar-connect.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=25"></script>
+  <script src="script.js?v=26"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>
-  <script src="backup-config.js?v=2"></script>
-  <script src="local-backup.js?v=1"></script>
+  <script src="backup-config.js?v=3"></script>
+  <script src="local-backup.js?v=2"></script>
   <script src="updater.js?v=2"></script>
 </body>
 </html>

@@ -147,4 +147,10 @@ Khi bắt đầu, máy người dùng chỉ có: 1 ổ 930GB đang chạy Window
 - Cấu hình Alert email.
 - Export Config Backup định kỳ.
 - Tailscale/WireGuard (chỉ cần nếu có nhu cầu truy cập NAS từ ngoài mạng LAN).
-- 2 việc tích hợp code ở mục "Bước tiếp theo" phía trên (`local-backup.js`, `api.js` upload) — vẫn đang chờ xác nhận riêng từ người dùng vì ảnh hưởng dữ liệu đang chạy.
+- ~~2 việc tích hợp code ở mục "Bước tiếp theo" phía trên (`local-backup.js`, `api.js` upload)~~ — `local-backup.js` đã tích hợp thư mục mạng (Phase F, xem mục "Ghi chú DR & bảo mật" bên dưới). Phần `api.js` upload file qua MinIO **đã build riêng nhưng đang tắt** (xem ghi chú bên dưới), không thuộc phạm vi Phase F.
+
+## Ghi chú DR (Disaster Recovery) & bảo mật — Phase F (2026-09-02)
+
+**Khóa ký cập nhật (`workhub.key`)**: cả 3 app dùng chung một khóa minisign để ký các bản cập nhật tự động (`tauri-plugin-updater`). Khóa này hiện **chỉ tồn tại trên máy dev hiện tại** — không có trong CI/CD (vì chưa có CI/CD, build hoàn toàn thủ công bằng `tauri build`), không có nơi lưu trữ phụ nào. **Nếu mất file này hoặc mất máy này, sẽ không thể ký và phát hành bản cập nhật mới cho bất kỳ bản nào trong 3 app đã cài trên máy người dùng** — người dùng sẽ phải cài lại thủ công thay vì auto-update. Khuyến nghị: sao chép `workhub.key` sang ít nhất 1 nơi lưu trữ bền vững, tách biệt khỏi máy dev (USB mã hóa, tính năng đính kèm file của trình quản lý mật khẩu, hoặc dataset `wh-backups` trên TrueNAS này — giờ đã có sẵn).
+
+**MinIO storage-proxy**: có một tính năng riêng (route upload file qua MinIO thay vì Supabase Storage) đã được build (Edge Function `storage-proxy` + `api.js` wiring) nhưng đang **tắt** (`USE_MINIO_STORAGE = false`) do một lỗi hang chưa liên quan đến Phase F này — việc đọc/xóa file vẫn đi qua MinIO theo tên bucket bất kể cờ này, chỉ upload mới là còn dùng Supabase Storage cũ. Đây là vấn đề riêng, không thuộc phạm vi sao lưu/phục hồi, chưa được xử lý trong Phase F.

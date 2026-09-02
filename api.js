@@ -2197,6 +2197,81 @@ const API = {
             return data;
         }
     },
+    // Phase F: local backup / restore. Local-backup.js writes JSON snapshots to
+    // $APPLOCALDATA/backups via the fs plugin directly (no DB round trip). This module
+    // is the read-back/restore side — list what's on disk, diff a chosen snapshot
+    // against live data before touching anything, then restore via upsert (never
+    // delete+reinsert) so an interruption partway leaves already-restored tables intact.
+    backup: {
+        _RESTORE_EXCLUDE: new Set(['audit_log', 'system_logs']), // append-only history, never a restore target
+        _PK: { // upsert onConflict column(s) per table -- most default to 'id'
+            app_settings: 'key', finance_stocks: 'symbol', user_status: 'uid',
+            lounge_players: 'email', task_assignees: 'task_id,user_email',
+            finance_holdings_price: 'user_id,symbol'
+        },
+        listLocal: async () => {
+            if (!window.__TAURI__ || !window.__TAURI__.fs) return [];
+            const fs = window.__TAURI__.fs;
+            const entries = await fs.readDir('backups', { baseDir: fs.BaseDirectory.AppLocalData });
+            return entries.filter(e => e.name && e.name.indexOf('backup-') === 0)
+                .sort((a, b) => (a.name < b.name ? 1 : -1));
+        },
+        _readBackup: async (fileName) => {
+            const fs = window.__TAURI__.fs;
+            const text = await fs.readTextFile('backups/' + fileName, { baseDir: fs.BaseDirectory.AppLocalData });
+            return JSON.parse(text);
+        },
+        previewDiff: async (fileName) => {
+            const snapshot = await API.backup._readBackup(fileName);
+            const rows = [];
+            for (const table of Object.keys(snapshot)) {
+                if (API.backup._RESTORE_EXCLUDE.has(table)) continue;
+                const entry = snapshot[table];
+                const backupCount = Array.isArray(entry) ? entry.length : 0;
+                const backupError = !Array.isArray(entry) ? (entry && entry.error) : null;
+                let liveCount = null, liveError = null;
+                try {
+                    const { count, error } = await sbClient.from(table).select('*', { count: 'exact', head: true });
+                    if (error) liveError = error.message; else liveCount = count;
+                } catch (e) { liveError = String(e); }
+                rows.push({ table, backupCount, liveCount, backupError, liveError });
+            }
+            return rows;
+        },
+        restore: async (fileName, confirmFileName) => {
+            if (fileName !== confirmFileName) throw new Error('Xác nhận tên file không khớp -- huỷ khôi phục.');
+            const snapshot = await API.backup._readBackup(fileName);
+            const ORDER = ['users', 'org_units', 'projects', 'tasks', 'task_assignees', 'task_comments',
+                'project_milestones', 'files', 'events', 'app_settings', 'fin_roles', 'sci_roles',
+                'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
+                'finance_corporate_actions', 'finance_holdings_price', 'finance_benchmark_prices',
+                'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stocks',
+                'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'user_status', 'lounge_players'];
+            const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
+            tables.sort((a, b) => {
+                const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+                return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+            });
+            const results = [];
+            for (const table of tables) {
+                const rowsData = snapshot[table];
+                if (!Array.isArray(rowsData)) { results.push({ table, skipped: true, reason: 'backup entry lỗi, bỏ qua' }); continue; }
+                if (!rowsData.length) { results.push({ table, upserted: 0 }); continue; }
+                const onConflict = API.backup._PK[table] || 'id';
+                let upserted = 0, error = null;
+                const CHUNK = 500;
+                for (let i = 0; i < rowsData.length; i += CHUNK) {
+                    const chunk = rowsData.slice(i, i + CHUNK);
+                    const { error: err } = await sbClient.from(table).upsert(chunk, { onConflict });
+                    if (err) { error = err.message; break; }
+                    upserted += chunk.length;
+                }
+                results.push({ table, upserted, error });
+            }
+            return results;
+        }
+    },
     // Light "team status" KPI strip — ported from wh-org's admin-only cross-group BI
     // dashboard (Phase 2), but this app is single-group so it's always called with
     // filters.groupKey = 'finance' fixed, visible to any logged-in user (their own
@@ -2615,7 +2690,8 @@ const MUTATING_ACTIONS = new Set([
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem',
     'saveCalendarConnection', 'disconnectCalendarConnection',
-    'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit'
+    'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit',
+    'restoreFromBackup'
 ]);
 window.MUTATING_ACTIONS = MUTATING_ACTIONS;
 
@@ -2741,6 +2817,18 @@ async function _dispatchAction(action, params = {}) {
             case 'hardDeleteItem': result = await API.system.hardDeleteItem(params.tableName, params.id); break;
 
             case 'getAuditLog': result = await API.audit.list(params); break;
+
+            case 'getLocalBackups': result = await API.backup.listLocal(); break;
+            case 'previewRestoreDiff': result = await API.backup.previewDiff(params.fileName); break;
+            case 'restoreFromBackup': {
+                result = await API.backup.restore(params.fileName, params.confirmFileName);
+                const failed = result.filter(r => r.error);
+                const traceId2 = "TRC_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+                await API.audit.log('backup', params.fileName, 'restoreFromBackup',
+                    `Khôi phục từ ${params.fileName}: ${result.length - failed.length}/${result.length} bảng thành công`,
+                    null, params.email, params.groupKey, traceId2, failed.length ? 'error' : 'success');
+                break;
+            }
 
             case 'getReportSummary': result = await API.reporting.summary(params); break;
             case 'getReportProjects': result = await API.reporting.projects(params); break;
