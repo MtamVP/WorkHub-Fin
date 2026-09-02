@@ -61,16 +61,8 @@
         <i class="fa-solid fa-trash-can"></i>
       </button>
 
-      <button class="header-btn" id="audit-log-toggle-btn" title="Nhật ký kiểm toán" onclick="openAuditLogModal()" style="display:none;">
-        <i class="fa-solid fa-clipboard-list"></i>
-      </button>
-
       <button class="header-btn" id="backup-restore-toggle-btn" title="Sao lưu & Phục hồi" onclick="openBackupRestoreModal()" style="display:none;">
         <i class="fa-solid fa-database"></i>
-      </button>
-
-      <button class="header-btn" id="team-status-toggle-btn" title="Tình hình đội nhóm" onclick="openTeamStatusModal()">
-        <i class="fa-solid fa-chart-pie"></i>
       </button>
 
       <button class="header-btn" id="role-mgmt-toggle-btn" title="Phân quyền thành viên" onclick="openRoleMgmtModal()" style="display:none;">
@@ -173,6 +165,12 @@
       <ul class="nav-group">
         <li class="nav-item" onclick="window.top.location.href='/roles/'" title="Phân Quyền">
           <i class="fa-solid fa-user-shield"></i><span> Phân Quyền</span>
+        </li>
+        <li class="nav-item" data-section="team-status" onclick="switchSection('team-status')" title="Báo Cáo BI">
+          <i class="fa-solid fa-chart-pie"></i><span> Báo Cáo BI</span>
+        </li>
+        <li class="nav-item" data-section="audit-log" onclick="switchSection('audit-log')" title="Nhật Ký Kiểm Toán">
+          <i class="fa-solid fa-clipboard-list"></i><span> Nhật Ký Kiểm Toán</span>
         </li>
       </ul>
     </nav>
@@ -1045,6 +1043,74 @@
       </div>
     </section>
 
+    <!-- Báo cáo BI (light KPI strip, no admin gate — own-team data) -->
+    <section class="app-section" id="team-status-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-chart-pie" style="color: var(--gold);"></i> Báo Cáo BI</h3>
+          <p>Tổng quan tiến độ và khối lượng công việc của nhóm Finance.</p>
+        </div>
+        <div class="section-actions">
+          <button type="button" class="btn btn-secondary" onclick="exportTeamStatusCsv()"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 20px 22px;">
+        <div id="team-status-kpi-row" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;"></div>
+        <div id="team-status-project-table" class="trash-list">
+          <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Nhật ký kiểm toán (admin-only; the guard below is cosmetic — real enforcement is the
+         audit_log RLS policy, a non-admin session gets zero rows back from getAuditLog regardless) -->
+    <section class="app-section" id="audit-log-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-clipboard-list" style="color: var(--gold);"></i> Nhật Ký Kiểm Toán</h3>
+          <p>Lịch sử thay đổi dữ liệu quan trọng — ai làm gì, khi nào.</p>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 20px 22px;">
+        <div id="audit-log-guard"></div>
+        <div id="audit-log-body">
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <input type="text" id="audit-log-filter-email" class="form-input" placeholder="Email người thực hiện" style="max-width:220px;">
+            <select id="audit-log-filter-entity" class="form-select" style="max-width:180px;">
+              <option value="">Tất cả đối tượng</option>
+              <option value="tasks">Công việc</option>
+              <option value="projects">Dự án</option>
+              <option value="events">Sự kiện</option>
+              <option value="project_milestones">Cột mốc</option>
+              <option value="messages">Tin nhắn</option>
+              <option value="users">Người dùng</option>
+              <option value="fin_roles">Vai trò Finance</option>
+              <option value="finance_transactions">Giao dịch</option>
+              <option value="finance_cash_flows">Dòng tiền</option>
+              <option value="finance_corporate_actions">Hành động doanh nghiệp</option>
+            </select>
+            <select id="audit-log-filter-group" class="form-select" style="max-width:160px;">
+              <option value="">Tất cả nhóm</option>
+              <option value="finance">Finance</option>
+              <option value="science">Science</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input type="date" id="audit-log-filter-from" class="form-input" style="max-width:150px;">
+            <input type="date" id="audit-log-filter-to" class="form-input" style="max-width:150px;">
+            <button type="button" class="btn btn-outline" onclick="loadAuditLog()"><i class="fa-solid fa-filter"></i> Lọc</button>
+          </div>
+          <div id="audit-log-list" class="trash-list">
+            <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
+          </div>
+          <div style="text-align:center; margin-top:10px;">
+            <button type="button" class="btn btn-outline btn-sm" id="audit-log-load-more-btn" onclick="loadMoreAuditLog()" style="display:none;">Tải thêm</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     </main>
   </div>
 
@@ -1405,56 +1471,6 @@
     </div>
   </div>
 
-  <!-- Audit Log Modal (admin-only; the check below is cosmetic — real enforcement is the
-       audit_log RLS policy, a non-admin session gets zero rows back from getAuditLog regardless) -->
-  <div class="modal-overlay" id="audit-log-modal">
-    <div class="modal-card" style="max-width: 920px;">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-clipboard-list" style="color: var(--gold);"></i> Nhật ký kiểm toán</h3>
-        <button class="header-btn" onclick="closeAppModal('audit-log-modal')"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div id="audit-log-guard"></div>
-        <div id="audit-log-body">
-          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
-            <input type="text" id="audit-log-filter-email" class="form-input" placeholder="Email người thực hiện" style="max-width:220px;">
-            <select id="audit-log-filter-entity" class="form-select" style="max-width:180px;">
-              <option value="">Tất cả đối tượng</option>
-              <option value="tasks">Công việc</option>
-              <option value="projects">Dự án</option>
-              <option value="events">Sự kiện</option>
-              <option value="project_milestones">Cột mốc</option>
-              <option value="messages">Tin nhắn</option>
-              <option value="users">Người dùng</option>
-              <option value="fin_roles">Vai trò Finance</option>
-              <option value="finance_transactions">Giao dịch</option>
-              <option value="finance_cash_flows">Dòng tiền</option>
-              <option value="finance_corporate_actions">Hành động doanh nghiệp</option>
-            </select>
-            <select id="audit-log-filter-group" class="form-select" style="max-width:160px;">
-              <option value="">Tất cả nhóm</option>
-              <option value="finance">Finance</option>
-              <option value="science">Science</option>
-              <option value="admin">Admin</option>
-            </select>
-            <input type="date" id="audit-log-filter-from" class="form-input" style="max-width:150px;">
-            <input type="date" id="audit-log-filter-to" class="form-input" style="max-width:150px;">
-            <button type="button" class="btn btn-outline" onclick="loadAuditLog()"><i class="fa-solid fa-filter"></i> Lọc</button>
-          </div>
-          <div id="audit-log-list" class="trash-list">
-            <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
-          </div>
-          <div style="text-align:center; margin-top:10px;">
-            <button type="button" class="btn btn-outline btn-sm" id="audit-log-load-more-btn" onclick="loadMoreAuditLog()" style="display:none;">Tải thêm</button>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeAppModal('audit-log-modal')">Đóng</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Backup & Restore Modal (admin-only; the guard below is cosmetic — backups are
        scoped by whatever the logged-in user's own RLS can already see) -->
   <div class="modal-overlay" id="backup-restore-modal">
@@ -1501,28 +1517,6 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeAppModal('backup-restore-modal')">Đóng</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Team Status Modal (light KPI strip, no admin gate — own-team data) -->
-  <div class="modal-overlay" id="team-status-modal">
-    <div class="modal-card" style="max-width: 760px;">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-chart-pie" style="color: var(--gold);"></i> Tình hình đội nhóm</h3>
-        <button class="header-btn" onclick="closeAppModal('team-status-modal')"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-          <button type="button" class="btn btn-outline btn-sm" onclick="exportTeamStatusCsv()"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
-        </div>
-        <div id="team-status-kpi-row" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;"></div>
-        <div id="team-status-project-table" class="trash-list">
-          <div style="padding:8px; color:var(--text-muted); font-size:12.5px;">Đang tải...</div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeAppModal('team-status-modal')">Đóng</button>
       </div>
     </div>
   </div>
@@ -1715,7 +1709,7 @@
   <script src="personal-sync.js?v=1"></script>
   <script src="calendar-connect.js?v=1"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
-  <script src="script.js?v=26"></script>
+  <script src="script.js?v=27"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

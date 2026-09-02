@@ -102,7 +102,7 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Tổng Quan / Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'personal'];
+const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'personal', 'team-status', 'audit-log'];
 let currentSectionKey = 'dashboard';
 const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false, personal: false };
 
@@ -174,7 +174,6 @@ async function resolveUserProfile(user) {
 
   unlockApp();
   updateUserProfileUI();
-  updateAuditLogButtonVisibility();
   updateBackupRestoreButtonVisibility();
   updateRoleGatedUI();
   startPresenceSystem();
@@ -209,7 +208,6 @@ async function initAuth() {
       try { localStorage.removeItem('userEmail'); } catch (e) {}
       if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
       if (chatChannel && sbClient) { sbClient.removeChannel(chatChannel); chatChannel = null; }
-      updateAuditLogButtonVisibility();
       updateBackupRestoreButtonVisibility();
       updateRoleGatedUI();
       lockApp();
@@ -804,6 +802,17 @@ function switchSection(sectionKey) {
   if (sectionKey === 'personal' && !SECTION_LOADED.personal) {
     SECTION_LOADED.personal = true;
     loadPersonalHub();
+  }
+
+  // Admin/reporting views reload fresh on every visit (no lazy-once cache) — matches
+  // wh-org's own admin-section behavior, and fresher data matters more here than
+  // avoiding a re-fetch.
+  if (sectionKey === 'team-status') {
+    loadTeamStatus();
+  }
+
+  if (sectionKey === 'audit-log') {
+    loadAuditLog();
   }
 }
 
@@ -5004,11 +5013,6 @@ async function purgeOldTrash(category, idsJoined) {
 // CURRENT_USER.groupKey is known (see resolveUserProfile). Real enforcement is the
 // audit_log RLS policy (current_user_group() = 'admin'); a non-admin session gets
 // zero rows back from getAuditLog regardless of whether this button is shown.
-function updateAuditLogButtonVisibility() {
-  const btn = document.getElementById('audit-log-toggle-btn');
-  if (btn) btn.style.display = CURRENT_USER.groupKey === 'admin' ? '' : 'none';
-}
-
 // -------------------- Phase B RBAC: role-gated UI (cosmetic — RLS is the real backstop) --------------------
 function isViewerRole() { return CURRENT_USER.role === 'viewer'; }
 function isGroupAdminRole() { return CURRENT_USER.role === 'admin'; }
@@ -5022,11 +5026,6 @@ function updateRoleGatedUI() {
 
 let auditLogOffset = 0;
 const AUDIT_LOG_PAGE_SIZE = 50;
-
-function openAuditLogModal() {
-  openAppModal('audit-log-modal');
-  loadAuditLog();
-}
 
 function getAuditLogFilters() {
   return {
@@ -5277,11 +5276,6 @@ async function restoreFromBackupAction() {
 }
 
 // -------------------- Team status (light KPI strip, no admin gate — own-team data) --------------------
-function openTeamStatusModal() {
-  openAppModal('team-status-modal');
-  loadTeamStatus();
-}
-
 async function loadTeamStatus() {
   const kpiRow = document.getElementById('team-status-kpi-row');
   const table = document.getElementById('team-status-project-table');
