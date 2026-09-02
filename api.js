@@ -181,7 +181,7 @@ const API = {
         },
         getUserInfo: async (email) => {
             if (!sbClient) return { group: 'guest', name: '' };
-            const { data, error } = await sbClient.from('users').select('name:nickname, group:group_key').eq('email', email).maybeSingle();
+            const { data, error } = await sbClient.from('users').select('name:nickname, group:group_key, active').eq('email', email).maybeSingle();
             if (error || !data) return { group: 'guest', name: '' };
             return data;
         },
@@ -341,7 +341,7 @@ const API = {
     user: {
         listAll: async () => {
             if (!sbClient) return [];
-            const { data, error } = await sbClient.from('users').select('email, nickname, group_key, created_at').order('created_at', { ascending: false }).limit(1000);
+            const { data, error } = await sbClient.from('users').select('email, nickname, group_key, active, created_at').order('created_at', { ascending: false }).limit(1000);
             if (error) throw error;
             return data;
         },
@@ -367,11 +367,26 @@ const API = {
             if (error) throw error;
             return `Đã đổi quyền của ${email} thành "${groupKey}"!`;
         },
+        // Hard delete. Không còn UI nào trong 3 app gọi hàm này nữa -- setActive(email,
+        // false) là luồng chuẩn. Giữ nguyên (không xoá) làm lối thoát khẩn cấp (xoá kiểu
+        // GDPR thật), RLS DELETE (admin-only) vẫn là chốt chặn thật sự như trước.
         remove: async (email) => {
             if (!sbClient) throw new Error("Chưa setup Supabase");
             const { error } = await sbClient.from('users').delete().eq('email', email);
             if (error) throw error;
             return `Đã thu hồi quyền truy cập của ${email}. (Tài khoản đăng nhập Firebase của họ vẫn còn tồn tại nếu có — không tự xóa được từ đây.)`;
+        },
+        // Vô hiệu hoá thay cho xoá cứng. Chỉ patch đúng cột `active`, không đi qua upsert
+        // nguyên hàng (mẫu giống API.personal.setFlags). RLS + trg_prevent_self_active_change
+        // (user-deactivation-migration.sql) là chốt chặn thật -- chỉ admin đổi được cột này
+        // dù ai gọi hàm này.
+        setActive: async (email, active) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const { data, error } = await sbClient.from('users').update({ active: !!active }).eq('email', email).select().single();
+            if (error) throw error;
+            return active
+                ? `Đã kích hoạt lại tài khoản ${email}.`
+                : `Đã vô hiệu hóa tài khoản ${email}. Người này sẽ bị đăng xuất và không đăng nhập lại được cho tới khi được kích hoạt lại.`;
         }
     },
     project: {
@@ -2715,7 +2730,7 @@ const MUTATING_ACTIONS = new Set([
     'createEvent', 'updateEvent', 'deleteEvent', 'toggleImportant',
     'uploadFile', 'deleteFile', 'shareFile',
     'restoreItem', 'hardDeleteItem',
-    'provisionUser', 'updateUserGroup', 'removeUser', 'updateNickname',
+    'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
@@ -2756,6 +2771,7 @@ async function _dispatchAction(action, params = {}) {
             case 'provisionUser': result = await API.user.provision(params.email, params.nickname, params.groupKey); break;
             case 'updateUserGroup': result = await API.user.updateGroup(params.email, params.groupKey); break;
             case 'removeUser': result = await API.user.remove(params.email); break;
+            case 'setUserActive': result = await API.user.setActive(params.email, params.active); break;
 
             case 'getRecentFilesForDashboard': result = await API.file.getRecentFilesForDashboard(params.groupKey); break;
             case 'getFileList': result = await API.file.list(params.groupKey, params); break;

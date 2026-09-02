@@ -131,14 +131,35 @@ async function resolveUserProfile(user) {
   // forever, no matter who actually logs in now. Keep it in sync with the real session.
   try { localStorage.setItem('userEmail', user.email); } catch (e) {}
 
+  let info;
   try {
-    const info = await API.auth.getUserInfo(user.email);
+    info = await API.auth.getUserInfo(user.email);
     CURRENT_USER.nickname = (info && info.name) || user.user_metadata?.display_name || user.email.split('@')[0];
     CURRENT_USER.groupKey = (info && info.group) || 'guest';
   } catch (err) {
     console.warn("Lỗi lấy thông tin user:", err);
     CURRENT_USER.nickname = user.email.split('@')[0];
     CURRENT_USER.groupKey = 'guest';
+  }
+
+  // Vô hiệu hoá thay xoá cứng (enterprise-readiness round-2). info.active === false chỉ
+  // xảy ra khi hàng thật sự tồn tại và bị admin tắt -- getUserInfo trả về không có field
+  // này (undefined) trên lỗi/không tìm thấy, nên so sánh chặt === false, không dùng
+  // !info.active, để hành vi hôm nay (trước migration, hoặc khi lỗi mạng) không đổi.
+  if (info && info.active === false) {
+    document.body.classList.add('app-locked');
+    closeAuthModal(true);
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'error',
+        title: 'Tài khoản đã bị vô hiệu hóa',
+        text: `Tài khoản ${CURRENT_USER.email} đã bị quản trị viên vô hiệu hóa quyền truy cập.`,
+        confirmButtonText: 'Đăng xuất',
+        confirmButtonColor: '#C9A84C',
+        allowOutsideClick: false
+      }).then(() => { auth.signOut().then(() => openAuthModal(true)); });
+    }
+    return false;
   }
 
   try {
