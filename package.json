@@ -4,7 +4,9 @@
   "description": "",
   "main": "api.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run tests/unit",
+    "test:watch": "vitest",
+    "test:rls": "vitest run tests/rls"
   },
   "repository": {
     "type": "git",
@@ -19,7 +21,10 @@
   },
   "homepage": "https://github.com/MtamVP/WorkHub-Fin#readme",
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "@tauri-apps/cli": "^2.11.4",
+    "vitest": "^4.1.11",
+    "html-validate": "^11.12.0",
+    "pg": "^8.23.0"
   },
   "dependencies": {
     "@tauri-apps/plugin-process": "^2.3.1",

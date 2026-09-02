@@ -1,0 +1,14 @@
+{
+  "note": "Baseline đo thật ngày 2026-09-02, sau khi tách lib/pure-helpers.js (enterprise-readiness mục 4). Khối Personal Hub được thiết kế dùng chung qua PERSONAL_SHIM nhưng ĐÃ lệch nhau thật -- so tuyệt đối sẽ fail ngay từ baseline, nên chỉ cảnh báo khi tăng đáng kể so với các số này. `personal_hub_block.start/end` là số dòng script.js của CHÍNH repo này (1-based, inclusive) -- mỗi repo tự khai đúng vùng của mình; script check-drift.mjs đọc file baseline này ở repo anh em để biết vùng của họ, không đoán ranh giới bằng marker (dễ vỡ khi code chèn thêm phía trên khối).",
+  "personal_hub_block": {
+    "marker": "// PERSONAL HUB (Cá Nhân) — private per-user workspace, shared across Fin/Sci/Org.",
+    "start": 5639,
+    "end": 6508
+  },
+  "pairs_diff_lines_baseline": {
+    "fin-sci": 173,
+    "fin-org": 929,
+    "sci-org": 848
+  },
+  "warn_threshold_ratio": 1.15
+}

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  fast-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: node --check trên mọi .js/.mjs
+        run: node scripts/check-syntax.mjs
+
+      - name: JSON hợp lệ
+        run: node scripts/check-json.mjs
+
+      - name: HTML hợp lệ (bộ rule rút gọn, xem .htmlvalidate.json)
+        run: npx html-validate .
+
+      - name: Cài devDependencies
+        run: npm ci
+
+      - name: Unit test (Vitest, chỉ tests/unit -- KHÔNG chạy tests/rls)
+        run: npm test
+
+  cross-app-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: self
+
+      - name: Clone 2 repo anh em (cả 3 repo public, không cần token)
+        run: |
+          git clone --depth 1 https://github.com/MtamVP/WorkHub-Sci.git sibling-sci
+          git clone --depth 1 https://github.com/MtamVP/WorkHub-ORG.git sibling-org
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Kiểm tra trôi lệch giữa 3 app
+        run: node self/scripts/check-drift.mjs

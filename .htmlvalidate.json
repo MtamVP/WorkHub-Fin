@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "close-order": "error",
+    "close-attr": "error",
+    "no-dup-attr": "error",
+    "no-dup-id": "error",
+    "void-content": "error"
+  }
+}

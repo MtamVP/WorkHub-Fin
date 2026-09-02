@@ -1,0 +1,8 @@
+# Enterprise-readiness mục 4 -- loại các thư mục không phải HTML do người viết tay: build
+# artifact (không commit, chỉ có cục bộ khi đã build) và report/ (báo cáo tài chính sinh tự
+# động bởi mastersheet/stocksheet, không phải UI của app -- có lỗi thẻ đóng thật trong file
+# sinh ra, không thuộc phạm vi sửa của round test/CI này).
+node_modules/
+tauri-dist/
+src-tauri/
+report/
