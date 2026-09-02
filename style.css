@@ -2448,3 +2448,62 @@ body.auth-page .text-muted { color: var(--text-muted) !important; }
 body.auth-page #toast-container { left: 50%; right: auto; top: 24px; transform: translateX(-50%); }
 .swal2-container { z-index: 9999 !important; }
 
+/* ==========================================================================
+   ROLES (Phân Quyền Nhóm)
+   ========================================================================== */
+
+.roles-admin-panel {
+  margin-bottom: 20px;
+  background: color-mix(in srgb, var(--gold) 4%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
+}
+
+.roles-panel-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grant-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  margin-right: 6px;
+  margin-bottom: 4px;
+}
+
+.role-badge i { font-size: 10px; }
+.role-badge-none {
+  background: var(--hover-bg);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+  font-weight: 500;
+}
+
+.btn-revoke {
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+.btn-revoke:hover {
+  opacity: 1;
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}

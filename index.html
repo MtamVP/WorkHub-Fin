@@ -163,7 +163,7 @@
 
       <div class="nav-group-label"><span>Quản Trị</span></div>
       <ul class="nav-group">
-        <li class="nav-item" onclick="window.top.location.href='/roles/'" title="Phân Quyền">
+        <li class="nav-item" data-section="fin-roles" onclick="switchSection('fin-roles')" title="Phân Quyền">
           <i class="fa-solid fa-user-shield"></i><span> Phân Quyền</span>
         </li>
         <li class="nav-item" data-section="team-status" onclick="switchSection('team-status')" title="Báo Cáo BI">
@@ -1063,8 +1063,7 @@
       </div>
     </section>
 
-    <!-- Nhật ký kiểm toán (admin-only; the guard below is cosmetic — real enforcement is the
-         audit_log RLS policy, a non-admin session gets zero rows back from getAuditLog regardless) -->
+    <!-- Nhật ký kiểm toán -->
     <section class="app-section" id="audit-log-section">
       <div class="section-hero-card card">
         <div class="section-hero-info">
@@ -1077,7 +1076,7 @@
         <div id="audit-log-guard"></div>
         <div id="audit-log-body">
           <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
-            <input type="text" id="audit-log-filter-email" class="form-input" placeholder="Email người thực hiện" style="max-width:220px;">
+            <select id="audit-log-filter-email" class="form-select" style="max-width:220px;"></select>
             <select id="audit-log-filter-entity" class="form-select" style="max-width:180px;">
               <option value="">Tất cả đối tượng</option>
               <option value="tasks">Công việc</option>
@@ -1108,6 +1107,60 @@
             <button type="button" class="btn btn-outline btn-sm" id="audit-log-load-more-btn" onclick="loadMoreAuditLog()" style="display:none;">Tải thêm</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Phân Quyền Finance -->
+    <section class="app-section" id="fin-roles-section">
+      <div class="section-hero-card card">
+        <div class="section-hero-info">
+          <h3><i class="fa-solid fa-user-shield" style="color: var(--gold);"></i> Phân Quyền Nhóm Finance</h3>
+          <p>Vai trò cấp 2 riêng của WorkHub Finance — độc lập với nhóm (group) do org quản lý. Quyết định ai được toàn quyền quản trị Pipeline / Tài sản / Công cụ thay người khác.</p>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-outline" onclick="loadFinRoles()"><i class="fa-solid fa-rotate-right"></i> Làm mới</button>
+        </div>
+      </div>
+
+      <div id="fin-roles-admin-panel" class="card roles-admin-panel" style="display:none;">
+          <h3 class="roles-panel-title"><i class="fa-solid fa-user-plus"></i> Gán vai trò</h3>
+          <form id="fin-roles-grant-form" class="grant-form-grid" onsubmit="handleFinRoleGrant(event)">
+              <div class="form-group">
+                  <label class="form-label" for="fin-roles-grant-member">Thành viên</label>
+                  <select id="fin-roles-grant-member" class="form-select" required>
+                      <option value="">-- Chọn --</option>
+                  </select>
+              </div>
+              <div class="form-group">
+                  <label class="form-label" for="fin-roles-grant-role">Vai trò</label>
+                  <select id="fin-roles-grant-role" class="form-select">
+                      <option value="asset_manager">Quản lý & đầu tư tài sản</option>
+                      <option value="chief_assistant">Trưởng Trợ Lý</option>
+                      <option value="executive_member">Thành Viên Điều Hành</option>
+                      <option value="fin_admin">Quản trị phân quyền</option>
+                      <option value="platform_lead">Phụ Trách Nền Tảng (toàn quyền)</option>
+                  </select>
+              </div>
+              <div class="form-group">
+                  <label>&nbsp;</label>
+                  <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Gán vai trò</button>
+              </div>
+          </form>
+      </div>
+
+      <div class="table-container card">
+          <table class="data-table" id="fin-roles-table" style="width:100%;">
+              <thead>
+                  <tr>
+                      <th>Thành viên</th>
+                      <th>Vai trò hiện tại</th>
+                      <th class="text-right">Thao tác</th>
+                  </tr>
+              </thead>
+              <tbody id="fin-roles-table-body">
+                  <tr><td colspan="3" class="empty-state">Đang tải...</td></tr>
+              </tbody>
+          </table>
       </div>
     </section>
 
@@ -1470,6 +1523,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Backup & Restore Modal (admin-only; the guard below is cosmetic — backups are
        scoped by whatever the logged-in user's own RLS can already see) -->

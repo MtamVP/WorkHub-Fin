@@ -102,9 +102,9 @@ let eventModalDefaultTitleHTML = null;
 let eventModalDefaultSubmitHTML = null;
 
 // Section navigation (Tổng Quan / Pipeline / Nhiệm Vụ / Tiến Độ / Lịch)
-const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'personal', 'team-status', 'audit-log'];
+const SECTION_KEYS = ['dashboard', 'chat', 'pipeline', 'task', 'progress', 'calendar', 'drive', 'mytasks', 'personal', 'team-status', 'audit-log', 'fin-roles'];
 let currentSectionKey = 'dashboard';
-const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false, personal: false };
+const SECTION_LOADED = { dashboard: false, projects: false, calendar: false, drive: false, mytasks: false, chat: false, personal: false, finroles: false };
 
 // ==========================================
 // 1. AUTHENTICATION & ACCESS GUARD (real Supabase Auth)
@@ -812,7 +812,13 @@ function switchSection(sectionKey) {
   }
 
   if (sectionKey === 'audit-log') {
+    populateAuditLogEmails();
     loadAuditLog();
+  }
+
+  if (sectionKey === 'fin-roles' && !SECTION_LOADED.finroles) {
+    SECTION_LOADED.finroles = true;
+    initFinRoles();
   }
 }
 
@@ -5027,6 +5033,24 @@ function updateRoleGatedUI() {
 let auditLogOffset = 0;
 const AUDIT_LOG_PAGE_SIZE = 50;
 
+async function populateAuditLogEmails() {
+  const emailSelected = document.getElementById("audit-log-filter-email");
+  if (emailSelected && emailSelected.tagName === "SELECT" && emailSelected.options.length <= 1) {
+    try{
+      const {data} = await supabaseClient 
+        .from('users')
+        .select('email')
+        .eq('group_key', 'admin')
+      if(data){
+        emailSelected.innerHTML = "<option value=''>Tất cả email</option>" +
+          data.map(u=>`<option value="${escapeHtml(u.email)}">${escapeHtml(u.email)}</option>`).join('')
+      }
+    }catch(err){
+      console.error('Error fetching admin emails:',err);
+      showToast('Lỗi: ' + err.message, 'error');
+    }
+  }
+}
 function getAuditLogFilters() {
   return {
     actorEmail: (document.getElementById('audit-log-filter-email')?.value || '').trim(),
@@ -6256,4 +6280,113 @@ async function renderRelatedPanel() {
   } catch (err) {
     listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi: ${escapeHtml(err.message || String(err))}</p></div>`;
   }
+}
+
+// -------------------- Fin Roles (Phân Quyền Nhóm) --------------------
+let isFinAdminRole = false;
+
+const FIN_ROLE_LABELS = {
+    asset_manager: 'Quản lý & đầu tư tài sản', fin_admin: 'Quản trị phân quyền',
+    platform_lead: 'Phụ Trách Nền Tảng', chief_assistant: 'Trưởng Trợ Lý',
+    executive_member: 'Thành Viên Điều Hành'
+};
+
+async function initFinRoles() {
+    try {
+        const myRolesResp = await callGAS('getMyFinRoles', { email: CURRENT_USER.email });
+        const myRoles = myRolesResp.data || [];
+        isFinAdminRole = myRoles.includes('fin_admin') || myRoles.includes('platform_lead') || myRoles.includes('chief_assistant');
+    } catch (e) {
+        console.error('Lỗi getMyFinRoles:', e);
+    }
+
+    const adminPanel = document.getElementById('fin-roles-admin-panel');
+    if (adminPanel) adminPanel.style.display = isFinAdminRole ? 'block' : 'none';
+
+    await loadFinRoles();
+}
+
+async function loadFinRoles() {
+    const tbody = document.getElementById('fin-roles-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+
+    try {
+        const response = await callGAS('listFinRoles');
+        const members = response.data || [];
+
+        if (members.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Chưa có thành viên nào trong nhóm Finance.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = members.map(m => `
+            <tr>
+                <td>
+                    <div class="member-name">${escapeHtml(m.nickname)}</div>
+                    <div class="member-email">${escapeHtml(m.email)}</div>
+                </td>
+                <td>${renderFinRoleBadges(m)}</td>
+                <td class="text-right">${renderFinRoleRevokeButtons(m)}</td>
+            </tr>`).join('');
+
+        if (isFinAdminRole) populateFinRoleMemberSelect(members);
+    } catch (e) {
+        console.error('Lỗi loadFinRoles:', e);
+        tbody.innerHTML = `<tr><td colspan="3" class="empty-state text-danger">Lỗi: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function renderFinRoleBadges(member) {
+    if (!member.roles || member.roles.length === 0) {
+        return '<span class="role-badge role-badge-none">Chưa có vai trò</span>';
+    }
+    return member.roles.map(r => `<span class="role-badge"><i class="fa-solid fa-shield-halved"></i>${escapeHtml(FIN_ROLE_LABELS[r] || r)}</span>`).join('');
+}
+
+function renderFinRoleRevokeButtons(member) {
+    if (!isFinAdminRole || !member.roles || member.roles.length === 0) return '';
+    return member.roles.map(r => `
+        <button type="button" class="btn-revoke icon-btn danger" data-email="${escapeHtml(escapeJs(member.email))}" data-role="${escapeHtml(escapeJs(r))}"
+            onclick="handleFinRoleRevoke(this)" title="Gỡ vai trò: ${escapeHtml(FIN_ROLE_LABELS[r] || r)}">
+            <i class="fa-solid fa-xmark"></i>
+        </button>`).join('');
+}
+
+function populateFinRoleMemberSelect(members) {
+    const select = document.getElementById('fin-roles-grant-member');
+    if (!select) return;
+    select.innerHTML = '<option value="">-- Chọn --</option>' +
+        members.map(m => `<option value="${escapeHtml(m.email)}">${escapeHtml(m.nickname)} (${escapeHtml(m.email)})</option>`).join('');
+}
+
+async function handleFinRoleGrant(e) {
+    if (e) e.preventDefault();
+    const targetEmail = document.getElementById('fin-roles-grant-member')?.value;
+    const role = document.getElementById('fin-roles-grant-role')?.value;
+
+    if (!targetEmail) {
+        showToast('Vui lòng chọn thành viên', 'error');
+        return;
+    }
+
+    try {
+        await callGAS('grantFinRole', { targetEmail, role, byEmail: CURRENT_USER.email });
+        showToast('Đã gán vai trò thành công', 'success');
+        await loadFinRoles();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+async function handleFinRoleRevoke(btn) {
+    const targetEmail = btn.dataset.email;
+    const role = btn.dataset.role;
+    try {
+        await callGAS('revokeFinRole', { targetEmail, role });
+        showToast('Đã gỡ vai trò', 'success');
+        await loadFinRoles();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
 }
