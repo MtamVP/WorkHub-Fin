@@ -1162,7 +1162,9 @@ const API = {
                     recurrence: recurrence,
                     recurrenceEnd: ev.recurrence_end,
                     attendees: ev.attendees,
-                    createdBy: ev.created_by
+                    createdBy: ev.created_by,
+                    source: ev.source,
+                    googleEventId: ev.google_event_id
                 });
 
                 if (recurrence === 'none') {
@@ -1300,6 +1302,31 @@ const API = {
             const { data, error } = await query.select('title').maybeSingle();
             if (error) throw error;
             return `Đã cập nhật trạng thái quan trọng của sự kiện "${data.title}" thành công!`;
+        },
+        // Đồng bộ Google Calendar (1 chiều, chỉ đọc) -- dùng bởi calendar-connect.js.
+        upsertGoogleEvents: async (rows) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            if (!rows || !rows.length) return 0;
+            const { error } = await sbClient.from('events').upsert(rows, { onConflict: 'google_event_id' });
+            if (error) throw error;
+            return rows.length;
+        },
+        // Dọn các sự kiện đã đồng bộ trước đó nhưng không còn xuất hiện trong lần kéo
+        // mới nhất (đã bị xoá/huỷ bên phía Google) -- Google API không trả "danh sách
+        // xoá" nên phải suy luận bằng khác biệt tập hợp, cùng kiểu đối chiếu local/remote
+        // đã dùng ở personal-sync.js's fullReconcile().
+        pruneGoogleEvents: async (email, groupKey, activeGoogleIds, windowStart, windowEnd) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            let query = sbClient.from('events')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('source', 'google').eq('created_by', email).eq('group_key', groupKey)
+                .is('deleted_at', null)
+                .gte('start_time', windowStart).lte('start_time', windowEnd);
+            if (activeGoogleIds && activeGoogleIds.length) {
+                query = query.not('google_event_id', 'in', `(${activeGoogleIds.map(id => `"${id}"`).join(',')})`);
+            }
+            const { error } = await query;
+            if (error) throw error;
         }
     },
     asset: {
@@ -2503,6 +2530,12 @@ const API = {
             const { error } = await sbClient.from('calendar_connections').delete().eq('provider', 'google');
             if (error) throw error;
             return 'Đã ngắt kết nối Google Calendar';
+        },
+        touchSync: async () => {
+            if (!sbClient) return;
+            const { error } = await sbClient.from('calendar_connections')
+                .update({ last_synced_at: new Date().toISOString() }).eq('provider', 'google');
+            if (error) throw error;
         }
     },
     lounge: {
@@ -2893,6 +2926,9 @@ async function _dispatchAction(action, params = {}) {
             case 'getCalendarConnection': result = await API.calendarConnection.get(); break;
             case 'saveCalendarConnection': result = await API.calendarConnection.save(params); break;
             case 'disconnectCalendarConnection': result = await API.calendarConnection.disconnect(); break;
+            case 'touchCalendarSync': result = await API.calendarConnection.touchSync(); break;
+            case 'upsertGoogleEvents': result = await API.calendar.upsertGoogleEvents(params.rows); break;
+            case 'pruneGoogleEvents': result = await API.calendar.pruneGoogleEvents(params.email, params.groupKey, params.activeGoogleIds, params.windowStart, params.windowEnd); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;

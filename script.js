@@ -3348,21 +3348,26 @@ function renderEventsForSelectedDate() {
 
     const recurrenceLabel = { daily: 'Lặp hằng ngày', weekly: 'Lặp hằng tuần', monthly: 'Lặp hằng tháng' }[event.recurrence];
     const attendeeCount = (event.attendees || '').split(',').map(x => x.trim()).filter(Boolean).length;
+    // Sự kiện đồng bộ từ Google Calendar -- chỉ đọc (scope OAuth chỉ readonly, sửa/xoá
+    // ở đây không đẩy ngược lên Google được nên không cho sửa qua WorkHub, tránh 2 bản
+    // dữ liệu lệch nhau). Bỏ hẳn 2 nút sửa/xoá mini, thay bằng icon nguồn.
+    const isGoogleSynced = event.source === 'google';
 
     div.innerHTML =
       '<div class="event-time">' + timeStr + ' - ' + endTimeStr + '</div>' +
-      '<div class="event-title">' + escapeHtml(event.title) + (recurrenceLabel ? ' <i class="fa-solid fa-rotate" style="color:var(--text-muted); font-size:0.75em;" title="' + recurrenceLabel + '"></i>' : '') + '</div>' +
+      '<div class="event-title">' + escapeHtml(event.title) + (recurrenceLabel ? ' <i class="fa-solid fa-rotate" style="color:var(--text-muted); font-size:0.75em;" title="' + recurrenceLabel + '"></i>' : '') + (isGoogleSynced ? ' <i class="fa-brands fa-google" style="color:var(--text-muted); font-size:0.75em;" title="Đồng bộ từ Google Calendar"></i>' : '') + '</div>' +
       (event.description ? '<div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px; font-style: italic;">' + escapeHtml(event.description) + '</div>' : '') +
       '<div class="event-meta">' +
       (event.location ? '<span><i class="fa-solid fa-location-dot"></i> ' + escapeHtml(event.location) + '</span>' : '') +
       (attendeeCount > 0 ? '<span><i class="fa-solid fa-user-group"></i> ' + attendeeCount + '</span>' : '') +
       '</div>' +
+      (isGoogleSynced ? '' :
       '<button class="btn-edit-event-mini" title="Sửa" onclick="openEditEvent(\'' + event.id + '\', event)">' +
       '<i class="fa-solid fa-pen"></i>' +
       '</button>' +
       '<button class="btn-delete-event-mini" title="Xóa" onclick="quickDeleteEvent(\'' + event.id + '\', \'' + escapeJs(event.title) + '\', event)">' +
       '<i class="fa-solid fa-trash"></i>' +
-      '</button>';
+      '</button>');
 
     div.addEventListener('click', () => {
       document.querySelectorAll('.event-item').forEach(el => el.style.borderRight = 'none');
@@ -5905,6 +5910,7 @@ function openPersonalIntegrationsModal() {
   PERSONAL_SHIM.openModal('personal-integrations-modal');
   renderSyncFolderPanel();
   renderCalendarConnectionPanel();
+  if (typeof initCalendarAutoSync === 'function') initCalendarAutoSync();
 }
 
 
