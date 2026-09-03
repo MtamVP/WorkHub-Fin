@@ -8,7 +8,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -16,7 +16,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=3.3.1">
+  <link rel="stylesheet" href="style.css?v=3.3.2">
   <link rel="stylesheet" href="pipeline/pipeline.css">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-512.png">
@@ -1227,44 +1227,77 @@
     </div>
   </aside>
 
-  <!-- Auth / Login Modal -->
-  <div class="modal-overlay" id="auth-modal">
-    <div class="modal-card auth-modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-shield-halved" style="color: var(--gold);"></i> Đăng nhập WorkHub Finance</h3>
-        <button class="header-btn" id="auth-modal-close-btn" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
+  <!-- Auth / Login (full-page split-screen, thay cho modal cũ -- xem comment ở style.css
+       #auth-modal. Không còn class "modal-overlay" vì layout mới không dùng backdrop-che-app-
+       phía-sau nữa (app-header đã ẩn hẳn lúc khoá), toàn bộ id/hàm JS giữ nguyên. -->
+  <div id="auth-modal">
+    <div class="login-split">
+      <div class="login-brand-pane" id="login-brand-pane">
+        <div class="login-brand-parallax" id="login-brand-parallax">
+          <div class="login-brand-wash"></div>
+        </div>
+        <canvas class="login-brand-canvas" id="login-net-canvas"></canvas>
+        <div class="login-brand-watermark" aria-hidden="true">Fin</div>
+        <div class="login-brand-grain"></div>
+        <div class="login-brand-vignette"></div>
+        <div class="login-brand-top">
+          <div class="login-brand-mark"><img src="logo.png" alt=""></div>
+          <span>WorkHub Finance</span>
+        </div>
+        <div class="login-brand-bottom">WorkHub suite — Fin · Sci · Org</div>
       </div>
-      <div class="modal-body">
-        <p style="color: var(--text-secondary); font-size: 13.5px; margin-bottom: 18px;">
-          Đăng nhập bằng tài khoản WorkHub của bạn để truy cập Economics Pipeline.
-        </p>
 
-        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-          <div class="form-group">
-            <label class="form-label" for="auth-email-input">Email tài khoản WorkHub:</label>
-            <input type="email" id="auth-email-input" class="form-control" placeholder="vidu: specialist@gmail.com" required autocomplete="username">
-          </div>
+      <div class="login-form-pane" id="login-form-pane">
+        <div class="login-form-glow" id="login-form-glow"></div>
+        <button type="button" class="login-theme-pill" id="login-theme-pill" onclick="toggleAppTheme()" aria-label="Chuyển chế độ Sáng/Tối">
+          <i class="fa-solid fa-sun login-theme-icon icon-sun" aria-hidden="true"></i>
+          <i class="fa-solid fa-moon login-theme-icon icon-moon" aria-hidden="true"></i>
+        </button>
+        <div class="login-form-top-mark">Economics Pipeline</div>
 
-          <div class="form-group">
-            <label class="form-label" for="auth-password-input">Mật khẩu:</label>
-            <input type="password" id="auth-password-input" class="form-control" placeholder="Mật khẩu WorkHub" required autocomplete="current-password">
-          </div>
+        <div class="login-form-mid">
+          <div class="login-form-inner">
+            <h2>Đăng nhập</h2>
+            <p class="auth-subtitle">Vào hệ thống WorkHub Finance.</p>
 
-          <div id="auth-error-msg" class="auth-error-message" style="display:none; color: var(--danger-color); font-size: 13px; margin-top: 6px;"></div>
-          <div class="text-center mt-3">
-            <a href="/forgot/" class="small text-decoration-none text-muted"> Quên mật khẩu?</a>
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+              <div class="auth-input-group">
+                <span class="auth-input-icon"><i class="fa-solid fa-envelope"></i></span>
+                <input type="email" id="auth-email-input" class="form-control" placeholder=" " required autocomplete="username">
+                <label for="auth-email-input" class="auth-float-label">Email tài khoản WorkHub</label>
+              </div>
+
+              <div class="auth-input-group">
+                <span class="auth-input-icon"><i class="fa-solid fa-lock"></i></span>
+                <input type="password" id="auth-password-input" class="form-control" placeholder=" " required autocomplete="current-password">
+                <label for="auth-password-input" class="auth-float-label">Mật khẩu</label>
+              </div>
+
+              <button type="submit" class="auth-btn-submit" id="auth-submit-btn">
+                Đăng nhập <i class="fa-solid fa-arrow-right ms-2"></i>
+              </button>
+
+              <div id="auth-error-msg" class="auth-error-message" style="display:none;"></div>
+
+              <div class="text-center mt-3">
+                <a href="/forgot/" class="small text-decoration-none text-muted"> Quên mật khẩu?</a>
+              </div>
+              <div class="text-center mt-3" style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
+                <a href="#" class="small text-decoration-none text-muted" onclick="handleSsoLoginClick(event)">
+                  <i class="fa-solid fa-building-shield"></i> Đăng nhập bằng SSO doanh nghiệp
+                </a>
+              </div>
+
+              <!-- Luôn forced=true khi mở (xem openAuthModal trong script.js) nên 2 nút này
+                   không bao giờ được JS gỡ display:none -- giữ trong DOM vì script.js vẫn
+                   reference trực tiếp (getElementById), không xoá để tránh lỗi null. -->
+              <button type="button" id="auth-cancel-btn" onclick="closeAuthModal()" style="display:none;">Hủy</button>
+              <button type="button" id="auth-modal-close-btn" onclick="closeAuthModal()" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+            </form>
           </div>
-          <div class="text-center mt-3" style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
-            <a href="#" class="small" onclick="handleSsoLoginClick(event)">
-              <i class="fa-solid fa-building-shield"></i> Đăng nhập bằng SSO doanh nghiệp
-            </a>
-          </div>
-          <div class="modal-footer" style="padding: 16px 0 0 0; margin-top: 20px; background: transparent; border-top: 1px solid var(--border-color);">
-            <button type="button" class="btn btn-secondary" id="auth-cancel-btn" onclick="closeAuthModal()">Hủy</button>
-            <button type="submit" class="btn btn-primary" id="auth-submit-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
-          </div>
-          
-        </form>
+        </div>
+
+        <div class="login-form-foot">© WorkHub — phiên bản nội bộ</div>
       </div>
     </div>
   </div>
@@ -1796,7 +1829,7 @@
   <script src="calendar-connect.js?v=2"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
   <script src="lib/pure-helpers.js?v=1"></script>
-  <script src="script.js?v=30"></script>
+  <script src="script.js?v=31"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1"></script>
   <script src="notify-deadlines.js?v=2"></script>

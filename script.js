@@ -1296,6 +1296,20 @@ function toggleObservationDrawer() {
   }
 }
 
+// Đảo data-theme + ghi localStorage['theme'] -- lõi dùng chung cho nút #theme-toggle-btn
+// (trong header, chỉ hiện khi đã đăng nhập) VÀ .login-theme-pill (trang đăng nhập mới,
+// #theme-toggle-btn bị ẩn cùng #app-header lúc khoá nên cần nút riêng gọi lại đúng hàm này).
+function toggleAppTheme() {
+  const activeTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+  const toggleBtn = document.getElementById('theme-toggle-btn');
+  if (toggleBtn) toggleBtn.innerHTML = newTheme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+  // .login-theme-pill tự chuyển icon bằng CSS theo [data-theme] (xem style.css), không
+  // cần set gì thêm ở đây.
+}
+
 function setupThemeToggle() {
   const toggleBtn = document.getElementById('theme-toggle-btn');
   const currentTheme = localStorage.getItem('theme') || 'dark';
@@ -1303,13 +1317,7 @@ function setupThemeToggle() {
 
   if (toggleBtn) {
     toggleBtn.innerHTML = currentTheme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
-    toggleBtn.addEventListener('click', () => {
-      const activeTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      toggleBtn.innerHTML = newTheme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
-    });
+    toggleBtn.addEventListener('click', toggleAppTheme);
   }
 }
 
@@ -6618,3 +6626,163 @@ async function handleFinRoleRevoke(btn) {
         showToast('Lỗi: ' + e.message, 'error');
     }
 }
+
+// ==========================================
+// LOGIN SPLIT-SCREEN — trang trí thuần, không phụ thuộc/ảnh hưởng logic đăng nhập
+// (handleAuthSubmit/lockApp/unlockApp ở trên không đổi). Canvas luôn có mặt trong
+// DOM (#auth-modal chỉ ẩn/hiện qua CSS .open) nên khởi tạo 1 lần lúc script load,
+// không cần đợi lockApp() gọi. Port từ wh-org, xem index.html/style.css bên đó.
+// ==========================================
+(function () {
+    var pane = document.getElementById('login-form-pane');
+    var glow = document.getElementById('login-form-glow');
+    if (pane && glow) {
+        pane.addEventListener('pointermove', function (e) {
+            var rect = pane.getBoundingClientRect();
+            glow.style.left = (e.clientX - rect.left - 320) + 'px';
+            glow.style.top = (e.clientY - rect.top - 320) + 'px';
+        });
+    }
+})();
+
+(function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var brandPane = document.getElementById('login-brand-pane');
+    var parallax = document.getElementById('login-brand-parallax');
+    if (!brandPane || !parallax) return;
+    brandPane.addEventListener('pointermove', function (e) {
+        var rect = brandPane.getBoundingClientRect();
+        var px = (e.clientX - rect.left) / rect.width - 0.5;
+        var py = (e.clientY - rect.top) / rect.height - 0.5;
+        parallax.style.transform = 'translate(' + (px * -14).toFixed(1) + 'px, ' + (py * -10).toFixed(1) + 'px)';
+    });
+    brandPane.addEventListener('pointerleave', function () { parallax.style.transform = ''; });
+})();
+
+(function () {
+    var canvas = document.getElementById('login-net-canvas');
+    var pane = document.getElementById('login-brand-pane');
+    if (!canvas || !pane) return;
+    var ctx = canvas.getContext('2d');
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var nodes = [];
+    var hub = { x: 0, y: 0 };
+    var pointer = { x: -9999, y: -9999, active: false };
+    var t = 0;
+    var NODE_COUNT = 26, LINK_DIST = 170, POINTER_DIST = 240;
+    // Màu mạng lưới: gold-light tint (fin) thay vì navy-light (org) -- literal, không
+    // theo theme vì brand pane luôn tối.
+    var LINE_RGB = '232, 200, 122';
+    var HUB_GLOW_RGB = '236, 210, 148';
+    var HUB_FILL = '#FBF3D9';
+
+    function resize() {
+        var rect = pane.getBoundingClientRect();
+        W = rect.width; H = rect.height;
+        canvas.width = W * dpr; canvas.height = H * dpr;
+        canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        hub.x = W * 0.30; hub.y = H * 0.38;
+    }
+
+    function seed() {
+        nodes = [];
+        for (var i = 0; i < NODE_COUNT; i++) {
+            var radius = 90 + Math.random() * Math.min(W, H) * 0.62;
+            var angle = Math.random() * Math.PI * 2;
+            var speed = (0.10 + Math.random() * 0.22) * (Math.random() < 0.5 ? 1 : -1);
+            nodes.push({
+                orbitR: radius, angle: angle, speed: speed / radius * 26,
+                bob: Math.random() * Math.PI * 2,
+                r: 1.3 + Math.random() * 2.1,
+                depth: 0.5 + Math.random() * 0.5
+            });
+        }
+    }
+
+    function step() {
+        t += 1;
+        for (var i = 0; i < nodes.length; i++) {
+            var n = nodes[i];
+            n.angle += n.speed * 0.01;
+            n.x = hub.x + Math.cos(n.angle) * n.orbitR;
+            n.y = hub.y + Math.sin(n.angle) * n.orbitR * 0.72 + Math.sin(t * 0.01 + n.bob) * 8;
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        for (var i = 0; i < nodes.length; i++) {
+            var a = nodes[i];
+            var dxh = a.x - hub.x, dyh = a.y - hub.y;
+            var dh = Math.sqrt(dxh * dxh + dyh * dyh);
+            if (dh < LINK_DIST * 2.4) {
+                var alphaH = Math.max(0, (1 - dh / (LINK_DIST * 2.4))) * 0.5 * a.depth;
+                ctx.strokeStyle = 'rgba(' + LINE_RGB + ', ' + alphaH + ')';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(hub.x, hub.y); ctx.lineTo(a.x, a.y); ctx.stroke();
+            }
+            for (var j = i + 1; j < nodes.length; j++) {
+                var b = nodes[j];
+                var dx = a.x - b.x, dy = a.y - b.y;
+                var d = Math.sqrt(dx * dx + dy * dy);
+                if (d < LINK_DIST) {
+                    var alpha = (1 - d / LINK_DIST) * 0.24 * Math.min(a.depth, b.depth);
+                    ctx.strokeStyle = 'rgba(' + LINE_RGB + ', ' + alpha + ')';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+                }
+            }
+            if (pointer.active) {
+                var pdx = a.x - pointer.x, pdy = a.y - pointer.y;
+                var pd = Math.sqrt(pdx * pdx + pdy * pdy);
+                if (pd < POINTER_DIST) {
+                    var palpha = (1 - pd / POINTER_DIST) * 0.6;
+                    ctx.strokeStyle = 'rgba(255, 244, 214, ' + palpha + ')';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(pointer.x, pointer.y); ctx.lineTo(a.x, a.y); ctx.stroke();
+                }
+            }
+        }
+        for (var k = 0; k < nodes.length; k++) {
+            var node = nodes[k];
+            ctx.save();
+            ctx.shadowColor = 'rgba(' + LINE_RGB + ', 0.9)';
+            ctx.shadowBlur = 8 * node.depth;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + HUB_GLOW_RGB + ', ' + (0.55 + node.depth * 0.4) + ')';
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.save();
+        ctx.shadowColor = 'rgba(' + HUB_GLOW_RGB + ', 1)';
+        ctx.shadowBlur = reduceMotion ? 22 : (20 + Math.sin(t * 0.012) * 6);
+        ctx.beginPath();
+        ctx.arc(hub.x, hub.y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = HUB_FILL;
+        ctx.fill();
+        ctx.restore();
+        if (pointer.active) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(255, 244, 214, 1)'; ctx.shadowBlur = 14;
+            ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 244, 214, 0.95)'; ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function loop() { step(); draw(); requestAnimationFrame(loop); }
+
+    pane.addEventListener('pointermove', function (e) {
+        var rect = pane.getBoundingClientRect();
+        pointer.x = e.clientX - rect.left; pointer.y = e.clientY - rect.top;
+        pointer.active = true;
+    });
+    pane.addEventListener('pointerleave', function () { pointer.active = false; });
+    window.addEventListener('resize', function () { resize(); });
+
+    resize(); seed(); step(); draw();
+    if (!reduceMotion) requestAnimationFrame(loop);
+})();
