@@ -15,7 +15,13 @@ window.escapeHtml = function (value) {
 };
 
 window.escapeJs = function (value) {
-    return String(value === null || value === undefined ? '' : value).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    // \n/\r và 2 ký tự phân đoạn ít ai để ý (U+2028/U+2029) đều kết thúc 1 chuỗi JS
+    // literal dù đang nằm trong dấu nháy đơn/kép -- trước đây thiếu, phải vá thủ công ở
+    // từng nơi gọi (task description dùng .replace(/\r?\n/g, "\\n") RIÊNG sau khi gọi
+    // escapeJs) -- gộp về đúng 1 chỗ để mọi caller tự động an toàn.
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
+        .replace(/\r\n/g, '\\n').replace(/[\r\n\u2028\u2029]/g, '\\n');
 };
 
 const SUPABASE_URL = "https://gqsbsqaxzpzcloaopzvv.supabase.co";
@@ -140,8 +146,13 @@ function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
 
 async function getUserId(emailOrUsername) {
     if (!sbClient) return null;
+    // Thoát ký tự có nghĩa đặc biệt trong toán tử .or() của PostgREST -- ",", "(" ")" cho
+    // phép chèn thêm điều kiện lọc tuỳ ý nếu không lọc, khai thác được cả khi CHƯA đăng
+    // nhập (hàm này gọi được từ trang login, trước khi có phiên xác thực).
+    const safe = String(emailOrUsername || '').replace(/[,()]/g, '');
+    if (!safe) return null;
     const { data } = await sbClient.from('users')
-        .select('id').or(`nickname.eq.${emailOrUsername},email.eq.${emailOrUsername}`).maybeSingle();
+        .select('id').or(`nickname.eq.${safe},email.eq.${safe}`).maybeSingle();
     return data ? data.id : null;
 }
 
@@ -153,8 +164,10 @@ const API = {
     auth: {
         getRealEmail: async (username) => {
             if (!sbClient) return null;
+            const safe = String(username || '').replace(/[,()]/g, '');
+            if (!safe) return null;
             const { data, error } = await sbClient.from('users')
-                .select('email').or(`nickname.eq.${username},email.eq.${username}`).maybeSingle();
+                .select('email').or(`nickname.eq.${safe},email.eq.${safe}`).maybeSingle();
             if (error || !data) return null;
             return data.email;
         },
@@ -1292,6 +1305,7 @@ const API = {
             }
             const { data, error } = await query.select('title').maybeSingle();
             if (error) throw error;
+            if (!data) throw new Error('Không tìm thấy sự kiện (đã bị xoá hoặc không thuộc quyền của bạn).');
             return `Đã đưa sự kiện "${data.title}" vào thùng rác!`;
         },
         toggleImportant: async (eventId, isImportant, calendarType, groupKey, email) => {
@@ -1301,6 +1315,7 @@ const API = {
             }
             const { data, error } = await query.select('title').maybeSingle();
             if (error) throw error;
+            if (!data) throw new Error('Không tìm thấy sự kiện (đã bị xoá hoặc không thuộc quyền của bạn).');
             return `Đã cập nhật trạng thái quan trọng của sự kiện "${data.title}" thành công!`;
         },
         // Đồng bộ Google Calendar (1 chiều, chỉ đọc) -- dùng bởi calendar-connect.js.
@@ -2096,6 +2111,7 @@ const API = {
 
             const { data, error } = await sbClient.from(tableName).update({ deleted_at: null }).eq('id', id).select('*').maybeSingle();
             if (error) throw error;
+            if (!data) throw new Error('Không tìm thấy mục cần khôi phục (có thể đã bị xoá hẳn hoặc vừa được khôi phục ở nơi khác).');
 
             if (tableName === 'tasks') {
                 await sbClient.from('tasks')
@@ -2139,7 +2155,10 @@ const API = {
                                 const urlParts = file.url.split('/general_bucket/');
                                 if (urlParts.length > 1) {
                                     const filePath = decodeURIComponent(urlParts[1]);
-                                    await sbClient.storage.from('general_bucket').remove([filePath]);
+                                    // deleteFromStorage() thay vì gọi sbClient.storage trực tiếp -- tự định
+                                    // tuyến qua MinIO nếu 'general_bucket' được thêm vào NEW_MINIO_BUCKETS
+                                    // sau này (2 bản gõ tay giống hệt từng có ở đây, dễ lệch nhau).
+                                    await deleteFromStorage('general_bucket', filePath);
                                 }
                             }
                         }
