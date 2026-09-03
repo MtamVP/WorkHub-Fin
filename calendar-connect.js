@@ -164,7 +164,22 @@ function mapGoogleEventToRow(ev, email, groupKey) {
   const isAllDay = !!(ev.start && ev.start.date && !ev.start.dateTime);
   const startTime = isAllDay ? ev.start.date + 'T00:00:00' : ev.start.dateTime;
   const endRaw = ev.end || ev.start;
-  const endTime = isAllDay ? (endRaw.date || ev.start.date) + 'T23:59:59' : (endRaw.dateTime || startTime);
+  // Google's end.date cho sự kiện cả-ngày là MỐC LOẠI TRỪ (ngày SAU ngày cuối cùng thật
+  // sự của sự kiện) -- vd. sự kiện 1 ngày (5/9) có end.date='2026-09-06', không phải
+  // '2026-09-05'. Lấy thẳng end.date làm cuối ngày sẽ khiến 1 sự kiện 1-ngày hiện chiếm
+  // 2 ngày trên lịch WorkHub -- phải lùi lại 1 ngày trước khi gán 23:59:59.
+  let endTime;
+  if (isAllDay) {
+    const endDateStr = endRaw.date || ev.start.date;
+    const endDateExclusive = new Date(endDateStr + 'T00:00:00');
+    endDateExclusive.setDate(endDateExclusive.getDate() - 1);
+    const y = endDateExclusive.getFullYear();
+    const m = String(endDateExclusive.getMonth() + 1).padStart(2, '0');
+    const d = String(endDateExclusive.getDate()).padStart(2, '0');
+    endTime = `${y}-${m}-${d}T23:59:59`;
+  } else {
+    endTime = endRaw.dateTime || startTime;
+  }
   const attendees = Array.isArray(ev.attendees)
     ? ev.attendees.map(a => a.email).filter(Boolean).join(',')
     : null;
@@ -227,6 +242,7 @@ async function syncGoogleCalendarEvents() {
   const rows = [];
   let pageToken = null;
   let pages = 0;
+  let truncated = false;
   do {
     const page = await fetchGoogleEventsPage(accessToken, windowStart, windowEnd, pageToken);
     const items = page.items || [];
@@ -237,19 +253,34 @@ async function syncGoogleCalendarEvents() {
     }
     pageToken = page.nextPageToken || null;
     pages += 1;
+    if (pageToken && pages >= SYNC_MAX_PAGES) truncated = true;
   } while (pageToken && pages < SYNC_MAX_PAGES);
 
+  // callGAS/_dispatchAction (api.js) không bao giờ throw -- luôn trả {status,message},
+  // kể cả khi lỗi. Phải tự kiểm tra status, đúng quy ước mọi nơi khác trong app đang
+  // dùng (vd. script.js checks response.status !== 'success'), nếu không lỗi ghi DB sẽ
+  // âm thầm bị nuốt và người dùng thấy toast "đồng bộ thành công" giả.
   if (rows.length) {
-    await callGAS('upsertGoogleEvents', { rows });
+    const upsertRes = await callGAS('upsertGoogleEvents', { rows });
+    if (upsertRes.status !== 'success') throw new Error(upsertRes.message || 'Lưu sự kiện đồng bộ thất bại.');
   }
-  await callGAS('pruneGoogleEvents', {
-    email, groupKey,
-    activeGoogleIds: rows.map(r => r.google_event_id),
-    windowStart, windowEnd
-  });
-  await callGAS('touchCalendarSync', {});
+  // Bỏ qua bước dọn (prune) nếu trang bị cắt bớt (còn sự kiện chưa kéo hết) -- nếu không,
+  // những sự kiện thật ở các trang chưa kéo (id không có trong activeGoogleIds) sẽ bị
+  // hiểu nhầm là "đã xoá bên Google" và bị xoá oan.
+  if (!truncated) {
+    const pruneRes = await callGAS('pruneGoogleEvents', {
+      email, groupKey,
+      activeGoogleIds: rows.map(r => r.google_event_id),
+      windowStart, windowEnd
+    });
+    if (pruneRes.status !== 'success') throw new Error(pruneRes.message || 'Dọn sự kiện cũ thất bại.');
+  } else {
+    console.warn('syncGoogleCalendarEvents: lịch có hơn ' + (SYNC_MAX_PAGES * 250) + ' sự kiện trong cửa sổ đồng bộ -- bỏ qua bước dọn để tránh xoá oan sự kiện thật ở các trang chưa kéo về.');
+  }
+  const touchRes = await callGAS('touchCalendarSync', {});
+  if (touchRes.status !== 'success') throw new Error(touchRes.message || 'Cập nhật thời điểm đồng bộ thất bại.');
 
-  return { count: rows.length };
+  return { count: rows.length, truncated };
 }
 
 // Wrapper có UI: khoá nút + spinner trong lúc chạy, toast kết quả, vẽ lại panel kết
@@ -260,7 +291,8 @@ async function syncGoogleCalendarNow() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ...'; }
   try {
     const result = await syncGoogleCalendarEvents();
-    showToast(`Đã đồng bộ ${result.count} sự kiện từ Google Calendar.`, 'success');
+    const suffix = result.truncated ? ' (lịch quá nhiều sự kiện, có thể chưa dọn hết sự kiện cũ)' : '';
+    showToast(`Đã đồng bộ ${result.count} sự kiện từ Google Calendar.${suffix}`, 'success');
   } catch (err) {
     showToast('Đồng bộ Google Calendar thất bại: ' + (err.message || String(err)), 'error');
   } finally {

@@ -3362,10 +3362,10 @@ function renderEventsForSelectedDate() {
       (attendeeCount > 0 ? '<span><i class="fa-solid fa-user-group"></i> ' + attendeeCount + '</span>' : '') +
       '</div>' +
       (isGoogleSynced ? '' :
-      '<button class="btn-edit-event-mini" title="Sửa" onclick="openEditEvent(\'' + event.id + '\', event)">' +
+      '<button class="btn-edit-event-mini" title="Sửa" onclick="openEditEvent(\'' + escapeHtml(escapeJs(event.id)) + '\', event)">' +
       '<i class="fa-solid fa-pen"></i>' +
       '</button>' +
-      '<button class="btn-delete-event-mini" title="Xóa" onclick="quickDeleteEvent(\'' + event.id + '\', \'' + escapeJs(event.title) + '\', event)">' +
+      '<button class="btn-delete-event-mini" title="Xóa" onclick="quickDeleteEvent(\'' + escapeHtml(escapeJs(event.id)) + '\', \'' + escapeHtml(escapeJs(event.title)) + '\', event)">' +
       '<i class="fa-solid fa-trash"></i>' +
       '</button>');
 

@@ -2768,7 +2768,8 @@ const MUTATING_ACTIONS = new Set([
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
-    'saveCalendarConnection', 'disconnectCalendarConnection',
+    'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync',
+    'upsertGoogleEvents', 'pruneGoogleEvents',
     'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit',
     'restoreFromBackup'
 ]);
