@@ -165,8 +165,11 @@ async function resolveUserProfile(user) {
   try {
     CURRENT_USER.role = await API.auth.getMyRole(activeGroup);
   } catch (e) {
-    console.warn('Không lấy được vai trò người dùng, mặc định Editor:', e);
-    CURRENT_USER.role = 'editor';
+    // Fail closed: nếu không lấy được vai trò thật, hạ quyền về viewer thay vì giữ
+    // nguyên mặc định 'editor' lạc quan -- tránh việc 1 lỗi mạng/RPC thoáng qua vô
+    // tình để lộ UI tạo/sửa/xóa cho người lẽ ra chỉ có quyền xem.
+    console.warn('Không lấy được vai trò người dùng, hạ về viewer (fail-closed):', e);
+    CURRENT_USER.role = 'viewer';
   }
 
   if (!ALLOWED_GROUPS.includes(CURRENT_USER.groupKey)) {
@@ -2135,6 +2138,7 @@ async function handleProjectFileUpload() {
 }
 
 function deleteProjectFileAction(fileId, fileName) {
+  if (isViewerRole()) { showToast('Bạn không có quyền xóa file.', 'error'); return; }
   Swal.fire({
     title: 'Xóa File?',
     text: `Bạn có chắc muốn xóa file "${fileName}"?`,
@@ -2611,6 +2615,7 @@ async function applyBulkStatusChange() {
 }
 
 async function applyBulkDelete() {
+  if (isViewerRole()) { showToast('Bạn không có quyền xóa công việc.', 'error'); return; }
   const ids = Array.from(bulkSelectedIds);
   if (ids.length === 0) return;
 
@@ -2803,6 +2808,7 @@ async function handleTaskFormSubmit(e) {
 }
 
 function deleteTaskAction(taskId, taskName) {
+  if (isViewerRole()) { showToast('Bạn không có quyền xóa công việc.', 'error'); return; }
   Swal.fire({
     title: 'Xóa Công Việc?',
     text: `Bạn có chắc chắn muốn xóa công việc: "${taskName}"?`,
@@ -3952,7 +3958,7 @@ function renderRecentFiles(fileData) {
     html += `
       <li style="display: flex; align-items: center; margin-bottom: 8px;">
         <i class="fa-solid ${icon}" style="color: var(--info-color); margin-right: 8px;"></i>
-        <a href="${file.url}" target="_blank" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>
+        <a href="${escapeHtml(file.url || '#')}" target="_blank" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</a>
       </li>`;
   });
   html += '</ul>';
@@ -6507,7 +6513,7 @@ async function personalSyncPushToTeam(relativePath) {
     const dataUrl = await personalSyncBlobToBase64(blob);
     const fileName = relativePath.split('/').pop();
     const res = await window.callGAS('uploadFile', {
-      fileData: dataUrl,
+      fileData: dataUrl.split(',')[1],
       fileName: fileName,
       mimeType: blob.type || 'application/octet-stream',
       groupKey: activeGroup,
