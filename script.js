@@ -6659,6 +6659,11 @@ async function handleFinRoleRevoke(btn) {
     brandPane.addEventListener('pointerleave', function () { parallax.style.transform = ''; });
 })();
 
+// "Tinh luyện giá trị" -- hạt sáng trôi từ đáy lên đỉnh, tối bronze -> sáng gold
+// (ẩn dụ dữ liệu đi qua các tầng pipeline Bronze/Silver/Gold của Economics Pipeline),
+// cộng 1 đường xu hướng (trend line) chạy ngang có điểm sáng ở đầu mút. Thay cho mạng
+// lưới điểm-nối-điểm (đợt trước) theo yêu cầu người dùng: hiệu ứng phải mang ý nghĩa
+// riêng của Fin, không dùng chung mô-típ với org. Đã duyệt qua mockup trước khi lắp.
 (function () {
     var canvas = document.getElementById('login-net-canvas');
     var pane = document.getElementById('login-brand-pane');
@@ -6666,16 +6671,9 @@ async function handleFinRoleRevoke(btn) {
     var ctx = canvas.getContext('2d');
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var nodes = [];
-    var hub = { x: 0, y: 0 };
-    var pointer = { x: -9999, y: -9999, active: false };
+    var particles = [], N = 46;
+    var trend = [], TREND_LEN = 90, trendVal = 0.5;
     var t = 0;
-    var NODE_COUNT = 26, LINK_DIST = 170, POINTER_DIST = 240;
-    // Màu mạng lưới: gold-light tint (fin) thay vì navy-light (org) -- literal, không
-    // theo theme vì brand pane luôn tối.
-    var LINE_RGB = '232, 200, 122';
-    var HUB_GLOW_RGB = '236, 210, 148';
-    var HUB_FILL = '#FBF3D9';
 
     function resize() {
         var rect = pane.getBoundingClientRect();
@@ -6683,106 +6681,99 @@ async function handleFinRoleRevoke(btn) {
         canvas.width = W * dpr; canvas.height = H * dpr;
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        hub.x = W * 0.30; hub.y = H * 0.38;
     }
 
     function seed() {
-        nodes = [];
-        for (var i = 0; i < NODE_COUNT; i++) {
-            var radius = 90 + Math.random() * Math.min(W, H) * 0.62;
-            var angle = Math.random() * Math.PI * 2;
-            var speed = (0.10 + Math.random() * 0.22) * (Math.random() < 0.5 ? 1 : -1);
-            nodes.push({
-                orbitR: radius, angle: angle, speed: speed / radius * 26,
-                bob: Math.random() * Math.PI * 2,
-                r: 1.3 + Math.random() * 2.1,
-                depth: 0.5 + Math.random() * 0.5
-            });
+        particles = [];
+        for (var i = 0; i < N; i++) {
+            particles.push({ x: Math.random() * W, y: Math.random() * H, vy: 0.18 + Math.random() * 0.34, r: 1 + Math.random() * 2.2 });
         }
+        trend = [];
+        for (var j = 0; j < TREND_LEN; j++) trend.push(0.5);
     }
+
+    function lerp(a, b, k) { return a + (b - a) * k; }
 
     function step() {
         t += 1;
-        for (var i = 0; i < nodes.length; i++) {
-            var n = nodes[i];
-            n.angle += n.speed * 0.01;
-            n.x = hub.x + Math.cos(n.angle) * n.orbitR;
-            n.y = hub.y + Math.sin(n.angle) * n.orbitR * 0.72 + Math.sin(t * 0.01 + n.bob) * 8;
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            p.y -= p.vy;
+            if (p.y < -8) { p.y = H + 8; p.x = Math.random() * W; }
         }
+        trendVal += (Math.random() - 0.5) * 0.05;
+        trendVal = Math.max(0.15, Math.min(0.85, trendVal));
+        if (t % 3 === 0) { trend.push(trendVal); trend.shift(); }
     }
 
     function draw() {
         ctx.clearRect(0, 0, W, H);
-        for (var i = 0; i < nodes.length; i++) {
-            var a = nodes[i];
-            var dxh = a.x - hub.x, dyh = a.y - hub.y;
-            var dh = Math.sqrt(dxh * dxh + dyh * dyh);
-            if (dh < LINK_DIST * 2.4) {
-                var alphaH = Math.max(0, (1 - dh / (LINK_DIST * 2.4))) * 0.5 * a.depth;
-                ctx.strokeStyle = 'rgba(' + LINE_RGB + ', ' + alphaH + ')';
-                ctx.lineWidth = 1;
-                ctx.beginPath(); ctx.moveTo(hub.x, hub.y); ctx.lineTo(a.x, a.y); ctx.stroke();
-            }
-            for (var j = i + 1; j < nodes.length; j++) {
-                var b = nodes[j];
-                var dx = a.x - b.x, dy = a.y - b.y;
-                var d = Math.sqrt(dx * dx + dy * dy);
-                if (d < LINK_DIST) {
-                    var alpha = (1 - d / LINK_DIST) * 0.24 * Math.min(a.depth, b.depth);
-                    ctx.strokeStyle = 'rgba(' + LINE_RGB + ', ' + alpha + ')';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-                }
-            }
-            if (pointer.active) {
-                var pdx = a.x - pointer.x, pdy = a.y - pointer.y;
-                var pd = Math.sqrt(pdx * pdx + pdy * pdy);
-                if (pd < POINTER_DIST) {
-                    var palpha = (1 - pd / POINTER_DIST) * 0.6;
-                    ctx.strokeStyle = 'rgba(255, 244, 214, ' + palpha + ')';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath(); ctx.moveTo(pointer.x, pointer.y); ctx.lineTo(a.x, a.y); ctx.stroke();
-                }
-            }
-        }
-        for (var k = 0; k < nodes.length; k++) {
-            var node = nodes[k];
+        // Hạt: nội suy màu theo độ cao -- càng lên cao (y nhỏ) càng gần gold, càng
+        // thấp càng gần bronze. Bronze rgb(138,94,58) từ --gold-deep, gold rgb(232,200,122)
+        // từ --gold-light.
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            var k = 1 - Math.max(0, Math.min(1, p.y / H));
+            var r = lerp(138, 232, k), g = lerp(94, 200, k), b = lerp(58, 122, k);
+            var alpha = 0.35 + k * 0.55;
             ctx.save();
-            ctx.shadowColor = 'rgba(' + LINE_RGB + ', 0.9)';
-            ctx.shadowBlur = 8 * node.depth;
+            ctx.shadowColor = 'rgba(' + r + ',' + g + ',' + b + ',0.9)';
+            ctx.shadowBlur = 6 + k * 6;
             ctx.beginPath();
-            ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(' + HUB_GLOW_RGB + ', ' + (0.55 + node.depth * 0.4) + ')';
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
             ctx.fill();
             ctx.restore();
         }
-        ctx.save();
-        ctx.shadowColor = 'rgba(' + HUB_GLOW_RGB + ', 1)';
-        ctx.shadowBlur = reduceMotion ? 22 : (20 + Math.sin(t * 0.012) * 6);
+        // Đường xu hướng -- random walk mượt, cuộn từ trái sang phải như 1 chỉ số
+        // đang cập nhật liên tục.
+        var baseY = H * 0.62, amp = H * 0.16;
         ctx.beginPath();
-        ctx.arc(hub.x, hub.y, 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = HUB_FILL;
+        for (var j = 0; j < trend.length; j++) {
+            var x = (j / (trend.length - 1)) * W;
+            var y = baseY - (trend[j] - 0.5) * 2 * amp;
+            if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = 'rgba(232, 200, 122, 0.55)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        var lastX = W, lastY = baseY - (trend[trend.length - 1] - 0.5) * 2 * amp;
+        ctx.save();
+        ctx.shadowColor = 'rgba(232, 200, 122, 1)';
+        ctx.shadowBlur = reduceMotion ? 16 : (16 + Math.sin(t * 0.05) * 5);
+        ctx.beginPath();
+        ctx.arc(lastX - 3, lastY, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#FBF3D9';
         ctx.fill();
         ctx.restore();
-        if (pointer.active) {
-            ctx.save();
-            ctx.shadowColor = 'rgba(255, 244, 214, 1)'; ctx.shadowBlur = 14;
-            ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 244, 214, 0.95)'; ctx.fill();
-            ctx.restore();
-        }
     }
 
     function loop() { step(); draw(); requestAnimationFrame(loop); }
 
-    pane.addEventListener('pointermove', function (e) {
-        var rect = pane.getBoundingClientRect();
-        pointer.x = e.clientX - rect.left; pointer.y = e.clientY - rect.top;
-        pointer.active = true;
-    });
-    pane.addEventListener('pointerleave', function () { pointer.active = false; });
-    window.addEventListener('resize', function () { resize(); });
+    // #auth-modal vẫn display:none lúc script.js chạy (auth.onAuthStateChange chỉ mở
+    // modal SAU khi Supabase xác nhận không có session, việc này luôn bất đồng bộ --
+    // không thể chạy trước khi toàn bộ script.js thực thi xong theo thứ tự đồng bộ) --
+    // resize() gọi ngay ở đây đo được pane rỗng (0x0) vì tổ tiên còn ẩn. ResizeObserver
+    // tự bắn lại đúng kích thước thật ngay khi #auth-modal chuyển sang hiện, không cần
+    // đụng gì tới lockApp()/openAuthModal(). Thay hẳn cho window 'resize' (ResizeObserver
+    // cũng bắt được windowresize vì layout con đổi theo).
+    var everSeededReal = false;
+    if (window.ResizeObserver) {
+        var ro = new ResizeObserver(function () {
+            resize();
+            // Chỉ seed() lại lần ĐẦU TIÊN W/H chuyển từ 0 sang giá trị thật -- nếu lần
+            // đo lúc script.js chạy (trước khi #auth-modal hiện) rơi vào W=H=0, mọi hạt
+            // đã bị seed dồn về góc (0,0), resize() một mình không tự sửa được. Các lần
+            // resize cửa sổ SAU đó (đã có kích thước thật) không seed lại để tránh hạt
+            // giật lại vị trí giữa chừng khi người dùng đang kéo resize.
+            if (!everSeededReal && W > 0 && H > 0) { everSeededReal = true; seed(); }
+            if (reduceMotion) draw();
+        });
+        ro.observe(pane);
+    } else {
+        window.addEventListener('resize', function () { resize(); });
+    }
 
-    resize(); seed(); step(); draw();
+    resize(); seed(); draw();
     if (!reduceMotion) requestAnimationFrame(loop);
 })();
