@@ -46,10 +46,54 @@ struct SyncFileEntry {
 fn is_sync_ignored(path: &Path) -> bool {
     path.components().any(|c| {
         let name = c.as_os_str().to_string_lossy();
+        // eq_ignore_ascii_case thay vì == -- trước đây so khớp phân biệt hoa/thường, nên
+        // "desktop.ini"/"Thumbs.DB" (đúng tên OS Windows thật sự tạo ra, filesystem Windows
+        // không phân biệt hoa/thường) không khớp với "Thumbs.db"/"desktop.ini" trong danh
+        // sách, lọt qua bị đồng bộ như file thường thay vì bị bỏ qua như ý định.
         SYNC_IGNORE_NAMES
             .iter()
-            .any(|ignored| name.as_ref() == *ignored)
+            .any(|ignored| name.eq_ignore_ascii_case(ignored))
     })
+}
+
+// sync_read_file/sync_write_file/sync_file_exists/sync_delete_file/sync_hash_file trước đây
+// join thẳng root + relative_path (PathBuf::join) không kiểm tra gì -- relative_path đến từ
+// JS phía trước (dữ liệu đối chiếu remote/local trong personal-sync.js), và PathBuf::join với
+// 1 path TUYỆT ĐỐI (vd "C:\Windows\System32\..." hay bắt đầu bằng "\") sẽ THAY THẾ HOÀN TOÀN
+// root thay vì nối vào, còn ".." lồng nhau (vd "..\..\..\Windows\...") thoát khỏi root sau khi
+// hệ điều hành resolve -- cho phép đọc/ghi/xoá bất kỳ file nào máy người dùng đọc/ghi được,
+// nếu relative_path từng bị hỏng dữ liệu hoặc app từng có bug ở tầng JS phía trên. Hàm dùng
+// chung này chặn cả 2 dạng tấn công: từ chối thẳng path tuyệt đối, rồi tự resolve ".." bằng
+// tay (không đụng filesystem, vì file đích lúc ghi có thể chưa tồn tại) và xác nhận kết quả
+// vẫn nằm trong root đã canonicalize.
+fn resolve_sync_path(root: &str, relative_path: &str) -> Result<PathBuf, String> {
+    let canon_root = fs::canonicalize(root).map_err(|e| e.to_string())?;
+    let candidate = Path::new(relative_path);
+    if candidate.is_absolute()
+        || candidate.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::Prefix(_) | std::path::Component::RootDir
+            )
+        })
+    {
+        return Err("Đường dẫn không hợp lệ.".to_string());
+    }
+    let mut resolved = canon_root.clone();
+    for comp in candidate.components() {
+        match comp {
+            std::path::Component::ParentDir => {
+                resolved.pop();
+            }
+            std::path::Component::Normal(seg) => resolved.push(seg),
+            std::path::Component::CurDir => {}
+            _ => return Err("Đường dẫn không hợp lệ.".to_string()),
+        }
+    }
+    if !resolved.starts_with(&canon_root) {
+        return Err("Đường dẫn nằm ngoài thư mục đồng bộ.".to_string());
+    }
+    Ok(resolved)
 }
 
 #[tauri::command]
@@ -85,7 +129,16 @@ fn sync_list_folder(root: String) -> Result<Vec<SyncFileEntry>, String> {
 
 #[tauri::command]
 fn sync_read_file(root: String, relative_path: String) -> Result<String, String> {
-    let full = PathBuf::from(&root).join(&relative_path);
+    let full = resolve_sync_path(&root, &relative_path)?;
+    // SYNC_MAX_FILE_SIZE trước đây chỉ được kiểm ở sync_list_folder (bỏ qua file quá lớn khi
+    // liệt kê) -- sync_read_file/sync_hash_file lại đọc thẳng fs::read() không giới hạn, nên
+    // relative_path trỏ vào 1 file rất lớn (vài GB) vẫn bị đọc hết vào bộ nhớ, có thể làm app
+    // hết RAM và crash.
+    if let Ok(meta) = fs::metadata(&full) {
+        if meta.len() > SYNC_MAX_FILE_SIZE {
+            return Err("File vượt quá giới hạn kích thước đồng bộ (200MB).".to_string());
+        }
+    }
     let bytes = fs::read(&full).map_err(|e| e.to_string())?;
     Ok(BASE64.encode(bytes))
 }
@@ -96,24 +149,46 @@ fn sync_write_file(
     relative_path: String,
     content_base64: String,
 ) -> Result<(), String> {
-    let full = PathBuf::from(&root).join(&relative_path);
+    let full = resolve_sync_path(&root, &relative_path)?;
     if let Some(parent) = full.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let bytes = BASE64.decode(content_base64).map_err(|e| e.to_string())?;
-    let mut f = fs::File::create(&full).map_err(|e| e.to_string())?;
-    f.write_all(&bytes).map_err(|e| e.to_string())?;
+    // Ghi ra file tạm cùng thư mục rồi rename đè lên đích -- rename trên cùng ổ đĩa là thao
+    // tác nguyên tử ở cấp hệ điều hành (Windows/POSIX đều đảm bảo), trong khi File::create()
+    // ghi thẳng vào đích trước đây để lộ khoảng thời gian file bị truncate-rồi-đang-ghi-dở --
+    // 1 lệnh sync_read_file/sync_hash_file khác chạy đúng lúc đó (vd sync engine đối chiếu lại
+    // ngay sau khi nhận thay đổi) có thể đọc phải nội dung dở dang, hiểu nhầm là file hỏng hoặc
+    // đổi thật.
+    let tmp_name = format!(
+        "{}.wh-tmp-{}",
+        full.file_name().and_then(|n| n.to_str()).unwrap_or("file"),
+        std::process::id()
+    );
+    let tmp = full
+        .parent()
+        .map(|p| p.join(&tmp_name))
+        .unwrap_or_else(|| PathBuf::from(&tmp_name));
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(&bytes).map_err(|e| e.to_string())?;
+        f.flush().map_err(|e| e.to_string())?;
+    }
+    fs::rename(&tmp, &full).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
 fn sync_file_exists(root: String, relative_path: String) -> bool {
-    PathBuf::from(&root).join(&relative_path).is_file()
+    match resolve_sync_path(&root, &relative_path) {
+        Ok(full) => full.is_file(),
+        Err(_) => false,
+    }
 }
 
 #[tauri::command]
 fn sync_delete_file(root: String, relative_path: String) -> Result<(), String> {
-    let full = PathBuf::from(&root).join(&relative_path);
+    let full = resolve_sync_path(&root, &relative_path)?;
     if full.exists() {
         fs::remove_file(&full).map_err(|e| e.to_string())?;
     }
@@ -122,7 +197,12 @@ fn sync_delete_file(root: String, relative_path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn sync_hash_file(root: String, relative_path: String) -> Result<String, String> {
-    let full = PathBuf::from(&root).join(&relative_path);
+    let full = resolve_sync_path(&root, &relative_path)?;
+    if let Ok(meta) = fs::metadata(&full) {
+        if meta.len() > SYNC_MAX_FILE_SIZE {
+            return Err("File vượt quá giới hạn kích thước đồng bộ (200MB).".to_string());
+        }
+    }
     let bytes = fs::read(&full).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
@@ -170,7 +250,18 @@ fn sync_start_watch(
                 }
             }
             // Debounce: keep draining events that arrive within the window before emitting once.
+            // batch_start giới hạn TỔNG thời gian gom -- trước đây chỉ có cửa sổ nghỉ 800ms
+            // (reset lại mỗi lần có event mới), nên hoạt động ghi file LIÊN TỤC dày hơn 800ms
+            // (giải nén 1 archive lớn, git checkout hàng loạt file, copy hàng loạt...) khiến
+            // vòng lặp không bao giờ tới nhánh Err để thoát, "changed" gom mãi mà không bao
+            // giờ emit -- UI/tầng đồng bộ không nhận được cập nhật nào suốt cả quá trình đó.
+            // Ép emit nếu đã gom quá 8s dù hoạt động vẫn đang tiếp diễn.
+            let batch_start = std::time::Instant::now();
+            const MAX_BATCH_MS: u64 = 8_000;
             loop {
+                if batch_start.elapsed() >= Duration::from_millis(MAX_BATCH_MS) {
+                    break;
+                }
                 match rx.recv_timeout(Duration::from_millis(800)) {
                     Ok(Ok(event)) => {
                         for p in event.paths {
@@ -266,8 +357,15 @@ fn start_oauth_loopback(app: AppHandle, state: State<OAuthListenerState>) -> Res
     use std::net::TcpListener;
 
     {
+        // Trước đây chỉ *g = None -- điều này DROP cái Sender cũ chứ không GỬI tín hiệu huỷ
+        // qua nó, nên cancel_rx.try_recv() ở luồng cũ trả về Err(Disconnected) (không phải
+        // Ok), .is_ok() vẫn false, luồng cũ không hề biết mình cần dừng và giữ cổng
+        // OAUTH_LOOPBACK_PORT tới khi tự hết hạn 300s. Phải GỬI trước khi thay thế, giống
+        // đúng cách stop_oauth_loopback() (bên dưới) đã làm.
         let mut g = state.0.lock().map_err(|e| e.to_string())?;
-        *g = None;
+        if let Some(old_tx) = g.take() {
+            let _ = old_tx.send(());
+        }
     }
 
     let listener = TcpListener::bind(("127.0.0.1", OAUTH_LOOPBACK_PORT))
@@ -464,45 +562,118 @@ pub fn run() {
             let menu =
                 Menu::with_items(app, &[&show_i, &quick_add_i, &quick_capture_i, &quit_i])?;
 
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+            // .unwrap() trước đây panic CẢ APP nếu default_window_icon() trả về None (icon
+            // resource thiếu/lỗi decode trên 1 biến thể OS/build nào đó) -- mọi bước khác
+            // trong setup() đều xuống cấp nhẹ nhàng qua log::warn! (đăng ký phím tắt ở trên
+            // là ví dụ), chỉ riêng tray icon panic thẳng làm sập app khi khởi động. Không có
+            // icon thì bỏ qua tray (mất icon khay hệ thống, không mất phần còn lại của app).
+            if let Some(icon) = app.default_window_icon().cloned() {
+                let _tray = TrayIconBuilder::new()
+                    .icon(icon)
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
                         }
-                    }
-                    "quick_add" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                            let _ = w.emit("quick-add-task", ());
+                        "quick_add" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                                let _ = w.emit("quick-add-task", ());
+                            }
                         }
-                    }
-                    "quick_capture" => show_quick_capture_window(app),
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        if let Some(w) = tray.app_handle().get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
+                        "quick_capture" => show_quick_capture_window(app),
+                        "quit" => app.exit(0),
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            button_state: tauri::tray::MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            if let Some(w) = tray.app_handle().get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
                         }
-                    }
-                })
-                .build(app)?;
+                    })
+                    .build(app)?;
+            } else {
+                log::warn!("Không có icon mặc định -- bỏ qua tạo tray icon (phần còn lại của app vẫn chạy bình thường).");
+            }
 
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// Test khoá lại đúng hành vi của bản vá path-traversal ở resolve_sync_path() -- codebase
+// Rust này trước đây chưa có test nào, thêm test đầu tiên đúng chỗ rủi ro cao nhất (đọc/ghi/
+// xoá file tuỳ ý nếu relative_path không được kiểm) để bug không âm thầm quay lại sau này.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_temp_root() -> PathBuf {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!(
+            "wh_resolve_sync_path_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn allows_plain_relative_path() {
+        let root = make_temp_root();
+        let resolved = resolve_sync_path(root.to_str().unwrap(), "notes/todo.txt").unwrap();
+        assert!(resolved.starts_with(fs::canonicalize(&root).unwrap()));
+        assert!(resolved.ends_with("notes/todo.txt") || resolved.ends_with("notes\\todo.txt"));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn rejects_parent_dir_escape() {
+        let root = make_temp_root();
+        let err = resolve_sync_path(root.to_str().unwrap(), "../../../etc/passwd");
+        assert!(err.is_err(), "\"..\" phải bị chặn khi thoát khỏi root");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn rejects_windows_absolute_path() {
+        let root = make_temp_root();
+        let err = resolve_sync_path(root.to_str().unwrap(), "C:\\Windows\\System32\\config");
+        assert!(err.is_err(), "Đường dẫn tuyệt đối phải bị chặn");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn rejects_leading_backslash_absolute_path() {
+        let root = make_temp_root();
+        let err = resolve_sync_path(root.to_str().unwrap(), "\\Windows\\System32\\config");
+        assert!(err.is_err(), "Đường dẫn bắt đầu bằng \\ phải bị chặn");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn allows_parent_dir_that_stays_inside_root() {
+        let root = make_temp_root();
+        // "a/../b" resolve về "b", vẫn nằm trong root -- không nên bị chặn oan.
+        let resolved = resolve_sync_path(root.to_str().unwrap(), "a/../b.txt").unwrap();
+        assert!(resolved.starts_with(fs::canonicalize(&root).unwrap()));
+        fs::remove_dir_all(&root).ok();
+    }
 }
