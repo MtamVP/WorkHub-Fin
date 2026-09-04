@@ -2,7 +2,15 @@ window.WorkHubSync = (function () {
     var cfg = window.WORKHUB_SYNC_CONFIG || {};
     var db = null;
     var dbFailed = false;
-    var online = true;
+    // Trước đây luôn khởi tạo true -- nếu mở app khi ĐANG offline sẵn (vd. bật chế độ máy
+    // bay trước khi mở app), sự kiện 'offline' của trình duyệt chỉ bắn lúc CHUYỂN trạng
+    // thái, không bắn cho trạng thái đã offline sẵn từ đầu, và callback Realtime cũng có
+    // thể chưa kịp chạy -- online bị kẹt ở true sai, khiến ghi dữ liệu đi thẳng qua
+    // dispatch() thay vì queueWrite(), làm hỏng đúng cam kết "ghi được cả lúc offline" mà
+    // module này tồn tại để đảm bảo. navigator.onLine là phỏng đoán tốt nhất có sẵn ngay
+    // lúc script chạy, dù không hoàn hảo 100% (không phát hiện được kiểu "có mạng LAN
+    // nhưng không ra được Internet") vẫn đúng hơn hẳn so với luôn giả định true.
+    var online = typeof navigator !== 'undefined' ? navigator.onLine : true;
     var statusListeners = [];
 
     function tauriSql() {

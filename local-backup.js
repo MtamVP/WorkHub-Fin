@@ -56,23 +56,51 @@
             await fs.mkdir(dir, { baseDir: BaseDirectory.AppLocalData, recursive: true });
         }
 
+        // PAGE_SIZE/MAX_PAGES: trước đây .limit(5000) 1 lần duy nhất -- bảng nào vượt quá 5000
+        // dòng (audit_log, task_comments, system_logs đều tăng dần theo thời gian) bị cắt bớt
+        // ÂM THẦM, không có cờ báo gì, người khôi phục từ file backup này không biết dữ liệu đã
+        // thiếu. Phân trang bằng .range() cho tới khi hết hoặc chạm MAX_PAGES (~200k dòng/bảng,
+        // đủ dư cho cỡ dữ liệu thực tế -- vẫn giữ 1 giới hạn an toàn để không lặp vô hạn nếu
+        // bảng liên tục phình ra ngay trong lúc đang backup).
+        var PAGE_SIZE = 1000;
+        var MAX_PAGES = 200;
+
         var snapshot = {};
         for (var i = 0; i < tables.length; i++) {
             var t = tables[i];
             try {
-                var res = await window.supabaseClient.from(t).select('*').limit(5000);
+                var allRows = [];
+                var pageError = null;
+                var truncated = false;
+                for (var p = 0; p < MAX_PAGES; p++) {
+                    var res = await window.supabaseClient.from(t).select('*').range(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1);
+                    if (res.error) { pageError = res.error; break; }
+                    var page = res.data || [];
+                    allRows = allRows.concat(page);
+                    if (page.length < PAGE_SIZE) break;
+                    if (p === MAX_PAGES - 1) truncated = true;
+                }
+
+                if (pageError) {
+                    snapshot[t] = { error: pageError.message };
+                    continue;
+                }
+
                 // Backup files can end up on a shared/mapped drive -- never persist live
                 // OAuth tokens in them. A stale token is useless on restore anyway; the
                 // user just reconnects via the existing Calendar-connect flow.
-                if (t === 'calendar_connections' && Array.isArray(res.data)) {
-                    res.data = res.data.map(function (row) {
+                if (t === 'calendar_connections') {
+                    allRows = allRows.map(function (row) {
                         var copy = Object.assign({}, row);
                         delete copy.access_token;
                         delete copy.refresh_token;
                         return copy;
                     });
                 }
-                snapshot[t] = res.error ? { error: res.error.message } : res.data;
+                snapshot[t] = allRows;
+                if (truncated) {
+                    console.warn('local-backup: bảng "' + t + '" vượt quá ' + (MAX_PAGES * PAGE_SIZE) + ' dòng, backup có thể chưa đầy đủ.');
+                }
             } catch (e) {
                 snapshot[t] = { error: String(e) };
             }

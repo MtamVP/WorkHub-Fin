@@ -19,6 +19,7 @@ window.PersonalSync = (function () {
     let cachedUserId = null;
     let realtimeChannel = null;
     let statusListeners = [];
+    let unlistenLocalChange = null; // trả về từ __TAURI__.event.listen(), gọi lúc stopWatching()
     const suppressUntil = {}; // relativePath -> timestamp
 
     function isTauri() {
@@ -84,7 +85,11 @@ window.PersonalSync = (function () {
         if (!root || !isTauri() || watching) return;
         await invoke('sync_start_watch', { root });
         watching = true;
-        window.__TAURI__.event.listen('personal-sync-local-change', (event) => {
+        // __TAURI__.event.listen() trả về 1 hàm "unlisten" -- trước đây không lưu lại nên
+        // không gỡ được lúc stopWatching(). Chu kỳ unlink -> relink (watching reset về false
+        // ở stopWatching(), cho phép gọi startWatching() lần nữa) từng cộng dồn thêm 1 listener
+        // mỗi lần relink, khiến 1 lần đổi file cục bộ kích hoạt xử lý N lần sau N lần relink.
+        unlistenLocalChange = await window.__TAURI__.event.listen('personal-sync-local-change', (event) => {
             handleLocalChanges(event.payload || []);
         });
         if (!realtimeChannel) {
@@ -94,6 +99,7 @@ window.PersonalSync = (function () {
 
     async function stopWatching() {
         if (isTauri()) { try { await invoke('sync_stop_watch'); } catch (e) {} }
+        if (unlistenLocalChange) { try { unlistenLocalChange(); } catch (e) {} unlistenLocalChange = null; }
         watching = false;
     }
 
@@ -241,11 +247,28 @@ window.PersonalSync = (function () {
                 await pullFileTo(root, relPath, relPath, remoteByPath[relPath]);
             } else {
                 const hash = await invoke('sync_hash_file', { root, relativePath: relPath });
-                if (hash !== remoteByPath[relPath].content_hash) {
-                    await pullFileTo(root, relPath, conflictCopyName(relPath), remoteByPath[relPath]);
+                const remoteHash = remoteByPath[relPath].content_hash;
+                if (hash === remoteHash) {
+                    setLastSyncedHash(relPath, hash);
+                    continue;
+                }
+                // So với lastSynced (không chỉ so local<->remote trực tiếp như bản cũ) để phân
+                // biệt đúng 3 trường hợp, cùng logic 3 nhánh đã dùng ở syncOneLocalPath() phía
+                // trên -- bản cũ coi MỌI lần khác nhau là xung đột "cả 2 bên đều đổi", kể cả khi
+                // chỉ 1 bên (thường là remote, do máy khác đồng bộ trong lúc máy này không mở)
+                // thực sự đổi -- ghi đè oan bản mới ở máy kia bằng nội dung cũ ở máy này.
+                const cache = loadHashCache();
+                const lastSynced = cache[relPath] || null;
+                if (hash === lastSynced) {
+                    // Máy này không đổi gì kể từ lần đồng bộ trước -- chỉ remote đổi, kéo về thôi.
+                    await pullFileTo(root, relPath, relPath, remoteByPath[relPath]);
+                } else if (remoteHash === lastSynced) {
+                    // Remote không đổi kể từ lần đồng bộ trước -- chỉ máy này đổi, đẩy lên thôi.
                     await pushFile(root, relPath, hash);
                 } else {
-                    setLastSyncedHash(relPath, hash);
+                    // Cả 2 bên đều đổi kể từ lần đồng bộ trước -- xung đột thật.
+                    await pullFileTo(root, relPath, conflictCopyName(relPath), remoteByPath[relPath]);
+                    await pushFile(root, relPath, hash);
                 }
             }
         }
