@@ -6,5 +6,6 @@ tauri-dist/
 # Test/CI (enterprise-readiness mục 4) -- không repo nào có .env, không nên thêm secret
 # nào vào đây. WORKHUB_TEST_DB_URL cho tests/rls/ do người phát triển tự set cục bộ.
 .env
+env.js
 .env.local
 .env.test
