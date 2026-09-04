@@ -1330,17 +1330,130 @@ const API = {
         // mới nhất (đã bị xoá/huỷ bên phía Google) -- Google API không trả "danh sách
         // xoá" nên phải suy luận bằng khác biệt tập hợp, cùng kiểu đối chiếu local/remote
         // đã dùng ở personal-sync.js's fullReconcile().
+        // Đợt 3 (2 chiều): bỏ điều kiện source='google' -- giờ đây 1 sự kiện gốc tạo trong
+        // WorkHub cũng có thể đã liên kết với Google (google_event_id khác null); nếu người
+        // dùng xoá nó thẳng trên Google, lần đồng bộ tiếp theo phải phản ánh đúng (dọn luôn),
+        // không chỉ dọn các dòng gốc từ Google như đợt "chỉ kéo về" trước đây.
         pruneGoogleEvents: async (email, groupKey, activeGoogleIds, windowStart, windowEnd) => {
             if (!sbClient) throw new Error("Chưa setup Supabase");
             let query = sbClient.from('events')
                 .update({ deleted_at: new Date().toISOString() })
-                .eq('source', 'google').eq('created_by', email).eq('group_key', groupKey)
+                .eq('created_by', email).eq('group_key', groupKey)
+                .not('google_event_id', 'is', null)
                 .is('deleted_at', null)
                 .gte('start_time', windowStart).lte('start_time', windowEnd);
             if (activeGoogleIds && activeGoogleIds.length) {
                 query = query.not('google_event_id', 'in', `(${activeGoogleIds.map(id => `"${id}"`).join(',')})`);
             }
-            const { error } = await query;
+            const { data, error } = await query.select('id');
+            if (error) throw error;
+            const prunedIds = (data || []).map(r => r.id);
+            if (prunedIds.length) {
+                await sbClient.from('calendar_google_sync').delete().in('event_id', prunedIds);
+            }
+        },
+        // -------------------- Đồng bộ Google Calendar 2 CHIỀU (đợt 3) --------------------
+        // Các hàm dưới đây phục vụ chiều WorkHub -> Google (đẩy lên) + xử lý xung đột khi
+        // CẢ 2 bên đều đổi. Bookkeeping (synced_version/google_updated_at) nằm ở bảng riêng
+        // calendar_google_sync, KHÔNG lưu trên chính dòng events -- xem comment trong
+        // google-calendar-2way-sync-migration.sql: events có trigger tăng version vô điều
+        // kiện trên mọi UPDATE, gộp chung 1 bảng sẽ khiến việc ghi "đã đồng bộ xong" tự làm
+        // version tăng thêm, gây đẩy/kéo lặp vô ích mãi mãi.
+
+        // Sự kiện cá nhân (không lặp lại -- Google đã tự khai triển sự kiện lặp khi kéo về,
+        // còn đẩy 1 sự kiện WorkHub có recurrence != 'none' lên Google cần dựng RRULE, để
+        // ngoài phạm vi đợt này) có version MỚI HƠN lần đồng bộ gần nhất (hoặc chưa từng
+        // đồng bộ) -- ứng viên cần đẩy lên Google. Không lọc theo deleted_at: sự kiện vừa bị
+        // xoá cục bộ (soft-delete cũng là 1 UPDATE, cũng bump version) vẫn cần đẩy lệnh xoá
+        // tương ứng lên Google, không được bỏ qua.
+        getPersonalEventsForPush: async (email, groupKey, windowStart, windowEnd) => {
+            if (!sbClient) return [];
+            const { data: events, error } = await sbClient.from('events')
+                .select('id, title, start_time, end_time, description, location, deleted_at, google_event_id, version')
+                .eq('calendar_type', 'personal').eq('created_by', email).eq('group_key', groupKey)
+                .eq('recurrence', 'none')
+                .gte('start_time', windowStart).lte('start_time', windowEnd)
+                .limit(1000);
+            if (error) throw error;
+            if (!events || !events.length) return [];
+
+            const linkedIds = events.filter(e => e.google_event_id).map(e => e.id);
+            let syncedMap = {};
+            if (linkedIds.length) {
+                const { data: syncRows, error: syncErr } = await sbClient.from('calendar_google_sync')
+                    .select('event_id, synced_version').in('event_id', linkedIds);
+                if (syncErr) throw syncErr;
+                (syncRows || []).forEach(r => { syncedMap[r.event_id] = r.synced_version; });
+            }
+            return events.filter(e => {
+                if (!e.google_event_id) return true; // chưa từng đồng bộ -- ứng viên tạo mới bên Google
+                const syncedVersion = syncedMap[e.id];
+                return syncedVersion === undefined || e.version > syncedVersion;
+            });
+        },
+        // Tra bookkeeping đồng bộ theo google_event_id (dùng khi kéo về, để biết dòng nào
+        // Google thật sự đổi so với lần đồng bộ trước, tránh kéo về đè lên chỉnh sửa cục bộ
+        // chưa kịp đẩy lên).
+        getGoogleSyncState: async (googleEventIds) => {
+            if (!sbClient || !googleEventIds || !googleEventIds.length) return {};
+            const { data, error } = await sbClient.from('calendar_google_sync')
+                .select('*').in('google_event_id', googleEventIds);
+            if (error) throw error;
+            const map = {};
+            (data || []).forEach(r => { map[r.google_event_id] = r; });
+            return map;
+        },
+        // Version hiện tại của các dòng events đã liên kết với 1 google_event_id -- dùng
+        // cùng với getGoogleSyncState() để phát hiện xung đột thật (cả 2 bên đều đổi kể từ
+        // lần đồng bộ trước).
+        getEventsVersionsByGoogleId: async (googleEventIds) => {
+            if (!sbClient || !googleEventIds || !googleEventIds.length) return {};
+            const { data, error } = await sbClient.from('events')
+                .select('id, google_event_id, version').in('google_event_id', googleEventIds).is('deleted_at', null);
+            if (error) throw error;
+            const map = {};
+            (data || []).forEach(r => { map[r.google_event_id] = r; });
+            return map;
+        },
+        // Ghi nhận "đã đồng bộ xong" cho 1 loạt dòng (sau khi đẩy lên HOẶC kéo về thành
+        // công) -- upsert theo lô vào bảng bookkeeping riêng, không đụng bảng events.
+        markGoogleSyncedBatch: async (entries) => {
+            if (!sbClient || !entries || !entries.length) return;
+            const rows = entries.map(e => ({
+                event_id: e.eventId, google_event_id: e.googleEventId,
+                synced_version: e.syncedVersion, google_updated_at: e.googleUpdatedAt || null,
+                updated_at: new Date().toISOString()
+            }));
+            const { error } = await sbClient.from('calendar_google_sync').upsert(rows, { onConflict: 'event_id' });
+            if (error) throw error;
+        },
+        // Gắn google_event_id vào 1 dòng events lần ĐẦU TIÊN đẩy lên Google thành công (sự
+        // kiện tạo mới trong WorkHub, chưa từng liên kết) -- dùng .is('google_event_id',null)
+        // để chỉ thật sự UPDATE (và chỉ thật sự bump version qua trigger) đúng 1 lần lúc liên
+        // kết ban đầu, không phải mỗi lần đồng bộ. Trả về version MỚI NHẤT của dòng (sau khi
+        // trigger đã chạy, nếu có) để caller ghi đúng vào bookkeeping.
+        linkGoogleEventId: async (eventId, googleEventId) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            await sbClient.from('events').update({ google_event_id: googleEventId })
+                .eq('id', eventId).is('google_event_id', null);
+            const { data, error } = await sbClient.from('events').select('version').eq('id', eventId).maybeSingle();
+            if (error) throw error;
+            return data ? data.version : null;
+        },
+        // Áp bản cập nhật từ Google vào 1 dòng events ĐÃ liên kết sẵn -- caller (chiều kéo
+        // về trong calendar-connect.js) đã tự xác định chỉ Google đổi (không phải xung đột
+        // cần chặn) trước khi gọi hàm này, nên update thẳng không cần expectedVersion.
+        applyGooglePullUpdate: async (eventId, fields) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const { data, error } = await sbClient.from('events').update(fields).eq('id', eventId).select('version').maybeSingle();
+            if (error) throw error;
+            return data ? data.version : null;
+        },
+        // Xoá dòng bookkeeping sau khi 1 sự kiện đã bị xoá (mềm) cục bộ VÀ đã đẩy lệnh xoá
+        // tương ứng lên Google thành công -- không còn cần theo dõi trạng thái đồng bộ nữa.
+        deleteGoogleSyncRow: async (eventId) => {
+            if (!sbClient) return;
+            const { error } = await sbClient.from('calendar_google_sync').delete().eq('event_id', eventId);
             if (error) throw error;
         }
     },
@@ -2789,6 +2902,7 @@ const MUTATING_ACTIONS = new Set([
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync',
     'upsertGoogleEvents', 'pruneGoogleEvents',
+    'linkGoogleEventId', 'applyGooglePullUpdate', 'deleteGoogleSyncRow', 'markGoogleSyncedBatch',
     'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit',
     'restoreFromBackup'
 ]);
@@ -2949,6 +3063,13 @@ async function _dispatchAction(action, params = {}) {
             case 'touchCalendarSync': result = await API.calendarConnection.touchSync(); break;
             case 'upsertGoogleEvents': result = await API.calendar.upsertGoogleEvents(params.rows); break;
             case 'pruneGoogleEvents': result = await API.calendar.pruneGoogleEvents(params.email, params.groupKey, params.activeGoogleIds, params.windowStart, params.windowEnd); break;
+            case 'getPersonalEventsForPush': result = await API.calendar.getPersonalEventsForPush(params.email, params.groupKey, params.windowStart, params.windowEnd); break;
+            case 'getGoogleSyncState': result = await API.calendar.getGoogleSyncState(params.googleEventIds); break;
+            case 'getEventsVersionsByGoogleId': result = await API.calendar.getEventsVersionsByGoogleId(params.googleEventIds); break;
+            case 'linkGoogleEventId': result = await API.calendar.linkGoogleEventId(params.eventId, params.googleEventId); break;
+            case 'applyGooglePullUpdate': result = await API.calendar.applyGooglePullUpdate(params.eventId, params.fields); break;
+            case 'deleteGoogleSyncRow': result = await API.calendar.deleteGoogleSyncRow(params.eventId); break;
+            case 'markGoogleSyncedBatch': result = await API.calendar.markGoogleSyncedBatch(params.entries); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;

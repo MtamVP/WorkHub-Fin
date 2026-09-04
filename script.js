@@ -3406,9 +3406,9 @@ function renderEventsForSelectedDate() {
 
     const recurrenceLabel = { daily: 'Lặp hằng ngày', weekly: 'Lặp hằng tuần', monthly: 'Lặp hằng tháng' }[event.recurrence];
     const attendeeCount = (event.attendees || '').split(',').map(x => x.trim()).filter(Boolean).length;
-    // Sự kiện đồng bộ từ Google Calendar -- chỉ đọc (scope OAuth chỉ readonly, sửa/xoá
-    // ở đây không đẩy ngược lên Google được nên không cho sửa qua WorkHub, tránh 2 bản
-    // dữ liệu lệch nhau). Bỏ hẳn 2 nút sửa/xoá mini, thay bằng icon nguồn.
+    // Sự kiện đồng bộ từ Google Calendar -- giờ đã đồng bộ 2 CHIỀU (calendar-connect.js),
+    // sửa/xoá qua WorkHub sẽ đẩy ngược lên Google ở lần đồng bộ kế tiếp, nên vẫn cho sửa
+    // bình thường. Icon nguồn chỉ để biết gốc sự kiện từ đâu.
     const isGoogleSynced = event.source === 'google';
 
     div.innerHTML =
@@ -3419,13 +3419,12 @@ function renderEventsForSelectedDate() {
       (event.location ? '<span><i class="fa-solid fa-location-dot"></i> ' + escapeHtml(event.location) + '</span>' : '') +
       (attendeeCount > 0 ? '<span><i class="fa-solid fa-user-group"></i> ' + attendeeCount + '</span>' : '') +
       '</div>' +
-      (isGoogleSynced ? '' :
       '<button class="btn-edit-event-mini" title="Sửa" onclick="openEditEvent(\'' + escapeHtml(escapeJs(event.id)) + '\', event)">' +
       '<i class="fa-solid fa-pen"></i>' +
       '</button>' +
       '<button class="btn-delete-event-mini" title="Xóa" onclick="quickDeleteEvent(\'' + escapeHtml(escapeJs(event.id)) + '\', \'' + escapeHtml(escapeJs(event.title)) + '\', event)">' +
       '<i class="fa-solid fa-trash"></i>' +
-      '</button>');
+      '</button>';
 
     div.addEventListener('click', () => {
       document.querySelectorAll('.event-item').forEach(el => el.style.borderRight = 'none');
