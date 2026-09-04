@@ -54,9 +54,18 @@ async function checkForAppUpdates() {
                             break;
                         case 'Progress':
                             downloaded += event.data.chunkLength;
-                            if (contentLength && b) {
-                                const percent = Math.round((downloaded / contentLength) * 100);
-                                b.textContent = `${percent}%`;
+                            if (b) {
+                                if (contentLength) {
+                                    const percent = Math.round((downloaded / contentLength) * 100);
+                                    b.textContent = `${percent}%`;
+                                } else {
+                                    // Trước đây nếu contentLength không có (vd. server trả về tải
+                                    // dạng chunked/không rõ tổng dung lượng), % đứng yên ở "0%"
+                                    // mãi trong lúc tải thật sự vẫn đang chạy -- người dùng tưởng
+                                    // ứng dụng treo. Không có tổng để tính % thì hiện số MB đã tải
+                                    // thay vì để mốc 0% gây hiểu lầm.
+                                    b.textContent = `${(downloaded / 1048576).toFixed(1)} MB đã tải`;
+                                }
                             }
                             break;
                         case 'Finished':
