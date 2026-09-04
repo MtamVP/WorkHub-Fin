@@ -37,7 +37,18 @@
     async function renderConflictList() {
         var container = document.getElementById('sync-conflict-list');
         if (!container || !window.WorkHubSync) return;
-        var conflicts = await window.WorkHubSync.debugDumpConflicts();
+        var conflicts;
+        try {
+            conflicts = await window.WorkHubSync.debugDumpConflicts();
+        } catch (e) {
+            // debugDumpConflicts() đọc thẳng SQLite cục bộ (tauri-plugin-sql) -- file bị khoá/
+            // hỏng là lỗi thật có thể xảy ra trên app desktop. Trước đây không bắt lỗi ở đây
+            // (khác refreshBadge() đã có try/catch cho cùng loại lệnh gọi), khiến modal mở ra
+            // trống trơn, không có gì báo lỗi ngoài 1 unhandled rejection trong console.
+            container.innerHTML = '<p style="padding:12px 0; color:var(--danger-color,#e53e3e);">' +
+                'Không đọc được danh sách xung đột (lỗi cơ sở dữ liệu cục bộ). Thử mở lại sau.</p>';
+            return;
+        }
         if (!conflicts.length) {
             container.innerHTML = '<p style="padding:12px 0;">Không có xung đột nào.</p>';
             return;
@@ -66,7 +77,18 @@
 
     async function resolve(conflictId, action) {
         if (!window.WorkHubSync) return;
-        await window.WorkHubSync.discardConflict(conflictId);
+        // Trước đây không bắt lỗi ở đây -- discardConflict() ghi thẳng vào SQLite cục bộ, lỗi
+        // hoàn toàn có thể xảy ra (file khoá/hỏng). Khi đó promise reject NGAY, người dùng bấm
+        // "Sửa lại"/"Bỏ qua" không thấy gì phản hồi, và dòng xung đột + badge vẫn giữ nguyên
+        // trạng thái cũ không rõ lý do.
+        try {
+            await window.WorkHubSync.discardConflict(conflictId);
+        } catch (e) {
+            if (typeof window.showToast === 'function') {
+                window.showToast('Không xoá được xung đột (lỗi cơ sở dữ liệu cục bộ). Thử lại sau.', 'error');
+            }
+            return;
+        }
         if (action === 'reedit') {
             if (typeof window.showToast === 'function') {
                 window.showToast('Đã xoá xung đột — hãy mở lại mục này và sửa dựa trên dữ liệu mới nhất.', 'info');
