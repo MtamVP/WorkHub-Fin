@@ -1257,43 +1257,62 @@
 
         <div class="login-form-mid">
           <div class="login-form-inner">
-            <h2>Đăng nhập</h2>
-            <p class="auth-subtitle">Vào hệ thống WorkHub Finance.</p>
+            <div id="login-view">
+              <h2>Đăng nhập</h2>
+              <p class="auth-subtitle">Vào hệ thống WorkHub Finance.</p>
 
-            <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-              <div class="auth-input-group">
-                <span class="auth-input-icon"><i class="fa-solid fa-envelope"></i></span>
-                <input type="email" id="auth-email-input" class="form-control" placeholder=" " required autocomplete="username">
-                <label for="auth-email-input" class="auth-float-label">Email tài khoản WorkHub</label>
+              <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+                <div class="auth-input-group">
+                  <span class="auth-input-icon"><i class="fa-solid fa-envelope"></i></span>
+                  <input type="email" id="auth-email-input" class="form-control" placeholder=" " required autocomplete="username">
+                  <label for="auth-email-input" class="auth-float-label">Email tài khoản WorkHub</label>
+                </div>
+
+                <div class="auth-input-group">
+                  <span class="auth-input-icon"><i class="fa-solid fa-lock"></i></span>
+                  <input type="password" id="auth-password-input" class="form-control" placeholder=" " required autocomplete="current-password">
+                  <label for="auth-password-input" class="auth-float-label">Mật khẩu</label>
+                </div>
+
+                <button type="submit" class="auth-btn-submit" id="auth-submit-btn">
+                  Đăng nhập <i class="fa-solid fa-arrow-right ms-2"></i>
+                </button>
+
+                <div id="auth-error-msg" class="auth-error-message" style="display:none;"></div>
+
+                <div class="text-center mt-3">
+                  <a href="/forgot/" class="small text-decoration-none text-muted"> Quên mật khẩu?</a>
+                </div>
+                <div class="text-center mt-3" style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
+                  <a href="#" class="small text-decoration-none text-muted" onclick="handleSsoLoginClick(event)">
+                    <i class="fa-solid fa-building-shield"></i> Đăng nhập bằng SSO doanh nghiệp
+                  </a>
+                </div>
+
+                <!-- Luôn forced=true khi mở (xem openAuthModal trong script.js) nên 2 nút này
+                     không bao giờ được JS gỡ display:none -- giữ trong DOM vì script.js vẫn
+                     reference trực tiếp (getElementById), không xoá để tránh lỗi null. -->
+                <button type="button" id="auth-cancel-btn" onclick="closeAuthModal()" style="display:none;">Hủy</button>
+                <button type="button" id="auth-modal-close-btn" onclick="closeAuthModal()" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+              </form>
+            </div>
+
+            <!-- Màn "thành công" mượn từ wh-org's index.html -- hiện ra sau khi resolveUserProfile()
+                 (script.js) xác nhận xong vai trò/nhóm, dừng lại 1 nhịp trước khi tự đóng modal
+                 thay vì đóng ngay tức thì như trước đây. -->
+            <div id="success-view" class="auth-success-view">
+              <div class="auth-success-icon">
+                <svg class="success-check" viewBox="0 0 52 52" width="54" height="54" aria-hidden="true">
+                  <circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M14 27l8 8 16-17"/>
+                </svg>
               </div>
-
-              <div class="auth-input-group">
-                <span class="auth-input-icon"><i class="fa-solid fa-lock"></i></span>
-                <input type="password" id="auth-password-input" class="form-control" placeholder=" " required autocomplete="current-password">
-                <label for="auth-password-input" class="auth-float-label">Mật khẩu</label>
-              </div>
-
-              <button type="submit" class="auth-btn-submit" id="auth-submit-btn">
-                Đăng nhập <i class="fa-solid fa-arrow-right ms-2"></i>
+              <h2>Đăng nhập thành công!</h2>
+              <p class="auth-subtitle" id="auth-welcome-text">Đang tải dữ liệu người dùng...</p>
+              <button type="button" class="auth-btn-submit" id="auth-go-now-btn" disabled>
+                Vào ngay <i class="fa-solid fa-arrow-right ms-2"></i>
               </button>
-
-              <div id="auth-error-msg" class="auth-error-message" style="display:none;"></div>
-
-              <div class="text-center mt-3">
-                <a href="/forgot/" class="small text-decoration-none text-muted"> Quên mật khẩu?</a>
-              </div>
-              <div class="text-center mt-3" style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
-                <a href="#" class="small text-decoration-none text-muted" onclick="handleSsoLoginClick(event)">
-                  <i class="fa-solid fa-building-shield"></i> Đăng nhập bằng SSO doanh nghiệp
-                </a>
-              </div>
-
-              <!-- Luôn forced=true khi mở (xem openAuthModal trong script.js) nên 2 nút này
-                   không bao giờ được JS gỡ display:none -- giữ trong DOM vì script.js vẫn
-                   reference trực tiếp (getElementById), không xoá để tránh lỗi null. -->
-              <button type="button" id="auth-cancel-btn" onclick="closeAuthModal()" style="display:none;">Hủy</button>
-              <button type="button" id="auth-modal-close-btn" onclick="closeAuthModal()" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
-            </form>
+            </div>
           </div>
         </div>
 

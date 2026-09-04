@@ -2656,10 +2656,38 @@ body.auth-page #toast-container { left: 50%; right: auto; top: 24px; transform: 
    không qua class) -- định nghĩa thật để tái sử dụng thay vì lặp lại inline. */
 .auth-error-message { color: var(--danger-color); text-align: center; margin-top: 10px; font-size: 13px; }
 
+/* Success-view -- màn "Đăng nhập thành công!" trước khi đóng modal, mượn nguyên từ
+   wh-org's index.html (login đầy trang, có nút "Vào Dashboard"). App này là 1 SPA (modal
+   auth-modal đóng lại là vào thẳng app, không có trang /dashboard/ riêng để điều hướng),
+   nên #success-view ở đây chỉ tạm dừng lại 1 nhịp trước khi tự đóng modal (JS), nút bên
+   dưới cho người vội bấm để vào ngay không cần đợi. */
+.auth-success-view { text-align: center; display: none; animation: auth-fade-in 0.4s; }
+.auth-success-icon { font-size: 54px; color: var(--success-color); margin-bottom: 16px; }
+@keyframes auth-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.login-form-inner #success-view { animation: login-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.login-form-inner #success-view h2,
+.login-form-inner #success-view p,
+.login-form-inner #success-view .auth-btn-submit {
+  opacity: 0; animation: login-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.login-form-inner #success-view h2 { animation-delay: 0.1s; }
+.login-form-inner #success-view p { animation-delay: 0.16s; }
+.login-form-inner #success-view .auth-btn-submit { animation-delay: 0.22s; }
+.success-check circle, .success-check path { stroke-dasharray: 160; stroke-dashoffset: 160; }
+.success-check circle { animation: success-draw 0.5s ease-out forwards; }
+.success-check path { animation: success-draw 0.4s ease-out 0.45s forwards; }
+@keyframes success-draw { to { stroke-dashoffset: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .login-brand-wash { animation: none; }
   .login-form-inner, .login-form-inner .auth-input-group, .login-form-inner .auth-btn-submit { animation: none; opacity: 1; }
   .login-theme-icon { transition: none; }
+  .login-form-inner #success-view,
+  .login-form-inner #success-view h2,
+  .login-form-inner #success-view p,
+  .login-form-inner #success-view .auth-btn-submit { animation: none; opacity: 1; }
+  .success-check circle, .success-check path { animation: none; stroke-dashoffset: 0; }
 }
 @media (max-width: 860px) {
   .login-split { grid-template-columns: 1fr; height: auto; min-height: 100vh; }

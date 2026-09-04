@@ -120,7 +120,7 @@ function unlockApp() {
   closeAuthModal(true);
 }
 
-async function resolveUserProfile(user) {
+async function resolveUserProfile(user, authEvent) {
   CURRENT_USER.email = user.email;
   CURRENT_USER.id = user.id;
   window.__currentUserId = user.id; // real auth.uid(), used by client-driven audit-log writes
@@ -196,7 +196,17 @@ async function resolveUserProfile(user) {
     return false;
   }
 
-  unlockApp();
+  // authEvent === 'SIGNED_IN' chỉ đúng cho 1 lần đăng nhập THẬT (bấm nút/SSO) -- khi app khởi
+  // động lại với session cũ còn hạn, onAuthStateChange cũng bắn user nhưng event là
+  // 'INITIAL_SESSION', không phải 'SIGNED_IN' (đúng tín hiệu logPipelineEvent() bên dưới đã
+  // dùng để tránh ghi log "đăng nhập" mỗi lần mở app). Chỉ hiện màn "Đăng nhập thành công!"
+  // khi có bấm nút thật -- mở app lại với session cũ vẫn vào thẳng như trước, không chèn thêm
+  // hoạt cảnh/độ trễ nào.
+  if (authEvent === 'SIGNED_IN') {
+    await showAuthSuccessThenUnlock(CURRENT_USER.nickname);
+  } else {
+    unlockApp();
+  }
   updateUserProfileUI();
   updateBackupRestoreButtonVisibility();
   updateRoleGatedUI();
@@ -213,6 +223,36 @@ async function resolveUserProfile(user) {
   return true;
 }
 
+// Hiện #success-view (checkmark + "Xin chào, {tên}!") trong auth-modal, dừng lại 1 nhịp rồi
+// mới unlockApp() -- mượn ý tưởng từ wh-org's index.html (trang login riêng, có nút "Vào
+// Dashboard"). App này là 1 SPA nên "vào" đồng nghĩa với đóng modal, không có trang riêng để
+// điều hướng tới. Nút "Vào ngay" cho người vội bấm để bỏ qua khoảng dừng.
+function showAuthSuccessThenUnlock(displayName) {
+  return new Promise((resolve) => {
+    const loginView = document.getElementById('login-view');
+    const successView = document.getElementById('success-view');
+    if (!loginView || !successView) { unlockApp(); resolve(); return; }
+    const welcomeText = document.getElementById('auth-welcome-text');
+    const goBtn = document.getElementById('auth-go-now-btn');
+
+    loginView.style.display = 'none';
+    successView.style.display = 'block';
+    if (welcomeText) welcomeText.textContent = `Xin chào, ${displayName || 'bạn'}!`;
+    if (goBtn) goBtn.disabled = false;
+
+    let done = false;
+    const proceed = () => {
+      if (done) return;
+      done = true;
+      if (goBtn) goBtn.onclick = null;
+      unlockApp();
+      resolve();
+    };
+    if (goBtn) goBtn.onclick = proceed;
+    setTimeout(proceed, 1400);
+  });
+}
+
 async function initAuth() {
   if (!auth) {
     console.error('Supabase auth chưa sẵn sàng — kiểm tra api.js.');
@@ -222,7 +262,7 @@ async function initAuth() {
   auth.onAuthStateChange(async (event, session) => {
     const user = session?.user;
     if (user) {
-      await resolveUserProfile(user);
+      await resolveUserProfile(user, event);
       if (event === 'SIGNED_IN') {
         logPipelineEvent(`Đã đăng nhập tài khoản: ${user.email}`, 'success', 'USER_LOGIN');
       }
@@ -301,6 +341,13 @@ function openAuthModal(forced) {
     if (emailInput) emailInput.value = CURRENT_USER.email || '';
     const errBox = document.getElementById('auth-error-msg');
     if (errBox) errBox.style.display = 'none';
+    // Về lại form đăng nhập mỗi lần mở modal -- nếu không reset, 1 lần đăng xuất rồi mở lại
+    // (hoặc bị buộc đăng nhập lại vì tài khoản bị vô hiệu hoá) sẽ vẫn kẹt ở màn "Đăng nhập
+    // thành công!" của phiên trước đó thay vì hiện lại form.
+    const loginView = document.getElementById('login-view');
+    const successView = document.getElementById('success-view');
+    if (loginView) loginView.style.display = '';
+    if (successView) successView.style.display = 'none';
   }
 }
 
