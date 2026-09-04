@@ -24,11 +24,11 @@ window.escapeJs = function (value) {
         .replace(/\r\n/g, '\\n').replace(/[\r\n\u2028\u2029]/g, '\\n');
 };
 
-const SUPABASE_URL = window.SUPABASE_URL || "";
-const SUPABASE_KEY = window.SUPABASE_KEY || "";
+const SUPABASE_URL = "https://gqsbsqaxzpzcloaopzvv.supabase.co";
+const SUPABASE_KEY = "sb_publishable_sl9uOpcIzfzN9NZ5D_ZdsQ_FQZchyUR";
 
-const TOOLS_SUPABASE_URL = window.TOOLS_SUPABASE_URL || "";
-const TOOLS_SUPABASE_KEY = window.TOOLS_SUPABASE_KEY || "";
+const TOOLS_SUPABASE_URL = "https://jbibxrhorqmbbyjuxcgo.supabase.co";
+const TOOLS_SUPABASE_KEY = "sb_publishable_RgXnbjszBBJJUswXTzlpSA_ixYR3nJ-";
 
 const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 const toolsSbClient = window.supabase ? window.supabase.createClient(TOOLS_SUPABASE_URL, TOOLS_SUPABASE_KEY) : null;

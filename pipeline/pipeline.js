@@ -3,8 +3,13 @@
 
 window.isAutoPaused = false;
 
-// Tạm thời để trống chờ setup load từ .env (VD: window.ENV.GEMINI_API_KEYS)
-const GEMINI_API_KEYS = window.GEMINI_API_KEYS || [];
+const GEMINI_API_KEYS = [
+  "AIzaSyCxtj-tIcHY1CvIc7P56ZTPSS95W0ssLlU",
+  "AIzaSyDNFAQTDO4EmmgLKpa8uZupvMT5N9j0DO8",
+  "AIzaSyCIKmmjT8d4cAL3AhNX47Box1ArP9x0E10",
+  "AIzaSyABuiBHLYeWT-jm9jOxg5CpygkdomqM2k4",
+  "AIzaSyArWJsCc45mY6-_q5WBdX5HqeYSFXSrGVg"
+];
 let currentGeminiKeyIndex = 0;
 
 async function callGemini(prompt, isJsonMode = false, modelFallback = null) {
