@@ -735,9 +735,9 @@ function skeletonTableRows(colCount, rowCount) {
   for (let i = 0; i < rowCount; i++) {
     let cells = '';
     for (let c = 0; c < colCount; c++) {
-      cells += `<td><div style="height:12px; border-radius:6px; background:var(--hover-bg);"></div></td>`;
+      cells += `<td><div class="skeleton-block skeleton-bar" style="height:12px;"></div></td>`;
     }
-    rows += `<tr>${cells}</tr>`;
+    rows += `<tr class="skeleton-table-row">${cells}</tr>`;
   }
   return rows;
 }
@@ -746,7 +746,7 @@ function skeletonListItems(count) {
   count = count || 3;
   let html = '';
   for (let i = 0; i < count; i++) {
-    html += `<div style="height:52px; border-radius:8px; background:var(--hover-bg); margin-bottom:10px;"></div>`;
+    html += `<div class="skeleton-block" style="height:52px; margin-bottom:10px;"></div>`;
   }
   return html;
 }

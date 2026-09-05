@@ -126,6 +126,63 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Bôi đen văn bản trước đây dùng màu xanh mặc định của trình duyệt thay vì tông app
+   (đồng bộ với wh-org). */
+::selection { background-color: var(--gold); color: var(--on-gold); }
+
+/* Trước đây không có :focus-visible riêng -- phần tử focus qua bàn phím (Tab) chỉ có
+   outline mặc định của trình duyệt, dễ vô hình trên nền tối/card custom (đồng bộ với
+   wh-org, vốn đã có rule này). */
+*:focus:not(:focus-visible) { outline: none; }
+*:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Trước đây chỉ tắt animation ở riêng màn đăng nhập khi prefers-reduced-motion -- mọi
+   animation khác trong app (hover card, modal pop, toast, skeleton, kéo-thả kanban...)
+   vẫn chạy đầy đủ, bỏ sót phần lớn app (đồng bộ với wh-org, vốn đã có rule toàn cục này). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Spinner (fa-spin) trước đây không có màu riêng -- lấy màu icon mặc định của trình
+   duyệt thay vì tông app, trông như chưa xong mỗi lần tải dữ liệu (đồng bộ với wh-org). */
+.fa-spin { color: var(--text-muted); opacity: 0.85; }
+
+/* Khung xương chờ tải (đồng bộ với wh-org/wh-sci) -- skeletonTableRows()/skeletonListItems()
+   trong script.js trước đây tự vẽ khối inline-style tĩnh (background phẳng, không shimmer),
+   giờ đổi sang emit đúng các class này để có hiệu ứng lấp lánh giống 2 app kia. */
+.skeleton-block {
+  background: linear-gradient(90deg, var(--hover-bg) 25%, var(--border-color) 50%, var(--hover-bg) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block { animation: none; background: var(--hover-bg); }
+}
+.skeleton-table-row td { padding: 14px 16px; }
+.skeleton-bar { height: 14px; width: 85%; }
+.skeleton-bar.short { width: 55%; }
+.skeleton-bar.tiny { width: 30%; }
+.skeleton-list-item { display: flex; align-items: center; gap: 10px; padding: 10px 4px; }
+.skeleton-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+.skeleton-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.skeleton-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px; }
+.skeleton-card .skeleton-bar { margin-bottom: 10px; }
+.skeleton-card .skeleton-bar:last-child { margin-bottom: 0; }
+
 body {
   font-family: var(--font-body);
   background-color: var(--bg-color);
@@ -801,6 +858,14 @@ button { font-family: inherit; cursor: pointer; border: none; }
   border-color: var(--gold);
   box-shadow: 0 0 0 3px var(--gold-glow);
   background: var(--card-bg-elevated);
+}
+
+/* Input/select bị disabled trước đây không có style riêng -- rơi vào nền trắng/chữ đen
+   mặc định của trình duyệt bất kể theme, đặc biệt chói ở dark mode (đồng bộ với wh-org). */
+.form-control:disabled, .form-select:disabled {
+  background-color: var(--hover-bg) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-color) !important;
 }
 
 .form-select option {
