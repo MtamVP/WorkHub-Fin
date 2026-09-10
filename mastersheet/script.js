@@ -162,15 +162,16 @@ async function loadTeamSummary() {
                 let name = item.name || "Unknown";
                 let navStr = item.nav || "0";
                 let percentStr = item.percent || "0%";
+                const pctNum = Math.max(0, Math.min(100, parseFloat(String(percentStr).replace(/[^0-9.]/g, '')) || 0));
 
                 if (name.toUpperCase().includes('TỔNG')) {
-                    html += `<tr class="table-total-row"><td>${escapeAssetHtml(name)}</td><td class="text-right">${escapeAssetHtml(navStr)}</td><td class="text-center">${escapeAssetHtml(percentStr)}</td></tr>`;
+                    html += `<tr class="table-total-row"><td>${escapeAssetHtml(name)}</td><td class="text-right">${escapeAssetHtml(navStr)}</td><td class="text-right">${escapeAssetHtml(percentStr)}</td></tr>`;
                 } else {
                     const dotColor = colorByName[name] || cssVar('--border-color');
                     html += `<tr>
                         <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${escapeAssetHtml(name)}</span></span></td>
                         <td class="text-right">${escapeAssetHtml(navStr)}</td>
-                        <td class="text-center">${escapeAssetHtml(percentStr)}</td>
+                        <td class="text-right"><span class="weight-cell"><span>${escapeAssetHtml(percentStr)}</span><span class="weight-bar"><i style="width:${pctNum.toFixed(1)}%;background:${dotColor};"></i></span></span></td>
                     </tr>`;
                 }
             });
@@ -255,6 +256,7 @@ function renderChart(labels, data, colors) {
         <div class="allocation-legend-item">
             <span class="allocation-legend-dot" style="background:${colors[i]};"></span>
             <span class="allocation-legend-name">${escapeAssetHtml(label)}</span>
+            <span class="allocation-legend-val">${Math.round(data[i] / 1e6).toLocaleString('vi-VN')}tr</span>
             <span class="allocation-legend-pct">${((data[i] / total) * 100).toFixed(1)}%</span>
         </div>`).join('');
 }

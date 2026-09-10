@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -23,8 +23,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=1.3">
-    <link rel="stylesheet" href="/mastersheet/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.0">
+    <link rel="stylesheet" href="/mastersheet/style.css?v=1789050000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,22 +34,21 @@
     </head>
 <body>
 
-    <div class="asset-container">
-        
-        <div class="top-bar">
+    <div class="asset-container desk">
+
+        <header class="top-bar">
             <div class="left-section">
                 <a href="../" class="back-link">
                     <i class="fa-solid fa-house"></i> <span>Finance</span>
                 </a>
-                <h1>Tổng Hợp Tài Sản</h1>
+                <h1>Tổng hợp tài sản team</h1>
             </div>
-
             <div class="right-section">
                 <button onclick="loadMemberList()" class="btn-refresh">
                     <i class="fa-solid fa-rotate-right"></i> Làm mới
                 </button>
             </div>
-        </div>
+        </header>
 
         <nav class="fin-tool-nav">
             <a href="/mastersheet/" class="active"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
@@ -58,31 +57,36 @@
             <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
         </nav>
 
-        <div class="kpi-row">
-            <div class="kpi-card">
-                <span class="kpi-icon"><i class="fa-solid fa-users"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">Số thành viên</span>
-                    <span class="kpi-value" id="team-kpi-count">--</span>
-                </span>
+        <section class="asset-hero">
+            <div class="hero-main">
+                <span class="hero-label">Tổng NAV toàn team</span>
+                <span class="hero-nav-figure" id="team-kpi-nav">--</span>
+                <div class="hero-foot">
+                    <span>Gộp giá trị tài sản ròng của mọi thành viên trong MasterSheet.</span>
+                </div>
             </div>
-            <div class="kpi-card">
-                <span class="kpi-icon"><i class="fa-solid fa-sack-dollar"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">Tổng NAV Team</span>
-                    <span class="kpi-value" id="team-kpi-nav">--</span>
-                </span>
+            <div class="hero-grid">
+                <div class="mini-kpi">
+                    <span class="mini-k">Thành viên</span>
+                    <span class="mini-v" id="team-kpi-count">--</span>
+                    <span class="mini-t">đang theo dõi tài sản</span>
+                </div>
+                <div class="mini-kpi">
+                    <span class="mini-k">Nguồn dữ liệu</span>
+                    <span class="mini-v" style="font-size:0.92rem;">MasterSheet</span>
+                    <span class="mini-t">bấm "Làm mới" để tải lại</span>
+                </div>
             </div>
-        </div>
+        </section>
 
         <div class="control-panel">
-            <label><i class="fa-solid fa-user-tag"></i> Chọn thành viên:</label>
+            <label for="member-select"><i class="fa-solid fa-user-tag"></i> Xem chi tiết thành viên:</label>
             <select id="member-select" onchange="loadMemberDetail()">
                 <option value="">-- Đang tải danh sách... --</option>
             </select>
         </div>
 
-        <div id="sheet-display" class="spreadsheet-wrapper" style="display: none; padding: 20px; overflow-x: auto;">
+        <div id="sheet-display" class="spreadsheet-wrapper" style="display: none; overflow-x: auto;">
             <table id="member-table" class="asset-table" style="width: 100%;"></table>
         </div>
 
@@ -91,14 +95,14 @@
             <p style="margin-top: 10px; color: var(--text-secondary);">Đang tải dữ liệu...</p>
         </div>
 
-        <div class="holdings-layout" style="margin-top: 30px;">
+        <div class="holdings-layout">
             <div class="spreadsheet-wrapper">
                 <table id="team-table" class="asset-table" style="width:100%;">
                     <thead>
                         <tr>
                             <th>Thành viên</th>
                             <th class="text-right">Tổng NAV</th>
-                            <th class="text-center">Tỉ trọng</th>
+                            <th class="text-right">Tỉ trọng team</th>
                         </tr>
                     </thead>
                     <tbody id="team-table-body">
@@ -108,6 +112,7 @@
             </div>
             <div class="allocation-card">
                 <h3><i class="fa-solid fa-chart-pie"></i> Cơ Cấu Tài Sản</h3>
+                <div class="alloc-cap">Theo NAV từng thành viên</div>
                 <div class="allocation-chart-box">
                     <canvas id="teamChart"></canvas>
                 </div>
@@ -119,8 +124,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=1788564459163"></script>
-    <script src="script.js?v=1788630490059"></script>
+    <script src="script.js?v=1789050000000"></script>
 </body>
 </html>
-
-

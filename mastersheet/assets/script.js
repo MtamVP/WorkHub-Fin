@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     await loadCashDebt();
     await loadKpis();
     await loadHoldings();
+    loadHeroSpark();
 
     const txnForm = document.getElementById('txn-form');
     if (txnForm) txnForm.addEventListener('submit', handleTxnSubmit);
@@ -102,6 +103,7 @@ async function setupTargetUserSwitcher() {
             await loadCashDebt();
             await loadKpis();
             await loadHoldings();
+            loadHeroSpark();
         });
     } catch (e) {
         console.error('Lỗi getMemberList:', e);
@@ -190,6 +192,7 @@ async function loadKpis() {
         setKpi('kpi-unrealized', k.unrealizedPnl, true, true);
         setKpi('kpi-realized', k.realizedPnl, true, true);
         setKpi('kpi-market-value', k.marketValue, true);
+        updateHeroDelta(k);
     } catch (e) {
         console.error('Lỗi loadKpis:', e);
     }
@@ -213,21 +216,23 @@ function setKpi(id, value, isMoney, colorByValue) {
 async function loadHoldings() {
     const tbody = document.getElementById('holdings-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
         const response = await callGAS('getHoldingsView', { email: targetEmail });
         const holdings = response.data || [];
 
         if (holdings.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
             renderAllocationChart([]);
             return;
         }
 
+        const totalMv = holdings.reduce((s, h) => s + (Number(h.marketValue) || 0), 0);
+
         tbody.innerHTML = holdings.map((h, idx) => {
             const dotColor = allocationColorFor(idx);
-            const pnl = renderPnlPill(h.unrealizedPnl, h.unrealizedPct);
+            const weightPct = totalMv > 0 ? (Number(h.marketValue) || 0) / totalMv * 100 : 0;
             return `
                 <tr>
                     <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${escapeAssetHtml(h.symbol)}</span></span></td>
@@ -240,14 +245,23 @@ async function loadHoldings() {
                     </td>
                     <td class="text-right">${Number(h.costValue).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.marketValue).toLocaleString('en-US')}</td>
-                    <td class="text-right">${pnl}</td>
+                    <td class="text-right"><span class="weight-cell"><span>${weightPct.toFixed(1)}%</span><span class="weight-bar"><i style="width:${Math.min(weightPct, 100).toFixed(1)}%;background:${dotColor};"></i></span></span></td>
+                    <td class="text-right">${renderPnlStack(h.unrealizedPnl, h.unrealizedPct)}</td>
                 </tr>`;
         }).join('');
 
         renderAllocationChart(holdings);
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
     }
+}
+
+// Ô lãi/lỗ 2 dòng (số tuyệt đối + %) — dùng cho cột "Lãi/lỗ" của bảng Danh Mục.
+function renderPnlStack(pnl, pct) {
+    const num = Number(pnl) || 0;
+    const cls = num > 0 ? 'pnl-up' : (num < 0 ? 'pnl-down' : 'pnl-flat');
+    const sign = num > 0 ? '+' : (num < 0 ? '−' : '');
+    return `<span class="pnl-stack ${cls}"><span class="pnl-abs">${sign}${Math.abs(num).toLocaleString('en-US')}</span><span class="pnl-pct">${sign}${Math.abs(Number(pct) || 0).toFixed(1)}%</span></span>`;
 }
 
 function renderPnlPill(pnl, pct) {
@@ -316,8 +330,67 @@ function renderAllocationChart(holdings) {
         <div class="allocation-legend-item">
             <span class="allocation-legend-dot" style="background:${colors[i]};"></span>
             <span class="allocation-legend-name">${escapeAssetHtml(label)}</span>
+            <span class="allocation-legend-val">${Math.round(values[i] / 1e6).toLocaleString('vi-VN')}tr</span>
             <span class="allocation-legend-pct">${((values[i] / total) * 100).toFixed(1)}%</span>
         </div>`).join('');
+}
+
+// --- HERO: chip lãi/lỗ chưa chốt (%) + sparkline NAV theo thời gian ---
+function updateHeroDelta(k) {
+    const el = document.getElementById('hero-delta');
+    if (!el) return;
+    const unreal = Number(k.unrealizedPnl) || 0;
+    const mv = Number(k.marketValue) || 0;
+    const cost = mv - unreal;
+    if (!cost) { el.textContent = ''; el.className = 'hero-delta'; return; }
+    const pct = unreal / cost * 100;
+    const dir = unreal > 0 ? 'up' : (unreal < 0 ? 'down' : '');
+    const arrow = unreal > 0 ? '<i class="fa-solid fa-arrow-up"></i>' : (unreal < 0 ? '<i class="fa-solid fa-arrow-down"></i>' : '');
+    el.className = 'hero-delta ' + dir;
+    el.innerHTML = `${arrow} ${formatVnd(unreal)} · ${(pct > 0 ? '+' : '')}${pct.toFixed(1)}% so với giá vốn`;
+}
+
+async function loadHeroSpark() {
+    const box = document.getElementById('hero-spark');
+    if (!box) return;
+    try {
+        const response = await callGAS('getNavHistory', { email: targetEmail });
+        const history = response.data || [];
+        const vals = history.map(h => Number(h.nav) || 0).filter(v => v > 0);
+        if (vals.length < 2) { box.innerHTML = ''; return; }
+        drawSparkline(box, vals);
+    } catch (e) {
+        box.innerHTML = '';
+    }
+}
+
+function drawSparkline(el, vals) {
+    const w = el.clientWidth || 460, h = 44, pad = 3;
+    const mn = Math.min(...vals), mx = Math.max(...vals), rng = (mx - mn) || 1;
+    const x = i => pad + i * (w - pad * 2) / (vals.length - 1);
+    const y = v => h - pad - (v - mn) / rng * (h - pad * 2);
+    const line = vals.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+    const area = line + ` L${x(vals.length - 1).toFixed(1)} ${h} L${x(0).toFixed(1)} ${h} Z`;
+    const up = vals[vals.length - 1] >= vals[0];
+    const c = up ? cssVar('--success-color') : cssVar('--danger-color');
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <defs><linearGradient id="whSpark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${c}" stop-opacity="0.20"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#whSpark)"/>
+        <path d="${line}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${x(vals.length - 1).toFixed(1)}" cy="${y(vals[vals.length - 1]).toFixed(1)}" r="3" fill="${c}"/>
+    </svg>`;
+}
+
+// Nhãn định tính cho ô Hiệu Suất
+function setPerfTag(id, kind, text) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!kind) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'perf-tag ' + kind;
+    el.textContent = text;
 }
 
 async function handleMarketPriceChange(input) {
@@ -644,6 +717,8 @@ function renderPerfStats(history) {
     if (!history || history.length < 2) {
         returnEl.textContent = '--';
         pctEl.textContent = '--';
+        setPerfTag('perf-total-return-tag', null);
+        setPerfTag('perf-pct-tag', null);
         return;
     }
 
@@ -658,6 +733,10 @@ function renderPerfStats(history) {
     pctEl.textContent = (pct > 0 ? '+' : '') + pct.toFixed(2) + '%';
     pctEl.classList.toggle('text-success', pct > 0);
     pctEl.classList.toggle('text-danger', pct < 0);
+
+    setPerfTag('perf-total-return-tag', diff >= 0 ? 'good' : 'warn', diff >= 0 ? 'Đang lãi' : 'Đang lỗ');
+    setPerfTag('perf-pct-tag', pct >= 10 ? 'good' : (pct >= 0 ? 'mid' : 'warn'),
+        pct >= 10 ? 'Tốt' : (pct >= 0 ? 'Trung bình' : 'Âm'));
 }
 
 function renderNavChart(history) {
@@ -724,17 +803,30 @@ async function loadPerformanceMetrics() {
 
         const sharpeEl = document.getElementById('perf-sharpe');
         if (sharpeEl) {
-            sharpeEl.textContent = m.sharpe === null || m.sharpe === undefined ? '--' : m.sharpe.toFixed(2);
+            const hasS = m.sharpe !== null && m.sharpe !== undefined;
+            sharpeEl.textContent = hasS ? m.sharpe.toFixed(2) : '--';
             sharpeEl.classList.toggle('text-success', m.sharpe > 0);
             sharpeEl.classList.toggle('text-danger', m.sharpe < 0);
+            setPerfTag('perf-sharpe-tag', hasS ? (m.sharpe >= 1 ? 'good' : (m.sharpe >= 0 ? 'mid' : 'warn')) : null,
+                m.sharpe >= 1 ? 'Tốt' : (m.sharpe >= 0 ? 'Khá' : 'Kém'));
         }
         const maxddEl = document.getElementById('perf-maxdd');
         if (maxddEl) {
-            maxddEl.textContent = m.maxDrawdown === null || m.maxDrawdown === undefined ? '--' : (m.maxDrawdown * 100).toFixed(1) + '%';
+            const hasD = m.maxDrawdown !== null && m.maxDrawdown !== undefined;
+            maxddEl.textContent = hasD ? (m.maxDrawdown * 100).toFixed(1) + '%' : '--';
             maxddEl.classList.toggle('text-danger', m.maxDrawdown < 0);
+            const ddAbs = Math.abs((m.maxDrawdown || 0) * 100);
+            setPerfTag('perf-maxdd-tag', hasD ? (ddAbs <= 15 ? 'good' : (ddAbs <= 30 ? 'mid' : 'warn')) : null,
+                ddAbs <= 15 ? 'Thấp' : (ddAbs <= 30 ? 'Chấp nhận được' : 'Cao'));
         }
         const volEl = document.getElementById('perf-vol');
-        if (volEl) volEl.textContent = m.volatility === null || m.volatility === undefined ? '--' : (m.volatility * 100).toFixed(1) + '%';
+        if (volEl) {
+            const hasV = m.volatility !== null && m.volatility !== undefined;
+            volEl.textContent = hasV ? (m.volatility * 100).toFixed(1) + '%' : '--';
+            const volPct = (m.volatility || 0) * 100;
+            setPerfTag('perf-vol-tag', hasV ? (volPct <= 15 ? 'good' : (volPct <= 30 ? 'mid' : 'warn')) : null,
+                volPct <= 15 ? 'Thấp' : (volPct <= 30 ? 'Trung bình' : 'Cao'));
+        }
 
         renderBenchmarkChart(m.benchmark);
     } catch (e) {

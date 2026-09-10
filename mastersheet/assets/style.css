@@ -2,4 +2,4 @@
    Toàn bộ component dùng chung (kpi-card, asset-table, pnl-pill, txn-form, allocation-card...)
    đã chuyển sang /finance-shared.css — file này chỉ còn override thật sự riêng của trang. */
 
-.asset-container { max-width: 1420px; }
+.asset-container.desk { max-width: 1260px; }

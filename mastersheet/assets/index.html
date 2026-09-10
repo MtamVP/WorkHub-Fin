@@ -24,8 +24,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=1.3">
-    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.0">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789050000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -36,17 +36,17 @@
 </head>
 <body>
 
-    <div class="asset-container">
+    <div class="asset-container desk">
         <header class="top-bar">
             <div class="left-section">
                 <a href="/" class="back-link">
                     <i class="fa-solid fa-house"></i> <span>Finance</span>
                 </a>
-                <h1>Quản Lý Danh Mục Đầu Tư</h1>
+                <h1>Danh mục đầu tư</h1>
             </div>
             <div class="right-section">
                 <div id="target-user-switcher" class="target-user-switcher" style="display:none;">
-                    <label for="target-user-select"><i class="fa-solid fa-user-pen"></i> Đang chỉnh sửa của:</label>
+                    <label for="target-user-select"><i class="fa-solid fa-user-pen"></i> Đang xem của</label>
                     <select id="target-user-select"></select>
                 </div>
                 <span id="user-display"><i class="fa-solid fa-user"></i> Đang tải...</span>
@@ -60,37 +60,37 @@
             <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
         </nav>
 
-        <!-- KPI tổng quan -->
-        <div class="kpi-row" id="kpi-row">
-            <div class="kpi-card">
-                <span class="kpi-icon"><i class="fa-solid fa-wallet"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">NAV</span>
-                    <span class="kpi-value" id="kpi-nav">--</span>
-                </span>
+        <!-- HERO: NAV lớn + chỉ số phụ -->
+        <section class="asset-hero">
+            <div class="hero-main">
+                <span class="hero-label">Giá trị tài sản ròng · NAV</span>
+                <span class="hero-nav-figure" id="kpi-nav">--</span>
+                <span class="hero-delta" id="hero-delta"></span>
+                <div class="hero-spark" id="hero-spark"></div>
             </div>
-            <div class="kpi-card" id="kpi-card-unrealized">
-                <span class="kpi-icon"><i class="fa-solid fa-chart-line"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">Lãi/lỗ chưa chốt</span>
-                    <span class="kpi-value" id="kpi-unrealized">--</span>
-                </span>
+            <div class="hero-grid" id="kpi-row">
+                <div class="mini-kpi" id="kpi-card-unrealized">
+                    <span class="mini-k">Lãi/lỗ chưa chốt</span>
+                    <span class="mini-v kpi-value" id="kpi-unrealized">--</span>
+                    <span class="mini-t">phần chưa bán</span>
+                </div>
+                <div class="mini-kpi" id="kpi-card-realized">
+                    <span class="mini-k">Lãi/lỗ đã chốt</span>
+                    <span class="mini-v kpi-value" id="kpi-realized">--</span>
+                    <span class="mini-t">FIFO trong năm</span>
+                </div>
+                <div class="mini-kpi">
+                    <span class="mini-k">Giá trị thị trường</span>
+                    <span class="mini-v kpi-value" id="kpi-market-value">--</span>
+                    <span class="mini-t">theo giá nhập tay</span>
+                </div>
+                <div class="mini-kpi">
+                    <span class="mini-k">Vốn ròng</span>
+                    <span class="mini-v mono" id="disp-net-capital">0 ₫</span>
+                    <span class="mini-t">tiền mặt − dư nợ</span>
+                </div>
             </div>
-            <div class="kpi-card" id="kpi-card-realized">
-                <span class="kpi-icon"><i class="fa-solid fa-circle-check"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">Lãi/lỗ đã chốt</span>
-                    <span class="kpi-value" id="kpi-realized">--</span>
-                </span>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-icon"><i class="fa-solid fa-coins"></i></span>
-                <span class="kpi-body">
-                    <span class="kpi-label">Giá trị thị trường</span>
-                    <span class="kpi-value" id="kpi-market-value">--</span>
-                </span>
-            </div>
-        </div>
+        </section>
 
         <!-- Tiền mặt / Dư nợ -->
         <div class="balance-section">
@@ -101,10 +101,6 @@
             <div class="balance-card debt">
                 <label><i class="fa-solid fa-money-bill-transfer"></i> Dư nợ (VND)</label>
                 <input type="text" id="inp-debt" class="money-input" placeholder="0">
-            </div>
-            <div class="balance-card net">
-                <label><i class="fa-solid fa-scale-balanced"></i> Vốn ròng</label>
-                <span id="disp-net-capital" class="money-input money-input-readonly">0</span>
             </div>
         </div>
 
@@ -124,16 +120,17 @@
                             <tr>
                                 <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
                                 <th class="text-right">Giá TT (nhập tay)</th><th class="text-right">GT vốn</th>
-                                <th class="text-right">GTTT</th><th class="text-right">Lãi/lỗ</th>
+                                <th class="text-right">GTTT</th><th class="text-right">Tỷ trọng</th><th class="text-right">Lãi/lỗ</th>
                             </tr>
                         </thead>
                         <tbody id="holdings-body">
-                            <tr><td colspan="7" class="empty-state">Đang tải...</td></tr>
+                            <tr><td colspan="8" class="empty-state">Đang tải...</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="allocation-card">
                     <h3><i class="fa-solid fa-chart-pie"></i> Cơ Cấu Danh Mục</h3>
+                    <div class="alloc-cap">Theo giá trị thị trường</div>
                     <div class="allocation-chart-box">
                         <canvas id="allocationChart"></canvas>
                     </div>
@@ -313,38 +310,33 @@
             <div class="perf-stats-row">
                 <div class="kpi-card">
                     <span class="kpi-icon"><i class="fa-solid fa-arrow-trend-up"></i></span>
-                    <span class="kpi-body">
-                        <span class="kpi-label">Lợi nhuận từ đầu</span>
-                        <span class="kpi-value" id="perf-total-return">--</span>
-                    </span>
+                    <span class="kpi-label">Lợi nhuận từ đầu</span>
+                    <span class="kpi-value" id="perf-total-return">--</span>
+                    <span class="perf-tag" id="perf-total-return-tag" hidden></span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-icon"><i class="fa-solid fa-percent"></i></span>
-                    <span class="kpi-body">
-                        <span class="kpi-label">% Tăng trưởng</span>
-                        <span class="kpi-value" id="perf-total-return-pct">--</span>
-                    </span>
+                    <span class="kpi-label">% Tăng trưởng</span>
+                    <span class="kpi-value" id="perf-total-return-pct">--</span>
+                    <span class="perf-tag" id="perf-pct-tag" hidden></span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></span>
-                    <span class="kpi-body">
-                        <span class="kpi-label">Sharpe Ratio</span>
-                        <span class="kpi-value" id="perf-sharpe">--</span>
-                    </span>
+                    <span class="kpi-label">Sharpe Ratio</span>
+                    <span class="kpi-value" id="perf-sharpe">--</span>
+                    <span class="perf-tag" id="perf-sharpe-tag" hidden></span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-icon"><i class="fa-solid fa-arrow-trend-down"></i></span>
-                    <span class="kpi-body">
-                        <span class="kpi-label">Max Drawdown</span>
-                        <span class="kpi-value" id="perf-maxdd">--</span>
-                    </span>
+                    <span class="kpi-label">Max Drawdown</span>
+                    <span class="kpi-value" id="perf-maxdd">--</span>
+                    <span class="perf-tag" id="perf-maxdd-tag" hidden></span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-icon"><i class="fa-solid fa-wave-square"></i></span>
-                    <span class="kpi-body">
-                        <span class="kpi-label">Biến động (năm hóa)</span>
-                        <span class="kpi-value" id="perf-vol">--</span>
-                    </span>
+                    <span class="kpi-label">Biến động (năm hóa)</span>
+                    <span class="kpi-value" id="perf-vol">--</span>
+                    <span class="perf-tag" id="perf-vol-tag" hidden></span>
                 </div>
             </div>
             <div class="spreadsheet-wrapper perf-chart-wrapper">
@@ -387,7 +379,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=1788564459163"></script>
-    <script src="script.js?v=1788630490059"></script>
+    <script src="script.js?v=1789050000000"></script>
 
 </body>
 </html>

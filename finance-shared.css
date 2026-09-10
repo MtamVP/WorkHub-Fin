@@ -1,118 +1,138 @@
 /* =========================================================================
    finance-shared.css — Hệ thống thiết kế dùng chung cho Quản Lý Tài Sản,
    Quản Lý Cổ Phiếu và Phân Quyền (5 trang). Mọi trang load file này NGAY
-   SAU /style.css và TRƯỚC stylesheet riêng của từng trang — stylesheet
-   riêng chỉ còn giữ phần thật đặc thù, không lặp lại component chung nữa.
+   SAU /style.css và TRƯỚC stylesheet riêng của từng trang.
 
-   Toàn bộ tên class giữ nguyên như cũ (kpi-card, asset-table, pnl-pill...)
-   vì script.js của cả 5 trang tạo HTML động bằng đúng các tên này — đổi
-   tên sẽ làm vỡ chức năng mà không đổi được gì về hình thức.
-
-   Bảng giá trị (spacing/radius/shadow/type-scale/tên biến) lấy TRỰC TIẾP
-   từ src/styles.css của chính app kế toán (onyxline-accounting) — không
-   áng chừng. Nguyên tắc của bản gốc: card/kpi/table tĩnh (không hover-lift),
-   không viền màu trang trí, tiêu đề mục không viết hoa/không gạch chân,
-   màu chỉ xuất hiện ở nơi mang nghĩa (icon, giá trị, badge) — dữ liệu là
-   trung tâm, không phải khung trang trí xung quanh nó.
+   Đợt "Bàn Tài Sản" (2026-09): đổi phong cách sang hướng "bàn giao dịch của
+   định chế" — accent XANH RỪNG đậm + VÀNG TRẦM (thay tông vàng-đơn-sắc cũ),
+   số lớn đặt bằng serif (DM Serif Display, CHỈ dùng cho chuỗi số/₫ vì font
+   này làm vỡ dấu tiếng Việt), số liệu canh cột bằng DM Mono. Toàn bộ TÊN
+   CLASS và TÊN BIẾN giữ nguyên như cũ (kpi-card, asset-table, pnl-pill,
+   allocation-*, txn-form, --finance-accent, --card-bg, --series-1..4...) vì
+   script.js của cả 5 trang render HTML động bằng đúng các tên này.
 
    Luôn dùng giao diện sáng bất kể site đang ở chế độ tối mặc định — quyết
-   định của người dùng, áp dụng nhất quán trên cả 5 trang.
+   định của người dùng, áp dụng nhất quán trên cả 5 trang (body ép token sáng).
    ========================================================================= */
 
 body {
-    /* Neutrals/gold không còn lặp lại hex -- kéo thẳng từ --wh-static-light-* khai báo 1 lần
-       duy nhất ở :root của /style.css (không phản ứng theo data-theme), để 2 file luôn khớp
-       nhau tự động thay vì phải dò tay mỗi khi bảng màu sáng gốc đổi. */
-    --bg-color: var(--wh-static-light-bg); --bg-color-2: var(--wh-static-light-bg-2);
-    --card-bg: var(--wh-static-light-card); --card-bg-elevated: #FBF9F4;
-    --text-primary: var(--wh-static-light-text); --text-secondary: var(--wh-static-light-text-secondary);
-    --text-muted: var(--wh-static-light-text-muted);
-    --border-color: var(--wh-static-light-border); --border-strong: rgba(28, 23, 16, 0.18); --hover-bg: #ECE7DB;
-    --gold: var(--wh-static-light-gold); --gold-light: var(--wh-static-light-gold-light); --gold-dim: var(--wh-static-light-gold-dim);
-    --finance-accent: #9A6B0D; --finance-accent-subtle: rgba(154, 107, 13, 0.15);
-    /* Success/danger/warning/info riêng cho 5 trang này (không lấy từ /style.css gốc) — vì trang luôn
-       ép giao diện sáng bất kể theme site, còn biến ở /style.css lại đổi theo theme site đang bật,
-       nên dùng chung sẽ ra màu tối (quá chói) trên nền sáng. */
-    --success-color: #1C8F5A; --success-bg: rgba(28, 143, 90, 0.13);
-    --danger-color: #BD3B3B; --danger-bg: rgba(189, 59, 59, 0.11);
-    --warning-color: #9A6B0D; --warning-bg: rgba(154, 107, 13, 0.15);
-    --info-color: #2F6AE0;
-    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.07), 0 1px 1px rgba(15, 23, 42, 0.04);
-    --shadow-modal: 0 24px 60px rgba(15, 23, 42, 0.16);
-    --shadow-gold: 0 8px 22px rgba(176, 137, 42, 0.18);
-    /* Bộ màu category đã validate qua dataviz skill (validate_palette.js) — dùng cho mọi biểu đồ donut */
-    --series-1: #2a78d6; --series-2: #eda100; --series-3: #1baf7a; --series-4: #4a3aa7; --series-other: #9a9a94;
-    /* --font-display không tồn tại ở /style.css gốc dù được dùng khắp nơi — khai báo riêng ở đây. */
-    --font-display: 'DM Serif Display', Georgia, serif;
-    --dur: 200ms; --ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-fast: background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  /* Neutrals kéo từ --wh-static-light-* (khai báo 1 lần ở :root của /style.css,
+     không phản ứng theo data-theme) để 2 file luôn khớp nhau tự động. */
+  --bg-color: var(--wh-static-light-bg);
+  --bg-color-2: #F1EDE3;
+  --card-bg: var(--wh-static-light-card);
+  --card-bg-elevated: #FBF9F3;
+  --text-primary: #1C1915;
+  --text-secondary: #5B554B;
+  --text-muted: #8A8377;
+  --border-color: rgba(28, 25, 21, 0.11);
+  --border-strong: rgba(28, 25, 21, 0.20);
+  --hover-bg: #ECE7DB;
 
-    font-family: var(--font-body);
-    background-color: var(--bg-color);
-    color: var(--text-primary);
-    margin: 0; padding: 0; line-height: 1.5;
-    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  /* Accent chính: xanh rừng (thương hiệu, nút, tab active). --finance-accent
+     giữ tên nhưng chuyển sang xanh; --gold trở thành accent PHỤ (nhãn mục,
+     viền focus, hint). */
+  --finance-accent: #1E5A44;
+  --finance-accent-hover: #21684E;
+  --finance-accent-subtle: rgba(30, 90, 68, 0.10);
+  --finance-accent-line: rgba(30, 90, 68, 0.26);
+  --gold: #9A6B0D;
+  --gold-light: #8A5F0B;
+  --gold-dim: rgba(154, 107, 13, 0.13);
+
+  /* P&L / trạng thái — tách khỏi accent, luôn mang nghĩa (xanh lãi / đỏ lỗ). */
+  --success-color: #12855A; --success-bg: rgba(18, 133, 90, 0.12);
+  --danger-color: #C23B3B;  --danger-bg: rgba(194, 59, 59, 0.11);
+  --warning-color: #9A6B0D; --warning-bg: rgba(154, 107, 13, 0.14);
+  --info-color: #2F6AE0;
+
+  --shadow-soft: 0 1px 2px rgba(28, 25, 21, 0.06), 0 1px 1px rgba(28, 25, 21, 0.04);
+  --shadow-modal: 0 12px 34px rgba(28, 25, 21, 0.16);
+  --shadow-gold: 0 6px 18px rgba(30, 90, 68, 0.18);
+
+  /* Bộ màu category cho biểu đồ donut — đã validate qua dataviz skill. */
+  --series-1: #2A78D6; --series-2: #EDA100; --series-3: #1BAF7A; --series-4: #4A3AA7;
+  --series-5: #C23B7A; --series-other: #9A9A94;
+
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --radius-xs: 5px; --radius-sm: 7px; --radius-md: 10px; --radius-lg: 14px; --radius-pill: 999px;
+  --dur: 190ms; --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+
+  font-family: var(--font-body);
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  margin: 0; padding: 0; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 
 * { box-sizing: border-box; }
+.num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-.asset-container { max-width: 1160px; margin: 24px auto 60px; padding: 0 20px; }
+.asset-container { max-width: 1200px; margin: 26px auto 72px; padding: 0 22px; }
 .asset-container.narrow { max-width: 960px; }
 
 /* =========================================================================
-   1. TOP BAR + TOOL SWITCHER
+   1. TOP BAR + BYLINE + TOOL SWITCHER
    ========================================================================= */
 .top-bar {
-    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;
-    background: var(--card-bg); padding: 16px 20px; border-radius: var(--radius-md);
-    box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); margin-bottom: 16px;
+  display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px;
+  padding: 4px 0 18px; margin-bottom: 4px;
 }
-.left-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.left-section { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .left-section h1 {
-    /* Tiêu đề luôn là tiếng Việt có dấu — DM Serif Display (var(--font-display)) làm vỡ dấu tiếng Việt
-       (đây là lý do styles.css gốc chỉ cho phép font-display trên chuỗi ASCII). Dùng font-body đậm thay thế. */
-    margin: 0 0 0 6px; font-family: var(--font-body); font-size: 1.3rem; font-weight: 700;
-    color: var(--text-primary); letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px;
+  margin: 0; font-family: var(--font-body); font-size: 1.35rem; font-weight: 700;
+  color: var(--text-primary); letter-spacing: -0.015em;
 }
-.right-section { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.right-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 .back-link {
-    text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.8rem;
-    padding: 7px 13px; border-radius: var(--radius-sm); background: var(--hover-bg); border: 1px solid var(--border-color);
-    transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 7px;
+  text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.78rem;
+  padding: 6px 12px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border-color);
+  transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 7px;
 }
-.back-link:hover { background: var(--border-color); color: var(--text-primary); }
+.back-link:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
 #user-display, .user-badge {
-    font-weight: 600; color: var(--text-primary); background: var(--hover-bg); padding: 7px 16px;
-    border-radius: var(--radius-pill); font-size: 0.8rem; border: 1px solid var(--border-color);
-    display: inline-flex; align-items: center; gap: 8px;
+  font-weight: 600; color: var(--text-secondary); background: var(--card-bg); padding: 6px 14px;
+  border-radius: var(--radius-pill); font-size: 0.78rem; border: 1px solid var(--border-color);
+  display: inline-flex; align-items: center; gap: 8px;
 }
 
-/* Tab-pill điều hướng giữa 5 trang — dùng đúng ngôn ngữ trạng thái active của .nav-item bên sidebar
-   (gold-dim + inset shadow) thay vì tô nền đặc, để nhất quán trong toàn bộ hệ thống. */
+/* Tab-pill điều hướng giữa 5 trang */
 .fin-tool-nav {
-    display: flex; gap: 4px; flex-wrap: wrap; background: var(--card-bg); padding: 5px;
-    border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-soft);
-    width: fit-content; margin-bottom: 20px;
+  display: flex; gap: 3px; flex-wrap: wrap; background: var(--card-bg); padding: 4px;
+  border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-soft);
+  width: fit-content; margin-bottom: 22px;
 }
 .fin-tool-nav a {
-    text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.8rem;
-    padding: 7px 13px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 7px;
-    transition: var(--transition-fast); white-space: nowrap;
+  text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.8rem;
+  padding: 7px 13px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 7px;
+  transition: var(--transition-fast); white-space: nowrap;
 }
 .fin-tool-nav a:hover { background: var(--hover-bg); color: var(--text-primary); }
-.fin-tool-nav a.active { background: var(--gold-dim); color: var(--gold-light); box-shadow: inset 0 -2px 0 var(--gold); }
+.fin-tool-nav a.active { background: var(--finance-accent); color: #fff; }
 .fin-tool-nav a i { font-size: 0.76rem; }
 
+/* "Đang chỉnh sửa của" — masthead byline thay cho pill vàng cũ */
+.target-user-switcher {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card-bg); padding: 5px 12px 5px 8px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-secondary);
+}
+.target-user-switcher label { font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.target-user-switcher select {
+  border: 0; background: transparent; font: inherit; font-weight: 600; color: var(--text-primary);
+  cursor: pointer; padding: 0; max-width: 220px;
+}
+.target-user-switcher select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+
 /* =========================================================================
-   2. SECTION TITLE (dùng lại .stock-section-title cho mọi tiêu đề khối) —
-   lấy đúng theo .sec-title của src/styles.css: nhãn nhỏ, không viết hoa,
-   không gạch chân trải dài — chỉ là một nhãn màu vàng trầm đứng trước khối.
+   2. SECTION TITLE — nhãn nhỏ vàng trầm đứng trước khối
    ========================================================================= */
 .stock-section-title {
-    margin: 22px 0 12px 0; font-size: 0.8125rem; font-weight: 600; color: var(--gold-light);
-    letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px;
+  margin: 24px 0 12px 0; font-size: 0.72rem; font-weight: 700; color: var(--gold);
+  letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; gap: 8px;
 }
 .stock-section-title:first-child { margin-top: 0; }
 .stock-section-title i { font-size: 0.78rem; }
@@ -121,306 +141,376 @@ body {
    3. BUTTONS
    ========================================================================= */
 .btn-refresh {
-    background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-strong);
-    padding: 9px 15px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer;
-    transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 7px; font-size: 0.8125rem;
+  background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border-color);
+  padding: 8px 14px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer;
+  transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem;
 }
-.btn-refresh:hover { border-color: var(--gold); }
+.btn-refresh:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
 .btn-save {
-    background-color: var(--finance-accent); color: #FFF; border: none;
-    padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem;
-    cursor: pointer; transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 8px;
-    box-shadow: var(--shadow-gold);
+  background-color: var(--finance-accent); color: #FFF; border: none;
+  padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.84rem;
+  cursor: pointer; transition: var(--transition-fast); display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: var(--shadow-gold);
 }
-.btn-save:hover { filter: brightness(1.06); }
+.btn-save:hover { background-color: var(--finance-accent-hover); }
 .btn-save:active { transform: translateY(1px); }
 .btn-save:disabled { background-color: var(--text-muted); cursor: not-allowed; transform: none; opacity: 0.5; box-shadow: none; }
 .btn-txn-save { padding: 9px 18px; font-size: 0.8125rem; }
-
-.btn-save-cloud { background-color: var(--success-color); box-shadow: 0 4px 10px rgba(28, 143, 90, 0.22); }
-.btn-save-cloud:hover { filter: brightness(1.05); }
+.btn-save-cloud { background-color: var(--success-color); box-shadow: 0 4px 10px rgba(18, 133, 90, 0.22); }
+.btn-save-cloud:hover { filter: brightness(1.05); background-color: var(--success-color); }
 
 .icon-btn {
-    background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-    color: var(--text-secondary); width: 28px; height: 28px; cursor: pointer; font-size: 0.78rem;
-    display: inline-flex; align-items: center; justify-content: center; transition: var(--transition-fast);
+  background: none; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  color: var(--text-muted); width: 28px; height: 28px; cursor: pointer; font-size: 0.76rem;
+  display: inline-flex; align-items: center; justify-content: center; transition: var(--transition-fast);
 }
-.icon-btn:hover { border-color: var(--gold); color: var(--text-primary); }
-.icon-btn.danger { color: var(--danger-color); }
-.icon-btn.danger:hover { background: var(--danger-bg); border-color: rgba(189, 59, 59, 0.4); }
-.btn-revoke { background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--danger-color); width: 26px; height: 26px; cursor: pointer; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; transition: var(--transition-fast); margin-left: 4px; }
-.btn-revoke:hover { background: var(--danger-bg); border-color: rgba(189, 59, 59, 0.4); }
+.icon-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.icon-btn.danger { color: var(--text-muted); }
+.icon-btn.danger:hover { background: var(--danger-bg); border-color: rgba(194, 59, 59, 0.4); color: var(--danger-color); }
+.btn-revoke { background: none; border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--danger-color); width: 26px; height: 26px; cursor: pointer; font-size: 0.76rem; display: inline-flex; align-items: center; justify-content: center; transition: var(--transition-fast); margin-left: 4px; }
+.btn-revoke:hover { background: var(--danger-bg); border-color: rgba(194, 59, 59, 0.4); }
 
 /* =========================================================================
-   4. KPI CARDS — bố cục lấy đúng theo .kpi của src/styles.css: nhãn + số
-   lớn xếp dọc chiếm toàn bộ bề rộng thẻ, icon là 1 badge nhỏ nổi góc phải
-   trên (position:absolute), không còn icon+nội-dung nằm ngang như trước.
-   Thẻ tĩnh — không hover-lift (card dữ liệu trong app kế toán không "nhấc"
-   lên khi rê chuột).
+   4. HERO BAND (Bàn Tài Sản) — NAV lớn serif + lưới chỉ số phụ
    ========================================================================= */
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.asset-hero {
+  display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px; margin-bottom: 22px;
+}
+.hero-main {
+  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft); padding: 20px 24px; position: relative; overflow: hidden;
+}
+.hero-main::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 82% at 100% 0%, var(--finance-accent-subtle), transparent 62%);
+}
+.hero-label {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-muted);
+}
+.hero-nav-figure {
+  display: block; font-family: var(--font-display); font-size: clamp(2rem, 4.4vw, 2.9rem); line-height: 1.05;
+  margin: 6px 0 10px; letter-spacing: -0.005em; font-variant-numeric: tabular-nums; color: var(--text-primary);
+}
+.hero-delta {
+  display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.8rem;
+  padding: 3px 10px; border-radius: var(--radius-pill); background: var(--hover-bg); color: var(--text-secondary);
+}
+.hero-delta.up { background: var(--success-bg); color: var(--success-color); }
+.hero-delta.down { background: var(--danger-bg); color: var(--danger-color); }
+.hero-delta:empty { display: none; }
+.hero-spark { margin-top: 14px; height: 44px; }
+.hero-spark svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.hero-foot { margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 18px; flex-wrap: wrap; }
+.hero-foot b { color: var(--text-secondary); font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.mini-kpi {
+  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.mini-kpi .mini-k { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.mini-kpi .mini-v {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.05rem; font-weight: 500;
+  letter-spacing: -0.01em; overflow-wrap: break-word; line-height: 1.25; color: var(--text-primary);
+}
+.mini-kpi .mini-v.text-success { color: var(--success-color); }
+.mini-kpi .mini-v.text-danger { color: var(--danger-color); }
+.mini-kpi .mini-t { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+
+/* =========================================================================
+   4b. KPI CARDS (giữ cho các trang cổ phiếu) — nhãn + số dọc, icon badge góc
+   ========================================================================= */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .kpi-card {
-    background: var(--card-bg); border: 1px solid var(--border-color);
-    border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 16px 18px;
-    position: relative; min-width: 0;
+  background: var(--card-bg); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 15px 17px;
+  position: relative; min-width: 0;
 }
 .kpi-icon {
-    position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; background: var(--finance-accent-subtle); color: var(--finance-accent);
+  position: absolute; top: 13px; right: 13px; width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.95rem; background: var(--finance-accent-subtle); color: var(--finance-accent);
 }
 .kpi-card.kpi-positive .kpi-icon { background: var(--success-bg); color: var(--success-color); }
 .kpi-card.kpi-negative .kpi-icon { background: var(--danger-bg); color: var(--danger-color); }
-.kpi-body { display: flex; flex-direction: column; gap: 5px; max-width: calc(100% - 40px); }
-.kpi-label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-/* Số tiền lớn (vd -88.327.832 ₫) có thể rộng hơn thẻ KPI ở màn hẹp — cho phép co cỡ chữ
-   và xuống dòng an toàn thay vì tràn (nowrap) ra ngoài viền thẻ. */
+.kpi-body { display: flex; flex-direction: column; gap: 5px; max-width: calc(100% - 38px); }
+.kpi-label { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .kpi-value {
-    font-size: clamp(1rem, 1.4vw + 0.6rem, 1.4rem); font-weight: 700; color: var(--text-primary);
-    font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: normal;
-    overflow-wrap: break-word; line-height: 1.2;
+  font-size: clamp(1rem, 1.3vw + 0.6rem, 1.35rem); font-weight: 600; color: var(--text-primary);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: normal;
+  overflow-wrap: break-word; line-height: 1.2;
 }
 .kpi-value.text-success { color: var(--success-color) !important; }
 .kpi-value.text-danger { color: var(--danger-color) !important; }
 
 /* =========================================================================
-   5. BALANCE CARDS (tiền mặt / dư nợ) — bỏ viền trái màu trang trí, dùng
-   màu ở icon để giữ tín hiệu ngữ nghĩa (xanh=tiền mặt, đỏ=nợ, vàng=ròng).
+   5. BALANCE STRIP (tiền mặt / dư nợ / vốn ròng)
    ========================================================================= */
-.balance-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.balance-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 22px; }
 .balance-card {
-    background: var(--card-bg); padding: 16px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-soft); display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--card-bg); padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.balance-card label { font-weight: 600; color: var(--text-primary); font-size: 0.875rem; display: flex; align-items: center; gap: 10px; }
-.balance-card label i { font-size: 1.05rem; color: var(--success-color); }
-.balance-card.debt label i { color: var(--danger-color); }
-.balance-card.net label i { color: var(--gold); }
+.balance-card label { font-weight: 600; color: var(--text-secondary); font-size: 0.82rem; display: flex; align-items: center; gap: 9px; }
+.balance-card label::before { content: ""; width: 3px; height: 20px; border-radius: 2px; background: var(--success-color); flex-shrink: 0; }
+.balance-card.debt label::before { background: var(--danger-color); }
+.balance-card.net label::before { background: var(--gold); }
+.balance-card label i { font-size: 0.98rem; color: var(--text-muted); }
 .money-input {
-    background: var(--hover-bg); border: 1px solid var(--border-strong); padding: 9px 13px; border-radius: var(--radius-sm);
-    font-size: 1rem; font-weight: 700; color: var(--text-primary); width: 170px; outline: none;
-    text-align: right; font-family: var(--font-mono); transition: var(--transition-fast);
-    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--bg-color-2); border: 1px solid var(--border-strong); padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size: 0.95rem; font-weight: 500; color: var(--text-primary); width: 160px; outline: none;
+  text-align: right; font-family: var(--font-mono); transition: var(--transition-fast);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .money-input:focus { background: var(--card-bg); border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
-/* Vốn ròng là số tính toán, không phải ô nhập — dùng lại hình dạng money-input nhưng vô hiệu tương tác/focus */
-.money-input-readonly { display: inline-flex; align-items: center; justify-content: flex-end; border-style: dashed; cursor: default; }
+.money-input-readonly { display: inline-flex; align-items: center; justify-content: flex-end; border-style: dashed; cursor: default; color: var(--gold-light); }
+.money-input-readonly.text-success { color: var(--success-color); }
+.money-input-readonly.text-danger { color: var(--danger-color); }
 
 /* =========================================================================
-   6. TABS
+   6. TABS — segmented control gạch chân
    ========================================================================= */
-.task-view-toggle.asset-tab-toggle { display: flex; gap: 4px; margin-bottom: 18px; background: var(--card-bg); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: fit-content; box-shadow: var(--shadow-soft); }
-.view-toggle-btn {
-    border: none; background: none; padding: 8px 16px; border-radius: var(--radius-sm); font-weight: 600;
-    font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; transition: var(--transition-fast);
-    display: inline-flex; align-items: center; gap: 7px;
+.task-view-toggle.asset-tab-toggle { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+.asset-tab-toggle .view-toggle-btn { border-radius: 0; padding: 10px 4px; margin-right: 22px; }
+.ledger-sub-toggle {
+  display: inline-flex; gap: 2px; margin-bottom: 18px; background: var(--card-bg); padding: 4px;
+  border-radius: var(--radius-pill); border: 1px solid var(--border-color); box-shadow: var(--shadow-soft); width: fit-content;
 }
-.view-toggle-btn:hover { color: var(--text-primary); }
-.view-toggle-btn.active { background: var(--gold-dim); color: var(--gold-light); box-shadow: inset 0 -2px 0 var(--gold); }
-.asset-tab-panel { animation: finFadeIn 0.22s ease; }
+.view-toggle-btn {
+  border: none; background: none; padding: 7px 14px; border-radius: var(--radius-pill); font-weight: 600;
+  font-size: 0.8125rem; color: var(--text-muted); cursor: pointer; transition: var(--transition-fast);
+  display: inline-flex; align-items: center; gap: 7px; position: relative;
+}
+.view-toggle-btn:hover { color: var(--text-secondary); }
+.ledger-sub-toggle .view-toggle-btn.active { background: var(--card-bg-elevated); color: var(--text-primary); box-shadow: var(--shadow-soft); }
+.asset-tab-toggle .view-toggle-btn.active { background: none; color: var(--text-primary); box-shadow: none; }
+.asset-tab-toggle .view-toggle-btn.active::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--finance-accent);
+}
+.asset-tab-panel { animation: finFadeIn 0.2s ease; }
 @keyframes finFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .asset-tab-panel { animation: none; } }
 
 /* =========================================================================
    7. CONTROL PANEL (chọn mã / thành viên)
    ========================================================================= */
 .control-panel {
-    background: var(--card-bg); padding: 16px 18px; border-radius: var(--radius-md); margin-bottom: 20px;
-    box-shadow: var(--shadow-soft); border: 1px solid var(--border-color);
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: var(--card-bg); padding: 15px 17px; border-radius: var(--radius-md); margin-bottom: 20px;
+  box-shadow: var(--shadow-soft); border: 1px solid var(--border-color);
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
-.control-panel label { font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; }
+.control-panel label { font-weight: 600; color: var(--text-secondary); font-size: 0.84rem; display: inline-flex; align-items: center; gap: 8px; }
 .control-panel select, #stock-select, #stock-year-select, #member-select {
-    padding: 9px 13px; font-size: 0.9rem; font-weight: 600; border-radius: var(--radius-sm); min-width: 220px;
-    outline: none; cursor: pointer; color: var(--text-primary); background-color: var(--hover-bg);
-    border: 1px solid var(--border-strong); transition: var(--transition-fast);
+  padding: 8px 12px; font-size: 0.88rem; font-weight: 600; border-radius: var(--radius-sm); min-width: 220px;
+  outline: none; cursor: pointer; color: var(--text-primary); background-color: var(--bg-color-2);
+  border: 1px solid var(--border-strong); transition: var(--transition-fast);
 }
 .control-panel select:focus, #stock-select:focus, #stock-year-select:focus, #member-select:focus {
-    background-color: var(--card-bg); border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim);
+  background-color: var(--card-bg); border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim);
 }
 #stock-year-select { min-width: 110px; }
 
-.target-user-switcher {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--finance-accent-subtle); padding: 6px 14px; border-radius: var(--radius-pill);
-    border: 1px solid rgba(154, 107, 13, 0.3);
-}
-.target-user-switcher label { font-size: 0.78rem; font-weight: 600; color: var(--finance-accent); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.target-user-switcher select { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); font-size: 0.78rem; font-family: var(--font-body); max-width: 220px; }
-
 /* =========================================================================
-   8. TABLE — mật độ/kiểu chữ lấy đúng theo th/td của src/styles.css.
+   8. TABLE
    ========================================================================= */
-.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 18px; }
+.spreadsheet-wrapper { background: var(--card-bg); padding: 0; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 16px; }
 .spreadsheet-wrapper:last-child { margin-bottom: 0; }
 
 .asset-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: 0.8125rem; }
 .asset-table thead th {
-    text-align: left; font-size: 0.6875rem; letter-spacing: 0.03em; text-transform: uppercase;
-    color: var(--text-muted); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+  text-align: left; font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 700; padding: 11px 15px; border-bottom: 1px solid var(--border-color);
+  background: var(--card-bg); white-space: nowrap;
 }
 .asset-table thead th.text-right { text-align: right; }
 .asset-table thead th.text-center { text-align: center; }
-.asset-table tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border-color); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.asset-table tbody td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.asset-table tbody td:not(:first-child) { font-family: var(--font-mono); }
+.asset-table tbody td.text-right { text-align: right; }
+.asset-table tbody td.text-center { text-align: center; }
 .asset-table tbody tr:last-child td { border-bottom: none; }
 .asset-table tbody tr { transition: background-color var(--dur) var(--ease); }
-.asset-table tbody tr:nth-child(even):not(:hover) td { background-color: var(--bg-color-2); }
-.asset-table tbody tr:hover td { background-color: var(--hover-bg); }
-.asset-table .empty-state { text-align: center; padding: 42px 20px; color: var(--text-muted); font-variant-numeric: normal; }
-.asset-table .empty-state i { display: block; font-size: 1.75rem; margin-bottom: 10px; color: var(--border-strong); }
+.asset-table tbody tr:hover td { background-color: var(--bg-color-2); }
+.asset-table .empty-state { text-align: center; padding: 44px 20px; color: var(--text-muted); font-variant-numeric: normal; font-family: var(--font-body); }
+.asset-table .empty-state i { display: block; font-size: 1.7rem; margin-bottom: 10px; color: var(--border-strong); }
 
-/* Hàng tổng: chỉ đậm chữ + viền trên, không tô nền màu vàng (đúng .totrow của bản gốc) */
-.table-total-row td { font-weight: 700; border-top: 2px solid var(--border-strong); }
-.table-email-row td { background: var(--hover-bg); color: var(--text-primary); font-weight: 700; font-size: 0.95rem; padding: 11px 14px; }
-.table-header-row td { background: var(--hover-bg); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.03em; border-bottom: 1px solid var(--border-color); text-align: center; }
-.table-highlight-row td { background-color: var(--gold-dim) !important; font-weight: 600; }
-.table-nav-row td { color: var(--gold-light); font-weight: 700; border-top: 2px solid var(--gold); }
+.table-total-row td { font-weight: 700; border-top: 2px solid var(--border-strong) !important; background: var(--card-bg); }
+.table-email-row td { background: var(--card-bg-elevated); color: var(--text-primary); font-weight: 700; font-size: 0.9rem; padding: 12px 15px; }
+.table-header-row td { background: var(--bg-color-2); color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-color); text-align: center; }
+.table-highlight-row td { background-color: var(--finance-accent-subtle) !important; font-weight: 600; }
+.table-nav-row td { color: var(--finance-accent); font-weight: 700; border-top: 2px solid var(--finance-accent-line); }
 
 .symbol-cell { display: flex; align-items: center; gap: 10px; }
-.symbol-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.symbol-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 .symbol-name { font-weight: 700; color: var(--text-primary); letter-spacing: 0.01em; }
+.symbol-sub { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 500; font-family: var(--font-body); margin-top: 1px; }
+
+/* Thanh tỷ trọng inline trong cột */
+.weight-cell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.weight-bar { width: 58px; height: 4px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
+.weight-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--finance-accent); }
+
+/* Ô lãi/lỗ xếp 2 dòng (số tuyệt đối trên, % dưới) */
+.pnl-stack { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.25; }
+.pnl-stack .pnl-abs { font-weight: 600; }
+.pnl-stack .pnl-pct { font-size: 0.72rem; }
+.pnl-stack.pnl-up { color: var(--success-color); }
+.pnl-stack.pnl-down { color: var(--danger-color); }
+.pnl-stack.pnl-flat { color: var(--text-muted); }
 
 .price-input {
-    width: 108px; text-align: right; padding: 6px 9px; border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm); background: var(--hover-bg); color: var(--text-primary);
-    font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 0.8125rem;
+  width: 104px; text-align: right; padding: 6px 9px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary);
+  font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; font-size: 0.8125rem;
 }
 .price-input:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
 
 /* =========================================================================
    9. PILLS / BADGES
    ========================================================================= */
-.pnl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius-pill); font-weight: 600; font-size: 0.71875rem; font-variant-numeric: tabular-nums; }
+.pnl-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: var(--radius-pill); font-weight: 600; font-size: 0.71875rem; font-variant-numeric: tabular-nums; }
 .pnl-pill.pnl-up { background: var(--success-bg); color: var(--success-color); }
 .pnl-pill.pnl-down { background: var(--danger-bg); color: var(--danger-color); }
 .pnl-pill.pnl-flat { background: var(--hover-bg); color: var(--text-secondary); }
 
-.txn-type-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.txn-type-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: var(--radius-pill); font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .txn-type-badge.buy { background: var(--success-bg); color: var(--success-color); }
 .txn-type-badge.sell { background: var(--danger-bg); color: var(--danger-color); }
 
 .role-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600; background: var(--finance-accent-subtle); color: var(--finance-accent); margin: 2px 4px 2px 0; }
 .role-badge-none { background: var(--hover-bg); color: var(--text-secondary); }
 
+/* Nhãn định tính (Hiệu suất) */
+.perf-tag { display: inline-flex; align-self: flex-start; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); letter-spacing: 0.02em; }
+.perf-tag.good { background: var(--success-bg); color: var(--success-color); }
+.perf-tag.mid { background: var(--gold-dim); color: var(--gold); }
+.perf-tag.warn { background: var(--danger-bg); color: var(--danger-color); }
+
 /* =========================================================================
-   10. HOLDINGS LAYOUT + ALLOCATION CHART
+   10. HOLDINGS LAYOUT + ALLOCATION
    ========================================================================= */
-.holdings-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+.holdings-layout { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 16px; align-items: start; }
 .allocation-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 18px; }
-.allocation-card h3 { margin: 0 0 14px 0; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.allocation-card h3 { margin: 0 0 4px 0; font-size: 0.82rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .allocation-card h3 i { color: var(--text-muted); }
-.allocation-chart-box { position: relative; height: 180px; margin-bottom: 14px; }
-.allocation-legend { display: flex; flex-direction: column; gap: 7px; }
-.allocation-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
-.allocation-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.allocation-legend-name { flex: 1; color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.allocation-legend-pct { font-family: var(--font-mono); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.allocation-empty { text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 28px 10px; }
+.allocation-card .alloc-cap { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px; }
+.allocation-chart-box { position: relative; height: 190px; margin-bottom: 8px; }
+.allocation-legend { display: flex; flex-direction: column; }
+.allocation-legend-item { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 9px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border-color); font-size: 0.78rem; }
+.allocation-legend-item:first-child { border-top: 0; }
+.allocation-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.allocation-legend-name { color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.allocation-legend-val { font-family: var(--font-mono); font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+.allocation-legend-pct { font-family: var(--font-mono); font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+.allocation-empty { text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 26px 10px; }
 
 /* =========================================================================
    11. TRANSACTION FORM
    ========================================================================= */
-.txn-form { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px 20px; margin-bottom: 18px; box-shadow: var(--shadow-soft); }
-.txn-form-title { margin: 0 0 14px 0; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.txn-form { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
+.txn-form-title { margin: 0 0 15px 0; font-size: 0.82rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .txn-form-title i { color: var(--text-muted); }
-.txn-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; align-items: end; }
+.txn-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 12px; align-items: end; }
 .txn-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .txn-field.txn-field-wide { grid-column: span 2; }
-.txn-field label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.txn-field label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .txn-form select, .txn-form input {
-    padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-    background: var(--hover-bg); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); width: 100%;
-    transition: var(--transition-fast);
+  padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg-color-2); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); width: 100%;
+  transition: var(--transition-fast);
 }
 .txn-form input[type="number"], .txn-form input[type="date"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .txn-form select:focus, .txn-form input:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
 
 .grant-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: end; }
 .grant-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.grant-field label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
-.grant-field select { padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--hover-bg); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); width: 100%; transition: var(--transition-fast); }
-.grant-field select:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
+.grant-field label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.grant-field select, .grant-field input { padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); width: 100%; transition: var(--transition-fast); }
+.grant-field select:focus, .grant-field input:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
 
 /* =========================================================================
    12. PERFORMANCE TAB
    ========================================================================= */
-.perf-stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.perf-stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.perf-stats-row .kpi-card { display: flex; flex-direction: column; gap: 6px; }
 .perf-chart-wrapper { padding: 20px; }
-.perf-chart-title { margin: 0 0 14px 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
+.perf-chart-title { margin: 0 0 14px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
 .perf-chart-title i { color: var(--text-muted); }
-.perf-chart-empty { text-align: center; padding: 56px 20px; color: var(--text-muted); }
-.perf-chart-empty i { display: block; font-size: 2rem; margin-bottom: 12px; color: var(--border-strong); }
+.perf-chart-empty { text-align: center; padding: 54px 20px; color: var(--text-muted); }
+.perf-chart-empty i { display: block; font-size: 1.9rem; margin-bottom: 12px; color: var(--border-strong); }
 
 /* =========================================================================
    13. STOCK HERO (Tổng hợp cổ phiếu)
    ========================================================================= */
 .stock-hero {
-    background: var(--card-bg); border: 1px solid var(--border-color);
-    border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 22px 24px; margin-bottom: 20px;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  background: var(--card-bg); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 22px 24px; margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
 }
 .stock-hero-id { display: flex; align-items: baseline; gap: 12px; }
 .stock-hero-symbol { font-family: var(--font-display); font-size: 1.9rem; font-weight: 400; color: var(--text-primary); letter-spacing: 0.01em; }
 .stock-hero-year { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); background: var(--hover-bg); padding: 4px 12px; border-radius: var(--radius-pill); }
 .stock-hero-price { text-align: right; }
-.stock-hero-price-label { display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 5px; }
+.stock-hero-price-label { display: block; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; }
 .stock-hero-price-value { font-family: var(--font-display); font-size: 1.7rem; font-weight: 400; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
-.stat-grid { display: grid; gap: 12px; margin-bottom: 8px; }
+.stat-grid { display: grid; gap: 11px; margin-bottom: 8px; }
 .stat-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
 .stat-grid:last-of-type { margin-bottom: 24px; }
 .stat-tile {
-    background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    box-shadow: var(--shadow-soft); padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;
+  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft); padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;
 }
-.stat-tile.stat-tile-highlight { background: var(--gold-dim); border-color: rgba(176, 137, 42, 0.3); }
-.stat-tile.stat-tile-highlight .stat-tile-value { color: var(--gold-light); font-size: 1.25rem; }
+.stat-tile.stat-tile-highlight { background: var(--finance-accent-subtle); border-color: var(--finance-accent-line); }
+.stat-tile.stat-tile-highlight .stat-tile-value { color: var(--finance-accent); font-size: 1.25rem; }
 .stat-tile-icon { color: var(--text-muted); font-size: 0.9rem; }
-.stat-tile-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.stat-tile-value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.stat-tile-label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-tile-value { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-.target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 10px; }
+.target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 10px; }
 .target-card { background: var(--card-bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 18px; text-align: center; }
-.target-card-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 10px; }
+.target-card-title { font-size: 0.8125rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
 .target-multiple { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
 .target-card-price { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-bottom: 8px; }
-.target-card-price-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; margin-top: 6px; }
+.target-card-price-label { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 6px; }
 
-.stock-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 20px; color: var(--text-muted); text-align: center; }
-.stock-empty-state i { font-size: 2.2rem; margin-bottom: 14px; color: var(--border-strong); }
+.stock-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 62px 20px; color: var(--text-muted); text-align: center; }
+.stock-empty-state i { font-size: 2.1rem; margin-bottom: 14px; color: var(--border-strong); }
 .stock-empty-state p { margin: 0; font-size: 0.9rem; }
 
 .trend-chart-wrapper { background: var(--card-bg); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); padding: 18px; margin-top: 18px; }
 
 /* =========================================================================
-   14. AUTOSHEET FORM (Định Giá Cổ Phiếu — nhập liệu)
+   14. AUTOSHEET FORM (Định Giá Cổ Phiếu)
    ========================================================================= */
 .calc-wrapper { background: var(--card-bg); padding: 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); border: 1px solid var(--border-color); }
 .stock-header { margin-bottom: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .stock-header-field { display: flex; flex-direction: column; gap: 5px; }
-.stock-header-field label { font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
+.stock-header-field label { font-size: 0.82rem; color: var(--text-secondary); font-weight: 600; }
 .stock-header-input {
-    font-size: 1.05rem; font-weight: 700; padding: 9px; width: 118px; text-align: center;
-    border: 1px solid var(--gold); border-radius: var(--radius-sm); color: var(--gold-light);
-    background: var(--hover-bg); font-family: var(--font-mono); transition: var(--transition-fast);
+  font-size: 1.05rem; font-weight: 700; padding: 9px; width: 118px; text-align: center;
+  border: 1px solid var(--gold); border-radius: var(--radius-sm); color: var(--gold-light);
+  background: var(--bg-color-2); font-family: var(--font-mono); transition: var(--transition-fast);
 }
 .stock-header-input.year-input { width: 98px; }
 .stock-header-input:focus { outline: none; background: var(--card-bg); box-shadow: 0 0 0 3px var(--gold-dim); }
 
-.input-field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.input-field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 13px; margin-bottom: 8px; }
 .input-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.input-field label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.input-field label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .input-field-highlight-label { color: var(--gold-light) !important; }
 
 .input-val {
-    width: 100%; padding: 9px 12px; background: var(--hover-bg); border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600; text-align: right; outline: none;
-    box-sizing: border-box; font-family: var(--font-mono); transition: var(--transition-fast); color: var(--text-primary);
+  width: 100%; padding: 9px 12px; background: var(--bg-color-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 600; text-align: right; outline: none;
+  box-sizing: border-box; font-family: var(--font-mono); transition: var(--transition-fast); color: var(--text-primary);
 }
 .input-val:focus { border-color: var(--gold); background: var(--card-bg); box-shadow: 0 0 0 3px var(--gold-dim); }
-.highlight-input { border-color: rgba(28, 143, 90, 0.4); background-color: var(--success-bg); }
-.target-input { border-color: rgba(176, 137, 42, 0.4); color: var(--gold-light); background-color: var(--gold-dim); }
+.highlight-input { border-color: rgba(18, 133, 90, 0.4); background-color: var(--success-bg); }
+.target-input { border-color: rgba(154, 107, 13, 0.4); color: var(--gold-light); background-color: var(--gold-dim); }
 .target-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
 
 .output-val { font-weight: 600; font-family: var(--font-mono); color: var(--text-primary); }
@@ -428,7 +518,6 @@ body {
 small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top: 2px; font-weight: normal; }
 
 .target-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color); }
-
 .text-green { color: var(--success-color); }
 .text-red { color: var(--danger-color); }
 
@@ -441,7 +530,7 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .member-email { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
 
 /* =========================================================================
-   16. UTILITY / TEXT
+   16. UTILITY / HINT
    ========================================================================= */
 .text-right { text-align: right; }
 .text-center { text-align: center; }
@@ -449,26 +538,27 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .text-success { color: var(--success-color) !important; font-weight: 600 !important; }
 .text-danger { color: var(--danger-color) !important; font-weight: 600 !important; }
 .text-primary { color: var(--info-color) !important; }
+.text-muted { color: var(--text-muted) !important; }
 .guide-text, .fin-hint {
-    margin-top: 14px; padding: 12px 16px; background: var(--warning-bg);
-    color: var(--gold-light); border: 1px solid rgba(154, 107, 13, 0.3);
-    border-radius: var(--radius-sm); font-size: 0.82rem; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6;
+  margin-top: 14px; padding: 11px 15px; background: var(--gold-dim);
+  color: var(--text-secondary); border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-sm); font-size: 0.8rem; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6;
 }
+.guide-text b, .fin-hint b { color: var(--gold); }
 
 /* =========================================================================
-   17. TOAST — nền trung tính, chỉ viền đổi màu theo loại (đúng .toast của
-   bản gốc), thay vì tô nền đặc màu như trước.
+   17. TOAST
    ========================================================================= */
 .toast-notification {
-    position: fixed; top: 20px; right: 20px; padding: 13px 18px; border-radius: var(--radius-sm);
-    background: var(--card-bg); color: var(--text-primary); font-weight: 600; box-shadow: var(--shadow-modal); z-index: 10000;
-    display: flex; align-items: center; gap: 10px; font-size: 0.875rem; min-width: 300px;
-    border: 1px solid var(--border-strong);
-    animation: finSlideIn 0.32s cubic-bezier(0.4, 0, 0.2, 1), finFadeOut 0.4s 2.5s forwards;
+  position: fixed; top: 20px; right: 20px; padding: 12px 17px; border-radius: var(--radius-sm);
+  background: var(--card-bg); color: var(--text-primary); font-weight: 600; box-shadow: var(--shadow-modal); z-index: 10000;
+  display: flex; align-items: center; gap: 10px; font-size: 0.875rem; min-width: 300px;
+  border: 1px solid var(--border-strong); border-left: 3px solid var(--success-color);
+  animation: finSlideIn 0.32s cubic-bezier(0.4, 0, 0.2, 1), finFadeOut 0.4s 2.5s forwards;
 }
-.toast-success { border-color: rgba(28, 143, 90, 0.4); }
+.toast-success { border-left-color: var(--success-color); }
 .toast-success i { color: var(--success-color); }
-.toast-error { border-color: rgba(189, 59, 59, 0.4); }
+.toast-error { border-left-color: var(--danger-color); }
 .toast-error i { color: var(--danger-color); }
 @keyframes finSlideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes finFadeOut { to { opacity: 0; visibility: hidden; } }
@@ -476,21 +566,22 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 /* =========================================================================
    18. RESPONSIVE
    ========================================================================= */
-@media (max-width: 900px) {
-    .holdings-layout { grid-template-columns: 1fr; }
+@media (max-width: 940px) {
+  .asset-hero { grid-template-columns: 1fr; }
+  .holdings-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
-    .asset-container { padding: 0 12px; margin: 16px auto 40px; }
-    .top-bar { flex-direction: column; align-items: flex-start; }
-    .left-section, .right-section { width: 100%; justify-content: space-between; }
-    .back-link span { display: none; }
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .txn-field.txn-field-wide { grid-column: span 2; }
-    .stock-hero { flex-direction: column; align-items: flex-start; }
-    .stock-hero-price { text-align: left; }
-    .stat-grid-3, .stat-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .asset-container { padding: 0 12px; margin: 16px auto 44px; }
+  .top-bar { align-items: flex-start; }
+  .back-link span { display: none; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .txn-field.txn-field-wide { grid-column: span 2; }
+  .stock-hero { flex-direction: column; align-items: flex-start; }
+  .stock-hero-price { text-align: left; }
+  .stat-grid-3, .stat-grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 480px) {
-    .kpi-row { grid-template-columns: 1fr; }
-    .stat-grid-3, .stat-grid-4 { grid-template-columns: 1fr; }
+  .hero-grid { grid-template-columns: 1fr 1fr; }
+  .kpi-row, .balance-section { grid-template-columns: 1fr; }
+  .stat-grid-3, .stat-grid-4 { grid-template-columns: 1fr; }
 }
