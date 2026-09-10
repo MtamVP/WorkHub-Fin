@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -23,8 +23,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.1">
-    <link rel="stylesheet" href="/stocksheet/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.2">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=1789060000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -32,31 +32,40 @@
     <meta name="apple-mobile-web-app-title" content="WorkHub">
     <link rel="apple-touch-icon" href="/logo.png">
 </head>
-<body>
+<body class="desk">
 
-    <div class="asset-container">
-        
-        <div class="top-bar">
-            <div class="left-section">
-                <a href="/" class="back-link">
-                    <i class="fa-solid fa-house"></i> <span>Finance</span>
-                </a>
-                <h1>Tổng Hợp Cổ Phiếu</h1>
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Bàn Tài Sản</span>
             </div>
-
-            <div class="right-section">
-                <button onclick="loadStockList()" class="btn-refresh">
-                    <i class="fa-solid fa-rotate-right"></i> Làm mới
-                </button>
+            <nav class="desk-nav">
+                <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+                <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+                <a href="/stocksheet/" class="active"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+                <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
             </div>
         </div>
+    </header>
 
-        <nav class="fin-tool-nav">
-            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
-            <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
-            <a href="/stocksheet/" class="active"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
-            <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
-        </nav>
+    <div class="asset-container desk">
+
+        <div class="desk-byline">
+            <h1>Tổng hợp cổ phiếu</h1>
+            <span class="desk-who">
+                <span class="av"><i class="fa-solid fa-database"></i></span>
+                Bảng định giá đã lưu
+            </span>
+            <button onclick="loadStockList()" class="desk-iconbtn" title="Làm mới" aria-label="Làm mới"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
 
         <div class="control-panel">
             <label><i class="fa-solid fa-magnifying-glass"></i> Chọn mã cổ phiếu:</label>
@@ -109,9 +118,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../api.js?v=1788564459163"></script>
-    <script src="script.js?v=1788630490059"></script>
+    <script src="../api.js?v=1789060000000"></script>
+    <script src="script.js?v=1789060000000"></script>
 </body>
 </html>
-
-

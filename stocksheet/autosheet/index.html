@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Định Giá Cổ Phiếu | WorkHub Finance</title>
-    
+
     <link rel="icon" type="image/png" href="../../logo.png">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
@@ -25,8 +25,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.1">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.2">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1789060000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,32 +34,43 @@
     <meta name="apple-mobile-web-app-title" content="WorkHub">
     <link rel="apple-touch-icon" href="/logo.png">
 </head>
-<body>
+<body class="desk">
 
-    <div class="asset-container">
-        
-        <div class="top-bar">
-            <div class="left-section">
-                <a href="/" class="back-link">
-                    <i class="fa-solid fa-house"></i> <span>Finance</span>
-                </a>
-                <h1>Định Giá Cổ Phiếu</h1>
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Bàn Tài Sản</span>
             </div>
-
-            <div class="right-section">
-                <button onclick="saveToSheet()" class="btn-save btn-save-cloud" id="btn-save-sheet"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
-                <button onclick="resetData()" class="btn-refresh">
-                    <i class="fa-solid fa-rotate-right"></i> Nhập lại
-                </button>
+            <nav class="desk-nav">
+                <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+                <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+                <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+                <a href="/stocksheet/autosheet/" class="active"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
             </div>
         </div>
+    </header>
 
-        <nav class="fin-tool-nav">
-            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
-            <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
-            <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
-            <a href="/stocksheet/autosheet/" class="active"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
-        </nav>
+    <div class="asset-container desk">
+
+        <div class="desk-byline">
+            <h1>Định giá cổ phiếu</h1>
+            <span class="desk-who">
+                <span class="av"><i class="fa-solid fa-calculator"></i></span>
+                Máy tính P/E · P/B
+            </span>
+            <div class="desk-byline-actions">
+                <button onclick="saveToSheet()" class="btn-save btn-save-cloud" id="btn-save-sheet"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
+                <button onclick="resetData()" class="btn-refresh"><i class="fa-solid fa-rotate-right"></i> Nhập lại</button>
+            </div>
+        </div>
 
         <div class="calc-wrapper">
 
@@ -146,10 +157,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1788564459163"></script>
-    <script src="script.js?v=1788630490059"></script>
+    <script src="../../api.js?v=1789060000000"></script>
+    <script src="script.js?v=1789060000000"></script>
 
 </body>
 </html>
-
-

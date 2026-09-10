@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 2. Tự động tải bảng tổng hợp (QUAN TRỌNG: Phải gọi hàm này)
     loadTeamSummary();
+
+    // 3. Biểu đồ tổng NAV team theo thời gian
+    loadTeamNavHistory();
 });
 
 // --- Giao diện sáng / tối (chỉ 2 trang Bàn Tài Sản, khớp bản demo) ---
@@ -25,7 +28,97 @@ function toggleDeskTheme() {
     try { localStorage.setItem('user-theme', next); } catch (e) {}
     applyThemeIcon();
     loadTeamSummary();
+    loadTeamNavHistory();
     if (document.getElementById('member-select') && document.getElementById('member-select').value) loadMemberDetail();
+}
+
+// --- BIỂU ĐỒ: tổng NAV team theo thời gian (sparkline ở hero + area chart) ---
+let teamNavChartInstance = null;
+async function loadTeamNavHistory() {
+    try {
+        const response = await callGAS('getTeamNavHistory');
+        const history = (response && response.data) || [];
+        renderTeamNavSpark(history);
+        renderTeamNavChart(history);
+    } catch (e) {
+        console.warn('Lỗi loadTeamNavHistory:', e);
+    }
+}
+
+function renderTeamNavSpark(history) {
+    const box = document.getElementById('team-hero-spark');
+    const deltaEl = document.getElementById('team-hero-delta');
+    const vals = history.map(h => Number(h.nav) || 0).filter(v => v > 0);
+    if (!box) return;
+    if (vals.length < 2) { box.innerHTML = ''; if (deltaEl) deltaEl.textContent = ''; return; }
+    drawSparkline(box, vals);
+    if (deltaEl) {
+        const diff = vals[vals.length - 1] - vals[0];
+        const pct = vals[0] ? diff / vals[0] * 100 : 0;
+        const dir = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+        const arrow = diff > 0 ? '<i class="fa-solid fa-arrow-up"></i>' : (diff < 0 ? '<i class="fa-solid fa-arrow-down"></i>' : '');
+        deltaEl.className = 'hero-delta ' + dir;
+        deltaEl.innerHTML = `${arrow} ${(pct > 0 ? '+' : '')}${pct.toFixed(1)}% kể từ mốc đầu`;
+    }
+}
+
+function drawSparkline(el, vals) {
+    const w = el.clientWidth || 460, h = 44, pad = 3;
+    const mn = Math.min(...vals), mx = Math.max(...vals), rng = (mx - mn) || 1;
+    const x = i => pad + i * (w - pad * 2) / (vals.length - 1);
+    const y = v => h - pad - (v - mn) / rng * (h - pad * 2);
+    const line = vals.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+    const area = line + ` L${x(vals.length - 1).toFixed(1)} ${h} L${x(0).toFixed(1)} ${h} Z`;
+    const up = vals[vals.length - 1] >= vals[0];
+    const c = up ? cssVar('--success-color') : cssVar('--danger-color');
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <defs><linearGradient id="whTeamSpark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${c}" stop-opacity="0.20"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#whTeamSpark)"/>
+        <path d="${line}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${x(vals.length - 1).toFixed(1)}" cy="${y(vals[vals.length - 1]).toFixed(1)}" r="3" fill="${c}"/>
+    </svg>`;
+}
+
+function renderTeamNavChart(history) {
+    const wrapper = document.getElementById('team-nav-chart-wrapper');
+    const canvas = document.getElementById('teamNavChart');
+    if (!wrapper || !canvas) return;
+    if (teamNavChartInstance) { teamNavChartInstance.destroy(); teamNavChartInstance = null; }
+    if (!history || history.length < 2) { wrapper.style.display = 'none'; return; }
+    wrapper.style.display = 'block';
+
+    const accent = cssVar('--finance-accent');
+    const grid = cssVar('--border-color');
+    const ink = cssVar('--text-muted');
+    const g = canvas.getContext('2d').createLinearGradient(0, 0, 0, 280);
+    g.addColorStop(0, cssVar('--finance-accent-subtle'));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+
+    teamNavChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: history.map(h => h.snapshot_date),
+            datasets: [{
+                data: history.map(h => Number(h.nav) || 0),
+                borderColor: accent, borderWidth: 2, fill: true, backgroundColor: g,
+                tension: 0.28, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: accent
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: ink, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 16 } },
+                y: { grid: { color: grid }, border: { display: false }, ticks: { color: ink, font: { size: 11 }, callback: v => Math.round(v / 1e6).toLocaleString('vi-VN') + 'tr' } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => ' Tổng NAV ' + Number(c.raw).toLocaleString('vi-VN') + ' ₫' } }
+            }
+        }
+    });
 }
 
 // --- 1. TẢI DANH SÁCH THÀNH VIÊN ---

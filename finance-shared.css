@@ -156,6 +156,7 @@ body {
 .desk-who .av { width: 18px; height: 18px; border-radius: 50%; background: var(--gold-dim); color: var(--gold); display: grid; place-items: center; font-size: 0.62rem; font-weight: 700; flex-shrink: 0; }
 .desk-who select { border: 0; background: transparent; font: inherit; font-weight: 600; color: var(--text-primary); cursor: pointer; padding: 0; }
 .desk-who select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+.desk-byline-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* =========================================================================
    1. TOP BAR + BYLINE + TOOL SWITCHER

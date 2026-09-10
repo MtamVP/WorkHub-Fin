@@ -1,6 +1,20 @@
 /* --- FILE: /stocksheet/autosheet/script.js --- */
 
+// --- Giao diện sáng / tối (Bàn Tài Sản) ---
+function applyThemeIcon() {
+    const ic = document.getElementById('theme-ic');
+    if (!ic) return;
+    ic.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+function toggleDeskTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('user-theme', next); } catch (e) {}
+    applyThemeIcon();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    applyThemeIcon();
     // Tự động tính toán lần đầu (nếu có dữ liệu cũ trong cache trình duyệt hoặc mặc định)
     calculate();
 

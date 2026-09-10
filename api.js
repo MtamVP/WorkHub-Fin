@@ -1872,6 +1872,19 @@ const API = {
             });
             return result;
         },
+        // Tổng NAV toàn team theo ngày — cộng nav mọi thành viên finance/admin từ
+        // finance_nav_history. Dùng cho biểu đồ "NAV team theo thời gian" ở trang Tổng Hợp TS.
+        getTeamNavHistory: async () => {
+            const { data: members } = await sbClient.from('users').select('id').in('group_key', ['finance', 'admin']);
+            const ids = (members || []).map(m => m.id);
+            if (!ids.length) return [];
+            const { data, error } = await sbClient.from('finance_nav_history')
+                .select('snapshot_date, nav').in('user_id', ids).order('snapshot_date', { ascending: true });
+            if (error) throw error;
+            const byDate = {};
+            (data || []).forEach(r => { byDate[r.snapshot_date] = (byDate[r.snapshot_date] || 0) + (Number(r.nav) || 0); });
+            return Object.keys(byDate).sort().map(d => ({ snapshot_date: d, nav: byDate[d] }));
+        },
         getMemberList: async () => {
             const { data } = await sbClient.from('users').select('email').in('group_key', ['finance', 'admin']);
             return data ? data.map(d => d.email) : [];
@@ -2989,6 +3002,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getTaskHistory': result = await API.task.getHistory(params.taskId); break;
 
             case 'getTeamSummary': result = await API.asset.getTeamSummary(); break;
+            case 'getTeamNavHistory': result = await API.asset.getTeamNavHistory(); break;
             case 'getMemberList': result = await API.asset.getMemberList(); break;
             case 'getMemberDetail': result = await API.asset.getMemberDetail(params.email); break;
             case 'listAssetTransactions': result = await API.asset.listTransactions(params.email); break;
