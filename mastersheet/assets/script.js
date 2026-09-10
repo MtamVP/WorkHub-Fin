@@ -12,6 +12,53 @@ const TAB_LOADED = { holdings: false, ledger: false, performance: false };
 const LEDGER_SUB_LOADED = { cashflow: false, corporate: false };
 const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
 
+// Tên gọn một số mã VN phổ biến — chỉ để hiện dòng phụ dưới ticker trong bảng danh mục.
+const VN_NAMES = {
+    FPT: 'Tập đoàn FPT', HPG: 'Hoà Phát', MWG: 'Thế Giới Di Động', VNM: 'Vinamilk',
+    VCB: 'Vietcombank', TCB: 'Techcombank', MBB: 'MB Bank', ACB: 'ACB', VPB: 'VPBank',
+    CTG: 'VietinBank', BID: 'BIDV', SSI: 'Chứng khoán SSI', VND: 'VNDirect', HCM: 'HSC',
+    DGC: 'Hoá chất Đức Giang', GAS: 'PV Gas', PLX: 'Petrolimex', POW: 'PV Power',
+    VIC: 'Vingroup', VHM: 'Vinhomes', VRE: 'Vincom Retail', MSN: 'Masan', SAB: 'Sabeco',
+    GVR: 'Cao su VN', DPM: 'Đạm Phú Mỹ', DCM: 'Đạm Cà Mau', PNJ: 'PNJ', REE: 'REE',
+    STB: 'Sacombank', SHB: 'SHB', HDB: 'HDBank', TPB: 'TPBank', EIB: 'Eximbank',
+    KDH: 'Khang Điền', NLG: 'Nam Long', DXG: 'Đất Xanh', PDR: 'Phát Đạt', DIG: 'DIC Corp',
+    HSG: 'Hoa Sen', NKG: 'Nam Kim', BSR: 'Lọc dầu Bình Sơn', PVS: 'PTSC', PVD: 'PV Drilling',
+    VJC: 'Vietjet', HVN: 'Vietnam Airlines', GMD: 'Gemadept', FRT: 'FPT Retail', DBC: 'Dabaco'
+};
+
+// --- Giao diện sáng / tối (chỉ 2 trang Bàn Tài Sản, khớp bản demo) ---
+function applyThemeIcon() {
+    const ic = document.getElementById('theme-ic');
+    if (!ic) return;
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    ic.className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+function toggleDeskTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('user-theme', next); } catch (e) {}
+    applyThemeIcon();
+    // Vẽ lại mọi biểu đồ theo token màu mới
+    loadHoldings();
+    loadHeroSpark();
+    if (TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); }
+}
+
+// --- Nút gạt Mua / Bán cho form giao dịch ---
+function pickTxnType(btn) {
+    btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    const hidden = document.getElementById('txn-type');
+    if (hidden) hidden.value = btn.dataset.v;
+}
+function resetTxnTypeSeg() {
+    const seg = document.querySelector('#txn-form .seg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === 'buy')));
+    const hidden = document.getElementById('txn-type');
+    if (hidden) hidden.value = 'buy';
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
     // Trang này tạo sbClient riêng (qua api.js) khi mở/điều hướng lại, và việc khôi phục phiên
     // đăng nhập Supabase từ localStorage có thể chưa xong nếu tải liền các truy vấn ngay bên
@@ -67,8 +114,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     await loadHoldings();
     loadHeroSpark();
 
+    applyThemeIcon();
+
     const txnForm = document.getElementById('txn-form');
-    if (txnForm) txnForm.addEventListener('submit', handleTxnSubmit);
+    if (txnForm) {
+        txnForm.addEventListener('submit', handleTxnSubmit);
+        txnForm.addEventListener('reset', () => setTimeout(resetTxnTypeSeg, 0));
+    }
     const cashflowForm = document.getElementById('cashflow-form');
     if (cashflowForm) cashflowForm.addEventListener('submit', handleCashFlowSubmit);
     const corpActionForm = document.getElementById('corpaction-form');
@@ -225,6 +277,7 @@ async function loadHoldings() {
         if (holdings.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
             renderAllocationChart([]);
+            renderHeroFoot(0);
             return;
         }
 
@@ -233,13 +286,15 @@ async function loadHoldings() {
         tbody.innerHTML = holdings.map((h, idx) => {
             const dotColor = allocationColorFor(idx);
             const weightPct = totalMv > 0 ? (Number(h.marketValue) || 0) / totalMv * 100 : 0;
+            const sym = escapeAssetHtml(h.symbol);
+            const sub = VN_NAMES[String(h.symbol || '').toUpperCase()];
             return `
                 <tr>
-                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${escapeAssetHtml(h.symbol)}</span></span></td>
+                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span></span></td>
                     <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
                     <td class="text-right">
-                        <input type="text" class="price-input" data-symbol="${escapeAssetHtml(h.symbol)}"
+                        <input type="text" class="price-input" data-symbol="${sym}"
                             value="${Number(h.marketPrice).toLocaleString('en-US')}"
                             onchange="handleMarketPriceChange(this)">
                     </td>
@@ -251,9 +306,20 @@ async function loadHoldings() {
         }).join('');
 
         renderAllocationChart(holdings);
+        renderHeroFoot(holdings.length);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="8" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
     }
+}
+
+// Dòng chân dưới NAV ở hero: số mã + vốn ròng (đọc lại từ ô đã tính sẵn).
+function renderHeroFoot(holdingCount) {
+    const el = document.getElementById('hero-foot');
+    if (!el) return;
+    const netTxt = (document.getElementById('disp-net-capital') || {}).textContent || '';
+    const parts = [`<span>${holdingCount} mã đang nắm giữ</span>`];
+    if (netTxt && netTxt !== '0 ₫') parts.push(`<span>Vốn ròng <b>${escapeAssetHtml(netTxt)}</b></span>`);
+    el.innerHTML = parts.join('');
 }
 
 // Ô lãi/lỗ 2 dòng (số tuyệt đối + %) — dùng cho cột "Lãi/lỗ" của bảng Danh Mục.
@@ -280,16 +346,19 @@ function allocationColorFor(idx) {
 function renderAllocationChart(holdings) {
     const canvas = document.getElementById('allocationChart');
     const legendBox = document.getElementById('allocation-legend');
+    const centerBox = document.getElementById('alloc-center');
     if (!canvas || !legendBox) return;
     if (allocationChartInstance) { allocationChartInstance.destroy(); allocationChartInstance = null; }
 
     const withValue = (holdings || []).filter(h => h.marketValue > 0);
     if (withValue.length === 0) {
         canvas.style.display = 'none';
+        if (centerBox) centerBox.innerHTML = '';
         legendBox.innerHTML = '<div class="allocation-empty"><i class="fa-solid fa-chart-pie" style="display:block; font-size:1.6rem; margin-bottom:8px; opacity:.4;"></i>Chưa có dữ liệu để vẽ cơ cấu.</div>';
         return;
     }
     canvas.style.display = 'block';
+    if (centerBox) centerBox.innerHTML = `<div><div class="dc-big">${withValue.length} mã</div><div class="dc-lbl">nắm giữ</div></div>`;
 
     // Gộp các mã ngoài top 4 vào "Khác" — giữ chart dễ đọc, không sinh thêm hue mới (đúng nguyên tắc categorical palette)
     const sorted = [...withValue].sort((a, b) => b.marketValue - a.marketValue);
@@ -313,6 +382,7 @@ function renderAllocationChart(holdings) {
         type: 'doughnut',
         data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: cssVar('--card-bg'), hoverOffset: 6 }] },
         options: {
+            cutout: '64%',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {

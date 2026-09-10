@@ -11,8 +11,10 @@
    allocation-*, txn-form, --finance-accent, --card-bg, --series-1..4...) vì
    script.js của cả 5 trang render HTML động bằng đúng các tên này.
 
-   Luôn dùng giao diện sáng bất kể site đang ở chế độ tối mặc định — quyết
-   định của người dùng, áp dụng nhất quán trên cả 5 trang (body ép token sáng).
+   Sáng là mặc định cho cả 5 trang. RIÊNG 2 trang Bàn Tài Sản (<body class="desk">)
+   có thêm chế độ TỐI + thanh trên cùng dạng "bàn giao dịch" (khớp bản demo đã
+   chốt) — token tối chỉ áp trong phạm vi body.desk nên 3 trang cổ phiếu/phân
+   quyền không đổi.
    ========================================================================= */
 
 body {
@@ -66,11 +68,94 @@ body {
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 
+/* --- Chế độ TỐI: chỉ trong body.desk (2 trang Bàn Tài Sản) --- */
+:root[data-theme="dark"] body.desk {
+  --bg-color: #12130F;
+  --bg-color-2: #191A13;
+  --card-bg: #1A1B15;
+  --card-bg-elevated: #21221A;
+  --text-primary: #EDE9DE;
+  --text-secondary: #A8A093;
+  --text-muted: #7C766A;
+  --border-color: rgba(237, 233, 222, 0.12);
+  --border-strong: rgba(237, 233, 222, 0.22);
+  --hover-bg: #262720;
+
+  --finance-accent: #55BE93;
+  --finance-accent-hover: #63C9A0;
+  --finance-accent-subtle: rgba(85, 190, 147, 0.14);
+  --finance-accent-line: rgba(85, 190, 147, 0.32);
+  --gold: #D9A441;
+  --gold-light: #E4B662;
+  --gold-dim: rgba(217, 164, 65, 0.16);
+
+  --success-color: #3DBA87; --success-bg: rgba(61, 186, 135, 0.15);
+  --danger-color: #E8695B;  --danger-bg: rgba(232, 105, 91, 0.15);
+  --warning-color: #D9A441; --warning-bg: rgba(217, 164, 65, 0.15);
+  --info-color: #5AA3F0;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --shadow-gold: 0 6px 18px rgba(0, 0, 0, 0.4);
+
+  --series-1: #5AA3F0; --series-2: #F5C04A; --series-3: #46C99A; --series-4: #9F90EC;
+  --series-5: #E884B4; --series-other: #A8A29A;
+}
+:root[data-theme="dark"] body.desk { background-color: var(--bg-color); color: var(--text-primary); }
+
 * { box-sizing: border-box; }
 .num, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 .asset-container { max-width: 1200px; margin: 26px auto 72px; padding: 0 22px; }
 .asset-container.narrow { max-width: 960px; }
+
+/* =========================================================================
+   0. DESK TOP BAR (2 trang Bàn Tài Sản) — wordmark + pill nav + điều khiển
+   ========================================================================= */
+.desk-topbar {
+  position: sticky; top: 0; z-index: 40;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-color) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.desk-topbar-inner {
+  max-width: 1240px; margin: 0 auto; padding: 0 22px; height: 58px;
+  display: flex; align-items: center; gap: 16px;
+}
+.desk-wordmark { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-primary); white-space: nowrap; }
+.desk-wordmark .glyph { width: 24px; height: 24px; border-radius: 6px; background: var(--finance-accent); display: grid; place-items: center; color: #fff; flex-shrink: 0; }
+:root[data-theme="dark"] body.desk .desk-wordmark .glyph { color: #0E241C; }
+.desk-wordmark .sub { color: var(--text-muted); font-weight: 500; }
+
+.desk-nav { display: flex; gap: 2px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-pill); padding: 3px; }
+.desk-nav a {
+  text-decoration: none; font-weight: 600; font-size: 0.78rem; color: var(--text-secondary);
+  padding: 6px 13px; border-radius: var(--radius-pill); display: inline-flex; align-items: center; gap: 7px;
+  transition: var(--transition-fast); white-space: nowrap;
+}
+.desk-nav a:hover { color: var(--text-primary); }
+.desk-nav a.active { background: var(--card-bg-elevated); color: var(--text-primary); box-shadow: var(--shadow-soft); }
+.desk-nav a i { font-size: 0.72rem; }
+
+.desk-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.desk-sync { font-size: 0.72rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.desk-sync .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success-color); }
+.desk-iconbtn {
+  width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);
+  background: var(--card-bg); color: var(--text-secondary); cursor: pointer; display: grid; place-items: center;
+  transition: var(--transition-fast);
+}
+.desk-iconbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+.desk-byline { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 24px 0 18px; }
+.desk-byline h1 { margin: 0; font-family: var(--font-body); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.015em; color: var(--text-primary); }
+.desk-who {
+  font-size: 0.75rem; color: var(--text-secondary); border: 1px solid var(--border-color); background: var(--card-bg);
+  padding: 3px 12px 3px 6px; border-radius: var(--radius-pill); display: inline-flex; align-items: center; gap: 7px;
+}
+.desk-who .av { width: 18px; height: 18px; border-radius: 50%; background: var(--gold-dim); color: var(--gold); display: grid; place-items: center; font-size: 0.62rem; font-weight: 700; flex-shrink: 0; }
+.desk-who select { border: 0; background: transparent; font: inherit; font-weight: 600; color: var(--text-primary); cursor: pointer; padding: 0; }
+.desk-who select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
 
 /* =========================================================================
    1. TOP BAR + BYLINE + TOOL SWITCHER
@@ -397,6 +482,10 @@ body {
 .allocation-card h3 i { color: var(--text-muted); }
 .allocation-card .alloc-cap { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px; }
 .allocation-chart-box { position: relative; height: 190px; margin-bottom: 8px; }
+.donut-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none; }
+.donut-center .dc-big { font-family: var(--font-mono); font-weight: 500; font-size: 0.95rem; color: var(--text-primary); }
+.donut-center .dc-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.donut-center:empty { display: none; }
 .allocation-legend { display: flex; flex-direction: column; }
 .allocation-legend-item { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 9px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border-color); font-size: 0.78rem; }
 .allocation-legend-item:first-child { border-top: 0; }
@@ -423,6 +512,13 @@ body {
 }
 .txn-form input[type="number"], .txn-form input[type="date"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .txn-form select:focus, .txn-form input:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
+
+/* Nút gạt Mua / Bán (thay <select> loại lệnh) */
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { border: 0; background: var(--bg-color-2); font: inherit; font-weight: 600; font-size: 0.85rem; padding: 8px 15px; cursor: pointer; color: var(--text-secondary); transition: var(--transition-fast); }
+.seg button + button { border-left: 1px solid var(--border-strong); }
+.seg button[aria-pressed="true"][data-v="buy"] { background: var(--success-bg); color: var(--success-color); }
+.seg button[aria-pressed="true"][data-v="sell"] { background: var(--danger-bg); color: var(--danger-color); }
 
 .grant-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: end; }
 .grant-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -569,6 +665,11 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 @media (max-width: 940px) {
   .asset-hero { grid-template-columns: 1fr; }
   .holdings-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 780px) {
+  .desk-topbar-inner { height: auto; flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+  .desk-nav { order: 3; width: 100%; overflow-x: auto; }
+  .desk-sync .txt { display: none; }
 }
 @media (max-width: 768px) {
   .asset-container { padding: 0 12px; margin: 16px auto 44px; }

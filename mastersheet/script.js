@@ -4,13 +4,29 @@ const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--seri
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Page Loaded. Initializing...");
-    
+    applyThemeIcon();
+
     // 1. Tải danh sách thành viên vào dropdown
     loadMemberList();
-    
+
     // 2. Tự động tải bảng tổng hợp (QUAN TRỌNG: Phải gọi hàm này)
     loadTeamSummary();
 });
+
+// --- Giao diện sáng / tối (chỉ 2 trang Bàn Tài Sản, khớp bản demo) ---
+function applyThemeIcon() {
+    const ic = document.getElementById('theme-ic');
+    if (!ic) return;
+    ic.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+function toggleDeskTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('user-theme', next); } catch (e) {}
+    applyThemeIcon();
+    loadTeamSummary();
+    if (document.getElementById('member-select') && document.getElementById('member-select').value) loadMemberDetail();
+}
 
 // --- 1. TẢI DANH SÁCH THÀNH VIÊN ---
 async function loadMemberList() {
@@ -213,15 +229,18 @@ let teamChartInstance = null;
 function renderChart(labels, data, colors) {
     const canvas = document.getElementById('teamChart');
     const legendBox = document.getElementById('team-legend');
+    const centerBox = document.getElementById('team-center');
     if (!canvas || !legendBox) return;
     if (teamChartInstance) { teamChartInstance.destroy(); teamChartInstance = null; }
 
     if (!data || data.length === 0) {
         canvas.style.display = 'none';
+        if (centerBox) centerBox.innerHTML = '';
         legendBox.innerHTML = '<div class="allocation-empty"><i class="fa-solid fa-chart-pie" style="display:block; font-size:1.6rem; margin-bottom:8px; opacity:.4;"></i>Chưa có dữ liệu để vẽ cơ cấu.</div>';
         return;
     }
     canvas.style.display = 'block';
+    if (centerBox) centerBox.innerHTML = `<div><div class="dc-big">${data.length} người</div><div class="dc-lbl">có NAV</div></div>`;
 
     const total = data.reduce((s, v) => s + v, 0);
     const ctx = canvas.getContext('2d');
@@ -239,6 +258,7 @@ function renderChart(labels, data, colors) {
             }]
         },
         options: {
+            cutout: '64%',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {

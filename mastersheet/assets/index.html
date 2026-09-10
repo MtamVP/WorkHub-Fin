@@ -24,8 +24,8 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.0">
-    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789050000000">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.1">
+    <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,31 +34,42 @@
     <link rel="apple-touch-icon" href="/logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
 </head>
-<body>
+<body class="desk">
+
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Bàn Tài Sản</span>
+            </div>
+            <nav class="desk-nav">
+                <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
+                <a href="/mastersheet/assets/" class="active"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
+                <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
+                <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
+            </div>
+        </div>
+    </header>
 
     <div class="asset-container desk">
-        <header class="top-bar">
-            <div class="left-section">
-                <a href="/" class="back-link">
-                    <i class="fa-solid fa-house"></i> <span>Finance</span>
-                </a>
-                <h1>Danh mục đầu tư</h1>
-            </div>
-            <div class="right-section">
-                <div id="target-user-switcher" class="target-user-switcher" style="display:none;">
-                    <label for="target-user-select"><i class="fa-solid fa-user-pen"></i> Đang xem của</label>
-                    <select id="target-user-select"></select>
-                </div>
-                <span id="user-display"><i class="fa-solid fa-user"></i> Đang tải...</span>
-            </div>
-        </header>
-
-        <nav class="fin-tool-nav">
-            <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Tổng Hợp TS</a>
-            <a href="/mastersheet/assets/" class="active"><i class="fa-solid fa-sack-dollar"></i> Nhập Liệu TS</a>
-            <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Tổng Hợp CP</a>
-            <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
-        </nav>
+        <div class="desk-byline">
+            <h1>Danh mục đầu tư</h1>
+            <span class="desk-who">
+                <span class="av" id="desk-av"><i class="fa-solid fa-shield-halved"></i></span>
+                <span id="user-display">Đang tải...</span>
+            </span>
+            <span class="desk-who" id="target-user-switcher" style="display:none;">
+                <span class="av"><i class="fa-solid fa-user-pen"></i></span>
+                Đang xem&nbsp;<select id="target-user-select"></select>
+            </span>
+        </div>
 
         <!-- HERO: NAV lớn + chỉ số phụ -->
         <section class="asset-hero">
@@ -67,6 +78,7 @@
                 <span class="hero-nav-figure" id="kpi-nav">--</span>
                 <span class="hero-delta" id="hero-delta"></span>
                 <div class="hero-spark" id="hero-spark"></div>
+                <div class="hero-foot" id="hero-foot"></div>
             </div>
             <div class="hero-grid" id="kpi-row">
                 <div class="mini-kpi" id="kpi-card-unrealized">
@@ -133,6 +145,7 @@
                     <div class="alloc-cap">Theo giá trị thị trường</div>
                     <div class="allocation-chart-box">
                         <canvas id="allocationChart"></canvas>
+                        <div class="donut-center" id="alloc-center"></div>
                     </div>
                     <div class="allocation-legend" id="allocation-legend"></div>
                 </div>
@@ -152,11 +165,12 @@
                     <h3 class="txn-form-title"><i class="fa-solid fa-plus-circle"></i> Thêm Lệnh Giao Dịch</h3>
                     <div class="txn-form-grid">
                         <div class="txn-field">
-                            <label for="txn-type">Loại lệnh</label>
-                            <select id="txn-type" required>
-                                <option value="buy">Mua</option>
-                                <option value="sell">Bán</option>
-                            </select>
+                            <label>Loại lệnh</label>
+                            <div class="seg" role="group" aria-label="Loại lệnh">
+                                <button type="button" data-v="buy" aria-pressed="true" onclick="pickTxnType(this)">Mua</button>
+                                <button type="button" data-v="sell" aria-pressed="false" onclick="pickTxnType(this)">Bán</button>
+                            </div>
+                            <input type="hidden" id="txn-type" value="buy">
                         </div>
                         <div class="txn-field">
                             <label for="txn-symbol">Mã</label>
@@ -379,7 +393,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=1788564459163"></script>
-    <script src="script.js?v=1789050000000"></script>
+    <script src="script.js?v=1789060000000"></script>
 
 </body>
 </html>
