@@ -1654,26 +1654,84 @@ const API = {
         },
 
         // --- Danh mục hiện tại: khối lượng + giá vốn (từ sổ lệnh) ghép với giá TT (nhập tay/tự động) ---
+        // Giá mục tiêu suy ra từ trang Định Giá CP: trung bình các giá theo P/E và P/B mục tiêu (chỉ lấy
+        // phần dương). EPS/BVPS dùng đúng công thức của stocksheet/autosheet/script.js (mệnh giá 10.000).
+        _valuationTarget: (d) => {
+            const v1 = Number(d && d.v1) || 0;
+            if (!v1) return null;
+            const eps = (Number(d.v3) || 0) / v1 * 10000;
+            const bvps = (Number(d.v2) || 0) / v1 * 10000;
+            const parts = [(Number(d.targetPE) || 0) * eps, (Number(d.targetPB) || 0) * bvps].filter(p => p > 0);
+            return parts.length ? parts.reduce((s, p) => s + p, 0) / parts.length : null;
+        },
+
         getHoldingsView: async (email) => {
             const userId = await getUserId(email);
             const holdings = await API.asset.computeHoldings(userId);
-            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price, locked').eq('user_id', userId);
+            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price, locked, target_price, stop_loss').eq('user_id', userId);
             const priceMap = {};
-            (prices || []).forEach(p => { priceMap[p.symbol] = { price: Number(p.market_price) || 0, locked: !!p.locked }; });
+            (prices || []).forEach(p => {
+                priceMap[p.symbol] = {
+                    price: Number(p.market_price) || 0, locked: !!p.locked,
+                    target: Number(p.target_price) || 0, stop: Number(p.stop_loss) || 0
+                };
+            });
+
+            // Định giá mới nhất theo từng mã đang nắm giữ (bảng dùng chung, mỗi mã nhiều năm -> lấy năm lớn nhất)
+            const valuationBySymbol = {};
+            const symbols = holdings.map(h => h.symbol);
+            if (symbols.length) {
+                const { data: vals } = await sbClient.from('finance_stock_valuations')
+                    .select('symbol, year, data').in('symbol', symbols).order('year', { ascending: false });
+                (vals || []).forEach(v => {
+                    if (valuationBySymbol[v.symbol]) return;
+                    const t = API.asset._valuationTarget(v.data);
+                    if (t) valuationBySymbol[v.symbol] = { target: t, year: v.year };
+                });
+            }
 
             return holdings.map(h => {
                 const entry = priceMap[h.symbol];
                 const marketPrice = entry ? entry.price : 0;
                 const costValue = h.avgCost * h.quantity;
                 const marketValue = marketPrice * h.quantity;
+                const manualTarget = entry ? entry.target : 0;
+                const valuation = valuationBySymbol[h.symbol];
+                const targetPrice = manualTarget || (valuation ? Math.round(valuation.target) : 0);
+                const targetSource = manualTarget ? 'manual' : (valuation ? 'valuation' : null);
+                const stopLoss = entry ? entry.stop : 0;
                 return {
                     symbol: h.symbol, quantity: h.quantity, avgCost: h.avgCost, marketPrice,
                     priceLocked: entry ? entry.locked : false,
+                    targetPrice, targetSource, targetYear: targetSource === 'valuation' ? valuation.year : null,
+                    stopLoss,
+                    upsidePct: targetPrice > 0 && marketPrice > 0 ? ((targetPrice - marketPrice) / marketPrice) * 100 : null,
+                    stopDistancePct: stopLoss > 0 && marketPrice > 0 ? ((stopLoss - marketPrice) / marketPrice) * 100 : null,
                     costValue, marketValue,
                     unrealizedPnl: marketValue - costValue,
                     unrealizedPct: costValue > 0 ? ((marketValue - costValue) / costValue) * 100 : 0
                 };
             });
+        },
+
+        // kind: 'target' (giá mục tiêu thủ công, ghi đè giá từ Định Giá CP) | 'stop' (ngưỡng cắt lỗ).
+        // value rỗng/0 = xoá. Chỉ ghi đúng 1 cột nên không đụng giá TT/khóa giá do cron quản lý.
+        setHoldingLevel: async (email, symbol, kind, value) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const cleanSymbol = String(symbol || '').trim().toUpperCase();
+            if (!cleanSymbol) throw new Error("Thiếu mã danh mục");
+            const column = kind === 'target' ? 'target_price' : (kind === 'stop' ? 'stop_loss' : null);
+            if (!column) throw new Error("Loại ngưỡng không hợp lệ");
+            const num = Number(value);
+            if (value !== null && value !== '' && (!isFinite(num) || num < 0)) throw new Error("Giá không hợp lệ");
+            const { error } = await sbClient.from('finance_holdings_price').upsert({
+                user_id: userId, symbol: cleanSymbol,
+                [column]: num > 0 ? num : null
+            }, { onConflict: 'user_id,symbol' });
+            if (error) throw error;
+            const label = kind === 'target' ? 'giá mục tiêu' : 'ngưỡng cắt lỗ';
+            return num > 0 ? `Đã lưu ${label} của ${cleanSymbol}` : `Đã xoá ${label} của ${cleanSymbol}`;
         },
 
         // --- Tiền mặt / dư nợ (vẫn dùng bảng finance_assets, chỉ 2 cột này còn "thủ công") ---
@@ -3006,7 +3064,7 @@ const MUTATING_ACTIONS = new Set([
     'uploadFile', 'deleteFile', 'shareFile',
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
-    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setCashDebt', 'saveStockValuation',
+    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
@@ -3108,6 +3166,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getHoldingsView': result = await API.asset.getHoldingsView(params.email); break;
             case 'setMarketPrice': result = await API.asset.setMarketPrice(params.email, params.symbol, params.price); break;
             case 'togglePriceLock': result = await API.asset.togglePriceLock(params.email, params.symbol, params.locked); break;
+            case 'setHoldingLevel': result = await API.asset.setHoldingLevel(params.email, params.symbol, params.kind, params.value); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;

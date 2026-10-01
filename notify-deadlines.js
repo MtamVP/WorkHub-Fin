@@ -1,5 +1,6 @@
 (function () {
     var POLL_MS = 5 * 60 * 1000;
+    var PRICE_POLL_MS = 15 * 60 * 1000;
     var GROUP_KEY = 'finance';
 
     // toISOString().slice(0,10) trước đây lấy ngày theo UTC -- mốc "sang ngày mới" (reset
@@ -134,6 +135,51 @@
         if (changed) saveNotifiedTo(personalTodayKey(), notified);
     }
 
+    function priceAlertsKey() {
+        return 'wh_notified_price_alerts_' + localDateKey();
+    }
+
+    // Cảnh báo giá danh mục: giá TT chạm giá mục tiêu (từ Định Giá CP hoặc nhập tay) hoặc thủng ngưỡng
+    // cắt lỗ. Mỗi mức báo tối đa 1 lần/ngày (khoá gồm cả mức giá, nên đổi mức sẽ báo lại). Chỉ báo khi app
+    // đang chạy -- giá tự cập nhật mỗi giờ phiên giao dịch bởi cron fetch-stock-prices.
+    async function checkPriceAlerts() {
+        var email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
+        if (!email || typeof window.callGAS !== 'function') return;
+        var res;
+        try { res = await window.callGAS('getHoldingsView', { email: email }); }
+        catch (e) { return; }
+        if (!res || res.status !== 'success' || !Array.isArray(res.data)) return;
+
+        var notified = loadNotifiedFrom(priceAlertsKey());
+        var changed = false;
+        var fmt = function (n) { return Number(n).toLocaleString('vi-VN'); };
+
+        res.data.forEach(function (h) {
+            var price = Number(h.marketPrice) || 0;
+            if (price <= 0) return;
+            var target = Number(h.targetPrice) || 0;
+            var stop = Number(h.stopLoss) || 0;
+            if (target > 0 && price >= target) {
+                var tKey = h.symbol + ':target:' + target;
+                if (!notified.has(tKey)) {
+                    fire('Chạm giá mục tiêu: ' + h.symbol, 'Giá ' + fmt(price) + ' ≥ mục tiêu ' + fmt(target) + ' — cân nhắc chốt lời.');
+                    notified.add(tKey);
+                    changed = true;
+                }
+            }
+            if (stop > 0 && price <= stop) {
+                var sKey = h.symbol + ':stop:' + stop;
+                if (!notified.has(sKey)) {
+                    fire('Chạm ngưỡng cắt lỗ: ' + h.symbol, 'Giá ' + fmt(price) + ' ≤ ngưỡng ' + fmt(stop) + ' — cân nhắc cắt lỗ.');
+                    notified.add(sKey);
+                    changed = true;
+                }
+            }
+        });
+
+        if (changed) saveNotifiedTo(priceAlertsKey(), notified);
+    }
+
     async function start() {
         // Xin quyền thông báo TRƯỚC, đợi xong mới chạy check()/checkPersonalEvents() --
         // trước đây gọi 2 hàm này song song không đợi nhau, nên checkPersonalEvents() (vốn
@@ -142,8 +188,10 @@
         await ensureNotificationPermission();
         check();
         checkPersonalEvents();
+        checkPriceAlerts();
         setInterval(check, POLL_MS);
         setInterval(checkPersonalEvents, POLL_MS);
+        setInterval(checkPriceAlerts, PRICE_POLL_MS);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

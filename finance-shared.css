@@ -463,6 +463,21 @@ body {
 .price-lock-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
 .price-lock-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* Cột "Mục tiêu / Cắt lỗ": 2 hàng nhập nhỏ, % cách giá hiện tại bên phải */
+.levels-cell { display: inline-flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+.level-row { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-sm); padding: 1px 4px 1px 2px; }
+.level-icon { width: 14px; font-size: 0.68rem; color: var(--text-muted); text-align: center; }
+.level-input { width: 84px; padding: 4px 7px; font-size: 0.75rem; }
+.level-input::placeholder { color: var(--text-muted); opacity: 0.85; }
+.level-pct { min-width: 44px; text-align: right; font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.level-pct.pnl-up { color: var(--success-color); }
+.level-pct.pnl-down { color: var(--danger-color); }
+.level-pct.pnl-flat { color: var(--text-muted); }
+.level-row.level-hit { background: var(--gold-dim); }
+.level-row.level-hit .level-icon { color: var(--gold); }
+.level-row.level-hit-stop { background: color-mix(in srgb, var(--danger-color) 14%, transparent); }
+.level-row.level-hit-stop .level-icon { color: var(--danger-color); }
+
 /* =========================================================================
    9. PILLS / BADGES
    ========================================================================= */

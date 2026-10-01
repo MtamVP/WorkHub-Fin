@@ -268,14 +268,14 @@ function setKpi(id, value, isMoney, colorByValue) {
 async function loadHoldings() {
     const tbody = document.getElementById('holdings-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
         const response = await callGAS('getHoldingsView', { email: targetEmail });
         const holdings = response.data || [];
 
         if (holdings.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
             renderAllocationChart([]);
             renderHeroFoot(0);
             return;
@@ -306,6 +306,7 @@ async function loadHoldings() {
                             </button>
                         </span>
                     </td>
+                    <td class="text-right">${renderLevelsCell(h, sym)}</td>
                     <td class="text-right">${Number(h.costValue).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.marketValue).toLocaleString('en-US')}</td>
                     <td class="text-right"><span class="weight-cell"><span>${weightPct.toFixed(1)}%</span><span class="weight-bar"><i style="width:${Math.min(weightPct, 100).toFixed(1)}%;background:${dotColor};"></i></span></span></td>
@@ -316,7 +317,53 @@ async function loadHoldings() {
         renderAllocationChart(holdings);
         renderHeroFoot(holdings.length);
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
+    }
+}
+
+// Ô "Mục tiêu / Cắt lỗ": 2 dòng, mỗi dòng 1 ô nhập + % cách giá hiện tại. Giá mục tiêu để trống thì
+// dùng giá từ Định Giá CP (hiện làm placeholder + nhãn nguồn); nhập tay sẽ ghi đè.
+function renderLevelsCell(h, sym) {
+    const fmt = (n) => Number(n).toLocaleString('en-US');
+    const pctTxt = (p) => (p === null || p === undefined) ? '' : `${p > 0 ? '+' : (p < 0 ? '−' : '')}${Math.abs(p).toFixed(1)}%`;
+    const pctCls = (p) => p > 0 ? 'pnl-up' : (p < 0 ? 'pnl-down' : 'pnl-flat');
+
+    const isManual = h.targetSource === 'manual';
+    const targetTitle = h.targetSource === 'valuation'
+        ? `Từ Định Giá CP (năm ${h.targetYear}): trung bình giá theo P/E và P/B mục tiêu. Nhập giá để ghi đè.`
+        : (isManual ? 'Giá mục tiêu nhập tay. Xoá trống để quay về giá từ Định Giá CP.' : 'Chưa có giá mục tiêu — nhập giá, hoặc lưu định giá ở trang Định Giá CP.');
+    const targetShown = isManual ? fmt(h.targetPrice) : '';
+    const targetHint = h.targetSource === 'valuation' ? fmt(h.targetPrice) : '—';
+    const hit = h.targetPrice > 0 && h.marketPrice >= h.targetPrice;
+    const stopHit = h.stopLoss > 0 && h.marketPrice > 0 && h.marketPrice <= h.stopLoss;
+
+    return `<span class="levels-cell">
+        <span class="level-row${hit ? ' level-hit' : ''}" title="${escapeAssetHtml(targetTitle)}">
+            <i class="fa-solid fa-bullseye level-icon"></i>
+            <input type="text" class="price-input level-input" data-symbol="${sym}" data-kind="target"
+                value="${targetShown}" placeholder="${targetHint}" onchange="handleLevelChange(this)">
+            <span class="level-pct ${pctCls(h.upsidePct)}">${pctTxt(h.upsidePct)}</span>
+        </span>
+        <span class="level-row${stopHit ? ' level-hit level-hit-stop' : ''}" title="Ngưỡng cắt lỗ — app báo khi giá thị trường chạm hoặc thấp hơn mức này. Xoá trống để tắt.">
+            <i class="fa-solid fa-shield-halved level-icon"></i>
+            <input type="text" class="price-input level-input" data-symbol="${sym}" data-kind="stop"
+                value="${h.stopLoss > 0 ? fmt(h.stopLoss) : ''}" placeholder="—" onchange="handleLevelChange(this)">
+            <span class="level-pct ${pctCls(h.stopDistancePct)}">${pctTxt(h.stopDistancePct)}</span>
+        </span>
+    </span>`;
+}
+
+async function handleLevelChange(input) {
+    const symbol = input.dataset.symbol;
+    const kind = input.dataset.kind;
+    const raw = input.value.trim();
+    const value = raw === '' ? null : parseMoney(raw);
+    try {
+        const resp = await callGAS('setHoldingLevel', { email: targetEmail, symbol, kind, value });
+        showToast(resp.message, 'success');
+        await loadHoldings();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
     }
 }
 

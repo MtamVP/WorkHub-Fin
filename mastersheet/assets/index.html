@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.3">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.4">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
@@ -131,12 +131,14 @@
                         <thead>
                             <tr>
                                 <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
-                                <th class="text-right">Giá TT (nhập tay)</th><th class="text-right">GT vốn</th>
+                                <th class="text-right">Giá TT (nhập tay)</th>
+                                <th class="text-right" title="Giá mục tiêu (mặc định lấy từ trang Định Giá CP, có thể nhập đè) và ngưỡng cắt lỗ — app sẽ báo khi giá chạm">Mục tiêu / Cắt lỗ</th>
+                                <th class="text-right">GT vốn</th>
                                 <th class="text-right">GTTT</th><th class="text-right">Tỷ trọng</th><th class="text-right">Lãi/lỗ</th>
                             </tr>
                         </thead>
                         <tbody id="holdings-body">
-                            <tr><td colspan="8" class="empty-state">Đang tải...</td></tr>
+                            <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -392,8 +394,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1790900000000"></script>
-    <script src="script.js?v=1789060000000"></script>
+    <script src="../../api.js?v=1791000000000"></script>
+    <script src="script.js?v=1791000000000"></script>
 
 </body>
 </html>
