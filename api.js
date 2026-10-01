@@ -1469,8 +1469,11 @@ const API = {
         },
         // Sổ lệnh FIFO chuẩn kế toán: lô cũ nhất bán trước. Hành động doanh nghiệp (tách/gộp,
         // cổ tức cổ phiếu) được replay xen kẽ theo đúng ex_date để điều chỉnh khối lượng/giá vốn hồi tố.
-        // Trả về map { symbol: [{quantity, cost}, ...] } — thứ tự mảng = thứ tự mua (lô cũ nhất ở đầu).
-        computeLots: async (userId) => {
+        // Dùng chung bởi computeLots (trạng thái lô hiện tại) và recomputeRealizedPnl (lãi/lỗ đã chốt
+        // của MỌI lệnh bán) — 1 lượt replay duy nhất theo đúng thứ tự thời gian thực (trade_date rồi
+        // created_at), để sửa/xóa lệnh cũ (thêm lệnh mua lùi ngày, xóa hành động doanh nghiệp, v.v.)
+        // không để lại số liệu đã lưu bị lỗi thời ở các lệnh bán khác.
+        _replayFifo: async (userId) => {
             const { data: txns, error } = await sbClient.from('finance_transactions')
                 .select('*').eq('user_id', userId).is('deleted_at', null)
                 .order('trade_date', { ascending: true }).order('created_at', { ascending: true });
@@ -1484,6 +1487,7 @@ const API = {
             ].sort((a, b) => (new Date(a._date) - new Date(b._date)) || (new Date(a._ts) - new Date(b._ts)));
 
             const lotsBySymbol = {};
+            const realizedPnlByTxnId = {};
             events.forEach(ev => {
                 if (ev._kind === 'action') {
                     const lots = lotsBySymbol[ev.symbol];
@@ -1500,16 +1504,35 @@ const API = {
                 if (ev.type === 'buy') {
                     lots.push({ quantity: qty, cost: Number(ev.price) || 0 });
                 } else {
-                    let remaining = qty;
+                    let remaining = qty, realized = 0;
+                    const price = Number(ev.price) || 0;
                     while (remaining > 1e-9 && lots.length) {
                         const lot = lots[0];
                         const consumed = Math.min(lot.quantity, remaining);
+                        realized += (price - lot.cost) * consumed;
                         lot.quantity -= consumed; remaining -= consumed;
                         if (lot.quantity <= 1e-9) lots.shift();
                     }
+                    realizedPnlByTxnId[ev.id] = realized;
                 }
             });
+            return { lotsBySymbol, realizedPnlByTxnId };
+        },
+        // Trả về map { symbol: [{quantity, cost}, ...] } — thứ tự mảng = thứ tự mua (lô cũ nhất ở đầu).
+        computeLots: async (userId) => {
+            const { lotsBySymbol } = await API.asset._replayFifo(userId);
             return lotsBySymbol;
+        },
+        // Replay lại toàn bộ lịch sử và ghi đè realized_pnl cho MỌI lệnh bán theo đúng FIFO thời gian
+        // thực — gọi sau mỗi lần thêm/xóa giao dịch hoặc hành động doanh nghiệp, để lệnh bán cũ không
+        // bao giờ "đứng yên" với số lãi/lỗ tính từ trạng thái lô đã lỗi thời.
+        recomputeRealizedPnl: async (userId) => {
+            const { realizedPnlByTxnId } = await API.asset._replayFifo(userId);
+            const ids = Object.keys(realizedPnlByTxnId);
+            for (const id of ids) {
+                await sbClient.from('finance_transactions').update({ realized_pnl: realizedPnlByTxnId[id] }).eq('id', id);
+            }
+            return ids.length;
         },
         // Tổng hợp lô FIFO thành khối lượng + giá vốn bình quân hiện tại của từng mã (để hiển thị danh mục)
         computeHoldings: async (userId) => {
@@ -1529,31 +1552,26 @@ const API = {
             const price = Number(txn.price) || 0;
             if (quantity <= 0) throw new Error("Khối lượng phải lớn hơn 0");
 
-            let realizedPnl = null;
             if (txn.type === 'sell') {
-                // Lãi/lỗ đã chốt tính theo FIFO: tiêu thụ lô cũ nhất trước, không phải giá vốn bình quân
+                // Chặn bán vượt khối lượng đang có, theo trạng thái lô hiện tại — đủ cho use-case
+                // thông thường (nhập đúng thứ tự thời gian). Lãi/lỗ đã chốt CHÍNH XÁC của lệnh này
+                // (và mọi lệnh bán khác) được tính lại ngay dưới qua recomputeRealizedPnl(), không
+                // tính tay ở đây — tránh bị sai nếu lệnh được nhập lùi ngày so với các lệnh đã có.
                 const lotsBySymbol = await API.asset.computeLots(userId);
-                const lots = (lotsBySymbol[symbol] || []).map(l => ({ ...l }));
-                const totalAvail = lots.reduce((s, l) => s + l.quantity, 0);
+                const totalAvail = (lotsBySymbol[symbol] || []).reduce((s, l) => s + l.quantity, 0);
                 if (totalAvail < quantity - 1e-9) throw new Error(`Không đủ khối lượng "${symbol}" để bán (đang có ${totalAvail})`);
-                let remaining = quantity, realized = 0;
-                while (remaining > 1e-9 && lots.length) {
-                    const lot = lots[0];
-                    const consumed = Math.min(lot.quantity, remaining);
-                    realized += (price - lot.cost) * consumed;
-                    lot.quantity -= consumed; remaining -= consumed;
-                    if (lot.quantity <= 1e-9) lots.shift();
-                }
-                realizedPnl = realized;
             }
 
             const { error } = await sbClient.from('finance_transactions').insert({
                 user_id: userId, symbol, type: txn.type === 'sell' ? 'sell' : 'buy', quantity, price,
                 fee: Number(txn.fee) || 0,
                 trade_date: txn.tradeDate || new Date().toISOString().slice(0, 10),
-                note: txn.note || null, realized_pnl: realizedPnl, created_by: email
+                note: txn.note || null, realized_pnl: null, created_by: email
             });
             if (error) throw error;
+            // Luôn replay lại (kể cả lệnh mua) — 1 lệnh mua lùi ngày trước các lệnh bán đã có cũng
+            // làm thay đổi thứ tự tiêu thụ lô FIFO của những lệnh bán đó.
+            await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
             return "Đã lưu lệnh giao dịch!";
         },
@@ -1562,6 +1580,8 @@ const API = {
             const { error } = await sbClient.from('finance_transactions')
                 .update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
             if (error) throw error;
+            // Xóa 1 lệnh mua có thể làm đổi hẳn lô FIFO mà các lệnh bán sau đó đã tiêu thụ.
+            await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
             return "Đã xóa lệnh giao dịch!";
         },
@@ -1694,6 +1714,9 @@ const API = {
                     note: action.note || null, created_by: email
                 });
                 if (error) throw error;
+                // Split/cổ tức CP làm đổi hệ số quy đổi của mọi lô mua trước ex_date -> lãi/lỗ đã
+                // chốt của các lệnh bán sau đó (tính theo giá vốn/lô đã điều chỉnh) cần tính lại.
+                await API.asset.recomputeRealizedPnl(userId);
                 await API.asset.recomputeAndSnapshot(email);
                 return "Đã ghi nhận hành động doanh nghiệp!";
             },
@@ -1702,6 +1725,7 @@ const API = {
                 const { error } = await sbClient.from('finance_corporate_actions')
                     .update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
                 if (error) throw error;
+                await API.asset.recomputeRealizedPnl(userId);
                 await API.asset.recomputeAndSnapshot(email);
                 return "Đã xóa hành động doanh nghiệp!";
             }
@@ -1798,7 +1822,7 @@ const API = {
         getPerformanceMetrics: async (email) => {
             const history = await API.asset.getNavHistory(email);
             if (!history || history.length < 2) {
-                return { sharpe: null, maxDrawdown: null, volatility: null, annualizedReturn: null, dataPoints: history ? history.length : 0, benchmark: null };
+                return { sharpe: null, maxDrawdown: null, volatility: null, annualizedReturn: null, cumulativeReturn: null, dataPoints: history ? history.length : 0, benchmark: null };
             }
 
             // Lợi nhuận ngày "sạch": bỏ qua các ngày có nạp/rút vốn vì NAV bị méo bởi tiền góp
@@ -1819,6 +1843,10 @@ const API = {
             const annualizedReturn = meanReturn * 252;
             // Sharpe giả định lãi suất phi rủi ro = 0 — đơn giản hóa hợp lý cho một portfolio nội bộ
             const sharpe = annualizedVol > 0 ? annualizedReturn / annualizedVol : null;
+            // Time-Weighted Return: nối các lợi nhuận ngày "sạch" theo kiểu lãi kép (geometric linking) —
+            // đo đúng hiệu quả đầu tư thực, không bị méo bởi quy mô/thời điểm nạp-rút vốn như %
+            // tăng trưởng NAV thô (last/first). Chuẩn ngành cho báo cáo hiệu suất danh mục cá nhân.
+            const cumulativeReturn = n > 0 ? (dailyReturns.reduce((acc, r) => acc * (1 + r), 1) - 1) * 100 : null;
 
             // Max Drawdown trên chuỗi NAV thực tế (không loại ngày có dòng tiền — đây là mức sụt
             // giá trị tài khoản nhà đầu tư thực sự trải qua, kể cả khi có rút vốn giữa chừng)
@@ -1849,7 +1877,7 @@ const API = {
                 }
             } catch (e) { /* chưa có dữ liệu VN-Index — bỏ qua phần benchmark, không chặn các chỉ số khác */ }
 
-            return { sharpe, maxDrawdown: maxDD, volatility: annualizedVol, annualizedReturn, dataPoints: n, benchmark };
+            return { sharpe, maxDrawdown: maxDD, volatility: annualizedVol, annualizedReturn, cumulativeReturn, dataPoints: n, benchmark };
         },
 
         // --- Trang "Tổng hợp" của cả team ---

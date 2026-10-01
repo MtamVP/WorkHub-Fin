@@ -779,34 +779,27 @@ async function loadPerformanceChart() {
     }
 }
 
+// Chỉ hiển thị mức tăng/giảm NAV tuyệt đối (VND) — phần % dùng TWR, tính ở loadPerformanceMetrics()
+// (xem bên dưới) vì đó mới là nơi có sẵn chuỗi lợi nhuận ngày "sạch" đã loại trừ nạp/rút vốn.
 function renderPerfStats(history) {
     const returnEl = document.getElementById('perf-total-return');
-    const pctEl = document.getElementById('perf-total-return-pct');
-    if (!returnEl || !pctEl) return;
+    if (!returnEl) return;
 
     if (!history || history.length < 2) {
         returnEl.textContent = '--';
-        pctEl.textContent = '--';
         setPerfTag('perf-total-return-tag', null);
-        setPerfTag('perf-pct-tag', null);
         return;
     }
 
     const first = Number(history[0].nav) || 0;
     const last = Number(history[history.length - 1].nav) || 0;
     const diff = last - first;
-    const pct = first !== 0 ? (diff / first) * 100 : 0;
 
     returnEl.textContent = formatVnd(diff);
     returnEl.classList.toggle('text-success', diff > 0);
     returnEl.classList.toggle('text-danger', diff < 0);
-    pctEl.textContent = (pct > 0 ? '+' : '') + pct.toFixed(2) + '%';
-    pctEl.classList.toggle('text-success', pct > 0);
-    pctEl.classList.toggle('text-danger', pct < 0);
 
     setPerfTag('perf-total-return-tag', diff >= 0 ? 'good' : 'warn', diff >= 0 ? 'Đang lãi' : 'Đang lỗ');
-    setPerfTag('perf-pct-tag', pct >= 10 ? 'good' : (pct >= 0 ? 'mid' : 'warn'),
-        pct >= 10 ? 'Tốt' : (pct >= 0 ? 'Trung bình' : 'Âm'));
 }
 
 function renderNavChart(history) {
@@ -870,6 +863,16 @@ async function loadPerformanceMetrics() {
     try {
         const response = await callGAS('getPerformanceMetrics', { email: targetEmail });
         const m = response.data || {};
+
+        const pctEl = document.getElementById('perf-total-return-pct');
+        if (pctEl) {
+            const hasTwr = m.cumulativeReturn !== null && m.cumulativeReturn !== undefined;
+            pctEl.textContent = hasTwr ? (m.cumulativeReturn > 0 ? '+' : '') + m.cumulativeReturn.toFixed(2) + '%' : '--';
+            pctEl.classList.toggle('text-success', m.cumulativeReturn > 0);
+            pctEl.classList.toggle('text-danger', m.cumulativeReturn < 0);
+            setPerfTag('perf-pct-tag', hasTwr ? (m.cumulativeReturn >= 10 ? 'good' : (m.cumulativeReturn >= 0 ? 'mid' : 'warn')) : null,
+                m.cumulativeReturn >= 10 ? 'Tốt' : (m.cumulativeReturn >= 0 ? 'Trung bình' : 'Âm'));
+        }
 
         const sharpeEl = document.getElementById('perf-sharpe');
         if (sharpeEl) {
