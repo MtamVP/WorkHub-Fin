@@ -1334,7 +1334,11 @@ const API = {
         // WorkHub cũng có thể đã liên kết với Google (google_event_id khác null); nếu người
         // dùng xoá nó thẳng trên Google, lần đồng bộ tiếp theo phải phản ánh đúng (dọn luôn),
         // không chỉ dọn các dòng gốc từ Google như đợt "chỉ kéo về" trước đây.
-        pruneGoogleEvents: async (email, groupKey, activeGoogleIds, windowStart, windowEnd) => {
+        // Đợt 4 (đa lịch): thêm tham số calendarId -- CHỈ dọn trong phạm vi đúng 1 lịch, không
+        // gộp activeIds của lịch khác vào, nếu không 1 sự kiện còn sống ở lịch A sẽ bị hiểu
+        // nhầm là "đã xoá bên Google" khi so với danh sách hoạt động của lịch B. Các dòng cũ
+        // (tạo trước khi có cột google_calendar_id) coi như thuộc 'primary'.
+        pruneGoogleEvents: async (email, groupKey, calendarId, activeGoogleIds, windowStart, windowEnd) => {
             if (!sbClient) throw new Error("Chưa setup Supabase");
             let query = sbClient.from('events')
                 .update({ deleted_at: new Date().toISOString() })
@@ -1342,6 +1346,9 @@ const API = {
                 .not('google_event_id', 'is', null)
                 .is('deleted_at', null)
                 .gte('start_time', windowStart).lte('start_time', windowEnd);
+            query = (calendarId === 'primary' || !calendarId)
+                ? query.or('google_calendar_id.eq.primary,google_calendar_id.is.null')
+                : query.eq('google_calendar_id', calendarId);
             if (activeGoogleIds && activeGoogleIds.length) {
                 query = query.not('google_event_id', 'in', `(${activeGoogleIds.map(id => `"${id}"`).join(',')})`);
             }
@@ -1360,22 +1367,39 @@ const API = {
         // kiện trên mọi UPDATE, gộp chung 1 bảng sẽ khiến việc ghi "đã đồng bộ xong" tự làm
         // version tăng thêm, gây đẩy/kéo lặp vô ích mãi mãi.
 
-        // Sự kiện cá nhân (không lặp lại -- Google đã tự khai triển sự kiện lặp khi kéo về,
-        // còn đẩy 1 sự kiện WorkHub có recurrence != 'none' lên Google cần dựng RRULE, để
-        // ngoài phạm vi đợt này) có version MỚI HƠN lần đồng bộ gần nhất (hoặc chưa từng
-        // đồng bộ) -- ứng viên cần đẩy lên Google. Không lọc theo deleted_at: sự kiện vừa bị
-        // xoá cục bộ (soft-delete cũng là 1 UPDATE, cũng bump version) vẫn cần đẩy lệnh xoá
-        // tương ứng lên Google, không được bỏ qua.
+        // Sự kiện cá nhân có version MỚI HƠN lần đồng bộ gần nhất (hoặc chưa từng đồng bộ) --
+        // ứng viên cần đẩy lên Google. Không lọc theo deleted_at: sự kiện vừa bị xoá cục bộ
+        // (soft-delete cũng là 1 UPDATE, cũng bump version) vẫn cần đẩy lệnh xoá tương ứng lên
+        // Google, không được bỏ qua.
+        // Đợt 4: gồm CẢ sự kiện lặp (recurrence != 'none', đẩy kèm RRULE -- xem buildRRule()
+        // trong calendar-connect.js). Vì WorkHub chỉ lưu 1 DÒNG MASTER cho cả chuỗi lặp (không
+        // materialize từng lần lặp), lọc theo start_time như sự kiện lẻ sẽ bỏ sót 1 chuỗi lặp
+        // bắt đầu từ rất lâu nhưng vẫn đang diễn ra (vd tạo cách đây 3 tháng, lặp hằng tuần,
+        // không có ngày kết) -- nên xét riêng: còn "sống" nếu bắt đầu trước khi cửa sổ kết
+        // thúc, VÀ (không có ngày kết hoặc) chưa kết thúc trước khi cửa sổ bắt đầu.
         getPersonalEventsForPush: async (email, groupKey, windowStart, windowEnd) => {
             if (!sbClient) return [];
-            const { data: events, error } = await sbClient.from('events')
-                .select('id, title, start_time, end_time, description, location, deleted_at, google_event_id, version')
+            const baseSelect = 'id, title, start_time, end_time, description, location, deleted_at, google_event_id, google_calendar_id, version, recurrence, recurrence_end';
+
+            const { data: onceEvents, error: onceErr } = await sbClient.from('events')
+                .select(baseSelect)
                 .eq('calendar_type', 'personal').eq('created_by', email).eq('group_key', groupKey)
                 .eq('recurrence', 'none')
                 .gte('start_time', windowStart).lte('start_time', windowEnd)
                 .limit(1000);
-            if (error) throw error;
-            if (!events || !events.length) return [];
+            if (onceErr) throw onceErr;
+
+            const { data: recurringEvents, error: recErr } = await sbClient.from('events')
+                .select(baseSelect)
+                .eq('calendar_type', 'personal').eq('created_by', email).eq('group_key', groupKey)
+                .neq('recurrence', 'none')
+                .lte('start_time', windowEnd)
+                .or(`recurrence_end.is.null,recurrence_end.gte.${windowStart.slice(0, 10)}`)
+                .limit(1000);
+            if (recErr) throw recErr;
+
+            const events = [...(onceEvents || []), ...(recurringEvents || [])];
+            if (!events.length) return [];
 
             const linkedIds = events.filter(e => e.google_event_id).map(e => e.id);
             let syncedMap = {};
@@ -1432,13 +1456,24 @@ const API = {
         // để chỉ thật sự UPDATE (và chỉ thật sự bump version qua trigger) đúng 1 lần lúc liên
         // kết ban đầu, không phải mỗi lần đồng bộ. Trả về version MỚI NHẤT của dòng (sau khi
         // trigger đã chạy, nếu có) để caller ghi đúng vào bookkeeping.
-        linkGoogleEventId: async (eventId, googleEventId) => {
+        linkGoogleEventId: async (eventId, googleEventId, googleCalendarId) => {
             if (!sbClient) throw new Error("Chưa setup Supabase");
-            await sbClient.from('events').update({ google_event_id: googleEventId })
+            await sbClient.from('events').update({ google_event_id: googleEventId, google_calendar_id: googleCalendarId || 'primary' })
                 .eq('id', eventId).is('google_event_id', null);
             const { data, error } = await sbClient.from('events').select('version').eq('id', eventId).maybeSingle();
             if (error) throw error;
             return data ? data.version : null;
+        },
+        // Trong danh sách google_event_id (recurringEventId của các instance Google tự khai
+        // triển), trả về tập con nào là MASTER của 1 sự kiện lặp tạo từ WorkHub (recurrence !=
+        // 'none') -- dùng khi kéo về để bỏ qua các instance lẻ đó, tránh tạo trùng với dòng
+        // master đã có sẵn (xem comment đầu calendar-connect.js, mục "Sự kiện lặp").
+        getRecurringMasterGoogleIds: async (googleEventIds) => {
+            if (!sbClient || !googleEventIds || !googleEventIds.length) return [];
+            const { data, error } = await sbClient.from('events')
+                .select('google_event_id').in('google_event_id', googleEventIds).neq('recurrence', 'none').is('deleted_at', null);
+            if (error) throw error;
+            return (data || []).map(r => r.google_event_id);
         },
         // Áp bản cập nhật từ Google vào 1 dòng events ĐÃ liên kết sẵn -- caller (chiều kéo
         // về trong calendar-connect.js) đã tự xác định chỉ Google đổi (không phải xung đột
@@ -2733,6 +2768,16 @@ const API = {
             const { error } = await sbClient.from('calendar_connections')
                 .update({ last_synced_at: new Date().toISOString() }).eq('provider', 'google');
             if (error) throw error;
+        },
+        // Đa lịch (đợt 4): danh sách calendarId Google mà người dùng chọn kéo về thêm, ngoài
+        // 'primary' (luôn bật mặc định, UI "Quản lý lịch" ở calendar-connect.js không cho bỏ).
+        setSyncedCalendars: async (calendarIds) => {
+            if (!sbClient) throw new Error("Chưa setup Supabase");
+            const ids = (Array.isArray(calendarIds) && calendarIds.length) ? calendarIds : ['primary'];
+            const { error } = await sbClient.from('calendar_connections')
+                .update({ synced_calendar_ids: ids }).eq('provider', 'google');
+            if (error) throw error;
+            return 'Đã lưu lựa chọn lịch đồng bộ.';
         }
     },
     lounge: {
@@ -2965,7 +3010,7 @@ const MUTATING_ACTIONS = new Set([
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
-    'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync',
+    'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
     'linkGoogleEventId', 'applyGooglePullUpdate', 'deleteGoogleSyncRow', 'markGoogleSyncedBatch',
     'createOrgUnit', 'updateOrgUnit', 'deleteOrgUnit', 'assignUserOrgUnit',
@@ -3128,15 +3173,17 @@ async function _dispatchAction(action, params = {}) {
             case 'saveCalendarConnection': result = await API.calendarConnection.save(params); break;
             case 'disconnectCalendarConnection': result = await API.calendarConnection.disconnect(); break;
             case 'touchCalendarSync': result = await API.calendarConnection.touchSync(); break;
+            case 'setSyncedCalendars': result = await API.calendarConnection.setSyncedCalendars(params.calendarIds); break;
             case 'upsertGoogleEvents': result = await API.calendar.upsertGoogleEvents(params.rows); break;
-            case 'pruneGoogleEvents': result = await API.calendar.pruneGoogleEvents(params.email, params.groupKey, params.activeGoogleIds, params.windowStart, params.windowEnd); break;
+            case 'pruneGoogleEvents': result = await API.calendar.pruneGoogleEvents(params.email, params.groupKey, params.calendarId, params.activeGoogleIds, params.windowStart, params.windowEnd); break;
             case 'getPersonalEventsForPush': result = await API.calendar.getPersonalEventsForPush(params.email, params.groupKey, params.windowStart, params.windowEnd); break;
             case 'getGoogleSyncState': result = await API.calendar.getGoogleSyncState(params.googleEventIds); break;
             case 'getEventsVersionsByGoogleId': result = await API.calendar.getEventsVersionsByGoogleId(params.googleEventIds); break;
-            case 'linkGoogleEventId': result = await API.calendar.linkGoogleEventId(params.eventId, params.googleEventId); break;
+            case 'linkGoogleEventId': result = await API.calendar.linkGoogleEventId(params.eventId, params.googleEventId, params.googleCalendarId); break;
             case 'applyGooglePullUpdate': result = await API.calendar.applyGooglePullUpdate(params.eventId, params.fields); break;
             case 'deleteGoogleSyncRow': result = await API.calendar.deleteGoogleSyncRow(params.eventId); break;
             case 'markGoogleSyncedBatch': result = await API.calendar.markGoogleSyncedBatch(params.entries); break;
+            case 'getRecurringMasterGoogleIds': result = await API.calendar.getRecurringMasterGoogleIds(params.googleEventIds); break;
 
             case 'getNotifications': result = await API.notification.get(params.groupKey, params.limit, params.email); break;
             case 'syncLounge': result = await API.lounge.sync(params); break;
