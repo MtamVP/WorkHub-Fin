@@ -294,9 +294,17 @@ async function loadHoldings() {
                     <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
                     <td class="text-right">
-                        <input type="text" class="price-input" data-symbol="${sym}"
-                            value="${Number(h.marketPrice).toLocaleString('en-US')}"
-                            onchange="handleMarketPriceChange(this)">
+                        <span class="price-cell">
+                            <input type="text" class="price-input" data-symbol="${sym}"
+                                value="${Number(h.marketPrice).toLocaleString('en-US')}"
+                                onchange="handleMarketPriceChange(this)">
+                            <button type="button" class="price-lock-btn${h.priceLocked ? ' active' : ''}"
+                                data-symbol="${sym}" data-locked="${h.priceLocked ? 'true' : 'false'}"
+                                title="${h.priceLocked ? 'Đang khóa — giá tự động sẽ không ghi đè. Bấm để mở khóa.' : 'Khóa giá này để giá tự động không ghi đè'}"
+                                onclick="togglePriceLockUI(this)">
+                                <i class="fa-solid ${h.priceLocked ? 'fa-lock' : 'fa-lock-open'}"></i>
+                            </button>
+                        </span>
                     </td>
                     <td class="text-right">${Number(h.costValue).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.marketValue).toLocaleString('en-US')}</td>
@@ -475,6 +483,22 @@ async function handleMarketPriceChange(input) {
         if (TAB_LOADED.performance) loadPerformanceChart();
     } catch (e) {
         showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+// Khóa/mở khóa giá 1 mã -- khi khóa, cron lấy giá tự động (fetch-stock-prices) sẽ bỏ qua mã
+// này ở lần chạy sau, không ghi đè giá vừa tự nhập. Không ảnh hưởng việc gõ giá tay.
+async function togglePriceLockUI(btn) {
+    const symbol = btn.dataset.symbol;
+    const nextLocked = btn.dataset.locked !== 'true';
+    btn.disabled = true;
+    try {
+        const resp = await callGAS('togglePriceLock', { email: targetEmail, symbol, locked: nextLocked });
+        showToast(resp.message, 'success');
+        await loadHoldings();
+    } catch (e) {
+        showToast('Lỗi: ' + e.message, 'error');
+        btn.disabled = false;
     }
 }
 

@@ -1599,20 +1599,41 @@ const API = {
             return "Đã cập nhật giá thị trường!";
         },
 
-        // --- Danh mục hiện tại: khối lượng + giá vốn (từ sổ lệnh) ghép với giá TT (nhập tay) ---
+        // --- Khóa/mở khóa giá 1 mã: khi khóa, cron fetch-stock-prices (lấy giá tự động từ VNDirect)
+        // sẽ bỏ qua mã này ở lần chạy sau, không ghi đè giá người dùng vừa tự nhập -- không ảnh
+        // hưởng việc sửa giá tay qua setMarketPrice, chỉ chặn riêng phần tự động.
+        togglePriceLock: async (email, symbol, locked) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const cleanSymbol = String(symbol || '').trim().toUpperCase();
+            if (!cleanSymbol) throw new Error("Thiếu mã danh mục");
+            const { data: existing } = await sbClient.from('finance_holdings_price')
+                .select('market_price').eq('user_id', userId).eq('symbol', cleanSymbol).maybeSingle();
+            const { error } = await sbClient.from('finance_holdings_price').upsert({
+                user_id: userId, symbol: cleanSymbol,
+                market_price: existing ? existing.market_price : 0,
+                locked: !!locked, updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,symbol' });
+            if (error) throw error;
+            return locked ? "Đã khóa giá — tự động sẽ không ghi đè" : "Đã mở khóa — tự động sẽ cập nhật lại";
+        },
+
+        // --- Danh mục hiện tại: khối lượng + giá vốn (từ sổ lệnh) ghép với giá TT (nhập tay/tự động) ---
         getHoldingsView: async (email) => {
             const userId = await getUserId(email);
             const holdings = await API.asset.computeHoldings(userId);
-            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price').eq('user_id', userId);
+            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price, locked').eq('user_id', userId);
             const priceMap = {};
-            (prices || []).forEach(p => { priceMap[p.symbol] = Number(p.market_price) || 0; });
+            (prices || []).forEach(p => { priceMap[p.symbol] = { price: Number(p.market_price) || 0, locked: !!p.locked }; });
 
             return holdings.map(h => {
-                const marketPrice = priceMap[h.symbol] || 0;
+                const entry = priceMap[h.symbol];
+                const marketPrice = entry ? entry.price : 0;
                 const costValue = h.avgCost * h.quantity;
                 const marketValue = marketPrice * h.quantity;
                 return {
                     symbol: h.symbol, quantity: h.quantity, avgCost: h.avgCost, marketPrice,
+                    priceLocked: entry ? entry.locked : false,
                     costValue, marketValue,
                     unrealizedPnl: marketValue - costValue,
                     unrealizedPct: costValue > 0 ? ((marketValue - costValue) / costValue) * 100 : 0
@@ -3041,6 +3062,7 @@ async function _dispatchAction(action, params = {}) {
             case 'deleteAssetTransaction': result = await API.asset.deleteTransaction(params.email, params.id); break;
             case 'getHoldingsView': result = await API.asset.getHoldingsView(params.email); break;
             case 'setMarketPrice': result = await API.asset.setMarketPrice(params.email, params.symbol, params.price); break;
+            case 'togglePriceLock': result = await API.asset.togglePriceLock(params.email, params.symbol, params.locked); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;

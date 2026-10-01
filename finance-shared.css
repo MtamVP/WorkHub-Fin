@@ -453,6 +453,16 @@ body {
 }
 .price-input:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
 
+.price-cell { display: inline-flex; align-items: center; gap: 6px; }
+.price-lock-btn {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: var(--radius-sm); border: 1px solid var(--border-color);
+  background: var(--bg-color-2); color: var(--text-muted); cursor: pointer; display: grid; place-items: center;
+  font-size: 0.72rem; transition: var(--transition-fast);
+}
+.price-lock-btn:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+.price-lock-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+.price-lock-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* =========================================================================
    9. PILLS / BADGES
    ========================================================================= */
