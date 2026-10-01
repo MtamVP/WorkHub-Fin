@@ -1627,7 +1627,8 @@ const API = {
             const cleanSymbol = String(symbol || '').trim().toUpperCase();
             if (!cleanSymbol) throw new Error("Thiếu mã danh mục");
             const { error } = await sbClient.from('finance_holdings_price').upsert({
-                user_id: userId, symbol: cleanSymbol, market_price: Number(price) || 0, updated_at: new Date().toISOString()
+                user_id: userId, symbol: cleanSymbol, market_price: Number(price) || 0, updated_at: new Date().toISOString(),
+                price_date: null, price_source: null // giá nhập tay -> không còn là giá tự động
             }, { onConflict: 'user_id,symbol' });
             if (error) throw error;
             await API.asset.recomputeAndSnapshot(email);
@@ -1665,15 +1666,40 @@ const API = {
             return parts.length ? parts.reduce((s, p) => s + p, 0) / parts.length : null;
         },
 
+        // Độ tươi của giá: 'auto' (cron lấy, có price_date) | 'manual' (nhập tay, tính theo updated_at) | 'none'.
+        // stale: giá tự động quá 4 ngày lịch chưa đổi (cuối tuần + 1 ngày nghỉ vẫn chưa tính là cũ), hoặc giá nhập
+        // tay quá 7 ngày mà chưa khóa (giá khóa là chủ ý của người dùng nên không cảnh báo).
+        _priceMeta: (entry, marketPrice) => {
+            if (!entry || !(marketPrice > 0)) return { kind: 'none', date: null, ageDays: null, stale: false, source: null };
+            const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+            const ageOf = (iso) => Math.max(0, Math.round((dayStart(new Date()) - dayStart(iso)) / 86400000));
+            if (entry.priceDate) {
+                const ageDays = ageOf(entry.priceDate + 'T00:00:00');
+                return { kind: 'auto', date: entry.priceDate, ageDays, stale: ageDays > 4, source: entry.priceSource };
+            }
+            const date = entry.updatedAt ? String(entry.updatedAt).slice(0, 10) : null;
+            const ageDays = entry.updatedAt ? ageOf(entry.updatedAt) : null;
+            return { kind: 'manual', date, ageDays, stale: !entry.locked && ageDays !== null && ageDays > 7, source: null };
+        },
+
+        // Trạng thái lần chạy gần nhất của cron lấy giá (Edge Function ghi vào app_settings).
+        getPriceFetchStatus: async () => {
+            const { data } = await sbClient.from('app_settings').select('value').eq('key', 'price_fetch_status').maybeSingle();
+            if (!data || !data.value) return null;
+            try { return JSON.parse(data.value); } catch (e) { return null; }
+        },
+
         getHoldingsView: async (email) => {
             const userId = await getUserId(email);
             const holdings = await API.asset.computeHoldings(userId);
-            const { data: prices } = await sbClient.from('finance_holdings_price').select('symbol, market_price, locked, target_price, stop_loss').eq('user_id', userId);
+            const { data: prices } = await sbClient.from('finance_holdings_price')
+                .select('symbol, market_price, locked, target_price, stop_loss, price_date, price_source, updated_at').eq('user_id', userId);
             const priceMap = {};
             (prices || []).forEach(p => {
                 priceMap[p.symbol] = {
                     price: Number(p.market_price) || 0, locked: !!p.locked,
-                    target: Number(p.target_price) || 0, stop: Number(p.stop_loss) || 0
+                    target: Number(p.target_price) || 0, stop: Number(p.stop_loss) || 0,
+                    priceDate: p.price_date || null, priceSource: p.price_source || null, updatedAt: p.updated_at || null
                 };
             });
 
@@ -1703,6 +1729,7 @@ const API = {
                 return {
                     symbol: h.symbol, quantity: h.quantity, avgCost: h.avgCost, marketPrice,
                     priceLocked: entry ? entry.locked : false,
+                    priceMeta: API.asset._priceMeta(entry, marketPrice),
                     targetPrice, targetSource, targetYear: targetSource === 'valuation' ? valuation.year : null,
                     stopLoss,
                     upsidePct: targetPrice > 0 && marketPrice > 0 ? ((targetPrice - marketPrice) / marketPrice) * 100 : null,
@@ -1712,6 +1739,87 @@ const API = {
                     unrealizedPct: costValue > 0 ? ((marketValue - costValue) / costValue) * 100 : 0
                 };
             });
+        },
+
+        // XIRR (lãi suất quy năm của chuỗi dòng tiền không đều). flows: [{t: Date, amt: number}], tiền ra < 0, tiền vào > 0.
+        // Tìm nghiệm bằng chia đôi (chắc chắn hội tụ khi có cả dòng âm lẫn dương); null nếu không xác định được.
+        _xirr: (flows) => {
+            if (!flows.length || !flows.some(f => f.amt < 0) || !flows.some(f => f.amt > 0)) return null;
+            const t0 = Math.min(...flows.map(f => f.t.getTime()));
+            const npv = (r) => flows.reduce((s, f) => s + f.amt / Math.pow(1 + r, (f.t.getTime() - t0) / (365 * 86400000)), 0);
+            let lo = -0.9999, hi = 1000;
+            let fLo = npv(lo), fHi = npv(hi);
+            if (!isFinite(fLo) || !isFinite(fHi) || fLo * fHi > 0) return null;
+            for (let i = 0; i < 200; i++) {
+                const mid = (lo + hi) / 2, fMid = npv(mid);
+                if (Math.abs(fMid) < 1e-6) return mid;
+                if (fLo * fMid < 0) { hi = mid; fHi = fMid; } else { lo = mid; fLo = fMid; }
+            }
+            return (lo + hi) / 2;
+        },
+
+        // Hiệu quả đầu tư theo từng mã, gồm cả mã đã bán hết: lãi đã chốt (FIFO) + chưa chốt + cổ tức tiền - phí,
+        // và XIRR từ dòng tiền thực (mua/bán/cổ tức + giá trị hiện tại nếu còn giữ). Lãi/lỗ tổng cộng khớp với
+        // tiền thực thu - tiền thực chi (tách/gộp, cổ tức cổ phiếu không đổi dòng tiền nên không ảnh hưởng).
+        getSymbolPerformance: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const [txns, flows, holdings] = await Promise.all([
+                API.asset.listTransactions(email),
+                API.asset.cashFlow.list(email),
+                API.asset.getHoldingsView(email)
+            ]);
+            const holdingBySymbol = {};
+            holdings.forEach(h => { holdingBySymbol[h.symbol] = h; });
+
+            const bySymbol = {};
+            const get = (symbol) => bySymbol[symbol] || (bySymbol[symbol] = {
+                symbol, bought: 0, sold: 0, fees: 0, realized: 0, dividends: 0, cashFlows: [], firstDate: null
+            });
+            const noteDate = (row, iso) => { if (!row.firstDate || iso < row.firstDate) row.firstDate = iso; };
+
+            txns.forEach(t => {
+                const row = get(t.symbol);
+                const gross = (Number(t.quantity) || 0) * (Number(t.price) || 0);
+                const fee = Number(t.fee) || 0;
+                row.fees += fee;
+                noteDate(row, t.trade_date);
+                const when = new Date(t.trade_date + 'T00:00:00');
+                if (t.type === 'buy') { row.bought += gross; row.cashFlows.push({ t: when, amt: -(gross + fee) }); }
+                else { row.sold += gross; row.realized += Number(t.realized_pnl) || 0; row.cashFlows.push({ t: when, amt: gross - fee }); }
+            });
+            flows.forEach(f => {
+                if (f.flow_type !== 'dividend' || !f.symbol || !bySymbol[f.symbol]) return;
+                const row = bySymbol[f.symbol];
+                const amt = Number(f.amount) || 0;
+                row.dividends += amt;
+                row.cashFlows.push({ t: new Date(f.flow_date + 'T00:00:00'), amt });
+            });
+
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const rows = Object.values(bySymbol).map(row => {
+                const h = holdingBySymbol[row.symbol];
+                const held = !!h;
+                const noPrice = held && !(h.marketPrice > 0);
+                const unrealized = held && !noPrice ? h.unrealizedPnl : 0;
+                const marketValue = held && !noPrice ? h.marketValue : 0;
+                const totalPnl = row.realized + unrealized + row.dividends - row.fees;
+                const flowsForXirr = marketValue > 0 ? [...row.cashFlows, { t: today, amt: marketValue }] : row.cashFlows;
+                const spanDays = row.firstDate ? Math.round((today - new Date(row.firstDate + 'T00:00:00')) / 86400000) : 0;
+                const xirr = spanDays >= 90 ? API.asset._xirr(flowsForXirr) : null;
+                return {
+                    symbol: row.symbol, held, noPrice,
+                    quantity: held ? h.quantity : 0,
+                    bought: row.bought, sold: row.sold, fees: row.fees,
+                    realized: row.realized, unrealized, dividends: row.dividends, marketValue,
+                    totalPnl,
+                    returnPct: row.bought > 0 ? (totalPnl / row.bought) * 100 : null,
+                    xirrPct: xirr === null ? null : xirr * 100,
+                    spanDays
+                };
+            });
+            rows.sort((a, b) => Math.abs(b.totalPnl) - Math.abs(a.totalPnl));
+            return rows;
         },
 
         // kind: 'target' (giá mục tiêu thủ công, ghi đè giá từ Định Giá CP) | 'stop' (ngưỡng cắt lỗ).
@@ -1972,7 +2080,7 @@ const API = {
             });
 
             // So sánh benchmark: chỉ số hóa NAV và VN-Index về gốc 100 tại ngày đầu tiên có dữ liệu chung
-            let benchmark = null;
+            let benchmark = null, benchmarkSummary = null;
             try {
                 const idxData = await API.asset.benchmark.list('VNINDEX');
                 if (idxData && idxData.length) {
@@ -1980,18 +2088,32 @@ const API = {
                     idxData.forEach(d => { idxByDate[d.price_date] = Number(d.close_value); });
                     const overlap = history.filter(h => idxByDate[h.snapshot_date] !== undefined);
                     if (overlap.length >= 2) {
-                        const baseNav = Number(overlap[0].nav) || 1;
-                        const baseIdx = idxByDate[overlap[0].snapshot_date] || 1;
-                        benchmark = overlap.map(h => ({
-                            date: h.snapshot_date,
-                            portfolioIndexed: baseNav > 0 ? (Number(h.nav) / baseNav) * 100 : 100,
-                            benchmarkIndexed: baseIdx > 0 ? (idxByDate[h.snapshot_date] / baseIdx) * 100 : 100
-                        }));
+                        // Cả hai đường được nối theo kiểu TWR trên CÙNG tập ngày: ngày có nạp/rút vốn (NAV bị méo
+                        // bởi tiền góp) giữ nguyên cả danh mục lẫn VN-Index, nên "vượt/thua" không bị lệch bởi dòng tiền.
+                        let pIdx = 100, bIdx = 100;
+                        benchmark = [{ date: overlap[0].snapshot_date, portfolioIndexed: 100, benchmarkIndexed: 100 }];
+                        for (let i = 1; i < overlap.length; i++) {
+                            const prev = overlap[i - 1], cur = overlap[i];
+                            const flowChanged = Math.abs((Number(cur.net_contributed) || 0) - (Number(prev.net_contributed) || 0)) > 1;
+                            const prevNav = Number(prev.nav) || 0;
+                            const prevIdx = idxByDate[prev.snapshot_date];
+                            if (!flowChanged && prevNav > 0 && prevIdx > 0) {
+                                pIdx *= Number(cur.nav) / prevNav;
+                                bIdx *= idxByDate[cur.snapshot_date] / prevIdx;
+                            }
+                            benchmark.push({ date: cur.snapshot_date, portfolioIndexed: pIdx, benchmarkIndexed: bIdx });
+                        }
+                        const last = benchmark[benchmark.length - 1];
+                        benchmarkSummary = {
+                            from: benchmark[0].date, to: last.date,
+                            portfolioPct: last.portfolioIndexed - 100, indexPct: last.benchmarkIndexed - 100,
+                            excessPct: last.portfolioIndexed - last.benchmarkIndexed
+                        };
                     }
                 }
             } catch (e) { /* chưa có dữ liệu VN-Index — bỏ qua phần benchmark, không chặn các chỉ số khác */ }
 
-            return { sharpe, maxDrawdown: maxDD, volatility: annualizedVol, annualizedReturn, cumulativeReturn, dataPoints: n, benchmark };
+            return { sharpe, maxDrawdown: maxDD, volatility: annualizedVol, annualizedReturn, cumulativeReturn, dataPoints: n, benchmark, benchmarkSummary };
         },
 
         // --- Trang "Tổng hợp" của cả team ---
@@ -3167,6 +3289,8 @@ async function _dispatchAction(action, params = {}) {
             case 'setMarketPrice': result = await API.asset.setMarketPrice(params.email, params.symbol, params.price); break;
             case 'togglePriceLock': result = await API.asset.togglePriceLock(params.email, params.symbol, params.locked); break;
             case 'setHoldingLevel': result = await API.asset.setHoldingLevel(params.email, params.symbol, params.kind, params.value); break;
+            case 'getSymbolPerformance': result = await API.asset.getSymbolPerformance(params.email); break;
+            case 'getPriceFetchStatus': result = await API.asset.getPriceFetchStatus(); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;

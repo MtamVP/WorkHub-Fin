@@ -278,6 +278,7 @@ async function loadHoldings() {
             tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-layer-group"></i>Chưa có danh mục nào — thêm lệnh mua ở tab "Sổ Lệnh".</td></tr>';
             renderAllocationChart([]);
             renderHeroFoot(0);
+            onHoldingsLoaded([]);
             return;
         }
 
@@ -294,16 +295,19 @@ async function loadHoldings() {
                     <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
                     <td class="text-right">
-                        <span class="price-cell">
-                            <input type="text" class="price-input" data-symbol="${sym}"
-                                value="${Number(h.marketPrice).toLocaleString('en-US')}"
-                                onchange="handleMarketPriceChange(this)">
-                            <button type="button" class="price-lock-btn${h.priceLocked ? ' active' : ''}"
-                                data-symbol="${sym}" data-locked="${h.priceLocked ? 'true' : 'false'}"
-                                title="${h.priceLocked ? 'Đang khóa — giá tự động sẽ không ghi đè. Bấm để mở khóa.' : 'Khóa giá này để giá tự động không ghi đè'}"
-                                onclick="togglePriceLockUI(this)">
-                                <i class="fa-solid ${h.priceLocked ? 'fa-lock' : 'fa-lock-open'}"></i>
-                            </button>
+                        <span class="price-wrap">
+                            <span class="price-cell">
+                                <input type="text" class="price-input" data-symbol="${sym}"
+                                    value="${Number(h.marketPrice).toLocaleString('en-US')}"
+                                    onchange="handleMarketPriceChange(this)">
+                                <button type="button" class="price-lock-btn${h.priceLocked ? ' active' : ''}"
+                                    data-symbol="${sym}" data-locked="${h.priceLocked ? 'true' : 'false'}"
+                                    title="${h.priceLocked ? 'Đang khóa — giá tự động sẽ không ghi đè. Bấm để mở khóa.' : 'Khóa giá này để giá tự động không ghi đè'}"
+                                    onclick="togglePriceLockUI(this)">
+                                    <i class="fa-solid ${h.priceLocked ? 'fa-lock' : 'fa-lock-open'}"></i>
+                                </button>
+                            </span>
+                            ${renderPriceAge(h)}
                         </span>
                     </td>
                     <td class="text-right">${renderLevelsCell(h, sym)}</td>
@@ -316,6 +320,7 @@ async function loadHoldings() {
 
         renderAllocationChart(holdings);
         renderHeroFoot(holdings.length);
+        onHoldingsLoaded(holdings);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
@@ -973,9 +978,11 @@ async function loadPerformanceMetrics() {
         }
 
         renderBenchmarkChart(m.benchmark);
+        renderBenchmarkSummary(m.benchmarkSummary);
     } catch (e) {
         console.error('Lỗi loadPerformanceMetrics:', e);
     }
+    loadSymbolPerformance();
 }
 
 function renderBenchmarkChart(benchmark) {

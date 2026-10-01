@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.4">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.6">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
@@ -94,7 +94,7 @@
                 <div class="mini-kpi">
                     <span class="mini-k">Giá trị thị trường</span>
                     <span class="mini-v kpi-value" id="kpi-market-value">--</span>
-                    <span class="mini-t">theo giá nhập tay</span>
+                    <span class="mini-t">theo giá thị trường</span>
                 </div>
                 <div class="mini-kpi">
                     <span class="mini-k">Vốn ròng</span>
@@ -125,13 +125,20 @@
 
         <!-- Tab: Danh Mục -->
         <section id="tab-holdings" class="asset-tab-panel">
+            <div class="holdings-toolbar">
+                <div id="price-status" class="price-status none"></div>
+                <div class="export-bar">
+                    <button type="button" class="btn-tool" onclick="exportHoldingsCsv()" title="Tải danh mục dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
+                    <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
+                </div>
+            </div>
             <div class="holdings-layout">
                 <div class="spreadsheet-wrapper">
                     <table class="excel-table asset-table" id="holdings-table">
                         <thead>
                             <tr>
                                 <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
-                                <th class="text-right">Giá TT (nhập tay)</th>
+                                <th class="text-right" title="Giá thị trường: tự động cập nhật mỗi giờ trong phiên, hoặc nhập tay (có thể khóa)">Giá TT</th>
                                 <th class="text-right" title="Giá mục tiêu (mặc định lấy từ trang Định Giá CP, có thể nhập đè) và ngưỡng cắt lỗ — app sẽ báo khi giá chạm">Mục tiêu / Cắt lỗ</th>
                                 <th class="text-right">GT vốn</th>
                                 <th class="text-right">GTTT</th><th class="text-right">Tỷ trọng</th><th class="text-right">Lãi/lỗ</th>
@@ -150,6 +157,7 @@
                         <div class="donut-center" id="alloc-center"></div>
                     </div>
                     <div class="allocation-legend" id="allocation-legend"></div>
+                    <div class="sector-block" id="sector-block"></div>
                 </div>
             </div>
         </section>
@@ -207,6 +215,10 @@
                 <p class="guide-text">
                     * <b>Lưu ý:</b> Giá vốn/lãi-lỗ đã chốt được tính theo phương pháp FIFO (lô mua cũ nhất bán trước) — chuẩn kế toán, không phải giá vốn bình quân đơn giản.
                 </p>
+                <div class="export-bar export-bar-inline">
+                    <button type="button" class="btn-tool" onclick="exportLedgerCsv()" title="Tải toàn bộ lệnh giao dịch dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
+                    <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
+                </div>
                 <div class="spreadsheet-wrapper">
                     <table class="excel-table asset-table" id="ledger-table">
                         <thead>
@@ -364,13 +376,41 @@
 
             <div id="benchmark-chart-wrapper" class="spreadsheet-wrapper perf-chart-wrapper" style="display:none;">
                 <h3 class="perf-chart-title"><i class="fa-solid fa-chart-line"></i> So Sánh Với VN-Index (chỉ số hóa gốc 100)</h3>
+                <div class="bm-summary" id="benchmark-summary"></div>
                 <div style="position:relative; height:300px;" id="benchmark-chart-box">
                     <canvas id="benchmarkChart"></canvas>
                 </div>
             </div>
 
+            <div class="spreadsheet-wrapper symperf-wrapper">
+                <div class="symperf-head">
+                    <h3 class="perf-chart-title"><i class="fa-solid fa-table-list"></i> Hiệu Quả Theo Từng Mã</h3>
+                    <div class="export-bar">
+                        <button type="button" class="btn-tool" onclick="exportSymbolPerfCsv()" title="Tải bảng này dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
+                        <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
+                    </div>
+                </div>
+                <table class="excel-table asset-table" id="symperf-table">
+                    <thead>
+                        <tr>
+                            <th>Mã</th><th>Trạng thái</th><th class="text-right">Vốn mua</th>
+                            <th class="text-right" title="Lãi/lỗ đã chốt theo FIFO">Đã chốt</th>
+                            <th class="text-right" title="Lãi/lỗ phần còn giữ theo giá thị trường">Chưa chốt</th>
+                            <th class="text-right">Cổ tức</th>
+                            <th class="text-right" title="Đã chốt + chưa chốt + cổ tức tiền − phí">Tổng lãi/lỗ</th>
+                            <th class="text-right" title="Tổng lãi/lỗ chia tổng vốn mua của mã">% trên vốn</th>
+                            <th class="text-right" title="Lãi suất quy năm theo dòng tiền thực (XIRR); cần ít nhất 90 ngày kể từ lệnh đầu tiên">XIRR</th>
+                        </tr>
+                    </thead>
+                    <tbody id="symperf-body">
+                        <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+                <p class="guide-text symperf-note">* Tổng lãi/lỗ đã trừ phí giao dịch và gồm cổ tức tiền ghi ở tab "Dòng Tiền" (cổ tức không gắn mã không được tính vào bảng này).</p>
+            </div>
+
             <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
-                <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Cập Nhật Giá Đóng Cửa VN-Index</h3>
+                <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi giờ trong phiên — chỉ dùng khi cần sửa)</span></h3>
                 <form id="benchmark-form" class="grant-form-grid">
                     <div class="grant-field">
                         <label for="bm-date">Ngày</label>
@@ -389,13 +429,15 @@
         </section>
 
         <p class="guide-text">
-            * <b>Hướng dẫn:</b> Khối lượng và giá vốn ở tab "Danh Mục" được tính tự động từ tab "Sổ Lệnh" — thêm lệnh mua/bán để cập nhật danh mục. Chỉ "Giá TT" là nhập tay.
+            * <b>Hướng dẫn:</b> Khối lượng và giá vốn ở tab "Danh Mục" được tính tự động từ tab "Sổ Lệnh" — thêm lệnh mua/bán để cập nhật danh mục. Giá TT tự động cập nhật mỗi giờ trong phiên giao dịch; bạn vẫn có thể nhập tay và khóa giá của từng mã.
         </p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791000000000"></script>
-    <script src="script.js?v=1791000000000"></script>
+    <script src="../../api.js?v=1791100000000"></script>
+    <script src="../../lib/finance-calc.js?v=1"></script>
+    <script src="script.js?v=1791100000000"></script>
+    <script src="insights.js?v=1791100000000"></script>
 
 </body>
 </html>

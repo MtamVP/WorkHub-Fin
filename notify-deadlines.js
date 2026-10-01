@@ -157,6 +157,8 @@
         res.data.forEach(function (h) {
             var price = Number(h.marketPrice) || 0;
             if (price <= 0) return;
+            // Giá đã cũ (mã tạm ngừng giao dịch / nguồn giá lỗi) -> không báo "chạm mức" dựa trên số liệu lỗi thời
+            if (h.priceMeta && h.priceMeta.stale) return;
             var target = Number(h.targetPrice) || 0;
             var stop = Number(h.stopLoss) || 0;
             if (target > 0 && price >= target) {

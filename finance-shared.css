@@ -712,3 +712,105 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
   .kpi-row, .balance-section { grid-template-columns: 1fr; }
   .stat-grid-3, .stat-grid-4 { grid-template-columns: 1fr; }
 }
+
+/* =========================================================================
+   BÀN TÀI SẢN: độ tươi giá, ngành, hiệu quả theo mã, xuất báo cáo
+   ========================================================================= */
+.holdings-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.export-bar { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.export-bar-inline { justify-content: flex-end; margin-bottom: 10px; }
+.btn-tool {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg);
+  color: var(--text-secondary); cursor: pointer; font-family: inherit; transition: var(--transition-fast);
+}
+.btn-tool:hover { border-color: var(--gold); color: var(--text-primary); background: var(--hover-bg); }
+.btn-tool:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.price-status {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px; border-radius: var(--radius-pill);
+  font-size: 0.72rem; font-weight: 600; border: 1px solid var(--border-color); background: var(--bg-color-2); color: var(--text-secondary);
+}
+.price-status:empty { display: none; }
+.price-status.ok i { color: var(--success-color); }
+.price-status.warn { background: var(--warning-bg); border-color: color-mix(in srgb, var(--warning-color) 35%, transparent); color: var(--warning-color); }
+.price-status.bad { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger-color) 35%, transparent); color: var(--danger-color); }
+
+.price-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.price-age { font-size: 0.66rem; font-weight: 500; font-family: var(--font-body); color: var(--text-muted); white-space: nowrap; }
+.price-age.stale { color: var(--warning-color); font-weight: 700; }
+.price-age.none { color: var(--danger-color); font-weight: 700; }
+
+.sector-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; }
+.sector-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.sector-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 44px; align-items: center; gap: 8px; font-size: 0.74rem; }
+.sector-name { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sector-bar { height: 5px; border-radius: 3px; background: var(--border-color); overflow: hidden; }
+.sector-bar > i { display: block; height: 100%; border-radius: 3px; }
+.sector-pct { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.72rem; }
+.conc-warn {
+  display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; line-height: 1.4;
+  background: var(--warning-bg); color: var(--warning-color); border: 1px solid color-mix(in srgb, var(--warning-color) 30%, transparent);
+}
+.conc-warn i { margin-top: 2px; }
+
+.bm-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 2px 0 12px; }
+.bm-summary:empty { display: none; }
+.bm-chip { display: inline-flex; flex-direction: column; gap: 1px; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-color-2); }
+.bm-chip.bm-excess { border-color: var(--border-strong); }
+.bm-k { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.bm-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.95rem; }
+.bm-v.pnl-up { color: var(--success-color); } .bm-v.pnl-down { color: var(--danger-color); } .bm-v.pnl-flat { color: var(--text-muted); }
+.bm-range { font-size: 0.7rem; color: var(--text-muted); }
+
+.symperf-wrapper { margin-top: 16px; }
+.symperf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.symperf-head .perf-chart-title { margin: 0; }
+.symperf-note { margin: 10px 0 0; }
+.asset-table td.pnl-up, .asset-table td.pnl-up span { color: var(--success-color); }
+.asset-table td.pnl-down, .asset-table td.pnl-down span { color: var(--danger-color); }
+.sp-tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.66rem; font-weight: 700; font-family: var(--font-body); }
+.sp-tag.held { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+.sp-tag.closed { background: var(--bg-color-2); color: var(--text-muted); border: 1px solid var(--border-color); }
+.sp-tag.warn { background: var(--warning-bg); color: var(--warning-color); }
+.sp-total { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.sp-bar { width: 64px; height: 3px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
+.sp-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--text-muted); }
+.sp-bar > i.pnl-up { background: var(--success-color); } .sp-bar > i.pnl-down { background: var(--danger-color); }
+.sub-note { font-weight: 500; font-size: 0.72rem; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+
+/* In / lưu PDF: nền sáng, bỏ thanh điều hướng + nút + form nhập */
+@media print {
+  :root[data-theme="dark"] body.desk, body.desk {
+    --bg-color: #fff; --bg-color-2: #f6f4ee; --card-bg: #fff; --card-bg-elevated: #fff;
+    --text-primary: #1C1915; --text-secondary: #3d382f; --text-muted: #6b655a;
+    --border-color: rgba(28, 25, 21, 0.18); --border-strong: rgba(28, 25, 21, 0.3);
+    --success-color: #12855A; --danger-color: #C23B3B; --warning-color: #9A6B0D; --gold: #9A6B0D; --finance-accent: #1E5A44;
+    --series-1: #2A78D6; --series-2: #EDA100; --series-3: #1BAF7A; --series-4: #4A3AA7; --series-other: #9A9A94;
+    background: #fff; color: #1C1915;
+  }
+  .desk-topbar, .asset-tab-toggle, .ledger-sub-toggle, .export-bar, .price-lock-btn, .txn-form, .balance-section,
+  #benchmark-admin-panel, .desk-sync, .desk-iconbtn, #target-user-switcher, .toast-notification { display: none !important; }
+  .price-input { border: none; background: transparent; padding: 0; width: auto; }
+  .spreadsheet-wrapper, .allocation-card, .asset-hero { box-shadow: none; break-inside: avoid; }
+  .holdings-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Bảng danh mục có 9 cột -> gọn hơn, và khi màn hình hẹp thì thẻ Cơ Cấu xuống dưới bảng (xếp ngang) */
+#holdings-table th, #holdings-table td { padding-left: 11px; padding-right: 11px; }
+#holdings-table .price-input { width: 94px; }
+#holdings-table .level-input { width: 76px; }
+#holdings-table .level-pct { min-width: 40px; }
+@media (max-width: 1360px) {
+  .holdings-layout { grid-template-columns: minmax(0, 1fr); }
+  .allocation-card { display: grid; grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr); gap: 4px 28px; align-items: start; }
+  .allocation-card h3, .allocation-card .alloc-cap { grid-column: 1 / -1; }
+  .allocation-card .allocation-chart-box { grid-column: 1; grid-row: 3 / span 2; margin: 0 auto; }
+  .allocation-card .allocation-legend { grid-column: 2; grid-row: 3; }
+  .allocation-card .sector-block { grid-column: 3; grid-row: 3; margin-top: 0; padding-top: 0; border-top: none; }
+}
+@media (max-width: 760px) {
+  .allocation-card { display: block; }
+  .allocation-card .sector-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+}
