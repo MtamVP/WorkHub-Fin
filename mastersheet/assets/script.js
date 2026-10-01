@@ -365,6 +365,7 @@ async function handleLevelChange(input) {
     const value = raw === '' ? null : parseMoney(raw);
     try {
         const resp = await callGAS('setHoldingLevel', { email: targetEmail, symbol, kind, value });
+        if (resp.status !== 'success') throw new Error(resp.message);
         showToast(resp.message, 'success');
         await loadHoldings();
     } catch (e) {
@@ -546,6 +547,7 @@ async function togglePriceLockUI(btn) {
     btn.disabled = true;
     try {
         const resp = await callGAS('togglePriceLock', { email: targetEmail, symbol, locked: nextLocked });
+        if (resp.status !== 'success') throw new Error(resp.message);
         showToast(resp.message, 'success');
         await loadHoldings();
     } catch (e) {

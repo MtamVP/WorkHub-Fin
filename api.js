@@ -1822,6 +1822,34 @@ const API = {
             return rows;
         },
 
+        // Email cảnh báo giá khi app tắt (Edge Function send-price-alerts gửi tới email đăng nhập của chính người dùng).
+        getAlertPrefs: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) return { emailEnabled: false };
+            const { data } = await sbClient.from('finance_alert_prefs').select('email_enabled').eq('user_id', userId).maybeSingle();
+            return { emailEnabled: !!(data && data.email_enabled) };
+        },
+        setAlertPrefs: async (email, enabled) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const { error } = await sbClient.from('finance_alert_prefs').upsert({
+                user_id: userId, email_enabled: !!enabled, updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+            if (error) throw error;
+            return enabled ? "Đã bật email cảnh báo giá" : "Đã tắt email cảnh báo giá";
+        },
+        // Gửi 1 email thử tới chính email đăng nhập (máy chủ tự lấy người nhận từ phiên đăng nhập, không nhận từ client)
+        sendTestAlertEmail: async () => {
+            const { data, error } = await sbClient.functions.invoke('send-price-alerts', { body: { test: true } });
+            if (error) {
+                let detail = error.message;
+                try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                throw new Error(detail);
+            }
+            if (!data || !data.ok) throw new Error((data && data.error) || 'Không gửi được email thử');
+            return `Đã gửi email thử tới ${data.to}`;
+        },
+
         // kind: 'target' (giá mục tiêu thủ công, ghi đè giá từ Định Giá CP) | 'stop' (ngưỡng cắt lỗ).
         // value rỗng/0 = xoá. Chỉ ghi đúng 1 cột nên không đụng giá TT/khóa giá do cron quản lý.
         setHoldingLevel: async (email, symbol, kind, value) => {
@@ -3188,7 +3216,7 @@ const MUTATING_ACTIONS = new Set([
     'uploadFile', 'deleteFile', 'shareFile',
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
-    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setCashDebt', 'saveStockValuation',
+    'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
@@ -3291,6 +3319,9 @@ async function _dispatchAction(action, params = {}) {
             case 'setMarketPrice': result = await API.asset.setMarketPrice(params.email, params.symbol, params.price); break;
             case 'togglePriceLock': result = await API.asset.togglePriceLock(params.email, params.symbol, params.locked); break;
             case 'setHoldingLevel': result = await API.asset.setHoldingLevel(params.email, params.symbol, params.kind, params.value); break;
+            case 'getAlertPrefs': result = await API.asset.getAlertPrefs(params.email); break;
+            case 'setAlertPrefs': result = await API.asset.setAlertPrefs(params.email, params.enabled); break;
+            case 'sendTestAlertEmail': result = await API.asset.sendTestAlertEmail(); break;
             case 'getSymbolPerformance': result = await API.asset.getSymbolPerformance(params.email); break;
             case 'getPriceFetchStatus': result = await API.asset.getPriceFetchStatus(); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;

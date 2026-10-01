@@ -11,6 +11,7 @@ function onHoldingsLoaded(holdings) {
     lastHoldings = holdings || [];
     renderSectorBlock(lastHoldings);
     renderPriceStatus();
+    renderAlertEmailBar();
 }
 
 function renderPriceAge(h) {
@@ -82,6 +83,7 @@ async function loadSymbolPerformance() {
     if (!tbody) return;
     try {
         const resp = await callGAS('getSymbolPerformance', { email: targetEmail });
+        if (resp.status !== 'success') throw new Error(resp.message);
         lastSymbolPerf = resp.data || [];
         if (!lastSymbolPerf.length) {
             tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-chart-column"></i>Chưa có giao dịch để phân tích.</td></tr>';
@@ -156,6 +158,7 @@ function exportHoldingsCsv() {
 async function exportLedgerCsv() {
     try {
         const resp = await callGAS('listAssetTransactions', { email: targetEmail });
+        if (resp.status !== 'success') throw new Error(resp.message);
         const txns = resp.data || [];
         if (!txns.length) { showToast('Chưa có lệnh giao dịch để xuất.', 'error'); return; }
         const rows = [['Ngày', 'Loại', 'Mã', 'Khối lượng', 'Giá', 'Phí', 'Giá trị', 'Lãi/lỗ đã chốt (FIFO)', 'Ghi chú']];
@@ -186,4 +189,56 @@ function exportSymbolPerfCsv() {
 // In / lưu PDF tab đang mở (hộp thoại in của hệ thống có sẵn "Lưu dạng PDF"); giao diện in nằm ở finance-shared.css (@media print)
 function printCurrentTab() {
     window.print();
+}
+
+// --- Email cảnh báo giá khi app đã tắt (Edge Function send-price-alerts, chạy mỗi giờ trong phiên giao dịch) ---
+let alertPrefs = null;
+
+async function renderAlertEmailBar() {
+    const el = document.getElementById('alert-email-bar');
+    if (!el) return;
+    // Tuỳ chọn gắn với tài khoản đang đăng nhập -- không hiện khi quản lý đang xem dữ liệu của người khác
+    if (targetEmail !== userEmail) { el.innerHTML = ''; return; }
+    if (!alertPrefs) {
+        try {
+            const resp = await callGAS('getAlertPrefs', { email: userEmail });
+            if (resp.status !== 'success') throw new Error(resp.message);
+            alertPrefs = resp.data || { emailEnabled: false };
+        } catch (e) { el.innerHTML = ''; return; }
+    }
+    const on = !!alertPrefs.emailEnabled;
+    const hint = `Gửi email tới ${userEmail} khi giá thị trường chạm giá mục tiêu hoặc ngưỡng cắt lỗ của mã bạn đang giữ. Mỗi mức chỉ báo 1 lần/ngày.`;
+    el.innerHTML = `
+        <label class="alert-email-toggle" title="${escapeAssetHtml(hint)}">
+            <input type="checkbox" id="alert-email-checkbox" ${on ? 'checked' : ''} onchange="toggleAlertEmail(this)">
+            <span><i class="fa-solid fa-envelope"></i> Gửi email khi giá chạm mục tiêu / cắt lỗ <b>(cả khi đã tắt app)</b></span>
+        </label>
+        ${on ? '<button type="button" class="btn-tool" onclick="sendTestAlertEmailUI(this)"><i class="fa-solid fa-paper-plane"></i> Gửi email thử</button>' : ''}`;
+}
+
+async function toggleAlertEmail(box) {
+    const enabled = box.checked;
+    box.disabled = true;
+    try {
+        const resp = await callGAS('setAlertPrefs', { email: userEmail, enabled });
+        if (resp.status !== 'success') throw new Error(resp.message);
+        alertPrefs = { emailEnabled: enabled };
+        showToast(resp.message, 'success');
+    } catch (e) {
+        box.checked = !enabled;
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+    renderAlertEmailBar();
+}
+
+async function sendTestAlertEmailUI(btn) {
+    btn.disabled = true;
+    try {
+        const resp = await callGAS('sendTestAlertEmail', {});
+        if (resp.status !== 'success') throw new Error(resp.message);
+        showToast(resp.message, 'success');
+    } catch (e) {
+        showToast('Không gửi được email thử: ' + e.message, 'error');
+    }
+    btn.disabled = false;
 }

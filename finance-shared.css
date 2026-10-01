@@ -814,3 +814,11 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
   .allocation-card { display: block; }
   .allocation-card .sector-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
 }
+
+/* Thanh bật/tắt email cảnh báo giá (khi app tắt) */
+.alert-email-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.alert-email-bar:empty { display: none; }
+.alert-email-toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-size: 0.78rem; color: var(--text-secondary); }
+.alert-email-toggle input { width: 16px; height: 16px; accent-color: var(--finance-accent); cursor: pointer; }
+.alert-email-toggle i { color: var(--text-muted); margin-right: 3px; }
+.alert-email-toggle b { color: var(--text-primary); font-weight: 600; }

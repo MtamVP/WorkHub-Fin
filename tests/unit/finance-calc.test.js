@@ -75,7 +75,7 @@ describe('getSymbolPerformance (api.js)', () => {
   const fnSrc = (() => {
     const start = 'getSymbolPerformance: ';
     const a = apiSrc.indexOf(start);
-    const b = apiSrc.indexOf("// kind: 'target'", a);
+    const b = apiSrc.indexOf('// Email cảnh báo giá khi app tắt', a);
     return apiSrc.slice(a + start.length, b).trim().replace(/,\s*$/, '');
   })();
 
