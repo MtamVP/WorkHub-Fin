@@ -1,6 +1,6 @@
 (function () {
     var POLL_MS = 5 * 60 * 1000;
-    var PRICE_POLL_MS = 15 * 60 * 1000;
+    var PRICE_POLL_MS = 5 * 60 * 1000;
     var GROUP_KEY = 'finance';
 
     // toISOString().slice(0,10) trước đây lấy ngày theo UTC -- mốc "sang ngày mới" (reset
@@ -141,7 +141,7 @@
 
     // Cảnh báo giá danh mục: giá TT chạm giá mục tiêu (từ Định Giá CP hoặc nhập tay) hoặc thủng ngưỡng
     // cắt lỗ. Mỗi mức báo tối đa 1 lần/ngày (khoá gồm cả mức giá, nên đổi mức sẽ báo lại). Chỉ báo khi app
-    // đang chạy -- giá tự cập nhật mỗi giờ phiên giao dịch bởi cron fetch-stock-prices.
+    // đang chạy -- giá tự cập nhật mỗi 5 phút trong phiên giao dịch bởi cron fetch-stock-prices.
     async function checkPriceAlerts() {
         var email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
         if (!email || typeof window.callGAS !== 'function') return;

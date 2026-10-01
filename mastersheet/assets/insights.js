@@ -191,7 +191,7 @@ function printCurrentTab() {
     window.print();
 }
 
-// --- Email cảnh báo giá khi app đã tắt (Edge Function send-price-alerts, chạy mỗi giờ trong phiên giao dịch) ---
+// --- Email cảnh báo giá khi app đã tắt (Edge Function send-price-alerts, chạy mỗi 5 phút trong phiên giao dịch) ---
 let alertPrefs = null;
 
 async function renderAlertEmailBar() {

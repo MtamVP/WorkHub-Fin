@@ -139,7 +139,7 @@
                         <thead>
                             <tr>
                                 <th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá vốn BQ</th>
-                                <th class="text-right" title="Giá thị trường: tự động cập nhật mỗi giờ trong phiên, hoặc nhập tay (có thể khóa)">Giá TT</th>
+                                <th class="text-right" title="Giá thị trường: tự động cập nhật mỗi 5 phút trong phiên, hoặc nhập tay (có thể khóa)">Giá TT</th>
                                 <th class="text-right" title="Giá mục tiêu (mặc định lấy từ trang Định Giá CP, có thể nhập đè) và ngưỡng cắt lỗ — app sẽ báo khi giá chạm">Mục tiêu / Cắt lỗ</th>
                                 <th class="text-right">GT vốn</th>
                                 <th class="text-right">GTTT</th><th class="text-right">Tỷ trọng</th><th class="text-right">Lãi/lỗ</th>
@@ -411,7 +411,7 @@
             </div>
 
             <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
-                <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi giờ trong phiên — chỉ dùng khi cần sửa)</span></h3>
+                <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi 5 phút trong phiên — chỉ dùng khi cần sửa)</span></h3>
                 <form id="benchmark-form" class="grant-form-grid">
                     <div class="grant-field">
                         <label for="bm-date">Ngày</label>
@@ -430,15 +430,15 @@
         </section>
 
         <p class="guide-text">
-            * <b>Hướng dẫn:</b> Khối lượng và giá vốn ở tab "Danh Mục" được tính tự động từ tab "Sổ Lệnh" — thêm lệnh mua/bán để cập nhật danh mục. Giá TT tự động cập nhật mỗi giờ trong phiên giao dịch; bạn vẫn có thể nhập tay và khóa giá của từng mã.
+            * <b>Hướng dẫn:</b> Khối lượng và giá vốn ở tab "Danh Mục" được tính tự động từ tab "Sổ Lệnh" — thêm lệnh mua/bán để cập nhật danh mục. Giá TT tự động cập nhật mỗi 5 phút trong phiên giao dịch; bạn vẫn có thể nhập tay và khóa giá của từng mã.
         </p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=1791300000000"></script>
-    <script src="../../lib/finance-calc.js?v=1"></script>
+    <script src="../../lib/finance-calc.js?v=2"></script>
     <script src="script.js?v=1791300000000"></script>
-    <script src="insights.js?v=1791300000000"></script>
+    <script src="insights.js?v=1791400000000"></script>
 
 </body>
 </html>
