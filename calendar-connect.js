@@ -35,6 +35,13 @@
 // phải bỏ qua, không tạo thêm N dòng instance trùng lặp với dòng master đã có.
 const GOOGLE_CLIENT_ID = '825025516269-gmictbckj5c8ameatht1bbj6tqct6tqq.apps.googleusercontent.com';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+// calendarList.list (UI "Quản lý lịch") KHÔNG nằm trong quyền của calendar.events -- cần thêm
+// calendar.calendarlist.readonly. 'openid email' để Google trả id_token chứa email tài khoản đã
+// chọn (hiện trong panel, không cần gọi thêm API nào). Người dùng có thể bỏ tick từng quyền ở
+// màn hình đồng ý của Google -- mọi chỗ dùng đều phải chịu được việc thiếu quyền (xem hasWriteScope
+// / hasCalendarListScope / google_account_email có thể null).
+const GOOGLE_CALENDARLIST_SCOPE = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const GOOGLE_OAUTH_SCOPES = [GOOGLE_CALENDAR_SCOPE, GOOGLE_CALENDARLIST_SCOPE, 'openid', 'email'].join(' ');
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GOOGLE_CALENDAR_LIST_ENDPOINT = 'https://www.googleapis.com/calendar/v3/users/me/calendarList';
@@ -85,11 +92,21 @@ async function renderCalendarConnectionPanel() {
       `<div class="sync-folder-status" style="color:var(--warning-color,#c07800)"><i class="fa-solid fa-triangle-exclamation"></i> Kết nối cũ chỉ đọc được từ Google -- kết nối lại để bật đồng bộ 2 chiều (sửa/xoá trong WorkHub cũng áp dụng lên Google).</div>`;
     const syncedCalendarIds = (connection.synced_calendar_ids && connection.synced_calendar_ids.length) ? connection.synced_calendar_ids : ['primary'];
     const calendarSummary = syncedCalendarIds.length <= 1 ? '1 lịch (Chính)' : syncedCalendarIds.length + ' lịch đã chọn';
+    const googleEmail = connection.google_account_email || '';
+    const workhubEmail = await getWorkhubLoginEmail();
+    const accountLine = googleEmail
+      ? `<div class="sync-folder-status"><i class="fa-brands fa-google"></i> Tài khoản Google: <b>${escapeHtml(googleEmail)}</b></div>` +
+        ((workhubEmail && workhubEmail.toLowerCase() !== googleEmail.toLowerCase())
+          ? `<div class="sync-folder-status">Khác với email đăng nhập WorkHub (${escapeHtml(workhubEmail)}) — bình thường nếu bạn chủ ý dùng tài khoản Google khác. Bấm "Kết nối lại" để đổi.</div>` : '')
+      : `<div class="sync-folder-status"><i class="fa-brands fa-google"></i> Tài khoản Google: chưa rõ — bấm "Kết nối lại" để hiện email tài khoản đang đồng bộ.</div>`;
+    const calendarListNotice = hasCalendarListScope(connection) ? '' :
+      `<div class="sync-folder-status" style="color:var(--warning-color,#c07800)"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có quyền xem danh sách lịch — kết nối lại (và giữ nguyên các quyền Google đề xuất) để dùng "Quản lý lịch".</div>`;
     listEl.innerHTML = `
     <div class="sync-folder-panel">
       <div class="sync-folder-header">
         <div>
           <div class="sync-folder-path"><i class="fa-solid fa-calendar-check"></i> Google Calendar đã kết nối</div>
+          ${accountLine}
           <div class="sync-folder-status">Kết nối lúc: ${escapeHtml(connectedAt)}</div>
           <div class="sync-folder-status" id="calendar-last-synced-status">Đồng bộ lần cuối: ${escapeHtml(syncedAt)}</div>
           ${readOnlyNotice}
@@ -106,6 +123,7 @@ async function renderCalendarConnectionPanel() {
         <div>
           <div class="sync-folder-path"><i class="fa-solid fa-calendar-days"></i> Lịch đang đồng bộ</div>
           <div class="sync-folder-status">${escapeHtml(calendarSummary)}</div>
+          ${calendarListNotice}
         </div>
         <div class="sync-folder-actions">
           <button type="button" class="btn btn-outline" onclick="toggleCalendarPicker()"><i class="fa-solid fa-sliders"></i> Quản lý lịch</button>
@@ -132,6 +150,43 @@ function hasWriteScope(connection) {
   return !!(connection && connection.scope && connection.scope.indexOf('calendar.events') !== -1);
 }
 
+// "Quản lý lịch" cần calendar.calendarlist.readonly -- kết nối cấp trước khi có quyền này (hoặc
+// người dùng bỏ tick quyền đó) sẽ bị Google từ chối calendarList.list bằng lỗi 403.
+function hasCalendarListScope(connection) {
+  return !!(connection && connection.scope && connection.scope.indexOf('calendar.calendarlist') !== -1);
+}
+
+// Email tài khoản WorkHub đang đăng nhập -- chỉ dùng làm login_hint gợi ý cho Google và để so sánh
+// hiển thị. Tự lấy qua sbClient (không đọc biến toàn cục riêng từng app, xem comment đầu file).
+async function getWorkhubLoginEmail() {
+  try {
+    const { data } = await sbClient.auth.getUser();
+    const email = data && data.user && data.user.email ? String(data.user.email).trim() : '';
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// id_token là JWT; payload (đoạn giữa, base64url) chứa claim "email". Token nhận thẳng từ endpoint
+// token của Google qua TLS nên chỉ cần ĐỌC claim để hiển thị -- không dùng nó để xác thực/phân quyền
+// gì cả, nên không cần kiểm chữ ký. Trả về null nếu thiếu/không đọc được (vd người dùng bỏ quyền email).
+function decodeIdTokenEmail(idToken) {
+  try {
+    if (!idToken) return null;
+    const parts = String(idToken).split('.');
+    if (parts.length < 2) return null;
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '==='.slice((b64.length + 3) % 4);
+    const bytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    if (!payload.email || payload.email_verified === false) return null;
+    return String(payload.email);
+  } catch (e) {
+    return null;
+  }
+}
+
 async function connectGoogleCalendar() {
   if (!GOOGLE_CLIENT_ID) { showToast('Chưa cấu hình GOOGLE_CLIENT_ID.', 'warning'); return; }
   if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) {
@@ -139,15 +194,20 @@ async function connectGoogleCalendar() {
   }
   try {
     const { codeVerifier, codeChallenge, method } = await window.OAuthLoopback.createPkcePair();
+    const previousConnection = await API.calendarConnection.get().catch(() => null);
+    const workhubEmail = await getWorkhubLoginEmail();
     const authUrl = new URL(GOOGLE_AUTH_ENDPOINT);
     authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
     authUrl.searchParams.set('redirect_uri', window.OAuthLoopback.OAUTH_CALLBACK_URL);
     authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', GOOGLE_CALENDAR_SCOPE);
+    authUrl.searchParams.set('scope', GOOGLE_OAUTH_SCOPES);
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', method);
     authUrl.searchParams.set('access_type', 'offline');
-    authUrl.searchParams.set('prompt', 'consent');
+    // select_account: luôn hiện bộ chọn tài khoản (không âm thầm dùng tài khoản đang đăng nhập sẵn
+    // trong trình duyệt). login_hint chỉ là GỢI Ý email đăng nhập WorkHub -- người dùng vẫn đổi được.
+    authUrl.searchParams.set('prompt', 'select_account consent');
+    if (workhubEmail) authUrl.searchParams.set('login_hint', workhubEmail);
 
     const queryString = await window.OAuthLoopback.awaitRedirect(authUrl.toString());
     const params = window.OAuthLoopback.parseQueryString(queryString);
@@ -165,11 +225,22 @@ async function connectGoogleCalendar() {
     if (!tokenResp.ok) throw new Error(tokenJson.error_description || tokenJson.error || 'Google từ chối yêu cầu token.');
 
     const expiresAt = new Date(Date.now() + (tokenJson.expires_in || 3600) * 1000).toISOString();
+    const googleEmail = decodeIdTokenEmail(tokenJson.id_token);
     await callGAS('saveCalendarConnection', {
       access_token: tokenJson.access_token, refresh_token: tokenJson.refresh_token || null,
-      expires_at: expiresAt, scope: tokenJson.scope || GOOGLE_CALENDAR_SCOPE
+      expires_at: expiresAt, scope: tokenJson.scope || GOOGLE_CALENDAR_SCOPE,
+      google_account_email: googleEmail
     });
-    showToast('Đã kết nối Google Calendar.', 'success');
+    // Đổi sang TÀI KHOẢN GOOGLE KHÁC so với lần kết nối trước: danh sách lịch phụ đã chọn thuộc về
+    // tài khoản cũ nên không còn ý nghĩa -- đưa về chỉ lịch chính.
+    const switchedAccount = !!(googleEmail && previousConnection && previousConnection.google_account_email &&
+      previousConnection.google_account_email.toLowerCase() !== googleEmail.toLowerCase());
+    if (switchedAccount) {
+      try { await callGASData('setSyncedCalendars', { calendarIds: ['primary'] }); } catch (e) { /* không chặn kết nối */ }
+    }
+    showToast(googleEmail
+      ? ('Đã kết nối Google Calendar (' + googleEmail + ')' + (switchedAccount ? ' — tài khoản đã đổi, danh sách lịch phụ được đặt lại.' : '.'))
+      : 'Đã kết nối Google Calendar.', 'success');
     // Đồng bộ ngay lần đầu kết nối -- không bắt người dùng tự bấm "Đồng bộ ngay" thêm 1 lần.
     await syncGoogleCalendarNow();
   } catch (err) {
@@ -211,6 +282,10 @@ async function toggleCalendarPicker() {
   try {
     const connection = await API.calendarConnection.get();
     if (!connection) { body.innerHTML = `<div class="empty-state">Chưa kết nối.</div>`; return; }
+    if (!hasCalendarListScope(connection)) {
+      body.innerHTML = `<div class="empty-state">Cần kết nối lại để cấp quyền xem danh sách lịch. Bấm "Kết nối lại" ở trên rồi giữ nguyên các quyền Google đề xuất.</div>`;
+      return;
+    }
     const accessToken = await getValidAccessToken(connection);
     const calendars = await fetchCalendarList(accessToken);
     const selected = new Set((connection.synced_calendar_ids && connection.synced_calendar_ids.length) ? connection.synced_calendar_ids : ['primary']);

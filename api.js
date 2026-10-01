@@ -2932,6 +2932,8 @@ const API = {
                 expires_at: tokens.expires_at || null,
                 scope: tokens.scope || null
             };
+            // Chỉ ghi email khi người gọi thật sự truyền (lúc kết nối); lần làm mới token không truyền nên giữ nguyên email cũ
+            if (Object.prototype.hasOwnProperty.call(tokens, 'google_account_email')) row.google_account_email = tokens.google_account_email || null;
             const { error } = await sbClient.from('calendar_connections')
                 .upsert(row, { onConflict: 'user_id,provider' });
             if (error) throw error;
