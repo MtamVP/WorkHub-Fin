@@ -1854,7 +1854,10 @@ const API = {
 
         // --- Trang "Tổng hợp" của cả team ---
         getTeamSummary: async () => {
-            const { data, error } = await sbClient.from('finance_assets').select('*, users!inner(nickname, email)');
+            // Lọc nhóm finance/admin — phải khớp đúng tập thành viên với getMemberList/getTeamNavHistory,
+            // nếu không KPI "Tổng NAV toàn team" và biểu đồ NAV team sẽ ra 2 con số khác nhau trên cùng 1 trang.
+            const { data, error } = await sbClient.from('finance_assets')
+                .select('*, users!inner(nickname, email, group_key)').in('users.group_key', ['finance', 'admin']);
             if (error) throw error;
 
             const totalNav = data.reduce((sum, row) => sum + Number(row.nav), 0);
