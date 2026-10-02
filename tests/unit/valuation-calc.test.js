@@ -362,3 +362,109 @@ describe('analyze và buildRecord', () => {
     expect(V.buildRecord(base).fair_value).toBe(21000);
   });
 });
+
+describe('cổ phiếu thưởng / phát hành thêm làm đổi cơ sở EPS', () => {
+  it('số cổ phiếu đổi > 3%: không tính tăng trưởng EPS, BVPS, PEG nhưng vẫn tính tăng trưởng LNST', () => {
+    const prev = V.normalize({ v1: 1000, v2: 1800, v3: 100 });
+    const n = V.normalize({ v1: 1500, v2: 3000, v3: 160, v6: 15000 });   // chia thưởng 50%
+    const m = V.metrics(n, { prev });
+    expect(m.shareChange).toBeCloseTo(0.5, 6);
+    expect(m.lnstGrowth).toBeCloseTo(60, 6);
+    expect(m.epsGrowth).toBeNull();
+    expect(m.bvpsGrowth).toBeNull();
+    expect(m.peg).toBeNull();
+  });
+  it('đổi nhẹ trong ngưỡng 3% vẫn so sánh được', () => {
+    const prev = V.normalize({ v1: 1000, v2: 1800, v3: 100 });
+    const m = V.metrics(V.normalize({ v1: 1020, v2: 2000, v3: 120, v6: 15000 }), { prev });
+    expect(m.shareChange).toBeCloseTo(0.02, 6);
+    expect(m.epsGrowth).not.toBeNull();
+  });
+});
+
+describe('syncRecords: ghép số liệu nguồn với hồ sơ đã lưu', () => {
+  const T = 1e9; // nguồn trả đồng; đơn vị hồ sơ mặc định tỷ đồng
+  const A = (year, o) => Object.assign({ year, fiscalDate: year + '-12-31', charter: 1000 * T, equity: 2200 * T, minority: 200 * T, equityParent: 2000 * T, lnst: 150 * T, revenue: 1500 * T, assets: 5000 * T }, o || {});
+  const fin = (annual, extra) => Object.assign({ form: 'NON_FINANCE', annual, quarters: [], dividends: {} }, extra || {});
+  const existing = [{ year: 2024, data: { symbol: 'ABC', year: 2024, v1: 1000, v2: 1800, v3: 120, v6: 14000, targetPE: 12, targetPB: 1.2, growthBase: 8, thesis: 'giữ nguyên', sector: 'general', unit: 'billion', fair_value: 1 } }];
+
+  it('hồ sơ có sẵn: ghi đè số liệu tài chính, giữ nguyên giả định/luận điểm/giá, tính lại giá hợp lý', () => {
+    const r = V.syncRecords(existing, fin([A(2024, { lnst: 130 * T })]), { symbol: 'abc', at: 'T0' });
+    expect(r.records).toHaveLength(1);
+    const rec = r.records[0].record;
+    expect(r.records[0].isNew).toBe(false);
+    expect(rec).toMatchObject({ symbol: 'ABC', year: 2024, v1: 1000, v2: 2000, v3: 130, v6: 14000, targetPE: 12, targetPB: 1.2, growthBase: 8, thesis: 'giữ nguyên', revenue: 1500, assets: 5000, financialsSource: 'vndirect', financialsAt: 'T0' });
+    expect(rec.fair_value).not.toBe(1);                       // đã tính lại từ số liệu mới
+    expect(rec.eps).toBe(1300);
+  });
+  it('năm mới nhất vừa có báo cáo: kế thừa giả định từ năm gần nhất và đánh dấu carriedFrom; giá lấy giá hiện tại', () => {
+    const r = V.syncRecords(existing, fin([A(2024), A(2025, { lnst: 180 * T })]), { symbol: 'ABC', livePrice: 21000 });
+    const y25 = r.records.find(x => x.year === 2025);
+    expect(y25.isNew).toBe(true);
+    expect(y25.carried).toBe(true);
+    expect(y25.record).toMatchObject({ targetPE: 12, targetPB: 1.2, growthBase: 8, carriedFrom: 2024, v6: 21000, v3: 180 });
+    expect(y25.record.thesis).toBeUndefined();               // luận điểm không kế thừa
+    expect(r.summary).toMatchObject({ created: 1, updated: 1, carried: true, years: [2024, 2025] });
+    expect(y25.record.roe).toBeUndefined();
+  });
+  it('năm lịch sử chưa có: chỉ có số liệu, không giả định, không giá; ngành theo loại hình', () => {
+    const r = V.syncRecords([], fin([A(2022), A(2023), A(2024)], { form: 'BANK' }), { symbol: 'VCB', livePrice: 90000 });
+    expect(r.records.map(x => x.year)).toEqual([2022, 2023, 2024]);
+    r.records.forEach(x => expect(x.record.sector).toBe('bank'));
+    const y22 = r.records[0].record;
+    expect('targetPE' in y22).toBe(false);
+    expect('v6' in y22).toBe(false);
+    expect('carriedFrom' in y22).toBe(false);
+    expect(r.records[2].record.v6).toBe(90000);              // chỉ năm mới nhất nhận giá hiện tại
+    expect(r.unit).toBe('billion');
+  });
+  it('cổ tức: ghi khi nguồn có, giữ số cũ khi nguồn không có; quy đổi theo đơn vị của hồ sơ (triệu đồng)', () => {
+    const ex = [{ year: 2024, data: { v1: 1000000, v2: 1, v3: 1, unit: 'million', dps: 700 } }];
+    const r1 = V.syncRecords(ex, fin([A(2024)]), { symbol: 'ABC' });
+    expect(r1.records[0].record.dps).toBe(700);               // nguồn không có cổ tức năm này -> giữ
+    expect(r1.records[0].record.v1).toBe(1000000);            // 1.000 tỷ = 1.000.000 triệu
+    const r2 = V.syncRecords(ex, fin([A(2024)], { dividends: { '2024': 1000 } }), { symbol: 'ABC' });
+    expect(r2.records[0].record.dps).toBe(1000);
+  });
+  it('vốn chủ dùng phần của cổ đông công ty mẹ; thiếu thì dùng vốn chủ gộp; nguồn thiếu số thì giữ số cũ', () => {
+    const r = V.syncRecords([], fin([A(2024, { equityParent: null, equity: 2200 * T, revenue: null })]), { symbol: 'ABC' });
+    expect(r.records[0].record.v2).toBe(2200);
+    expect('revenue' in r.records[0].record).toBe(false);
+    const keep = V.syncRecords([{ year: 2024, data: { v1: 1000, v2: 1, v3: 1, revenue: 777 } }], fin([A(2024, { revenue: null })]), { symbol: 'ABC' });
+    expect(keep.records[0].record.revenue).toBe(777);
+  });
+  it('ROE bình quân và tăng trưởng dùng năm liền trước ngay trong lượt đồng bộ; chia thưởng không tạo tăng trưởng EPS giả', () => {
+    const r = V.syncRecords([], fin([A(2023, { charter: 1000 * T, lnst: 100 * T }), A(2024, { charter: 1500 * T, lnst: 130 * T })]), { symbol: 'ABC' });
+    const y24 = V.normalize(r.records[1].record);
+    const m = V.metrics(y24, { prev: V.normalize(r.records[0].record) });
+    expect(m.lnstGrowth).toBeCloseTo(30, 6);
+    expect(m.epsGrowth).toBeNull();
+    expect(m.roeBasis).toBe('avg');
+  });
+  it('giới hạn số năm; nguồn rỗng -> không có bản ghi', () => {
+    const many = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map(y => A(y));
+    expect(V.syncRecords([], fin(many), { symbol: 'ABC', maxYears: 6 }).records.map(x => x.year)).toEqual([2020, 2021, 2022, 2023, 2024, 2025].slice(0, 6));
+    expect(V.syncRecords([], fin([]), { symbol: 'ABC' }).records).toEqual([]);
+    expect(V.syncRecords([], null, { symbol: 'ABC' }).records).toEqual([]);
+  });
+  it('dòng quý quy đổi về đơn vị hồ sơ, bỏ quý không có lợi nhuận, giới hạn số quý', () => {
+    const q = [{ year: 2026, quarter: 2, lnst: 2.5 * T, revenue: 13 * T }, { year: 2026, quarter: 1, lnst: null, revenue: 1 }, { year: 2025, quarter: 4, lnst: 2.4 * T, revenue: null }];
+    const rows = V.quarterRowsFrom({ quarters: q }, 'FPT', 'billion', 12);
+    expect(rows).toEqual([{ symbol: 'FPT', year: 2026, quarter: 2, lnst: 2.5, revenue: 13 }, { symbol: 'FPT', year: 2025, quarter: 4, lnst: 2.4, revenue: null }]);
+    expect(V.quarterRowsFrom({ quarters: q }, 'FPT', 'million', 1)[0].lnst).toBe(2500);
+    expect(V.quarterRowsFrom(null, 'FPT', 'billion')).toEqual([]);
+  });
+});
+
+describe('làm tròn số quy đổi theo đơn vị', () => {
+  it('tỷ đồng 2 số lẻ, triệu đồng 1 số lẻ, đồng nguyên', () => {
+    expect(V.roundForUnit(14710691830000, 'billion')).toBe(14710.69);
+    expect(V.roundForUnit(14710691830000, 'million')).toBe(14710691.8);
+    expect(V.roundForUnit(14710691830000, 'dong')).toBe(14710691830000);
+    expect(V.roundForUnit(1234567, 'unknown')).toBe(0); // đơn vị lạ rơi về tỷ đồng
+  });
+  it('syncRecords ghi số tròn theo đơn vị hồ sơ', () => {
+    const r = V.syncRecords([], { form: 'NON_FINANCE', annual: [{ year: 2025, charter: 17035071210000, equityParent: 36482943940772, lnst: 9376127629501, revenue: null, assets: null }], quarters: [], dividends: {} }, { symbol: 'FPT' });
+    expect(r.records[0].record).toMatchObject({ v1: 17035.07, v2: 36482.94, v3: 9376.13 });
+  });
+});

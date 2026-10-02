@@ -9,7 +9,7 @@ import { createFakeSupabase } from '../helpers/fake-supabase.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(here, '../../', rel), 'utf8');
-const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/monthly-report.js'];
+const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
 
 const USER = 'u-1', EMAIL = 'toi@example.com';
 const iso = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);

@@ -17,6 +17,7 @@ const DEFAULTS = {
   finance_cash_flows: () => ({ id: uuid(), created_at: new Date().toISOString(), deleted_at: null, symbol: null, note: null }),
   finance_corporate_actions: () => ({ id: uuid(), created_at: new Date().toISOString(), deleted_at: null, note: null }),
   finance_watchlist: () => ({ id: uuid(), created_at: new Date().toISOString(), buy_below: null, target_price: null, note: null, added_price: null }),
+  finance_decisions: () => ({ id: uuid(), created_at: new Date().toISOString(), deleted_at: null, tags: [], txn_id: null, price_at_decision: null, quantity: null, reason: null, expected_price: null, stop_price: null, horizon_months: null, confidence: null, valuation: null, review_date: null, review_rating: null, review_note: null, lesson: null }),
   finance_holdings_price: () => ({ locked: false, target_price: null, stop_loss: null, price_date: null, price_source: null, updated_at: new Date().toISOString() }),
 };
 
@@ -49,6 +50,10 @@ export function createFakeSupabase(seed = {}, opts = {}) {
     for (const cols of keys) {
       const dup = table(t).find((r, i) => i !== ignoreIndex && cols.every(c => r[c] === row[c]));
       if (dup) return { code: '23505', message: 'duplicate key value violates unique constraint (' + cols.join(',') + ')' };
+    }
+    if (t === 'finance_decisions' && row.txn_id) {
+      const dup = table(t).find((r, i) => i !== ignoreIndex && !r.deleted_at && r.txn_id === row.txn_id);
+      if (dup) return { code: '23505', message: 'duplicate txn_id' };
     }
     if (t === 'finance_transactions' && row.external_ref) {
       const dup = table(t).find((r, i) => i !== ignoreIndex && !r.deleted_at && r.user_id === row.user_id && r.external_ref === row.external_ref);

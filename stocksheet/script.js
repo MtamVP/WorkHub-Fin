@@ -15,6 +15,7 @@ const state = {
     query: '',
     sort: { key: 'upside', dir: -1 },
     detail: null,           // { symbol, year, rows, quarters, live, series, a, hist }
+    portfolio: { held: [], watched: [] }, // mã đang nắm / theo dõi (kể cả chưa định giá)
     charts: []
 };
 
@@ -94,7 +95,7 @@ function analyzeItem(item) {
     const prev = item.prev ? VC.normalize(Object.assign({}, item.prev, { year: item.year - 1 })) : null;
     const a = VC.analyze(data, { prev: prev, quarters: item.quarters, price: item.price });
     return {
-        symbol: item.symbol, year: item.year, held: item.held, watched: item.watched,
+        symbol: item.symbol, year: item.year, held: item.held, watched: item.watched, data: item.data,
         priceSource: item.priceSource, priceDate: item.priceDate, updatedAt: item.updatedAt, a: a
     };
 }
@@ -105,6 +106,7 @@ async function loadOverview() {
     try {
         const raw = await call('getStockOverview');
         state.items = raw.map(analyzeItem);
+        try { state.portfolio = await call('getStockPortfolioSymbols'); } catch (e) { state.portfolio = { held: [], watched: [] }; }
         state.overviewLoaded = true;
         fillSymbolSelect();
         renderOverview();
@@ -166,6 +168,7 @@ function filteredRows() {
 }
 
 function renderOverview() {
+    renderSyncBar();
     const items = state.items;
     const count = k => items.filter(i => i.a.verdict.key === k).length;
     const tile = (label, value, sub) => `<div class="vl-sum"><span class="vl-sum-label">${label}</span><span class="vl-sum-value">${value}${sub ? `<small>${sub}</small>` : ''}</span></div>`;
@@ -397,7 +400,9 @@ function renderDetail() {
 
     // --- Hero + kết luận ---
     const hero = VU.heroHtml({
-        symbol: d.symbol, meta: [`Số liệu năm ${d.year}`, VC.SECTORS[n.sector].label],
+        symbol: d.symbol, meta: [`Số liệu năm ${d.year}`, VC.SECTORS[n.sector].label,
+            n.meta.financialsAt ? `Số liệu tự động ${fmtDate(n.meta.financialsAt)}` : 'Số liệu nhập tay',
+            n.meta.carriedFrom ? `Giả định kế thừa từ ${n.meta.carriedFrom} — soát lại` : ''],
         statusHtml: status, priceNote: priceNote, a: a
     });
 
@@ -415,6 +420,7 @@ function renderDetail() {
     const notes = VU.dataNotes(n, m).concat(d.historyError ? ['Chưa lấy được giá lịch sử nên chưa có dải P/E, P/B (' + d.historyError + ').'] : []);
     const scen = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-layer-group"></i> Ba kịch bản<span class="vl-muted">% so với giá hiện tại</span></h3>
         ${VU.scenarioTableHtml(v, a.price)}
+        ${!v.methods.length ? `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>Chưa có P/E, P/B mục tiêu nên chưa có giá hợp lý. <a class="vl-link" href="/stocksheet/autosheet/#${VU.esc(d.symbol)}/${d.year}">Mở Định Giá CP</a> và bấm “Gợi ý P/E, P/B theo lịch sử”, rồi Lưu.</span></div>` : ''}
         ${v.scenarios.bear.auto.pe || v.scenarios.bear.auto.pb ? '<p class="vl-hint">Kịch bản xấu/tốt bạn chưa nhập nên mặc định bội số cơ sở −/+20%. Chỉnh trong Định Giá CP › Kịch bản & nâng cao.</p>' : ''}
         ${notes.map(t => `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>${VU.esc(t)}</span></div>`).join('')}</div>`;
 
@@ -487,6 +493,7 @@ function renderDetail() {
             <span class="vl-muted">Mã đang nắm: ghi vào giá mục tiêu của mã. Giá muốn mua: thêm/cập nhật mục Theo Dõi (cảnh báo email và desktop chạy như cũ).</span></div>
         <div class="vl-apply-actions" style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:14px">
             <a class="btn-refresh" href="/stocksheet/autosheet/#${VU.esc(d.symbol)}/${d.year}"><i class="fa-solid fa-pen"></i> Sửa định giá ${d.year}</a>
+            <button type="button" class="btn-refresh" onclick="refreshFinancials()"><i class="fa-solid fa-cloud-arrow-down"></i> Làm mới số liệu tự động</button>
             <button type="button" class="btn-refresh" onclick="deleteCurrentValuation()" style="color:var(--danger-color)"><i class="fa-solid fa-trash"></i> Xoá hồ sơ năm ${d.year}</button></div>
     </div>`;
 
@@ -632,6 +639,125 @@ async function deleteCurrentValuation() {
         } else {
             await loadStockDetail({ force: true });
         }
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// ---------- đồng bộ số liệu tài chính tự động ----------
+function fmtDateTime(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderSyncBar() {
+    const el = document.getElementById('ov-syncbar');
+    if (!el) return;
+    const last = FinancialsSync.lastSyncOf(state.items.map(i => i.data));
+    const stale = last && last.ageDays > 45;
+    const status = last
+        ? `Số liệu tự động cập nhật lần cuối <b>${VU.esc(fmtDateTime(last.at))}</b> (${last.ageDays === 0 ? 'hôm nay' : last.ageDays + ' ngày trước'})${stale ? ' <span class="vl-pill vl-pill-expensive"><i class="fa-solid fa-clock" aria-hidden="true"></i> Nên cập nhật</span>' : ''}`
+        : (state.items.length ? 'Chưa đồng bộ số liệu tự động lần nào — các mã đang dùng số liệu nhập tay.' : 'Thêm mã để lấy số liệu tài chính tự động.');
+    const have = new Set(state.items.map(i => i.symbol));
+    const missing = [...new Set([...(state.portfolio.held || []), ...(state.portfolio.watched || [])])].filter(s => !have.has(s));
+    el.innerHTML = `<div class="vl-syncrow">
+            <span class="vl-sync-status"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i> ${status}</span>
+            <span class="vl-sync-actions">
+                <input type="text" class="vl-search" id="qa-symbol" placeholder="Thêm mã (VD: MWG)" maxlength="12" aria-label="Thêm mã cổ phiếu" autocomplete="off" style="margin-left:0;min-width:150px;text-transform:uppercase">
+                <button type="button" class="btn-refresh" id="btn-quick-add" onclick="quickAdd()"><i class="fa-solid fa-plus"></i> Thêm</button>
+                <button type="button" class="btn-save" id="btn-sync-all" onclick="syncAll()"${state.items.length ? '' : ' disabled'}><i class="fa-solid fa-rotate"></i> Đồng bộ số liệu</button>
+            </span>
+        </div>
+        ${missing.length ? `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>Trong danh mục của bạn có ${missing.length} mã chưa định giá: <b>${missing.map(VU.esc).join(', ')}</b>. <button type="button" class="vl-link" onclick="addMissing()">Thêm tất cả tự động</button></span></div>` : ''}`;
+    const input = document.getElementById('qa-symbol');
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') quickAdd(); });
+}
+
+function renderSyncResult(results) {
+    const box = document.getElementById('ov-syncresult');
+    if (!box) return;
+    const ok = results.filter(r => r.ok), bad = results.filter(r => !r.ok);
+    const line = (r) => r.ok
+        ? `<li><i class="fa-solid fa-circle-check" style="color:var(--success-color)" aria-hidden="true"></i> <b>${VU.esc(r.symbol)}</b>: ${r.summary.updated} năm cập nhật${r.summary.created ? `, ${r.summary.created} năm mới` : ''}${r.summary.carried ? ' — <span style="color:var(--warning-color)">năm mới nhất kế thừa P/E, P/B mục tiêu từ năm trước, hãy soát lại</span>' : ''}</li>`
+        : `<li><i class="fa-solid fa-circle-exclamation" style="color:var(--danger-color)" aria-hidden="true"></i> <b>${VU.esc(r.symbol)}</b>: ${VU.esc(r.error)}</li>`;
+    box.style.display = 'block';
+    box.innerHTML = `<h3 class="vl-card-title"><i class="fa-solid fa-list-check"></i> Kết quả đồng bộ: ${ok.length}/${results.length} mã thành công
+            <button type="button" class="vl-link" style="margin-left:auto" onclick="document.getElementById('ov-syncresult').style.display='none'">Đóng</button></h3>
+        <ul style="margin:0;padding-left:18px;font-size:0.82rem;line-height:1.9">${results.map(line).join('')}</ul>
+        ${bad.length ? '<p class="vl-hint">Mã lỗi thường do sai mã, mã chưa niêm yết hoặc nguồn tạm thời không phản hồi — thử lại sau.</p>' : ''}`;
+}
+
+async function runSync(symbols) {
+    const btn = document.getElementById('btn-sync-all');
+    const quick = document.getElementById('btn-quick-add');
+    if (btn) btn.disabled = true;
+    if (quick) quick.disabled = true;
+    try {
+        const results = await FinancialsSync.syncMany(symbols, function (done, total, sym) {
+            if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${done}/${total} · ${VU.esc(sym)}`;
+        });
+        await loadOverview();
+        renderSyncResult(results);
+        return results;
+    } finally {
+        const b = document.getElementById('btn-sync-all'), q = document.getElementById('btn-quick-add');
+        if (b) b.disabled = !state.items.length;
+        if (q) q.disabled = false;
+    }
+}
+
+async function syncAll() {
+    const symbols = state.items.map(i => i.symbol);
+    if (!symbols.length) { showToast('Chưa có mã nào để đồng bộ', 'error'); return; }
+    const msg = `Cập nhật số liệu tài chính của ${symbols.length} mã từ nguồn thị trường?\n\n` +
+        '• Ghi đè: vốn điều lệ, vốn chủ, lợi nhuận, doanh thu, tổng tài sản (và cổ tức khi nguồn có)\n' +
+        '• Giữ nguyên: P/E-P/B mục tiêu, luận điểm, giá của bạn\n' +
+        '• Tự thêm năm mới / năm lịch sử và dữ liệu quý nếu còn thiếu';
+    if (!window.confirm(msg)) return;
+    await runSync(symbols);
+}
+
+async function addMissing() {
+    const have = new Set(state.items.map(i => i.symbol));
+    const missing = [...new Set([...(state.portfolio.held || []), ...(state.portfolio.watched || [])])].filter(s => !have.has(s));
+    if (!missing.length) return;
+    await runSync(missing);
+}
+
+// Thêm 1 mã mới: lấy số liệu từ nguồn, tạo hồ sơ các năm + dữ liệu quý, rồi mở trang chi tiết.
+async function quickAdd() {
+    const input = document.getElementById('qa-symbol');
+    const sym = String((input && input.value) || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{1,12}$/.test(sym)) { showToast('Nhập mã cổ phiếu hợp lệ (VD: MWG)', 'error'); if (input) input.focus(); return; }
+    if (state.items.find(i => i.symbol === sym)) { showToast(sym + ' đã có trong bảng', 'success'); openDetail(sym); return; }
+    const btn = document.getElementById('btn-quick-add');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lấy…'; }
+    try {
+        const p = await FinancialsSync.preview(sym);
+        const summary = await FinancialsSync.apply(p);
+        await loadOverview();
+        showToast(`Đã thêm ${sym}: ${summary.years.length} năm số liệu + ${p.plan.quarters.length} quý. Đặt P/E, P/B mục tiêu ở Định Giá CP (nút “Gợi ý theo lịch sử”).`, 'success');
+        openDetail(sym);
+    } catch (e) {
+        showToast(e.message, 'error');
+        const b = document.getElementById('btn-quick-add');
+        if (b) { b.disabled = false; b.innerHTML = '<i class="fa-solid fa-plus"></i> Thêm'; }
+    }
+}
+
+// Làm mới số liệu của mã đang xem (trang chi tiết)
+async function refreshFinancials() {
+    const d = state.detail;
+    if (!d) return;
+    if (!window.confirm(`Làm mới số liệu tài chính của ${d.symbol} từ nguồn thị trường?\nSố liệu tài chính các năm sẽ theo nguồn; P/E-P/B mục tiêu, luận điểm, giá của bạn giữ nguyên.`)) return;
+    try {
+        const results = await FinancialsSync.syncMany([d.symbol]);
+        if (!results[0].ok) throw new Error(results[0].error);
+        showToast(`Đã làm mới số liệu ${d.symbol}`, 'success');
+        await loadOverview();
+        await loadStockDetail({ force: true, year: d.year });
     } catch (e) {
         showToast(e.message, 'error');
     }

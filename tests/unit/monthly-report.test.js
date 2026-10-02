@@ -201,7 +201,7 @@ describe('toSheets + Excel', () => {
 
   it('đủ 9 sheet đặt tên theo slide, mỗi bảng biểu đồ có cột A là nhãn', () => {
     const sheets = MonthlyReport.toSheets(r);
-    expect(sheets.map(s => s.name)).toEqual(['00_Huong_dan', '01_KPI', '02_Cumulative', '03_MarketIndex', '04_Decisions', '05_Contribution', '06_DeepDive', '07_Process', '08_Placeholders']);
+    expect(sheets.map(s => s.name)).toEqual(['00_Huong_dan', '01_KPI', '02_Cumulative', '03_MarketIndex', '04_Decisions', '05_Contribution', '06_DeepDive', '07_Process', '08_Placeholders', '09_Journal']);
     const cum = sheets.find(s => s.name === '02_Cumulative');
     expect(cum.rows.slice(1, 7).map(row => row[0])).toEqual(['Start', 'W1', 'W2', 'W3', 'W4', 'Month-end']);
   });
@@ -209,7 +209,7 @@ describe('toSheets + Excel', () => {
   it('ghi ra .xlsx rồi đọc lại đúng số liệu quan trọng', async () => {
     const bytes = XlsxWriter.build(MonthlyReport.toSheets(r));
     const sheets = await StatementImport.readXlsx(bytes);
-    expect(sheets.map(s => s.name)).toHaveLength(9);
+    expect(sheets.map(s => s.name)).toHaveLength(10);
     const kpi = sheets.find(s => s.name === '01_KPI').rows;
     const row = (label) => kpi.find(x => x[0] === label);
     expect(row('PORTFOLIO RETURN (TWR)')[1]).toBeCloseTo(r.kpi.portfolioReturnPct, 2);
@@ -232,9 +232,86 @@ describe('chạy như trong trình duyệt (script thường, không có require
     const sandbox = { console };
     sandbox.window = sandbox;                       // window.PortfolioCalc sẽ là undefined, giống trình duyệt thật
     vm.createContext(sandbox);
-    ['lib/portfolio-calc.js', 'lib/monthly-report.js'].forEach(f => vm.runInContext(fs.readFileSync(new URL('../../' + f, import.meta.url), 'utf8'), sandbox));
+    ['lib/portfolio-calc.js', 'lib/decision-journal.js', 'lib/monthly-report.js'].forEach(f => vm.runInContext(fs.readFileSync(new URL('../../' + f, import.meta.url), 'utf8'), sandbox));
     const report = vm.runInContext('MonthlyReport.compute(' + JSON.stringify(sample()) + ', { todayIso: "2026-10-02" })', sandbox);
     expect(report.kpi.tradesCount).toBe(3);
     expect(report.decisions.length).toBe(4);
+  });
+});
+
+describe('compute — nhật ký quyết định', () => {
+  // t1 = mua SSI 3/9 (giá 30.000); t2 = mua VHM 10/9; t3 = bán SSI 20/9. Nhật ký: ghi đủ cho t1, thiếu cắt lỗ cho t2, t3 chưa ghi.
+  const jr = (o) => Object.assign({ id: 'j', symbol: 'SSI', action: 'buy', decided_at: '2026-09-03', price_at_decision: 30000, quantity: 1000, reason: 'Lợi nhuận phục hồi, định giá hợp lý', expected_price: 34000, stop_price: 27000, horizon_months: 6, confidence: 4, tags: [], valuation: null, txn_id: 't1', review_date: null, review_rating: null, review_note: null, lesson: null }, o || {});
+  const journal = [
+    jr(),
+    jr({ id: 'j2', symbol: 'VHM', decided_at: '2026-09-10', price_at_decision: 70000, quantity: 100, expected_price: 80000, stop_price: null, txn_id: 't2', confidence: null }),
+    jr({ id: 'j3', symbol: 'MWG', action: 'skip', decided_at: '2026-09-12', price_at_decision: null, txn_id: null, reason: 'Định giá đang quá đắt so với lịch sử', expected_price: null, stop_price: null }),
+    jr({ id: 'jold', symbol: 'FPT', decided_at: '2026-08-20', price_at_decision: 100000, quantity: 100, expected_price: 120000, stop_price: 90000, txn_id: 't0' }),   // ra từ tháng trước, vẫn mở
+  ];
+  const r = MonthlyReport.compute(sample({ journal }), { todayIso: '2026-10-02' });
+
+  it('gắn lý do + kỳ vọng vào từng dòng DECISION LOG theo lệnh; lệnh chưa ghi thì không có', () => {
+    const byTxn = Object.fromEntries(r.decisions.filter(d => d.txnId).map(d => [d.txnId, d]));
+    expect(byTxn.t1.journal).toMatchObject({ reason: 'Lợi nhuận phục hồi, định giá hợp lý', expected: 34000, stop: 27000, horizonMonths: 6 });
+    expect(byTxn.t1.journal.planScore).toBe(100);
+    expect(byTxn.t2.journal.planScore).toBe(65);                      // lý do 30 + mục tiêu 25 + thời hạn 10
+    expect(byTxn.t3.journal).toBeUndefined();
+  });
+  it('trạng thái quyết định theo giá đóng cửa trong tháng: SSI chạm mục tiêu 34.000 ngày 24/9', () => {
+    const e = r.journal.entries.find(x => x.symbol === 'SSI');
+    expect(e.status).toBe('target_hit');
+    expect(e.hitDate).toBe('2026-09-24');
+    expect(e.returnPct).toBeCloseTo((33500 / 30000 - 1) * 100, 2);
+    expect(e.alphaPct).toBeCloseTo(e.returnPct - (1250 / 1200 - 1) * 100, 1);
+  });
+  it('quyết định tháng trước còn mở được liệt kê kèm cờ "mở từ trước kỳ" và KHÔNG tính vào tổng hợp tháng', () => {
+    const old = r.journal.entries.find(x => x.symbol === 'FPT');
+    expect(old.carried).toBe(true);
+    expect(old.status).toBe('open');
+    expect(r.journal.summary.total).toBe(3);
+  });
+  it('chỉ số quy trình đo được từ nhật ký (thay cho "chấm tay")', () => {
+    const p = Object.fromEntries(r.process.map(x => [x.label, x]));
+    expect(p['Decision quality'].current).toBeCloseTo((100 + 65 + 85) / 3, 1);       // mua SSI 100 + mua VHM 65 (thiếu cắt lỗ, tự tin) + bỏ qua MWG 85
+    expect(p['Decision quality'].note).toMatch(/QUY TRÌNH/);
+    expect(p['Journal coverage'].current).toBeCloseTo(2 / 3 * 100, 1);          // 2 trên 3 lệnh trong tháng
+    expect(p['Full-plan rate'].current).toBeCloseTo(2 / 3 * 100, 1);            // j2 mua nhưng thiếu cắt lỗ -> chưa đủ; j và j3 đủ
+    expect(p['Target-hit rate'].current).toBe(50);                               // 1 trong 2 lệnh mua đã đánh giá
+    expect(r.kpi).toMatchObject({ journalCount: 3, journalTargetHit: 1, journalStopHit: 0 });
+  });
+  it('phân tích sâu dùng kỳ vọng ghi lúc quyết định thay vì giá mục tiêu hiện tại', () => {
+    expect(r.deepDive.expectationSource).toBe('journal');
+    expect(r.deepDive.journalReason).toMatch(/phục hồi/);
+    const e = Object.fromEntries(r.deepDive.expectedVsRealized.map(x => [x.label, x]));
+    expect(e['Return'].expected).toBeCloseTo((34000 / 30000 - 1) * 100, 2);       // mục tiêu nhật ký 34.000, không phải 40.000 hiện tại
+    expect(e['Max drawdown'].expected).toBeCloseTo((27000 / 30000 - 1) * 100, 2); // cắt lỗ nhật ký 27.000
+  });
+  it('không có nhật ký: hành vi cũ — Decision quality để trống, kỳ vọng từ giá hiện tại', () => {
+    const none = MonthlyReport.compute(sample(), { todayIso: '2026-10-02' });
+    const p = Object.fromEntries(none.process.map(x => [x.label, x]));
+    expect(p['Decision quality'].current).toBeNull();
+    expect(p['Decision quality'].note).toMatch(/Chưa ghi nhật ký/);
+    expect(p['Journal coverage'].current).toBe(0);
+    expect(none.deepDive.expectationSource).toBe('current');
+    expect(none.journal.entries).toEqual([]);
+  });
+  it('sheet 09_Journal có đủ dòng + cột kết quả; 04_Decisions có cột lý do/kỳ vọng', async () => {
+    const sheets = MonthlyReport.toSheets(r);
+    const jr9 = sheets.find(s => s.name === '09_Journal').rows;
+    expect(jr9[0].map(c => c.v)).toEqual(expect.arrayContaining(['Lý do', 'Mục tiêu', 'Cắt lỗ', 'Điểm kế hoạch', 'Trạng thái', 'Alpha % vs VN-Index']));
+    const ssi = jr9.find(row => row[1] === 'SSI');
+    expect(ssi[2]).toBe('BUY');
+    expect(ssi[12]).toBe('Đã chạm mục tiêu');
+    expect(jr9.some(row => row[1] === 'FPT' && row[21] === 'Có')).toBe(true);
+    const dec = sheets.find(s => s.name === '04_Decisions').rows;
+    expect(dec[0].map(c => c.v)).toEqual(expect.arrayContaining(['Lý do (nhật ký)', 'Mục tiêu', 'Điểm kế hoạch']));
+    const bytes = XlsxWriter.build(sheets);
+    const back = await StatementImport.readXlsx(bytes);
+    expect(back.map(s => s.name)).toContain('09_Journal');
+  });
+  it('tháng không có nhật ký vẫn xuất 09_Journal kèm hướng dẫn', () => {
+    const none = MonthlyReport.compute(sample(), { todayIso: '2026-10-02' });
+    const rows = MonthlyReport.toSheets(none).find(s => s.name === '09_Journal').rows;
+    expect(JSON.stringify(rows)).toMatch(/chưa ghi quyết định nào/);
   });
 });

@@ -103,3 +103,66 @@ tr.tl-row-signal td { background: color-mix(in srgb, var(--success-color) 9%, tr
 
 @media (max-width: 720px) { .tl-kpi.big { grid-column: span 1; } .tl-modal .modal-card { max-width: 100%; } }
 @media print { .tl-card-tools, .tl-link, .tl-fee-row, .tl-fee-panel { display: none !important; } }
+
+/* ---- Nhật Ký Quyết Định ---- */
+.jn-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: var(--radius-pill); background: var(--gold); color: #fff; font-size: 0.66rem; font-weight: 700; }
+:root[data-theme="dark"] .jn-badge { color: #1a1408; }
+.jn-nudge { display: flex; flex-direction: column; gap: 9px; padding: 12px 14px; margin-bottom: 14px; border: 1px solid var(--gold); border-radius: var(--radius-sm); background: var(--gold-dim); font-size: 0.84rem; color: var(--text-primary); }
+.jn-nudge i.fa-pen-to-square { color: var(--gold); }
+.jn-nudge-list { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.jn-chip { border: 0; cursor: pointer; font: inherit; font-size: 0.72rem; font-weight: 700; }
+.jn-chip:hover { filter: brightness(1.08); }
+.jn-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.jn-toolbar .btn-save { margin-left: auto; }
+.jn-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.jn-filter { border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font: inherit; font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer; }
+.jn-filter:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.jn-filter[aria-pressed="true"] { background: var(--finance-accent-subtle); border-color: var(--finance-accent-line); color: var(--finance-accent); }
+.jn-filter:focus-visible, .jn-chip:focus-visible, .jn-star:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.jn-table td { vertical-align: top; }
+.jn-reason { max-width: 280px; font-size: 0.8rem; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+td.jn-reason { display: table-cell; overflow: visible; }
+td.jn-reason::before { content: none; }
+.jn-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; line-height: 1.45; font-family: var(--font-body); }
+.jn-plan-bits { display: flex; flex-direction: column; gap: 3px; font-size: 0.78rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.jn-plan-bits i { color: var(--text-muted); width: 14px; text-align: center; }
+.jn-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.jn-plan { display: inline-flex; align-items: center; gap: 7px; }
+.jn-plan b { font-family: var(--font-mono); font-size: 0.8rem; min-width: 22px; }
+.jn-plan-bar { width: 54px; height: 7px; border-radius: 4px; background: var(--hover-bg); overflow: hidden; display: inline-block; }
+.jn-plan-bar i { display: block; height: 100%; border-radius: 4px; }
+.jn-plan-bar i.ok { background: var(--success-color); } .jn-plan-bar i.warn { background: var(--warning-color); } .jn-plan-bar i.bad { background: var(--danger-color); }
+.txn-type-badge.jn-neutral { background: var(--hover-bg); color: var(--text-secondary); }
+.jn-form .jn-textarea, .jn-textarea { width: 100%; min-height: 78px; padding: 9px 12px; background: var(--bg-color-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: inherit; font-size: 0.86rem; color: var(--text-primary); resize: vertical; line-height: 1.5; }
+.jn-textarea:focus { outline: none; border-color: var(--gold); background: var(--card-bg); box-shadow: 0 0 0 3px var(--gold-dim); }
+.jn-form { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.jn-form .txn-field-wide { grid-column: 1 / -1; }
+.jn-form select, .jn-form input { width: 100%; }
+.jn-seg button[aria-pressed="true"] { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+.jn-seg button[aria-pressed="true"][data-v="buy"] { background: var(--success-bg); color: var(--success-color); }
+.jn-seg button[aria-pressed="true"][data-v="sell"] { background: var(--danger-bg); color: var(--danger-color); }
+.jn-seg button:disabled { cursor: not-allowed; opacity: 0.7; }
+.jn-assist { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.jn-modal .modal-card { max-width: 760px; }
+.jn-review-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.jn-review-summary > div { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); min-width: 0; }
+.jn-review-summary .k { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.jn-review-summary p { margin: 4px 0 0; font-size: 0.84rem; line-height: 1.5; overflow-wrap: anywhere; }
+.jn-stars { display: flex; gap: 8px; }
+.jn-star { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--bg-color-2); color: var(--text-secondary); font: inherit; font-weight: 700; cursor: pointer; }
+.jn-star:hover { border-color: var(--gold); color: var(--gold); }
+.jn-star[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: #fff; }
+:root[data-theme="dark"] .jn-star[aria-pressed="true"] { color: #1a1408; }
+.txn-plan > summary { font-size: 0.82rem; }
+@media (max-width: 720px) { .jn-toolbar .btn-save { margin-left: 0; width: 100%; } .jn-reason { max-width: none; } }
+.jn-form .jn-action-field { grid-column: 1 / -1; }
+.jn-modal .jn-form input, .jn-modal .jn-form select, .jn-modal .jn-form .tl-select {
+  padding: 8px 11px; height: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg-color-2); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-body); width: 100%;
+  transition: var(--transition-fast);
+}
+.jn-modal .jn-form input[type="number"], .jn-modal .jn-form input[type="date"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.jn-modal .jn-form input:focus, .jn-modal .jn-form select:focus { background: var(--card-bg); border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px var(--gold-dim); }
+.jn-modal .jn-form input[readonly] { opacity: 0.75; cursor: not-allowed; }
+.jn-modal .txn-field > label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.jn-modal .modal-body > .txn-field { margin-top: 2px; }

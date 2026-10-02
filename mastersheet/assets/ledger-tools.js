@@ -407,6 +407,7 @@ async function undoLastImport(batchId) {
 }
 
 function refreshAfterLedgerChange() {
+    if (typeof JN !== 'undefined') { JN.unplanned = []; if (typeof updateJournalBadge === 'function') updateJournalBadge(); }
     loadLedger();
     loadHoldings();
     loadKpis();

@@ -8,7 +8,7 @@ let isAssetManager = false;
 let navChartInstance = null;
 let allocationChartInstance = null;
 let benchmarkChartInstance = null;
-const TAB_LOADED = { holdings: false, ledger: false, performance: false, watchlist: false, reports: false };
+const TAB_LOADED = { holdings: false, ledger: false, journal: false, performance: false, watchlist: false, reports: false };
 const LEDGER_SUB_LOADED = { cashflow: false, corporate: false };
 const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
 
@@ -166,7 +166,7 @@ async function setupTargetUserSwitcher() {
 
 // --- TAB SWITCHING ---
 function switchAssetTab(tab) {
-    ['holdings', 'watchlist', 'ledger', 'performance', 'reports'].forEach(t => {
+    ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'reports'].forEach(t => {
         const panel = document.getElementById('tab-' + t);
         const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
         if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -174,6 +174,7 @@ function switchAssetTab(tab) {
     });
 
     if (tab === 'ledger' && !TAB_LOADED.ledger) { loadLedger(); TAB_LOADED.ledger = true; }
+    if (tab === 'journal') { loadJournal(); TAB_LOADED.journal = true; }   // lệnh mới / quyết định mới: mỗi lần mở đều tải lại
     if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
@@ -619,6 +620,9 @@ async function handleTxnSubmit(e) {
     };
     // Phí/thuế để trống -> tự tính theo biểu phí (nếu đang bật); điền số thì dùng đúng số đó
     if (typeof applyAutoFeesToTxn === 'function') txn = applyAutoFeesToTxn(txn);
+    // Kế hoạch & lý do đi kèm lệnh (nhật ký quyết định) — để trống thì không tạo nhật ký
+    const plan = typeof readTxnPlan === 'function' ? readTxnPlan() : null;
+    if (plan) txn.decision = plan;
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
@@ -630,6 +634,7 @@ async function handleTxnSubmit(e) {
             e.target.reset();
             document.getElementById('txn-date').value = new Date().toISOString().slice(0, 10);
             if (typeof updateTxnFeePreview === 'function') updateTxnFeePreview();
+            if (typeof resetTxnPlan === 'function') { resetTxnPlan(); if (typeof JN !== 'undefined') JN.unplanned = []; if (typeof updateJournalBadge === 'function') updateJournalBadge(); }
             TAB_LOADED.reports = false;
             await loadLedger();
             await loadHoldings();

@@ -371,3 +371,141 @@ function showToast(message, type = 'success') {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 }
+
+
+// --- 8. SỐ LIỆU TÀI CHÍNH TỰ ĐỘNG (nguồn thị trường) ---
+const finState = { plan: null };
+
+function billions(v, digits) {
+    return v === null || v === undefined ? '—' : VU.dec(v / 1e9, digits === undefined ? 0 : digits);
+}
+
+async function openFinPanel() {
+    const symbol = $('stock-symbol').value.trim().toUpperCase();
+    if (!symbol) { showToast('Nhập mã cổ phiếu trước', 'error'); $('stock-symbol').focus(); return; }
+    const panel = $('fin-panel');
+    panel.style.display = 'block';
+    panel.innerHTML = `<h3 class="vl-card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Số liệu tài chính tự động</h3><div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang lấy báo cáo tài chính của ${VU.esc(symbol)}…</div>`;
+    const btn = $('btn-fin');
+    btn.disabled = true;
+    try {
+        const price = readNum('val-6');
+        finState.plan = await FinancialsSync.preview(symbol, price > 0 ? { livePrice: price } : {});
+        renderFinPanel();
+    } catch (e) {
+        finState.plan = null;
+        panel.innerHTML = `<h3 class="vl-card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Số liệu tài chính tự động</h3>
+            <div class="vl-empty">${VU.esc(e.message)}</div>
+            <div class="vl-apply-actions"><button type="button" class="btn-refresh" onclick="openFinPanel()"><i class="fa-solid fa-rotate-right"></i> Thử lại</button><button type="button" class="btn-refresh" onclick="closeFinPanel()">Đóng</button></div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function closeFinPanel() { $('fin-panel').style.display = 'none'; finState.plan = null; }
+
+function renderFinPanel() {
+    const p = finState.plan;
+    if (!p) return;
+    const fin = p.fin, plan = p.plan, symbol = p.symbol;
+    const year = parseInt($('stock-year').value, 10);
+    const formLabel = { NON_FINANCE: 'Doanh nghiệp thường', BANK: 'Ngân hàng', SECURITIES: 'Chứng khoán', INSURANCE: 'Bảo hiểm' }[fin.form] || 'Chưa nhận diện';
+    const rows = fin.annual.slice(0, 6).map(a => `<tr${a.year === year ? ' style="background:var(--finance-accent-subtle)"' : ''}>
+        <td class="left">${a.year}</td><td>${billions(a.charter)}</td><td>${billions(a.equityParent !== null ? a.equityParent : a.equity)}</td>
+        <td>${billions(a.lnst)}</td><td>${billions(a.revenue)}</td><td>${billions(a.assets)}</td><td>${fin.dividends[a.year] ? VU.vnd(fin.dividends[a.year]) : '—'}</td>
+        <td><button type="button" class="vl-link" onclick="fillFromSource(${a.year})">Điền vào form</button></td></tr>`).join('');
+    const quarters = fin.quarters.slice(0, 8).map(q => `<span class="vl-qitem" style="padding:4px 12px">Q${q.quarter}/${q.year} · ${billions(q.lnst, 0)}</span>`).join('');
+    const s = plan.summary;
+    const bits = [];
+    if (s.created) bits.push(`${s.created} năm chưa có hồ sơ sẽ được tạo mới`);
+    if (s.updated) bits.push(`${s.updated} năm đã có hồ sơ sẽ cập nhật số liệu`);
+    if (s.carried) bits.push('năm mới nhất kế thừa P/E, P/B mục tiêu từ năm trước (nhớ soát lại)');
+    if (plan.quarters.length) bits.push(`${plan.quarters.length} quý`);
+    $('fin-panel').innerHTML = `<h3 class="vl-card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Số liệu tài chính tự động · ${VU.esc(symbol)}
+            <span class="vl-muted">${VU.esc(formLabel)} · nguồn VNDirect · tỷ đồng (cổ tức: đồng/cổ phiếu)</span></h3>
+        <div class="vl-table-wrap"><table class="vl-log">
+            <thead><tr><th>Năm</th><th>Vốn điều lệ</th><th>Vốn chủ (cổ đông mẹ)</th><th>LNST (cổ đông mẹ)</th><th>Doanh thu</th><th>Tổng tài sản</th><th>Cổ tức/cp</th><th></th></tr></thead>
+            <tbody>${rows || '<tr><td class="left" colspan="8">Chưa có báo cáo năm.</td></tr>'}</tbody></table></div>
+        ${quarters ? `<div class="vl-qlist" style="margin-top:12px">${quarters}</div><p class="vl-hint" style="margin-top:6px">LNST quý riêng lẻ (tỷ đồng). 4 quý liền nhau gần nhất dùng để tính EPS và P/E TTM.</p>` : ''}
+        <div class="vl-apply-actions">
+            <button type="button" class="btn-save" onclick="saveFinHistory()"><i class="fa-solid fa-floppy-disk"></i> Lưu lịch sử vào hệ thống</button>
+            <button type="button" class="btn-refresh" onclick="closeFinPanel()">Đóng</button>
+            <span class="vl-muted">${VU.esc(bits.join(' · '))}. Giả định, luận điểm và giá của bạn giữ nguyên.</span>
+        </div>`;
+}
+
+// Điền số liệu 1 năm của nguồn vào form (chưa lưu). Đổi sang năm đó, nạp bối cảnh (năm trước, quý) rồi ghi đè các ô số liệu tài chính.
+async function fillFromSource(year) {
+    const p = finState.plan;
+    if (!p) return;
+    const a = p.fin.annual.find(x => x.year === year);
+    if (!a) return;
+    $('stock-year').value = year;
+    await loadContext();
+    const unit = $('stock-unit').value;
+    const put = (id, v) => { if (v !== null && v !== undefined) setNum(id, VC.roundForUnit(v, unit)); };
+    put('val-1', a.charter);
+    put('val-2', a.equityParent !== null ? a.equityParent : a.equity);
+    put('val-3', a.lnst);
+    put('val-rev', a.revenue);
+    put('val-assets', a.assets);
+    if (p.fin.dividends[year] > 0) setNum('val-dps', p.fin.dividends[year]);
+    if (p.fin.form && VC.FORM_SECTOR[p.fin.form] && !ctx.existing) $('stock-sector').value = VC.FORM_SECTOR[p.fin.form];
+    $('adv-extra').open = true;
+    calculate();
+    renderFinPanel();
+    showToast(`Đã điền số liệu năm ${year} từ nguồn — kiểm tra rồi bấm Lưu`, 'success');
+}
+
+async function saveFinHistory() {
+    const p = finState.plan;
+    if (!p) return;
+    const s = p.plan.summary;
+    const lines = [`Lưu số liệu tài chính của ${p.symbol} vào hệ thống?`, '',
+        `• ${s.created} hồ sơ năm mới, ${s.updated} hồ sơ năm cập nhật số liệu`, `• ${p.plan.quarters.length} quý`, '',
+        'Số liệu tài chính (vốn điều lệ, vốn chủ, lợi nhuận, doanh thu, tổng tài sản, cổ tức) sẽ theo nguồn; P/E-P/B mục tiêu, luận điểm, giá của bạn giữ nguyên.'];
+    if (!window.confirm(lines.join('\n'))) return;
+    try {
+        await FinancialsSync.apply(p);
+        showToast(`Đã lưu ${s.years.length} năm + ${p.plan.quarters.length} quý của ${p.symbol}`, 'success');
+        closeFinPanel();
+        ctx.loadedKey = '';
+        await loadContext();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// Gợi ý P/E, P/B mục tiêu = trung bình lịch sử của chính mã (chỉ điền ô đang trống; ô đã có giá trị thì chỉ hiện số tham khảo).
+async function suggestTargets() {
+    const symbol = $('stock-symbol').value.trim().toUpperCase();
+    const note = $('suggest-note');
+    if (!symbol) { showToast('Nhập mã cổ phiếu trước', 'error'); $('stock-symbol').focus(); return; }
+    note.textContent = 'Đang tính từ lịch sử…';
+    try {
+        const rows = await call('getStockHistory', { symbol: symbol });
+        if (rows.length < 3) { note.textContent = `Mới có ${rows.length} năm hồ sơ — cần ít nhất 3. Bấm “Lấy số liệu tự động” rồi “Lưu lịch sử” để có đủ.`; return; }
+        const minYear = Math.min.apply(null, rows.map(r => r.year));
+        const today = new Date();
+        const earliest = new Date(today.getTime() - 2590 * 86400000);
+        let from = new Date(Date.UTC(minYear - 1, 11, 1));
+        if (from < earliest) from = earliest;
+        const series = await call('getAssetPriceHistory', { symbols: [symbol], from: from.toISOString().slice(0, 10), to: today.toISOString().slice(0, 10) });
+        const hist = VC.historicalMultiples(rows, series[symbol] || []);
+        const pe = hist.pe && hist.pe.n >= 3 ? hist.pe : null, pb = hist.pb && hist.pb.n >= 3 ? hist.pb : null;
+        if (!pe && !pb) { note.textContent = 'Chưa đủ 3 năm có cả số liệu dương và giá lịch sử để tính trung bình.'; return; }
+        const parts = [];
+        if (pe) {
+            parts.push(`P/E trung bình ${VU.mult(pe.mean)} (${VU.mult(pe.min)}–${VU.mult(pe.max)}, ${pe.n} năm)`);
+            if (readNum('target-pe') === '') setNum('target-pe', Math.round(pe.mean * 10) / 10);
+        }
+        if (pb) {
+            parts.push(`P/B trung bình ${VU.mult(pb.mean, 2)} (${VU.mult(pb.min, 2)}–${VU.mult(pb.max, 2)}, ${pb.n} năm)`);
+            if (readNum('target-pb') === '') setNum('target-pb', Math.round(pb.mean * 100) / 100);
+        }
+        note.textContent = parts.join(' · ') + '. Ô trống đã được điền bằng mức trung bình — đây chỉ là điểm xuất phát, hãy điều chỉnh theo triển vọng.';
+        calculate();
+    } catch (e) {
+        note.textContent = 'Không tính được: ' + e.message;
+    }
+}

@@ -9,7 +9,7 @@ import { createFakeSupabase } from '../helpers/fake-supabase.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(here, '../../', rel), 'utf8');
-const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/monthly-report.js'];
+const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
 
 const USER = 'u-1', EMAIL = 'toi@example.com';
 const iso = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
@@ -178,5 +178,72 @@ describe('callGAS: các lệnh định giá mới', () => {
     expect(fake.table('finance_stock_quarters')).toHaveLength(1);
     const src = read('api.js');
     ['saveStockQuarter', 'deleteStockQuarter', 'pushStockToPortfolio'].forEach(a => expect(src).toContain(`'${a}'`));
+  });
+});
+
+describe('API.stock — số liệu tài chính tự động', () => {
+  const FIN = { FPT: { form: 'NON_FINANCE', annual: [{ year: 2025, charter: 17e12 }], quarters: [], dividends: { '2025': 2000 } } };
+
+  it('fetchFinancials: gọi Edge Function với mã đã chuẩn hoá; trả kết quả + lỗi từng mã', async () => {
+    const { API, fake } = boot({}, { functions: { 'stock-financials': async () => ({ data: { ok: true, results: FIN, errors: { XXX: 'chưa có báo cáo' }, fetchedAt: '2026-10-02T00:00:00Z' }, error: null }) } });
+    const out = await API.stock.fetchFinancials(['fpt', 'FPT', 'xxx', 'a;b']);
+    expect(out.results.FPT.form).toBe('NON_FINANCE');
+    expect(out.errors.XXX).toBe('chưa có báo cáo');
+    expect(fake.functionCalls.find(c => c.name === 'stock-financials').body.symbols).toEqual(['FPT', 'XXX']);
+    await expect(API.stock.fetchFinancials([])).rejects.toThrow(/Thiếu mã/);
+  });
+  it('fetchFinancials: mọi mã đều lỗi vẫn trả errors (không văng); hàm lỗi hẳn thì báo lý do', async () => {
+    const allBad = boot({}, { functions: { 'stock-financials': async () => ({ data: { ok: false, results: {}, errors: { ZZZ: 'sai mã' } }, error: null }) } });
+    const r = await allBad.API.stock.fetchFinancials(['ZZZ']);
+    expect(r.results).toEqual({});
+    expect(r.errors.ZZZ).toBe('sai mã');
+    const down = boot({}, { functions: { 'stock-financials': async () => ({ data: null, error: { message: 'Edge Function down' } }) } });
+    await expect(down.API.stock.fetchFinancials(['FPT'])).rejects.toThrow(/Edge Function down/);
+    const noData = boot({}, { functions: { 'stock-financials': async () => ({ data: { ok: false, error: 'Cần đăng nhập.' }, error: null }) } });
+    await expect(noData.API.stock.fetchFinancials(['FPT'])).rejects.toThrow(/Cần đăng nhập/);
+  });
+  it('saveValuationRecords: ghi đè đúng (mã, năm), mã/năm hỏng bị bỏ, danh sách rỗng không lỗi', async () => {
+    const { API, fake } = boot({ finance_stock_valuations: [val('FPT', 2025, { v1: 1 })] });
+    const msg = await API.stock.saveValuationRecords([
+      { symbol: 'fpt', year: 2025, record: { symbol: 'FPT', year: 2025, v1: 17035, fair_value: 100 } },
+      { symbol: 'FPT', year: 2024, record: { symbol: 'FPT', year: 2024, v1: 14710 } },
+      { symbol: '', year: 2024, record: {} }, { symbol: 'VCB', year: 1800, record: {} },
+    ], EMAIL);
+    expect(msg).toMatch(/2 hồ sơ/);
+    const rows = fake.table('finance_stock_valuations');
+    expect(rows).toHaveLength(2);
+    expect(rows.find(r => r.year === 2025).data).toMatchObject({ v1: 17035, fair_value: 100 });
+    expect(await API.stock.saveValuationRecords([], EMAIL)).toMatch(/Không có/);
+  });
+  it('saveQuarters: ghi hàng loạt, lọc dòng hỏng, ghi đè quý đã có', async () => {
+    const { API, fake } = boot({ finance_stock_quarters: [{ symbol: 'FPT', year: 2026, quarter: 1, lnst: 1, revenue: null }] });
+    const msg = await API.stock.saveQuarters([
+      { symbol: 'fpt', year: 2026, quarter: 1, lnst: 2487, revenue: 12480 }, { symbol: 'FPT', year: 2026, quarter: 2, lnst: 2567, revenue: '' },
+      { symbol: 'FPT', year: 2026, quarter: 5, lnst: 1 }, { symbol: 'FPT', year: 2026, quarter: 3, lnst: 'abc' }, { symbol: '', year: 2026, quarter: 1, lnst: 1 },
+    ], EMAIL);
+    expect(msg).toMatch(/2 quý/);
+    const rows = fake.table('finance_stock_quarters');
+    expect(rows).toHaveLength(2);
+    expect(rows.find(r => r.quarter === 1)).toMatchObject({ lnst: 2487, revenue: 12480 });
+    expect(rows.find(r => r.quarter === 2).revenue).toBeNull();
+    expect(await API.stock.saveQuarters([], EMAIL)).toMatch(/Không có/);
+  });
+  it('getPortfolioSymbols: mã đang nắm + đang theo dõi (kể cả chưa có hồ sơ định giá)', async () => {
+    const { API } = boot({
+      finance_transactions: [{ id: 't1', user_id: USER, type: 'buy', symbol: 'FPT', quantity: 100, price: 90000, trade_date: '2026-09-01', created_at: '2026-09-01T01:00:00Z', fee: 0, tax: 0, deleted_at: null }],
+      finance_watchlist: [{ id: 'w1', user_id: USER, symbol: 'VCB', buy_below: 1, created_at: '2026-09-02T00:00:00Z' }],
+    });
+    expect(await API.stock.getPortfolioSymbols(EMAIL)).toEqual({ held: ['FPT'], watched: ['VCB'] });
+    expect(await API.stock.getPortfolioSymbols('la@example.com')).toEqual({ held: [], watched: [] });
+  });
+  it('callGAS: các lệnh mới đi đúng nhánh, lệnh ghi được đánh dấu thay đổi dữ liệu', async () => {
+    const { callGAS, fake } = boot({}, { functions: { 'stock-financials': async () => ({ data: { ok: true, results: FIN, errors: {} }, error: null }) } });
+    const f = await callGAS('fetchStockFinancials', { symbols: ['FPT'], email: EMAIL });
+    expect(f.data.results.FPT.form).toBe('NON_FINANCE');
+    const s = await callGAS('saveStockQuarterBatch', { rows: [{ symbol: 'FPT', year: 2026, quarter: 1, lnst: 5 }], email: EMAIL });
+    expect(s.status).toBe('success');
+    expect(fake.table('finance_stock_quarters')).toHaveLength(1);
+    const src = read('api.js');
+    ['saveStockValuationBatch', 'saveStockQuarterBatch'].forEach(a => expect(src).toContain(`'${a}'`));
   });
 });

@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.7">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
-    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791800000000">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -122,6 +122,7 @@
             <button class="view-toggle-btn active" data-tab="holdings" onclick="switchAssetTab('holdings')"><i class="fa-solid fa-layer-group"></i> Danh Mục</button>
             <button class="view-toggle-btn" data-tab="watchlist" onclick="switchAssetTab('watchlist')"><i class="fa-solid fa-eye"></i> Theo Dõi</button>
             <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh</button>
+            <button class="view-toggle-btn" data-tab="journal" onclick="switchAssetTab('journal')"><i class="fa-solid fa-book-open"></i> Nhật Ký <span class="jn-badge" id="jn-badge" style="display:none;"></span></button>
             <button class="view-toggle-btn" data-tab="performance" onclick="switchAssetTab('performance')"><i class="fa-solid fa-chart-area"></i> Hiệu Suất</button>
             <button class="view-toggle-btn" data-tab="reports" onclick="switchAssetTab('reports')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
         </div>
@@ -262,6 +263,20 @@
                             <label for="txn-note">Ghi chú (tùy chọn)</label>
                             <input type="text" id="txn-note" placeholder="Ghi chú...">
                         </div>
+                        <details class="tl-details txn-plan" id="txn-plan" style="grid-column: 1 / -1;">
+                            <summary><i class="fa-solid fa-book-open" style="color:var(--gold)"></i> Kế hoạch &amp; lý do (nhật ký quyết định — nên ghi ngay lúc đặt lệnh)</summary>
+                            <div class="txn-form-grid jn-form" style="margin-top:10px;">
+                                <div class="txn-field txn-field-wide" style="grid-column: 1 / -1;">
+                                    <label for="txn-plan-reason">Lý do — vì sao lệnh này? Điều gì làm bạn đổi ý?</label>
+                                    <textarea id="txn-plan-reason" class="jn-textarea" maxlength="1000" placeholder="VD: Lợi nhuận phục hồi 2 quý liền, P/E thấp hơn trung bình 5 năm."></textarea>
+                                </div>
+                                <div class="txn-field"><label for="txn-plan-expected">Giá mục tiêu</label><input type="number" id="txn-plan-expected" min="0" step="any" placeholder="0"></div>
+                                <div class="txn-field"><label for="txn-plan-stop">Ngưỡng cắt lỗ</label><input type="number" id="txn-plan-stop" min="0" step="any" placeholder="0"></div>
+                                <div class="txn-field"><label for="txn-plan-horizon">Thời hạn (tháng)</label><input type="number" id="txn-plan-horizon" min="1" max="120" step="1" placeholder="12"></div>
+                                <div class="txn-field"><label for="txn-plan-conf">Mức tự tin (1-5)</label><input type="number" id="txn-plan-conf" min="1" max="5" step="1" placeholder="—"></div>
+                                <div class="txn-field" style="grid-column: 1 / -1;"><div class="jn-assist"><button type="button" class="btn-tool" onclick="fillTxnPlanFromValuation()"><i class="fa-solid fa-wand-magic-sparkles"></i> Điền từ Định Giá CP</button><span class="tl-hint" id="txn-plan-note" style="margin:0"></span></div></div>
+                            </div>
+                        </details>
                         <div class="txn-field">
                             <label>&nbsp;</label>
                             <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
@@ -401,6 +416,14 @@
         </section>
 
         <!-- Tab: Hiệu Suất -->
+        <section id="tab-journal" class="asset-tab-panel" style="display:none;">
+            <div class="tl-card">
+                <div class="tl-card-head"><h3><i class="fa-solid fa-book-open"></i> Nhật Ký Quyết Định</h3></div>
+                <p class="tl-hint" style="margin:-6px 0 14px">Ghi <b>lý do và kỳ vọng ngay lúc quyết định</b> (giá mục tiêu, cắt lỗ, thời hạn). Hệ thống đối chiếu với giá thực tế sau đó và đưa vào báo cáo cuối tháng — để bạn học từ chính các quyết định của mình, không phải từ trí nhớ.</p>
+                <div id="jn-body"></div>
+            </div>
+        </section>
+
         <section id="tab-performance" class="asset-tab-panel" style="display:none;">
             <div class="perf-stats-row">
                 <div class="kpi-card">
@@ -580,18 +603,32 @@
         </div>
     </div>
 
+    <div class="modal-overlay tl-modal jn-modal" id="jn-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="jn-modal-title"></h3>
+                <button type="button" class="icon-btn" onclick="closeJournalModal()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="jn-modal-body"></div>
+            <div class="modal-footer" id="jn-modal-footer"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791800000000"></script>
+    <script src="../../api.js?v=1791900000000"></script>
     <script src="../../lib/finance-calc.js?v=2"></script>
-    <script src="../../lib/portfolio-calc.js?v=1791800000000"></script>
-    <script src="../../lib/statement-import.js?v=1791800000000"></script>
-    <script src="../../lib/xlsx-writer.js?v=1791800000000"></script>
-    <script src="../../lib/monthly-report.js?v=1791800000000"></script>
-    <script src="script.js?v=1791800000000"></script>
-    <script src="insights.js?v=1791800000000"></script>
-    <script src="ledger-tools.js?v=1791800000000"></script>
-    <script src="watchlist.js?v=1791800000000"></script>
-    <script src="reports.js?v=1791800000000"></script>
+    <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
+    <script src="../../lib/statement-import.js?v=1791900000000"></script>
+    <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
+    <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
+    <script src="../../lib/decision-journal.js?v=1791900000000"></script>
+    <script src="../../lib/monthly-report.js?v=1791900000000"></script>
+    <script src="script.js?v=1791900000000"></script>
+    <script src="insights.js?v=1791900000000"></script>
+    <script src="ledger-tools.js?v=1791900000000"></script>
+    <script src="watchlist.js?v=1791900000000"></script>
+    <script src="journal.js?v=1791900000000"></script>
+    <script src="reports.js?v=1791900000000"></script>
 
 </body>
 </html>

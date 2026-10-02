@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.7">
     <link rel="stylesheet" href="/stocksheet/style.css?v=1789060000000">
-    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791800000000">
+    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -78,6 +78,8 @@
 
         <!-- 1) BẢNG SO SÁNH: mọi mã đã định giá, kết luận Rẻ / Hợp lý / Đắt theo giá hiện tại -->
         <section id="view-overview" aria-label="Bảng so sánh các mã đã định giá">
+            <div class="vl-syncbar" id="ov-syncbar"></div>
+            <div class="vl-card" id="ov-syncresult" style="display:none"></div>
             <div class="vl-summary" id="ov-summary"></div>
             <div class="vl-filters" id="ov-filters" role="group" aria-label="Lọc theo nhóm"></div>
             <div class="spreadsheet-wrapper vl-table-wrap" id="ov-table-wrap"></div>
@@ -110,9 +112,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../api.js?v=1791800000000"></script>
-    <script src="../lib/valuation-calc.js?v=1791800000000"></script>
-    <script src="valuation-ui.js?v=1791800000000"></script>
-    <script src="script.js?v=1791800000000"></script>
+    <script src="../api.js?v=1791900000000"></script>
+    <script src="../lib/valuation-calc.js?v=1791900000000"></script>
+    <script src="valuation-ui.js?v=1791900000000"></script>
+    <script src="financials-sync.js?v=1791900000000"></script>
+    <script src="script.js?v=1791900000000"></script>
 </body>
 </html>

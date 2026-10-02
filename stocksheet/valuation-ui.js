@@ -133,6 +133,7 @@ const ValuationUI = (function () {
     if (m.basis === 'charter') notes.push('EPS/BVPS suy từ vốn điều lệ (mệnh giá 10.000, không trừ cổ phiếu quỹ). Nhập số cổ phiếu lưu hành để chính xác hơn.');
     if (m.lossMaking) notes.push('Doanh nghiệp đang lỗ: P/E không có nghĩa, giá hợp lý chỉ dựa vào P/B (và DDM nếu có).');
     if (m.roeBasis === 'end') notes.push('ROE tính trên vốn chủ cuối kỳ (chưa có số liệu năm trước để lấy bình quân).');
+    if (m.shareChange !== null && m.shareChange > ValuationCalc.SHARE_CHANGE_TOLERANCE) notes.push(`Số cổ phiếu đổi ${dec(m.shareChange * 100, 0)}% so với năm trước (phát hành thêm hoặc chia thưởng) nên không so sánh trực tiếp EPS, BVPS — không tính tăng trưởng EPS, BVPS và PEG.`);
     if (n.legacy) notes.push('Hồ sơ nhập từ phiên bản cũ — mở Định Giá CP và lưu lại để bổ sung đầy đủ chỉ số.');
     return notes;
   }

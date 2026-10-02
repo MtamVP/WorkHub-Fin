@@ -1610,18 +1610,29 @@ const API = {
                 if (totalAvail < quantity - 1e-9) throw new Error(`Không đủ khối lượng "${symbol}" để bán (đang có ${totalAvail})`);
             }
 
-            const { error } = await sbClient.from('finance_transactions').insert({
+            const tradeDate = txn.tradeDate || new Date().toISOString().slice(0, 10);
+            const { data: inserted, error } = await sbClient.from('finance_transactions').insert({
                 user_id: userId, symbol, type: txn.type === 'sell' ? 'sell' : 'buy', quantity, price,
                 fee: Number(txn.fee) || 0,
                 tax: txn.type === 'sell' ? (Number(txn.tax) || 0) : 0,
-                trade_date: txn.tradeDate || new Date().toISOString().slice(0, 10),
+                trade_date: tradeDate,
                 note: txn.note || null, realized_pnl: null, created_by: email
-            });
+            }).select('id').single();
             if (error) throw error;
             // Luôn replay lại (kể cả lệnh mua) — 1 lệnh mua lùi ngày trước các lệnh bán đã có cũng
             // làm thay đổi thứ tự tiêu thụ lô FIFO của những lệnh bán đó.
             await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
+            // Kế hoạch & lý do đi kèm lệnh (nhật ký quyết định): lỗi ở đây KHÔNG làm hỏng lệnh đã lưu
+            if (txn.decision && inserted) {
+                try {
+                    await API.asset.journal.save(email, Object.assign({}, txn.decision, {
+                        symbol, action: txn.type === 'sell' ? 'sell' : 'buy', date: tradeDate, price, quantity, txnId: inserted.id
+                    }));
+                } catch (e) {
+                    return "Đã lưu lệnh giao dịch, nhưng chưa lưu được nhật ký quyết định: " + e.message;
+                }
+            }
             return "Đã lưu lệnh giao dịch!";
         },
         deleteTransaction: async (email, id) => {
@@ -2256,6 +2267,74 @@ const API = {
             }
         },
 
+        // --- Nhật ký quyết định: lý do + kỳ vọng ghi lúc ra quyết định; kết quả đánh giá ở lib/decision-journal.js ---
+        journal: {
+            list: async (email) => {
+                const userId = await getUserId(email);
+                if (!userId) return [];
+                const { data, error } = await sbClient.from('finance_decisions').select('*')
+                    .eq('user_id', userId).is('deleted_at', null).order('decided_at', { ascending: false });
+                if (error) throw error;
+                return (data || []).slice().sort((a, b) => (a.decided_at < b.decided_at ? 1 : a.decided_at > b.decided_at ? -1 : (a.created_at < b.created_at ? 1 : -1)));
+            },
+            // Thêm mới hoặc sửa (có input.id, hoặc đã có quyết định gắn với txnId). Kiểm tra dữ liệu bằng DecisionJournal.validate.
+            save: async (email, input) => {
+                if (typeof DecisionJournal === 'undefined') throw new Error("Thiếu thư viện nhật ký quyết định (lib/decision-journal.js)");
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const v = DecisionJournal.validate(input);
+                if (!v.ok) throw new Error(v.error);
+                const row = Object.assign({}, v.row, { updated_at: new Date().toISOString() });
+                let existingId = input.id || null;
+                if (!existingId && row.txn_id) {
+                    const { data: ex } = await sbClient.from('finance_decisions').select('id').eq('user_id', userId).eq('txn_id', row.txn_id).is('deleted_at', null).maybeSingle();
+                    if (ex) existingId = ex.id;
+                }
+                if (existingId) {
+                    const patch = Object.assign({}, row);
+                    if (!patch.txn_id) delete patch.txn_id; // sửa tay không được gỡ liên kết với lệnh
+                    const { error } = await sbClient.from('finance_decisions').update(patch).eq('id', existingId).eq('user_id', userId);
+                    if (error) throw error;
+                    return "Đã cập nhật quyết định";
+                }
+                const { error } = await sbClient.from('finance_decisions').insert(Object.assign({ user_id: userId }, row));
+                if (error) throw new Error(error.code === '23505' ? 'Lệnh này đã có nhật ký quyết định' : error.message);
+                return "Đã ghi quyết định vào nhật ký";
+            },
+            // Đánh giá lại sau này: điểm 1-5 + nhận xét + bài học
+            saveReview: async (email, id, review) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const rating = Number(review && review.rating);
+                if (!(rating >= 1 && rating <= 5)) throw new Error("Chọn điểm đánh giá từ 1 đến 5");
+                const { error } = await sbClient.from('finance_decisions').update({
+                    review_rating: Math.round(rating), review_note: review.note ? String(review.note).trim().slice(0, 1000) : null,
+                    lesson: review.lesson ? String(review.lesson).trim().slice(0, 1000) : null,
+                    review_date: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString()
+                }).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+                return "Đã lưu đánh giá";
+            },
+            remove: async (email, id) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const { error } = await sbClient.from('finance_decisions').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+                return "Đã xoá quyết định khỏi nhật ký";
+            },
+            // Lệnh giao dịch gần đây CHƯA có nhật ký (để nhắc ghi lý do)
+            unplannedTrades: async (email, days) => {
+                const userId = await getUserId(email);
+                if (!userId) return [];
+                const since = new Date(Date.now() - (Number(days) || 45) * 86400000).toISOString().slice(0, 10);
+                const txns = (await API.asset.listTransactions(email)).filter(t => String(t.trade_date) >= since);
+                if (!txns.length) return [];
+                const { data: linked } = await sbClient.from('finance_decisions').select('txn_id').eq('user_id', userId).is('deleted_at', null);
+                const done = new Set((linked || []).map(d => d.txn_id).filter(Boolean));
+                return txns.filter(t => !done.has(t.id)).map(t => ({ id: t.id, symbol: t.symbol, type: t.type, quantity: Number(t.quantity), price: Number(t.price), trade_date: t.trade_date }));
+            },
+        },
+
         // --- Tỷ trọng mục tiêu để cân bằng danh mục (symbol 'CASH' = tiền mặt) ---
         allocation: {
             list: async (email) => {
@@ -2296,10 +2375,10 @@ const API = {
             if (!/^\d{4}-\d{2}$/.test(String(month))) throw new Error("Tháng không hợp lệ (cần dạng YYYY-MM)");
             const userId = await getUserId(email);
             if (!userId) throw new Error("User không tồn tại");
-            const [navHistory, txns, flows, holdings, watchlist, targets, benchmarkRows] = await Promise.all([
+            const [navHistory, txns, flows, holdings, watchlist, targets, benchmarkRows, journal] = await Promise.all([
                 API.asset.getNavHistory(email), API.asset.listTransactions(email), API.asset.cashFlow.list(email),
                 API.asset.getHoldingsView(email), API.asset.watchlist.list(email), API.asset.allocation.list(email),
-                API.asset.benchmark.list('VNINDEX')
+                API.asset.benchmark.list('VNINDEX'), API.asset.journal.list(email)
             ]);
             const { data: actions } = await sbClient.from('finance_corporate_actions')
                 .select('*').eq('user_id', userId).is('deleted_at', null);
@@ -2320,7 +2399,7 @@ const API = {
             } catch (e) { historyError = e.message || String(e); }
             return {
                 month, email, navHistory, txns, actions: actions || [], cashFlows: flows, holdingsNow: holdings, watchlist, targets,
-                benchmark: benchmarkRows, cash: cd ? Number(cd.cash) || 0 : 0, debt: cd ? Number(cd.debt) || 0 : 0, histories, historyError
+                benchmark: benchmarkRows, cash: cd ? Number(cd.cash) || 0 : 0, debt: cd ? Number(cd.debt) || 0 : 0, histories, historyError, journal
             };
         },
 
@@ -2787,6 +2866,55 @@ const API = {
             return `Đã xoá định giá ${sym} (${year})`;
         },
 
+        // Số liệu tài chính tự động (Edge Function stock-financials, nguồn VNDirect): tối đa 5 mã mỗi lần.
+        // Trả { results: { SYM: { form, annual[], quarters[], dividends{} } }, errors: { SYM: lý do }, fetchedAt }. Tiền tính bằng đồng.
+        fetchFinancials: async (symbols) => {
+            const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
+            if (!list.length) throw new Error("Thiếu mã cổ phiếu");
+            const { data, error } = await sbClient.functions.invoke('stock-financials', { body: { symbols: list } });
+            if (error) {
+                let detail = error.message;
+                try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                throw new Error(detail);
+            }
+            if (!data || (!data.ok && !data.errors)) throw new Error((data && data.error) || 'Không lấy được số liệu tài chính');
+            return { results: data.results || {}, errors: data.errors || {}, fetchedAt: data.fetchedAt || null };
+        },
+
+        // Lưu hàng loạt hồ sơ định giá (đã dựng bằng ValuationCalc.syncRecords/buildRecord): records = [{ symbol, year, record }].
+        saveValuationRecords: async (records, email) => {
+            const rows = (records || []).map(r => ({
+                symbol: String(r.symbol || r.record.symbol || '').trim().toUpperCase(), year: Number(r.year || r.record.year),
+                data: r.record, updated_by: email || null, updated_at: new Date().toISOString()
+            })).filter(r => r.symbol && r.year >= 1990);
+            if (!rows.length) return "Không có hồ sơ nào để lưu";
+            const { error } = await sbClient.from('finance_stock_valuations').upsert(rows, { onConflict: 'symbol,year' });
+            if (error) throw error;
+            return `Đã lưu ${rows.length} hồ sơ định giá`;
+        },
+        // Lưu hàng loạt dữ liệu quý: rows = [{ symbol, year, quarter, lnst, revenue }]
+        saveQuarters: async (rows, email) => {
+            const clean = (rows || []).map(r => ({
+                symbol: String(r.symbol || '').trim().toUpperCase(), year: Number(r.year), quarter: Number(r.quarter),
+                lnst: Number(r.lnst), revenue: r.revenue === null || r.revenue === undefined || r.revenue === '' ? null : Number(r.revenue),
+                updated_by: email || null, updated_at: new Date().toISOString()
+            })).filter(r => r.symbol && r.year >= 2000 && r.year <= 2100 && [1, 2, 3, 4].includes(r.quarter) && isFinite(r.lnst) && (r.revenue === null || isFinite(r.revenue)));
+            if (!clean.length) return "Không có dữ liệu quý nào để lưu";
+            const { error } = await sbClient.from('finance_stock_quarters').upsert(clean, { onConflict: 'symbol,year,quarter' });
+            if (error) throw error;
+            return `Đã lưu ${clean.length} quý`;
+        },
+
+        // Các mã người dùng đang nắm / đang theo dõi (kể cả mã CHƯA có hồ sơ định giá) -> để gợi ý thêm tự động.
+        getPortfolioSymbols: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) return { held: [], watched: [] };
+            let held = [];
+            try { held = (await API.asset.computeHoldings(userId)).map(h => h.symbol); } catch (e) { /* bỏ qua */ }
+            const { data: wl } = await sbClient.from('finance_watchlist').select('symbol').eq('user_id', userId);
+            return { held, watched: (wl || []).map(w => w.symbol) };
+        },
+
         // Mọi hồ sơ định giá (mỗi mã nhiều năm, năm mới trước). Chỉ số/kết luận do lib/valuation-calc.js tính ở trình duyệt.
         getAllValuations: async () => {
             const { data, error } = await sbClient.from('finance_stock_valuations')
@@ -3220,7 +3348,7 @@ const API = {
             const ORDER = ['users', 'org_units', 'projects', 'tasks', 'task_assignees', 'task_comments',
                 'project_milestones', 'files', 'events', 'app_settings', 'fin_roles', 'sci_roles',
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
-                'finance_corporate_actions', 'finance_holdings_price', 'finance_benchmark_prices',
+                'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
                 'finance_watchlist', 'finance_allocation_targets', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
@@ -3680,7 +3808,7 @@ const MUTATING_ACTIONS = new Set([
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
-    'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio',
+    'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
@@ -3826,6 +3954,15 @@ async function _dispatchAction(action, params = {}) {
             case 'getStockHistory': result = await API.stock.getStockHistory(params.symbol); break;
             case 'saveStockValuation': result = await API.stock.saveStockValuation(params, params.email); break;
             case 'deleteStockValuation': result = await API.stock.deleteValuation(params.symbol, params.year); break;
+            case 'fetchStockFinancials': result = await API.stock.fetchFinancials(params.symbols); break;
+            case 'saveStockValuationBatch': result = await API.stock.saveValuationRecords(params.records, params.email); break;
+            case 'saveStockQuarterBatch': result = await API.stock.saveQuarters(params.rows, params.email); break;
+            case 'getStockPortfolioSymbols': result = await API.stock.getPortfolioSymbols(params.email); break;
+            case 'listDecisions': result = await API.asset.journal.list(params.email); break;
+            case 'saveDecision': result = await API.asset.journal.save(params.email, params.decision); break;
+            case 'saveDecisionReview': result = await API.asset.journal.saveReview(params.email, params.id, params.review); break;
+            case 'deleteDecision': result = await API.asset.journal.remove(params.email, params.id); break;
+            case 'getUnplannedTrades': result = await API.asset.journal.unplannedTrades(params.email, params.days); break;
             case 'getStockOverview': result = await API.stock.getOverview(params.email); break;
             case 'getStockQuarters': result = await API.stock.getQuarters(params.symbol); break;
             case 'saveStockQuarter': result = await API.stock.saveQuarter(params, params.email); break;

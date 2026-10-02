@@ -26,8 +26,8 @@
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.7">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1791800000000">
-    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791800000000">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1791900000000">
+    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -96,8 +96,14 @@
                     <label for="stock-unit">Đơn vị các số liệu bên dưới:</label>
                     <select id="stock-unit" class="vl-sel" style="min-width:150px"></select>
                 </div>
+
+                <div class="stock-header-field">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn-save" id="btn-fin" onclick="openFinPanel()"><i class="fa-solid fa-cloud-arrow-down"></i> Lấy số liệu tự động</button>
+                </div>
             </div>
             <p class="vl-hint" id="ctx-line" style="margin:-10px 0 14px"></p>
+            <div class="vl-card" id="fin-panel" style="display:none;margin-bottom:18px"></div>
 
             <h3 class="stock-section-title"><i class="fa-solid fa-pen-to-square"></i> Chỉ Số Đầu Vào</h3>
             <div class="input-field-grid">
@@ -184,6 +190,10 @@
                     <input type="text" class="input-val target-input" id="growth-base" placeholder="VD: 15" inputmode="decimal" data-signed="1">
                 </div>
             </div>
+            <div class="vl-apply-actions" style="margin-top:10px">
+                <button type="button" class="btn-refresh" onclick="suggestTargets()"><i class="fa-solid fa-wand-magic-sparkles"></i> Gợi ý P/E, P/B theo lịch sử</button>
+                <span class="vl-muted" id="suggest-note"></span>
+            </div>
 
             <details class="vl-adv" id="adv-scen">
                 <summary>Kịch bản xấu / tốt, cổ tức (DDM) và dữ liệu quý (TTM)</summary>
@@ -255,10 +265,11 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791800000000"></script>
-    <script src="../../lib/valuation-calc.js?v=1791800000000"></script>
-    <script src="../valuation-ui.js?v=1791800000000"></script>
-    <script src="script.js?v=1791800000000"></script>
+    <script src="../../api.js?v=1791900000000"></script>
+    <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
+    <script src="../valuation-ui.js?v=1791900000000"></script>
+    <script src="../financials-sync.js?v=1791900000000"></script>
+    <script src="script.js?v=1791900000000"></script>
 
 </body>
 </html>
