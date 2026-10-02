@@ -30,4 +30,11 @@ function copyDir(src, dst, isRoot) {
 }
 
 copyDir(root, dest, true);
+
+// client_secret của OAuth client Google (loại Desktop): Google bắt buộc gửi ở endpoint token. Repo CÔNG KHAI nên
+// KHÔNG commit -- ghi vào tauri-dist (không nằm trong git) từ biến môi trường lúc build. Thiếu biến -> file rỗng,
+// build vẫn chạy nhưng kết nối Google Calendar sẽ báo "client_secret is missing".
+const googleSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
+fs.writeFileSync(path.join(dest, 'google-oauth-secret.js'), 'window.__WH_GOOGLE_CLIENT_SECRET = ' + JSON.stringify(googleSecret) + ';\n');
+if (!googleSecret) console.warn('[sync-web] CANH BAO: chua dat GOOGLE_OAUTH_CLIENT_SECRET -- ket noi Google Calendar se loi.');
 console.log(`[sync-web] copied web assets into ${dest}`);

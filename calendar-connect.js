@@ -44,6 +44,16 @@ const GOOGLE_CALENDARLIST_SCOPE = 'https://www.googleapis.com/auth/calendar.cale
 const GOOGLE_OAUTH_SCOPES = [GOOGLE_CALENDAR_SCOPE, GOOGLE_CALENDARLIST_SCOPE, 'openid', 'email'].join(' ');
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+
+// Google BẮT BUỘC gửi client_secret ở endpoint token kể cả với client loại Desktop + PKCE (lỗi "client_secret is
+// missing" nếu thiếu). Với app cài trên máy nó không được coi là bí mật thật, nhưng repo này CÔNG KHAI nên giá trị
+// KHÔNG được commit: scripts/sync-web.mjs ghi nó vào google-oauth-secret.js (chỉ trong tauri-dist) từ biến môi
+// trường GOOGLE_OAUTH_CLIENT_SECRET lúc đóng gói. Thiếu biến đó thì build vẫn chạy nhưng kết nối Calendar sẽ lỗi.
+function withGoogleClientSecret(fields) {
+  const secret = (typeof window !== 'undefined' && window.__WH_GOOGLE_CLIENT_SECRET) || '';
+  if (secret) fields.client_secret = secret;
+  return fields;
+}
 const GOOGLE_CALENDAR_LIST_ENDPOINT = 'https://www.googleapis.com/calendar/v3/users/me/calendarList';
 
 function eventsEndpointFor(calendarId) {
@@ -216,10 +226,10 @@ async function connectGoogleCalendar() {
 
     const tokenResp = await fetch(GOOGLE_TOKEN_ENDPOINT, {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+      body: new URLSearchParams(withGoogleClientSecret({
         client_id: GOOGLE_CLIENT_ID, code: params.code, code_verifier: codeVerifier,
         grant_type: 'authorization_code', redirect_uri: window.OAuthLoopback.OAUTH_CALLBACK_URL
-      })
+      }))
     });
     const tokenJson = await tokenResp.json();
     if (!tokenResp.ok) throw new Error(tokenJson.error_description || tokenJson.error || 'Google từ chối yêu cầu token.');
@@ -333,9 +343,9 @@ async function getValidAccessToken(connection) {
   }
   const resp = await fetch(GOOGLE_TOKEN_ENDPOINT, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
+    body: new URLSearchParams(withGoogleClientSecret({
       client_id: GOOGLE_CLIENT_ID, refresh_token: connection.refresh_token, grant_type: 'refresh_token'
-    })
+    }))
   });
   const json = await resp.json();
   if (!resp.ok) throw new Error(json.error_description || json.error || 'Google từ chối yêu cầu làm mới token.');
