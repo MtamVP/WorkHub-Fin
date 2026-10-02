@@ -13,8 +13,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildEmail, evaluateAlerts, heldQuantities, valuationTarget, vnDate, type Alert, type PriceRow } from "./logic.ts";
 
+// App desktop gọi hàm này từ trình duyệt nhúng (origin http://tauri.localhost) -> trình duyệt gửi yêu cầu
+// "hỏi đường" OPTIONS trước; thiếu header CORS thì lời gọi bị chặn ("Failed to send a request to the Edge Function").
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "content-type": "application/json" } });
 }
 
 async function sendEmail(apiKey: string, from: string, to: string, subject: string, html: string, text: string): Promise<{ ok: boolean; error?: string }> {
@@ -35,6 +43,8 @@ async function sendEmail(apiKey: string, from: string, to: string, subject: stri
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
 
