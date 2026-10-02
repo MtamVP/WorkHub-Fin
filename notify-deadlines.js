@@ -135,6 +135,49 @@
         if (changed) saveNotifiedTo(personalTodayKey(), notified);
     }
 
+    function calendarRemindKey() {
+        return 'wh_notified_calendar_reminders_' + localDateKey();
+    }
+
+    // Nhắc sự kiện trong Lịch riêng (bảng events, loại 'personal' -- gồm cả sự kiện kéo về từ Google Calendar): báo khi còn <= 30 phút
+    // tới giờ bắt đầu. Sự kiện cả ngày không nhắc (không có giờ bắt đầu thật). Mỗi lần xuất hiện của 1 sự kiện báo tối đa 1 lần/ngày.
+    var CAL_REMIND_MINUTES = 30;
+    async function checkPersonalCalendarReminders() {
+        var email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
+        if (!email || typeof window.callGAS !== 'function') return;
+        var now = Date.now();
+        var res;
+        try {
+            res = await window.callGAS('getEvents', {
+                startDate: new Date(now).toISOString(),
+                endDate: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+                calendarType: 'personal',
+                groupKey: typeof activeGroup !== 'undefined' ? activeGroup : GROUP_KEY,
+                email: email
+            });
+        } catch (e) { return; }
+        if (!res || res.status !== 'success' || !Array.isArray(res.data)) return;
+
+        var notified = loadNotifiedFrom(calendarRemindKey());
+        var changed = false;
+        res.data.forEach(function (ev) {
+            if (ev.type === 'task') return;
+            var s = new Date(ev.startTime);
+            var e = new Date(ev.endTime);
+            var start = s.getTime();
+            if (isNaN(start) || start < now) return; // đã bắt đầu rồi
+            if (s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59) return; // cả ngày
+            if (start - now > CAL_REMIND_MINUTES * 60 * 1000) return; // chưa tới lúc
+            var key = ev.id + '@' + ev.startTime;
+            if (notified.has(key)) return;
+            var hhmm = String(s.getHours()).padStart(2, '0') + ':' + String(s.getMinutes()).padStart(2, '0');
+            fire('Sắp diễn ra: ' + (ev.title || ''), 'Bắt đầu lúc ' + hhmm + (ev.location ? ' · ' + ev.location : ''));
+            notified.add(key);
+            changed = true;
+        });
+        if (changed) saveNotifiedTo(calendarRemindKey(), notified);
+    }
+
     function priceAlertsKey() {
         return 'wh_notified_price_alerts_' + localDateKey();
     }
@@ -190,9 +233,11 @@
         await ensureNotificationPermission();
         check();
         checkPersonalEvents();
+        checkPersonalCalendarReminders();
         checkPriceAlerts();
         setInterval(check, POLL_MS);
         setInterval(checkPersonalEvents, POLL_MS);
+        setInterval(checkPersonalCalendarReminders, POLL_MS);
         setInterval(checkPriceAlerts, PRICE_POLL_MS);
     }
 

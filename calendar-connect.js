@@ -33,6 +33,14 @@
 // instance riêng (singleEvents=true, mỗi instance có recurringEventId trỏ về id master) --
 // nếu instance đó là của 1 sự kiện lặp mà CHÍNH WorkHub đã đẩy lên (đã có sẵn 1 dòng master),
 // phải bỏ qua, không tạo thêm N dòng instance trùng lặp với dòng master đã có.
+// Đợt 5 -- vì sao "thêm sự kiện trong app" trước đây KHÔNG lên Google: việc đẩy chỉ chạy bên trong 1 lượt đồng bộ, mà lượt
+// đó chỉ được kích hoạt khi bấm "Đồng bộ ngay"/mở bảng Tích hợp. Giờ: (a) mọi createEvent/updateEvent/deleteEvent thành công
+// (api.js) gọi scheduleGoogleCalendarPush() -> sau ~4 giây tự đẩy; (b) đồng bộ nền mỗi 5 phút khi app đang mở (kéo từ Google
+// về + đẩy những gì còn sót); (c) có khoá chống 2 lượt chạy chồng (chồng nhau = tạo trùng sự kiện trên Google); (d) sự kiện tạo
+// mới dùng ID Google ổn định suy ra từ ID WorkHub nên thử lại sau khi rớt mạng không tạo trùng; (e) lỗi đẩy được báo ra thay vì
+// chỉ console.warn; (f) giờ gửi kèm timeZone (bắt buộc với sự kiện lặp) và sự kiện cả ngày lưu theo mốc nửa đêm ĐỊA PHƯƠNG
+// (trước đây lưu 00:00 UTC nên ở múi giờ phía tây UTC bị lùi sang ngày hôm trước và bị đẩy ngược lên như sự kiện có giờ).
+// Chỉ lịch loại "Cá nhân" (events.calendar_type='personal') được đồng bộ -- lịch nhóm thì không.
 const GOOGLE_CLIENT_ID = '825025516269-gmictbckj5c8ameatht1bbj6tqct6tqq.apps.googleusercontent.com';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 // calendarList.list (UI "Quản lý lịch") KHÔNG nằm trong quyền của calendar.events -- cần thêm
@@ -65,7 +73,14 @@ function eventsEndpointFor(calendarId) {
 const SYNC_WINDOW_PAST_DAYS = 30;
 const SYNC_WINDOW_FUTURE_DAYS = 180;
 const SYNC_MAX_PAGES = 4; // 4 x 250 = tối đa 1000 sự kiện/lần đồng bộ/lịch, đủ cho lịch bình thường
-const AUTO_SYNC_MIN_INTERVAL_MS = 15 * 60 * 1000; // 15 phút
+const AUTO_SYNC_MIN_INTERVAL_MS = 5 * 60 * 1000;      // mở bảng Tích hợp: chỉ tự đồng bộ nếu lần cuối đã quá 5 phút
+const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;    // đồng bộ nền khi app đang mở
+const BACKGROUND_FIRST_DELAY_MS = 15 * 1000;          // lượt đầu sau khi mở app (chờ đăng nhập xong)
+const PUSH_DEBOUNCE_MS = 4000;                        // gộp nhiều thao tác liên tiếp thành 1 lượt đẩy
+
+// Trạng thái đồng bộ của PHIÊN này (chỉ trong bộ nhớ) -- bảng Tích hợp đọc ra để hiện kết quả/lỗi gần nhất.
+const calendarSyncState = { running: false, lastAt: null, lastError: null, lastResult: null };
+let calendarSyncInFlight = null; // Promise của lượt đang chạy -- khoá chống chạy chồng
 
 // callGAS/_dispatchAction (api.js) không bao giờ throw -- luôn trả {status,message,data},
 // kể cả khi lỗi. Helper nhỏ này gói lại kiểm tra status + rút .data cho gọn, dùng cho
@@ -77,11 +92,62 @@ async function callGASData(action, params) {
   return res.data;
 }
 
+function describeCalendarResult(result) {
+  if (!result) return '';
+  const parts = [];
+  if (result.count) parts.push(result.count + ' sự kiện mới từ Google');
+  if (result.updatedCount) parts.push(result.updatedCount + ' cập nhật từ Google');
+  if (result.pushedCount) parts.push(result.pushedCount + ' đã đẩy lên Google');
+  return parts.length ? parts.join(' · ') : 'Không có thay đổi mới';
+}
+
+function calendarStatusLineHtml() {
+  if (calendarSyncState.running) {
+    return `<div class="whint-line"><i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ...</div>`;
+  }
+  const lines = [];
+  if (calendarSyncState.lastError) {
+    lines.push(`<div class="whint-line whint-line-bad"><i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(calendarSyncState.lastError)}</div>`);
+  }
+  const r = calendarSyncState.lastResult;
+  if (r && r.pushFailed && r.pushFailed.length) {
+    const first = r.pushFailed[0];
+    lines.push(`<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${r.pushFailed.length} sự kiện chưa đẩy lên Google được — “${escapeHtml(first.title)}”: ${escapeHtml(first.message)}. Sẽ tự thử lại ở lần đồng bộ sau.</div>`);
+  }
+  if (r && !calendarSyncState.lastError) {
+    lines.push(`<div class="whint-line"><i class="fa-solid fa-check"></i> ${escapeHtml(describeCalendarResult(r))}</div>`);
+  }
+  return lines.join('');
+}
+
+// Báo cho phần giao diện khác (vd. thanh trạng thái của Không Gian Riêng) rằng trạng thái đồng bộ/kết nối vừa đổi.
+function notifyCalendarState() {
+  try {
+    if (typeof window !== 'undefined' && typeof CustomEvent === 'function' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('wh-calendar-sync', { detail: Object.assign({}, calendarSyncState) }));
+    }
+  } catch (e) { /* không chặn đồng bộ vì giao diện */ }
+}
+
+// Cập nhật tại chỗ dòng kết quả + thời điểm đồng bộ, không dựng lại cả panel (tránh nháy khi đồng bộ nền chạy).
+function refreshCalendarStatusLine() {
+  notifyCalendarState();
+  const lineEl = document.getElementById('calendar-sync-status-line');
+  if (lineEl) lineEl.innerHTML = calendarStatusLineHtml();
+  const atEl = document.getElementById('calendar-last-synced-status');
+  if (atEl && calendarSyncState.lastAt) atEl.textContent = new Date(calendarSyncState.lastAt).toLocaleString('vi-VN');
+}
+
 async function renderCalendarConnectionPanel() {
+  await renderCalendarConnectionPanelInner();
+  notifyCalendarState();
+}
+
+async function renderCalendarConnectionPanelInner() {
   const listEl = document.getElementById('personal-calendar-connect-panel');
   if (!listEl) return;
 
-  listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải...</p></div>`;
+  listEl.innerHTML = `<div class="whint-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>`;
 
   let connection = null;
   try {
@@ -91,64 +157,72 @@ async function renderCalendarConnectionPanel() {
   }
 
   if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) {
-    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-desktop"></i><p>Kết nối Google Calendar chỉ hoạt động trong bản desktop app (không dùng được ở chế độ xem trình duyệt).</p></div>`;
+    listEl.innerHTML = `<div class="whint-empty"><i class="fa-solid fa-desktop"></i><p>Kết nối Google Calendar chỉ hoạt động trong bản desktop app (không dùng được ở chế độ xem trình duyệt).</p></div>`;
     return;
   }
 
+  const howItWorks = `
+    <details class="whint-how">
+      <summary>Đồng bộ hoạt động thế nào?</summary>
+      <ul>
+        <li><b>WorkHub → Google:</b> sự kiện bạn tạo, sửa hoặc xoá ở <b>Lịch</b> (loại <b>Cá nhân</b>) tự đẩy lên Google Calendar sau vài giây.</li>
+        <li><b>Google → WorkHub:</b> sự kiện tạo bên Google tự về WorkHub mỗi 5 phút khi app đang mở, hoặc ngay khi bấm “Đồng bộ ngay”.</li>
+        <li><b>Không đồng bộ:</b> Lịch nhóm (chỉ lịch Cá nhân) và danh sách người tham dự.</li>
+        <li>Nếu cả hai nơi cùng sửa một sự kiện, bản trong WorkHub được giữ.</li>
+      </ul>
+    </details>`;
+
   if (connection) {
-    const connectedAt = connection.connected_at ? new Date(connection.connected_at).toLocaleString('vi-VN') : '';
+    const connectedAt = connection.connected_at ? new Date(connection.connected_at).toLocaleString('vi-VN') : '—';
     const syncedAt = connection.last_synced_at ? new Date(connection.last_synced_at).toLocaleString('vi-VN') : 'Chưa đồng bộ lần nào';
     const readOnlyNotice = hasWriteScope(connection) ? '' :
-      `<div class="sync-folder-status" style="color:var(--warning-color,#c07800)"><i class="fa-solid fa-triangle-exclamation"></i> Kết nối cũ chỉ đọc được từ Google -- kết nối lại để bật đồng bộ 2 chiều (sửa/xoá trong WorkHub cũng áp dụng lên Google).</div>`;
+      `<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> Kết nối cũ chỉ đọc được từ Google — kết nối lại để bật đồng bộ 2 chiều (sửa/xoá trong WorkHub cũng áp dụng lên Google).</div>`;
     const syncedCalendarIds = (connection.synced_calendar_ids && connection.synced_calendar_ids.length) ? connection.synced_calendar_ids : ['primary'];
     const calendarSummary = syncedCalendarIds.length <= 1 ? '1 lịch (Chính)' : syncedCalendarIds.length + ' lịch đã chọn';
     const googleEmail = connection.google_account_email || '';
     const workhubEmail = await getWorkhubLoginEmail();
-    const accountLine = googleEmail
-      ? `<div class="sync-folder-status"><i class="fa-brands fa-google"></i> Tài khoản Google: <b>${escapeHtml(googleEmail)}</b></div>` +
+    const accountHtml = googleEmail
+      ? `<div class="whint-account"><i class="fa-brands fa-google"></i> <b>${escapeHtml(googleEmail)}</b></div>` +
         ((workhubEmail && workhubEmail.toLowerCase() !== googleEmail.toLowerCase())
-          ? `<div class="sync-folder-status">Khác với email đăng nhập WorkHub (${escapeHtml(workhubEmail)}) — bình thường nếu bạn chủ ý dùng tài khoản Google khác. Bấm "Kết nối lại" để đổi.</div>` : '')
-      : `<div class="sync-folder-status"><i class="fa-brands fa-google"></i> Tài khoản Google: chưa rõ — bấm "Kết nối lại" để hiện email tài khoản đang đồng bộ.</div>`;
+          ? `<div class="whint-hint">Khác với email đăng nhập WorkHub (${escapeHtml(workhubEmail)}) — bình thường nếu bạn chủ ý dùng tài khoản Google khác. Bấm “Kết nối lại” để đổi.</div>` : '')
+      : `<div class="whint-account"><i class="fa-brands fa-google"></i> Tài khoản Google: chưa rõ</div><div class="whint-hint">Bấm “Kết nối lại” để hiện email tài khoản đang đồng bộ.</div>`;
     const calendarListNotice = hasCalendarListScope(connection) ? '' :
-      `<div class="sync-folder-status" style="color:var(--warning-color,#c07800)"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có quyền xem danh sách lịch — kết nối lại (và giữ nguyên các quyền Google đề xuất) để dùng "Quản lý lịch".</div>`;
+      `<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có quyền xem danh sách lịch — kết nối lại (và giữ nguyên các quyền Google đề xuất) để dùng “Quản lý lịch”.</div>`;
+    const lastAtText = calendarSyncState.lastAt ? new Date(calendarSyncState.lastAt).toLocaleString('vi-VN') : syncedAt;
     listEl.innerHTML = `
-    <div class="sync-folder-panel">
-      <div class="sync-folder-header">
-        <div>
-          <div class="sync-folder-path"><i class="fa-solid fa-calendar-check"></i> Google Calendar đã kết nối</div>
-          ${accountLine}
-          <div class="sync-folder-status">Kết nối lúc: ${escapeHtml(connectedAt)}</div>
-          <div class="sync-folder-status" id="calendar-last-synced-status">Đồng bộ lần cuối: ${escapeHtml(syncedAt)}</div>
-          ${readOnlyNotice}
-        </div>
-        <div class="sync-folder-actions">
-          <button type="button" class="btn btn-outline" id="calendar-sync-now-btn" onclick="syncGoogleCalendarNow()"><i class="fa-solid fa-rotate"></i> Đồng bộ ngay</button>
-          <button type="button" class="btn btn-outline" onclick="connectGoogleCalendar()"><i class="fa-brands fa-google"></i> Kết nối lại</button>
-          <button type="button" class="btn btn-outline" onclick="disconnectGoogleCalendar()"><i class="fa-solid fa-link-slash"></i> Ngắt kết nối</button>
-        </div>
+    <div class="whint-card">
+      <div class="whint-head">
+        <span class="whint-badge whint-badge-ok"><i class="fa-solid fa-circle-check"></i> Đã kết nối</span>
+        ${accountHtml}
       </div>
-    </div>
-    <div class="sync-folder-panel" style="margin-top:10px;">
-      <div class="sync-folder-header">
-        <div>
-          <div class="sync-folder-path"><i class="fa-solid fa-calendar-days"></i> Lịch đang đồng bộ</div>
-          <div class="sync-folder-status">${escapeHtml(calendarSummary)}</div>
-          ${calendarListNotice}
-        </div>
-        <div class="sync-folder-actions">
-          <button type="button" class="btn btn-outline" onclick="toggleCalendarPicker()"><i class="fa-solid fa-sliders"></i> Quản lý lịch</button>
-        </div>
+      <dl class="whint-stats">
+        <div><dt>Kết nối lúc</dt><dd>${escapeHtml(connectedAt)}</dd></div>
+        <div><dt>Đồng bộ lần cuối</dt><dd id="calendar-last-synced-status">${escapeHtml(lastAtText)}</dd></div>
+        <div><dt>Lịch đang đồng bộ</dt><dd>${escapeHtml(calendarSummary)}</dd></div>
+      </dl>
+      <div id="calendar-sync-status-line">${calendarStatusLineHtml()}</div>
+      ${readOnlyNotice}
+      <div class="whint-actions">
+        <button type="button" class="btn btn-primary" id="calendar-sync-now-btn" onclick="syncGoogleCalendarNow()"><i class="fa-solid fa-rotate"></i> Đồng bộ ngay</button>
+        <button type="button" class="btn btn-outline" onclick="toggleCalendarPicker()"><i class="fa-solid fa-sliders"></i> Quản lý lịch</button>
+        <button type="button" class="btn btn-outline" onclick="connectGoogleCalendar()"><i class="fa-brands fa-google"></i> Kết nối lại</button>
+        <button type="button" class="btn btn-outline whint-danger" onclick="disconnectGoogleCalendar()"><i class="fa-solid fa-link-slash"></i> Ngắt kết nối</button>
       </div>
-      <div id="calendar-picker-body" style="display:none; margin-top:10px;"></div>
+      ${calendarListNotice}
+      <div id="calendar-picker-body" class="whint-picker" style="display:none;"></div>
+      ${howItWorks}
     </div>`;
     return;
   }
 
   listEl.innerHTML = `
-    <div class="empty-state">
-      <i class="fa-solid fa-calendar-plus"></i>
-      <p>Chưa kết nối Google Calendar. Kết nối để tự động đồng bộ 2 chiều sự kiện lịch cá nhân giữa WorkHub và Google Calendar của bạn.</p>
-      <button type="button" class="btn btn-primary" onclick="connectGoogleCalendar()"><i class="fa-brands fa-google"></i> Kết nối Google Calendar</button>
+    <div class="whint-card whint-card-empty">
+      <span class="whint-badge whint-badge-off"><i class="fa-regular fa-circle"></i> Chưa kết nối</span>
+      <p class="whint-lead">Kết nối để sự kiện lịch cá nhân tự động đồng bộ 2 chiều giữa WorkHub và Google Calendar của bạn.</p>
+      <div class="whint-actions">
+        <button type="button" class="btn btn-primary" onclick="connectGoogleCalendar()"><i class="fa-brands fa-google"></i> Kết nối Google Calendar</button>
+      </div>
+      ${howItWorks}
     </div>`;
 }
 
@@ -288,25 +362,25 @@ async function toggleCalendarPicker() {
   body.style.display = show ? 'block' : 'none';
   if (!show) return;
 
-  body.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+  body.innerHTML = `<div class="whint-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách lịch...</div>`;
   try {
     const connection = await API.calendarConnection.get();
-    if (!connection) { body.innerHTML = `<div class="empty-state">Chưa kết nối.</div>`; return; }
+    if (!connection) { body.innerHTML = `<div class="whint-line">Chưa kết nối.</div>`; return; }
     if (!hasCalendarListScope(connection)) {
-      body.innerHTML = `<div class="empty-state">Cần kết nối lại để cấp quyền xem danh sách lịch. Bấm "Kết nối lại" ở trên rồi giữ nguyên các quyền Google đề xuất.</div>`;
+      body.innerHTML = `<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> Cần kết nối lại để cấp quyền xem danh sách lịch. Bấm “Kết nối lại” ở trên rồi giữ nguyên các quyền Google đề xuất.</div>`;
       return;
     }
     const accessToken = await getValidAccessToken(connection);
     const calendars = await fetchCalendarList(accessToken);
     const selected = new Set((connection.synced_calendar_ids && connection.synced_calendar_ids.length) ? connection.synced_calendar_ids : ['primary']);
-    body.innerHTML = calendars.map(c => `
-      <label style="display:flex; align-items:center; gap:8px; padding:6px 0;">
+    body.innerHTML = '<div class="whint-picker-title">Chọn lịch Google muốn kéo về WorkHub</div>' + calendars.map(c => `
+      <label class="whint-check">
         <input type="checkbox" value="${escapeHtml(c.id)}" ${(c.primary || selected.has(c.id)) ? 'checked' : ''} ${c.primary ? 'disabled' : ''}>
         <span>${escapeHtml(c.name)}${c.primary ? ' <small>(lịch chính, luôn bật)</small>' : ''}</span>
       </label>`).join('') +
-      `<button type="button" class="btn btn-primary" style="margin-top:8px;" onclick="saveCalendarPicker()"><i class="fa-solid fa-floppy-disk"></i> Lưu lựa chọn</button>`;
+      `<button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="saveCalendarPicker()"><i class="fa-solid fa-floppy-disk"></i> Lưu lựa chọn</button>`;
   } catch (err) {
-    body.innerHTML = `<div class="empty-state" style="color:var(--danger-color,#c0392b)">${escapeHtml(err.message || String(err))}</div>`;
+    body.innerHTML = `<div class="whint-line whint-line-bad"><i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(err.message || String(err))}</div>`;
   }
 }
 
@@ -339,7 +413,7 @@ async function getValidAccessToken(connection) {
     return connection.access_token;
   }
   if (!connection.refresh_token) {
-    throw new Error('Phiên kết nối Google Calendar đã hết hạn và không thể tự làm mới -- vui lòng kết nối lại.');
+    throw new Error('Phiên kết nối Google Calendar đã hết hạn và không thể tự làm mới — vào Không Gian Riêng → Tích hợp rồi bấm “Kết nối lại”.');
   }
   const resp = await fetch(GOOGLE_TOKEN_ENDPOINT, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -363,16 +437,24 @@ async function getValidAccessToken(connection) {
 // Daily/weekly/monthly (mô hình lặp đơn giản của WorkHub) -> RRULE Google hiểu được.
 // Không hỗ trợ interval tuỳ chỉnh ("mỗi 2 tuần") hay chọn thứ trong tuần -- khớp đúng
 // những gì form tạo sự kiện lặp của WorkHub hiện có, không hơn không kém.
-function buildRRule(recurrence, recurrenceEnd) {
+function buildRRule(recurrence, recurrenceEnd, allDay) {
   const freqMap = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' };
   const freq = freqMap[recurrence];
   if (!freq) return null;
   let rule = 'RRULE:FREQ=' + freq;
   if (recurrenceEnd) {
-    const untilDate = new Date(recurrenceEnd + 'T23:59:59Z');
-    if (!isNaN(untilDate.getTime())) {
-      const until = untilDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-      rule += ';UNTIL=' + until;
+    if (allDay) {
+      // Sự kiện cả ngày: Google đòi UNTIL dạng NGÀY (YYYYMMDD), UNTIL có giờ bị từ chối.
+      const day = String(recurrenceEnd).slice(0, 10).replace(/-/g, '');
+      if (/^\d{8}$/.test(day)) rule += ';UNTIL=' + day;
+    } else {
+      // Hết ngày recurrence_end theo GIỜ ĐỊA PHƯƠNG (cùng cách getEvents tính), đổi sang UTC. Trước đây cộng cứng 23:59:59Z
+      // nên ở múi giờ phía tây UTC lần lặp cuối trong ngày kết thúc bị cắt mất.
+      const untilDate = new Date(recurrenceEnd + 'T23:59:59');
+      if (!isNaN(untilDate.getTime())) {
+        const until = untilDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+        rule += ';UNTIL=' + until;
+      }
     }
   }
   return rule;
@@ -380,7 +462,9 @@ function buildRRule(recurrence, recurrenceEnd) {
 
 function mapGoogleEventToRow(ev, email, groupKey, calendarId) {
   const isAllDay = !!(ev.start && ev.start.date && !ev.start.dateTime);
-  const startTime = isAllDay ? ev.start.date + 'T00:00:00' : ev.start.dateTime;
+  // Cả ngày: Google chỉ cho NGÀY. Lưu đúng nửa đêm ĐỊA PHƯƠNG dưới dạng mốc tuyệt đối (ISO, có 'Z'). Chuỗi trần
+  // '...T00:00:00' bị DB (UTC) hiểu là 00:00 UTC -> ở múi giờ phía tây UTC sự kiện hiện lùi sang NGÀY HÔM TRƯỚC.
+  const startTime = isAllDay ? new Date(ev.start.date + 'T00:00:00').toISOString() : ev.start.dateTime;
   const endRaw = ev.end || ev.start;
   // Google's end.date cho sự kiện cả-ngày là MỐC LOẠI TRỪ (ngày SAU ngày cuối cùng thật
   // sự của sự kiện) -- vd. sự kiện 1 ngày (5/9) có end.date='2026-09-06', không phải
@@ -391,10 +475,7 @@ function mapGoogleEventToRow(ev, email, groupKey, calendarId) {
     const endDateStr = endRaw.date || ev.start.date;
     const endDateExclusive = new Date(endDateStr + 'T00:00:00');
     endDateExclusive.setDate(endDateExclusive.getDate() - 1);
-    const y = endDateExclusive.getFullYear();
-    const m = String(endDateExclusive.getMonth() + 1).padStart(2, '0');
-    const d = String(endDateExclusive.getDate()).padStart(2, '0');
-    endTime = `${y}-${m}-${d}T23:59:59`;
+    endTime = new Date(endDateExclusive.getFullYear(), endDateExclusive.getMonth(), endDateExclusive.getDate(), 23, 59, 59).toISOString();
   } else {
     endTime = endRaw.dateTime || startTime;
   }
@@ -427,6 +508,10 @@ function mapGoogleEventToRow(ev, email, groupKey, calendarId) {
 // phải CỘNG lại 1 ngày cho end.date (Google coi end.date là mốc loại trừ). KHÔNG map
 // attendees -- tránh vô tình gửi giấy mời Google Calendar thay người dùng. Sự kiện lặp
 // (recurrence != 'none') kèm thêm RRULE -- xem buildRRule().
+function getLocalTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; }
+}
+
 function mapRowToGoogleEventBody(event) {
   const start = new Date(event.start_time);
   const end = new Date(event.end_time);
@@ -444,14 +529,25 @@ function mapRowToGoogleEventBody(event) {
     body.start = { date: fmtDate(start) };
     body.end = { date: fmtDate(endExclusive) };
   } else {
-    body.start = { dateTime: start.toISOString() };
-    body.end = { dateTime: end.toISOString() };
+    // timeZone BẮT BUỘC với sự kiện lặp (Google từ chối "Missing time zone definition"), và giúp Google hiện đúng giờ.
+    const timeZone = getLocalTimeZone();
+    body.start = timeZone ? { dateTime: start.toISOString(), timeZone } : { dateTime: start.toISOString() };
+    body.end = timeZone ? { dateTime: end.toISOString(), timeZone } : { dateTime: end.toISOString() };
   }
   if (event.recurrence && event.recurrence !== 'none') {
-    const rule = buildRRule(event.recurrence, event.recurrence_end || event.recurrenceEnd);
+    const rule = buildRRule(event.recurrence, event.recurrence_end || event.recurrenceEnd, isAllDay);
     if (rule) body.recurrence = [rule];
   }
   return body;
+}
+
+// ID sự kiện Google do ta đặt, suy ra từ ID WorkHub: chỉ gồm 0-9 a-v (base32hex), 5..1024 ký tự. Vì ổn định theo sự kiện nên
+// nếu lệnh tạo đã thành công bên Google nhưng mất kết nối trước khi kịp ghi liên kết về WorkHub, lần đẩy sau KHÔNG tạo bản
+// thứ hai mà gặp 409 (đã tồn tại) rồi chuyển sang cập nhật chính bản đó.
+function googleIdForWorkhubEvent(workhubEventId) {
+  let hex = '';
+  new TextEncoder().encode(String(workhubEventId)).forEach(b => { hex += b.toString(16).padStart(2, '0'); });
+  return 'vh' + hex;
 }
 
 async function insertGoogleEvent(accessToken, calendarId, body) {
@@ -459,6 +555,12 @@ async function insertGoogleEvent(accessToken, calendarId, body) {
     method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
+  if (resp.status === 409 && body.id) {
+    // Đã có sự kiện mang ID này (lần đẩy trước thành công nhưng chưa kịp liên kết): cập nhật nó, kể cả khi từng bị huỷ.
+    const { id, ...rest } = body;
+    const revived = await updateGoogleEvent(accessToken, calendarId, id, Object.assign({}, rest, { status: 'confirmed' }));
+    if (revived) return revived;
+  }
   const json = await resp.json();
   if (!resp.ok) throw new Error((json.error && json.error.message) || 'Tạo sự kiện trên Google Calendar thất bại.');
   return json;
@@ -491,9 +593,9 @@ async function deleteGoogleEvent(accessToken, calendarId, googleEventId) {
 // nó (google_calendar_id). Trả về số sự kiện đã đẩy thành công.
 async function pushPendingLocalEvents(accessToken, email, groupKey, windowStart, windowEnd) {
   const candidates = await callGASData('getPersonalEventsForPush', { email, groupKey, windowStart, windowEnd });
-  if (!candidates || !candidates.length) return 0;
+  const outcome = { pushed: 0, failed: [] };
+  if (!candidates || !candidates.length) return outcome;
   const syncedEntries = [];
-  let pushedCount = 0;
   for (const ev of candidates) {
     const calendarId = ev.google_calendar_id || 'primary';
     try {
@@ -502,10 +604,12 @@ async function pushPendingLocalEvents(accessToken, email, groupKey, windowStart,
           await deleteGoogleEvent(accessToken, calendarId, ev.google_event_id);
           await callGASData('deleteGoogleSyncRow', { eventId: ev.id });
         }
+        outcome.pushed += 1;
         continue;
       }
       const body = mapRowToGoogleEventBody(ev);
       if (!ev.google_event_id) {
+        body.id = googleIdForWorkhubEvent(ev.id);
         const created = await insertGoogleEvent(accessToken, 'primary', body);
         const newVersion = await callGASData('linkGoogleEventId', { eventId: ev.id, googleEventId: created.id, googleCalendarId: 'primary' });
         syncedEntries.push({ eventId: ev.id, googleEventId: created.id, syncedVersion: newVersion || ev.version, googleUpdatedAt: created.updated });
@@ -515,13 +619,14 @@ async function pushPendingLocalEvents(accessToken, email, groupKey, windowStart,
           syncedEntries.push({ eventId: ev.id, googleEventId: ev.google_event_id, syncedVersion: ev.version, googleUpdatedAt: updated.updated });
         }
       }
-      pushedCount += 1;
+      outcome.pushed += 1;
     } catch (err) {
-      console.warn('pushPendingLocalEvents: bỏ qua 1 sự kiện lỗi', ev.id, err);
+      console.warn('pushPendingLocalEvents: không đẩy được 1 sự kiện', ev.id, err);
+      outcome.failed.push({ id: ev.id, title: ev.title || '(Không có tiêu đề)', message: (err && err.message) || String(err) });
     }
   }
   if (syncedEntries.length) await callGASData('markGoogleSyncedBatch', { entries: syncedEntries });
-  return pushedCount;
+  return outcome;
 }
 
 async function fetchGoogleEventsPage(accessToken, calendarId, timeMin, timeMax, pageToken) {
@@ -549,7 +654,32 @@ async function fetchGoogleEventsPage(accessToken, calendarId, timeMin, timeMax, 
 // qua các instance tự sinh của sự kiện lặp mà chính WorkHub vừa đẩy lên, rồi dọn theo
 // TỪNG lịch riêng (không gộp activeIds của lịch khác). Không đọc biến toàn cục
 // app-specific -- xem comment đầu file.
-async function syncGoogleCalendarEvents() {
+function syncGoogleCalendarEvents() {
+  // Khoá: nếu đang có 1 lượt chạy (nền / bấm tay / sau khi tạo sự kiện) thì dùng chung kết quả của nó. Hai lượt chạy chồng
+  // nhau cùng thấy 1 sự kiện "chưa liên kết" và cùng tạo nó trên Google => trùng sự kiện.
+  if (calendarSyncInFlight) return calendarSyncInFlight;
+  calendarSyncState.running = true;
+  refreshCalendarStatusLine();
+  calendarSyncInFlight = runCalendarSyncOnce()
+    .then(result => {
+      calendarSyncState.lastAt = Date.now();
+      calendarSyncState.lastResult = result;
+      calendarSyncState.lastError = null;
+      return result;
+    })
+    .catch(err => {
+      calendarSyncState.lastError = (err && err.message) || String(err);
+      throw err;
+    })
+    .finally(() => {
+      calendarSyncState.running = false;
+      calendarSyncInFlight = null;
+      refreshCalendarStatusLine();
+    });
+  return calendarSyncInFlight;
+}
+
+async function runCalendarSyncOnce() {
   const connection = await API.calendarConnection.get();
   if (!connection) throw new Error('Chưa kết nối Google Calendar.');
 
@@ -565,12 +695,16 @@ async function syncGoogleCalendarEvents() {
   const windowEnd = new Date(now + SYNC_WINDOW_FUTURE_DAYS * 86400000).toISOString();
 
   let pushedCount = 0;
+  let pushFailed = [];
   const canPush = hasWriteScope(connection);
   if (canPush) {
     try {
-      pushedCount = await pushPendingLocalEvents(accessToken, email, groupKey, windowStart, windowEnd);
+      const pushOutcome = await pushPendingLocalEvents(accessToken, email, groupKey, windowStart, windowEnd);
+      pushedCount = pushOutcome.pushed;
+      pushFailed = pushOutcome.failed;
     } catch (err) {
       console.warn('syncGoogleCalendarEvents: đẩy thay đổi cục bộ lên Google thất bại', err);
+      pushFailed = [{ id: '', title: 'Danh sách sự kiện cần đẩy', message: (err && err.message) || String(err) }];
     }
   }
 
@@ -683,7 +817,17 @@ async function syncGoogleCalendarEvents() {
   }
   await callGASData('touchCalendarSync', {});
 
-  return { count: newRows.length, updatedCount: pulledUpdates.length, pushedCount, truncated: anyTruncated };
+  return { count: newRows.length, updatedCount: pulledUpdates.length, pushedCount, pushFailed, truncated: anyTruncated };
+}
+
+// Làm mới những gì đang hiển thị sau 1 lượt đồng bộ. redrawPanel: vẽ lại cả panel Tích hợp (chỉ khi người dùng vừa bấm tay /
+// vừa kết nối -- trạng thái kết nối có thể đã đổi). Lượt nền thì chỉ cập nhật tại chỗ dòng kết quả (refreshCalendarStatusLine),
+// để không phá bảng "Quản lý lịch" người dùng đang mở. reloadGrid: nạp lại lưới lịch khi có thay đổi thật.
+function refreshCalendarViewsAfterSync(redrawPanel, reloadGrid) {
+  if (redrawPanel) renderCalendarConnectionPanel();
+  if (reloadGrid && typeof loadCalendarData === 'function' && document.getElementById('full-calendar-display')) {
+    loadCalendarData({ quiet: true });
+  }
 }
 
 // Wrapper có UI: khoá nút + spinner trong lúc chạy, toast kết quả, vẽ lại panel kết
@@ -695,22 +839,51 @@ async function syncGoogleCalendarNow() {
   try {
     const result = await syncGoogleCalendarEvents();
     const suffix = result.truncated ? ' (lịch quá nhiều sự kiện, có thể chưa dọn hết sự kiện cũ)' : '';
-    const parts = [`${result.count} sự kiện mới`, `${result.updatedCount} cập nhật từ Google`];
-    if (result.pushedCount) parts.push(`${result.pushedCount} đã đẩy lên Google`);
-    showToast(`Đã đồng bộ: ${parts.join(', ')}.${suffix}`, 'success');
+    if (result.pushFailed && result.pushFailed.length) {
+      showToast(`Đã đồng bộ nhưng ${result.pushFailed.length} sự kiện chưa đẩy lên Google được: ${result.pushFailed[0].message}`, 'warning');
+    } else {
+      showToast(`Đã đồng bộ: ${describeCalendarResult(result)}.${suffix}`, 'success');
+    }
   } catch (err) {
     showToast('Đồng bộ Google Calendar thất bại: ' + (err.message || String(err)), 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
-    renderCalendarConnectionPanel();
-    if (typeof loadCalendarData === 'function' && document.getElementById('full-calendar-display')) {
-      loadCalendarData({ quiet: true });
-    }
+    refreshCalendarViewsAfterSync(true, true);
   }
 }
 
-// Gọi 1 lần lúc mở Personal Hub -- tự đồng bộ im lặng (không khoá nút, không toast
-// lỗi ồn ào) nếu đã kết nối và lâu rồi chưa đồng bộ. Không chặn UI: chạy nền.
+// Đồng bộ im lặng (nền / sau khi tạo sự kiện). reason: 'push' | 'background' | 'startup' | 'open'.
+// Chưa kết nối / chưa đăng nhập / không phải bản desktop => không làm gì. Không bao giờ throw.
+async function syncGoogleCalendarQuiet(reason) {
+  if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) return null;
+  let connection = null;
+  try {
+    connection = await API.calendarConnection.get();
+  } catch (err) {
+    return null;
+  }
+  if (!connection) return null;
+  try {
+    const result = await syncGoogleCalendarEvents();
+    const total = result.count + result.updatedCount + result.pushedCount;
+    refreshCalendarViewsAfterSync(false, total > 0);
+    if (result.pushFailed && result.pushFailed.length) {
+      showToast('Chưa đẩy được lên Google Calendar: ' + result.pushFailed[0].message, 'warning');
+    } else if (reason === 'push' && result.pushedCount > 0) {
+      showToast('Đã đồng bộ sự kiện lên Google Calendar.', 'success');
+    } else if (reason !== 'push' && (result.count + result.updatedCount) > 0) {
+      showToast(`Google Calendar có ${result.count + result.updatedCount} thay đổi mới, đã cập nhật vào lịch.`, 'success');
+    }
+    return result;
+  } catch (err) {
+    console.warn('syncGoogleCalendarQuiet (' + reason + '): đồng bộ thất bại', err);
+    refreshCalendarViewsAfterSync(false, false);
+    if (reason === 'push') showToast('Chưa đẩy được lên Google Calendar: ' + (err.message || String(err)), 'warning');
+    return null;
+  }
+}
+
+// Gọi 1 lần lúc mở Personal Hub / bảng Tích hợp -- tự đồng bộ im lặng nếu lâu rồi chưa đồng bộ.
 async function initCalendarAutoSync() {
   if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) return;
   let connection = null;
@@ -720,17 +893,36 @@ async function initCalendarAutoSync() {
     return;
   }
   if (!connection) return;
-  const lastSynced = connection.last_synced_at ? new Date(connection.last_synced_at).getTime() : 0;
+  const lastSynced = Math.max(
+    connection.last_synced_at ? new Date(connection.last_synced_at).getTime() : 0,
+    calendarSyncState.lastAt || 0
+  );
   if (Date.now() - lastSynced < AUTO_SYNC_MIN_INTERVAL_MS) return;
-  try {
-    const result = await syncGoogleCalendarEvents();
-    renderCalendarConnectionPanel();
-    if (typeof loadCalendarData === 'function' && document.getElementById('full-calendar-display')) {
-      loadCalendarData({ quiet: true });
-    }
-    const total = result.count + result.updatedCount + result.pushedCount;
-    if (total > 0) showToast(`Đã tự động đồng bộ ${total} thay đổi với Google Calendar.`, 'success');
-  } catch (err) {
-    console.warn('initCalendarAutoSync: đồng bộ nền thất bại', err);
-  }
+  await syncGoogleCalendarQuiet('open');
+}
+
+// api.js gọi hàm này sau mỗi createEvent/updateEvent/deleteEvent thành công. Gộp nhiều thao tác sát nhau thành 1 lượt đẩy;
+// nếu lúc hết giờ gộp mà đang có 1 lượt chạy (nên có thể chưa thấy thay đổi mới nhất) thì chờ nó xong rồi chạy thêm 1 lượt.
+let calendarPushTimer = null;
+function scheduleGoogleCalendarPush() {
+  if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) return;
+  if (calendarPushTimer) clearTimeout(calendarPushTimer);
+  calendarPushTimer = setTimeout(async () => {
+    calendarPushTimer = null;
+    if (calendarSyncInFlight) { try { await calendarSyncInFlight; } catch (e) { /* lượt trước lỗi không chặn lượt này */ } }
+    syncGoogleCalendarQuiet('push');
+  }, PUSH_DEBOUNCE_MS);
+}
+window.scheduleGoogleCalendarPush = scheduleGoogleCalendarPush;
+
+// Đồng bộ nền khi app đang mở (kể cả khi chưa từng mở Không Gian Riêng): lượt đầu sau ~15 giây, rồi mỗi 5 phút.
+let calendarBackgroundTimer = null;
+function startCalendarBackgroundSync() {
+  if (calendarBackgroundTimer || !window.OAuthLoopback || !window.OAuthLoopback.isTauri()) return;
+  calendarBackgroundTimer = setInterval(() => { syncGoogleCalendarQuiet('background'); }, BACKGROUND_SYNC_INTERVAL_MS);
+  setTimeout(() => { syncGoogleCalendarQuiet('startup'); }, BACKGROUND_FIRST_DELAY_MS);
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  if (document.readyState === 'complete') setTimeout(startCalendarBackgroundSync, 2000);
+  else window.addEventListener('load', () => setTimeout(startCalendarBackgroundSync, 2000));
 }

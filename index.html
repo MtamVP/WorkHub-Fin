@@ -17,6 +17,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <link rel="stylesheet" href="style.css?v=1788630490059">
+  <link rel="stylesheet" href="integrations.css?v=1791700000000">
+  <link rel="stylesheet" href="personal-hub.css?v=1791700000000">
   <link rel="stylesheet" href="pipeline/pipeline.css">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-512.png">
@@ -980,26 +982,35 @@
     </section>
 
     <section class="app-section personal-hub-section" id="personal-section">
-      <div class="section-hero-card card personal-hub-hero">
-        <div class="section-hero-info">
-          <h3><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Không Gian Riêng</h3>
-          <p>Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.</p>
+      <div class="section-hero-card card personal-hub-hero phub-hero">
+        <div class="phub-hero-main">
+          <div class="phub-eyebrow"><i class="fa-solid fa-user-lock"></i> Không gian riêng</div>
+          <h3 class="phub-greeting" id="personal-greeting">Chào bạn</h3>
+          <p class="phub-sub" id="personal-sub">Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.</p>
         </div>
-        <div class="section-actions">
-        <button type="button" class="btn btn-outline" id="personal-integrations-btn" onclick="openPersonalIntegrationsModal()" title="Thư mục đồng bộ & Google Calendar">
-          <i class="fa-solid fa-gear"></i> Tích hợp
-        </button>
-        <button type="button" class="btn btn-outline personal-archive-toggle" id="personal-archive-toggle" onclick="togglePersonalArchivedView()" title="Xem các mục đã lưu trữ">
-          <i class="fa-solid fa-box-archive"></i> Lưu trữ
-        </button>
-          <button type="button" class="btn btn-outline" onclick="openPersonalCustomizeModal()" title="Sắp xếp / ẩn hiện các mục">
-            <i class="fa-solid fa-sliders"></i> Tuỳ chỉnh
-          </button>
+        <div class="phub-hero-actions">
+          <div class="phub-search" id="personal-search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="personal-search" role="searchbox" placeholder="Tìm ghi chú, việc, lối tắt, sự kiện…" autocomplete="off" aria-label="Tìm trong Không Gian Riêng" oninput="onPersonalSearchInput(this.value)" onkeydown="onPersonalSearchKeydown(event)">
+            <kbd>/</kbd>
+            <button type="button" class="phub-search-clear" onclick="clearPersonalSearch()" aria-label="Xoá tìm kiếm"><i class="fa-solid fa-xmark"></i></button>
+          </div>
           <button type="button" class="btn btn-primary" id="personal-add-btn" onclick="openPersonalItemModal(null)">
             <i class="fa-solid fa-plus"></i> Thêm mới
           </button>
+          <button type="button" class="btn btn-outline phub-icon-btn" id="personal-integrations-btn" onclick="openPersonalIntegrationsModal()" title="Tích hợp: thư mục đồng bộ & Google Calendar" aria-label="Tích hợp">
+            <i class="fa-solid fa-plug"></i>
+          </button>
+          <button type="button" class="btn btn-outline phub-icon-btn personal-archive-toggle" id="personal-archive-toggle" onclick="togglePersonalArchivedView()" title="Xem các mục đã lưu trữ" aria-label="Lưu trữ">
+            <i class="fa-solid fa-box-archive"></i>
+          </button>
+          <button type="button" class="btn btn-outline phub-icon-btn" onclick="openPersonalCustomizeModal()" title="Sắp xếp / ẩn hiện các mục" aria-label="Tuỳ chỉnh">
+            <i class="fa-solid fa-sliders"></i>
+          </button>
         </div>
       </div>
+
+      <div id="personal-status-strip" class="phub-status" aria-live="polite"></div>
 
       <div id="personal-hub-tabs" class="personal-hub-tabs"></div>
       <div id="personal-tag-filter" class="personal-tag-filter" style="display:none;"></div>
@@ -1484,9 +1495,9 @@
   <!-- Tích hợp: gom "Thư mục đồng bộ" + "Kết nối Calendar" — trước là 2 tab nội dung, nhưng
        chúng là bảng cấu hình chứ không phải nội dung, để lẫn trong hàng tab gây hiểu nhầm. -->
   <div class="modal-overlay" id="personal-integrations-modal">
-    <div class="modal-card" style="max-width: 640px;">
+    <div class="modal-card" style="max-width: 760px;">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-gear" style="color: var(--gold);"></i> Tích hợp</h3>
+        <h3><i class="fa-solid fa-plug" style="color: var(--gold);"></i> Tích hợp</h3>
         <button class="header-btn" onclick="closeAppModal('personal-integrations-modal')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
@@ -1776,6 +1787,9 @@
             <label class="form-label" for="event-title">Tên Sự kiện</label>
             <input type="text" id="event-title" name="title" class="form-control" required>
           </div>
+          <div id="event-personal-hint" class="whint-line" style="display:none; margin-bottom:12px;">
+            <i class="fa-solid fa-lock"></i> <span>Sự kiện riêng — chỉ mình bạn thấy. Nếu đã kết nối Google Calendar, nó tự đẩy lên Google sau vài giây.</span>
+          </div>
           <div class="form-row-2">
             <div class="form-group">
               <label class="form-label" for="start-date">Ngày Bắt đầu</label>
@@ -1811,7 +1825,7 @@
               <input type="date" id="event-recurrence-end" name="recurrenceEnd" class="form-control">
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="event-attendees-group">
             <label class="form-label">Mời thành viên tham dự</label>
             <div class="multiselect-container">
               <div class="selectBox" onclick="showEventAttendeeCheckboxes()">
@@ -1840,19 +1854,21 @@
     </div>
   </div>
 
-  <script src="api.js?v=1791500000000"></script>
+  <script src="api.js?v=1791700000000"></script>
   <script src="oauth-loopback.js?v=1788532002219"></script>
   <script src="sync-config.js?v=2"></script>
   <script src="sync-engine.js?v=1788532002219"></script>
-  <script src="personal-sync.js?v=1788532002219"></script>
+  <script src="lib/sync-decision.js?v=1791700000000"></script>
+  <script src="personal-sync.js?v=1791700000000"></script>
   <script src="google-oauth-secret.js"></script>
-  <script src="calendar-connect.js?v=1791600000000"></script>
+  <script src="calendar-connect.js?v=1791700000000"></script>
   <script src="pipeline/pipeline.js?t=999"></script>
   <script src="lib/pure-helpers.js?v=1"></script>
-  <script src="script.js?v=1788630490059"></script>
+  <script src="lib/personal-ui-helpers.js?v=1791700000000"></script>
+  <script src="script.js?v=1791700000000"></script>
   <script src="tray-hotkey.js?v=1"></script>
   <script src="sync-conflict-ui.js?v=1788532002219"></script>
-  <script src="notify-deadlines.js?v=1791400000000"></script>
+  <script src="notify-deadlines.js?v=1791700000000"></script>
   <script src="backup-config.js?v=3"></script>
   <script src="local-backup.js?v=1788532002219"></script>
   <script src="updater.js?v=1788532002219"></script>

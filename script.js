@@ -89,6 +89,7 @@ let showArchivedProjects = false;
 let editingTaskExpectedVersion = null;
 let pendingTaskFilterRestore = null;
 let expanded = false; // toggle dropdown #checkboxes (chọn người thực hiện task)
+let eventModalForcedType = null;      // 'personal' khi form sự kiện được mở từ Không Gian Riêng (xem openPersonalEventModal)
 let eventAttendeesExpanded = false; // toggle dropdown #event-attendee-checkboxes
 
 // Calendar globals
@@ -864,6 +865,8 @@ function switchSection(sectionKey) {
   if (sectionKey === 'personal' && !SECTION_LOADED.personal) {
     SECTION_LOADED.personal = true;
     loadPersonalHub();
+  } else if (sectionKey === 'personal' && typeof onPersonalSectionShown === 'function') {
+    onPersonalSectionShown();
   }
 
   // Admin/reporting views reload fresh on every visit (no lazy-once cache) — matches
@@ -3499,6 +3502,17 @@ function resetEventModalUI() {
 
   document.querySelectorAll('input[name="event-attendees"]').forEach(cb => cb.checked = false);
   toggleRecurrenceEndVisibility();
+  applyEventModalMode();
+}
+
+// Form sự kiện mở từ Không Gian Riêng là sự kiện CÁ NHÂN: ẩn phần mời thành viên (không đồng bộ lên Google, và chỉ mình bạn thấy)
+// và hiện dòng giải thích. Mở từ tab Lịch thì giữ nguyên như cũ.
+function applyEventModalMode() {
+  const personal = eventModalForcedType === 'personal';
+  const attendees = document.getElementById('event-attendees-group');
+  const hint = document.getElementById('event-personal-hint');
+  if (attendees) attendees.style.display = personal ? 'none' : '';
+  if (hint) hint.style.display = personal ? 'flex' : 'none';
 }
 
 window.openEditEvent = function (id, e) {
@@ -3506,7 +3520,12 @@ window.openEditEvent = function (id, e) {
 
   const event = (currentMonthEvents || []).find(ev => ev.id === id);
   if (!event) return;
+  eventModalForcedType = null;
+  openEditEventObject(event);
+};
 
+// Mở form sửa cho 1 sự kiện đã có -- dùng chung bởi tab Lịch (openEditEvent) và Không Gian Riêng (personalEditEvent).
+function openEditEventObject(event) {
   const start = new Date(event.startTime);
   const end = new Date(event.endTime);
   const pad = n => String(n).padStart(2, '0');
@@ -3540,8 +3559,9 @@ window.openEditEvent = function (id, e) {
   const submitBtn = document.querySelector('button[form="event-form"]');
   if (submitBtn) submitBtn.innerHTML = 'Cập Nhật';
 
+  applyEventModalMode();
   openAppModal('add-event-modal');
-};
+}
 
 window.quickDeleteEvent = function (id, title, e) {
   if (e && e.stopPropagation) e.stopPropagation();
@@ -3605,6 +3625,7 @@ function handleCalendarError(error) {
 // init của app này đơn giản hơn — xem gọi ở cuối file (mục 6. INITIALIZATION).
 
 function handleAddEventClick() {
+  eventModalForcedType = null;
   const form = document.getElementById('event-form');
   if (form) form.reset();
   resetEventModalUI();
@@ -3657,7 +3678,7 @@ async function handleEventFormSubmit(e) {
     const response = await callGAS(isEditing ? 'updateEvent' : 'createEvent', {
       ...eventData,
       eventId: editingId,
-      calendarType: currentCalendarType,
+      calendarType: eventModalForcedType || currentCalendarType,
       groupKey: activeGroup,
       email: CURRENT_USER.email || null,
       expectedVersion: isEditing ? expectedVersion : undefined
@@ -3671,6 +3692,10 @@ async function handleEventFormSubmit(e) {
     form.reset();
     resetEventModalUI();
     loadCalendarData({ quiet: true });
+    if (eventModalForcedType) {
+      eventModalForcedType = null;
+      if (typeof onPersonalEventSaved === 'function') onPersonalEventSaved();
+    }
 
   } catch (error) {
     showToast("Lỗi: " + (error.message || error), "error");
@@ -5713,6 +5738,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 let personalItemsCache = [];
 let personalActiveTab = 'overview';
 let personalActiveTagFilter = null;
+let personalSearchQuery = '';              // chuỗi tìm kiếm hiện tại ('' = không tìm)
+let personalSearchTimer = null;
+let personalChecklistFilter = 'all';       // all | open | done
+let personalAgendaCache = null;            // null = chưa nạp; { events, loadedAt, failed }
+let personalAgendaLoading = null;          // Promise đang nạp (chống nạp chồng)
+let personalCalendarConn;                  // undefined = chưa tải; null = chưa kết nối Google
+let personalStatusTimer = null;
+const PERSONAL_AGENDA_DAYS = 45;
+const PERSONAL_AGENDA_STALE_MS = 60 * 1000;
 
 // ==================== Không Gian Riêng v3 — Tổng quan / Ghim / Lưu trữ ====================
 // PERSONAL_SHIM là chỗ DUY NHẤT khác nhau giữa 3 app trong toàn bộ khối này. Mọi hàm mới
@@ -5723,7 +5757,9 @@ const PERSONAL_SHIM = {
   closeModal: (id) => closeAppModal(id),
   accent: 'var(--gold)',
   me: () => ({ email: CURRENT_USER.email, groupKey: CURRENT_USER.groupKey }),
-  goToMyTasks: () => switchSection('mytasks')
+  goToMyTasks: () => switchSection('mytasks'),
+  agendaGroupKey: () => activeGroup,
+  openCalendarSection: () => switchSection('calendar')
 };
 
 let personalArchivedMode = false;          // chế độ xem kho lưu trữ (đè lên toàn khu vực)
@@ -5761,57 +5797,108 @@ function renderPersonalOverview() {
   if (!listEl) return;
   const token = personalRenderToken;
 
-  const now = Date.now();
+  const checklist = personalChecklistStats(personalItemsCache);
   const undone = personalItemsCache.filter(i => i.type === 'checklist' && !(i.data || {}).done).slice(0, 6);
-  const upcoming = personalItemsCache
-    .filter(i => i.type === 'calendar_event' && (i.data || {}).start && new Date(i.data.start).getTime() >= now)
-    .sort((a, b) => new Date(a.data.start) - new Date(b.data.start))
-    .slice(0, 5);
   const recentNotes = personalItemsCache
     .filter(i => i.type === 'note')
     .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
-    .slice(0, 5);
+    .slice(0, 4);
+  const shortcuts = personalItemsCache.filter(i => i.type === 'shortcut').slice(0, 6);
 
-  listEl.innerHTML = '<div class="personal-overview">'
-    + personalOverviewBlock('checklist', PERSONAL_TAB_META.checklist.label, PERSONAL_TAB_META.checklist.icon,
-        "switchPersonalTab('checklist')",
-        undone.length ? undone.map(i =>
-          '<label class="personal-overview-row personal-overview-check">'
-          + '<input type="checkbox" onchange="event.stopPropagation(); togglePersonalChecklist(\'' + escapeHtml(escapeJs(i.id)) + '\', this.checked)">'
-          + '<span>' + escapeHtml(i.title || '') + '</span></label>').join('')
-          : '<div class="personal-overview-empty">Không còn việc riêng nào chưa xong.</div>')
-    + personalOverviewBlock('calendar_event', PERSONAL_TAB_META.calendar_event.label, PERSONAL_TAB_META.calendar_event.icon,
-        "switchPersonalTab('calendar_event')",
-        upcoming.length ? upcoming.map(i => {
-          const when = new Date(i.data.start).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-          return '<div class="personal-overview-row" onclick="openPersonalItemModal(\'' + escapeHtml(escapeJs(i.id)) + '\')">'
-            + '<span>' + escapeHtml(i.title || '') + '</span><span class="meta">' + escapeHtml(when) + '</span></div>';
-        }).join('')
-          : '<div class="personal-overview-empty">Không có sự kiện nào sắp tới.</div>')
-    + personalOverviewBlock('note', PERSONAL_TAB_META.note.label, PERSONAL_TAB_META.note.icon,
-        "switchPersonalTab('note')",
+  // Sự kiện (lịch cá nhân, gồm cả sự kiện kéo từ Google) nạp bất đồng bộ; chưa có thì hiện khung chờ rồi vẽ lại khi xong.
+  const agendaReady = !!personalAgendaCache;
+  if (!agendaReady) loadPersonalAgenda();
+  const groups = agendaReady ? groupAgendaByDay(personalAgendaCache.events, { now: Date.now() }) : [];
+  const todayGroup = groups.find(g => g.isToday);
+  const todayEvents = todayGroup ? todayGroup.events : [];
+  const laterGroups = groups.filter(g => !g.isToday);
+
+  listEl.innerHTML = '<div class="phub-grid">'
+    + phubCard('today', 'Hôm nay', 'fa-sun', null, renderPersonalTodayBody(agendaReady, todayEvents, checklist), 'phub-card-wide')
+    + phubCard('checklist', PERSONAL_TAB_META.checklist.label, PERSONAL_TAB_META.checklist.icon, "switchPersonalTab('checklist')",
+        renderPersonalChecklistMini(checklist, undone))
+    + phubCard('calendar_event', 'Sắp tới', PERSONAL_TAB_META.calendar_event.icon, "switchPersonalTab('calendar_event')",
+        renderPersonalUpcomingMini(agendaReady, laterGroups))
+    + phubCard('note', 'Ghi chú gần đây', PERSONAL_TAB_META.note.icon, "switchPersonalTab('note')",
         recentNotes.length ? recentNotes.map(i =>
           '<div class="personal-overview-row" onclick="openPersonalItemModal(\'' + escapeHtml(escapeJs(i.id)) + '\')">'
           + '<span>' + escapeHtml(i.title || 'Không tiêu đề') + '</span>'
           + '<span class="meta">sửa ' + escapeHtml(formatPersonalTimeAgo(i.updated_at)) + '</span></div>').join('')
-          : '<div class="personal-overview-empty">Chưa có ghi chú nào.</div>')
-    + personalOverviewBlock('related', 'Việc nhóm giao cho bạn', 'fa-inbox',
-        null, '<div id="personal-overview-tasks">' + skeletonListItems(3) + '</div>')
+          : '<div class="phub-muted">Chưa có ghi chú nào. Bấm “Ghi chú” rồi “Thêm ghi chú” để bắt đầu.</div>')
+    + phubCard('shortcut', PERSONAL_TAB_META.shortcut.label, PERSONAL_TAB_META.shortcut.icon, "switchPersonalTab('shortcut')",
+        shortcuts.length ? '<div class="phub-tiles">' + shortcuts.map(renderPersonalShortcutTile).join('') + '</div>'
+          : '<div class="phub-muted">Chưa có lối tắt nào — lưu các trang web hay dùng để mở nhanh.</div>')
+    + phubCard('related', 'Việc nhóm giao cho bạn', 'fa-inbox', null, '<div id="personal-overview-tasks">' + skeletonListItems(3) + '</div>')
     + '</div>';
 
   renderPersonalOverviewTasks(token);
 }
 
-function personalOverviewBlock(key, label, icon, jumpExpr, innerHtml) {
+// Khung thẻ dùng chung của màn Tổng quan.
+function phubCard(key, label, icon, jumpExpr, innerHtml, cls) {
   const jump = jumpExpr
-    ? '<button type="button" class="personal-overview-jump" onclick="' + jumpExpr + '">Xem tất cả <i class="fa-solid fa-arrow-right"></i></button>'
+    ? '<button type="button" class="phub-link" onclick="' + jumpExpr + '">Xem tất cả <i class="fa-solid fa-arrow-right"></i></button>'
     : '';
-  return '<section class="personal-overview-block" data-block="' + key + '">'
-    + '<div class="personal-overview-head">'
-    + '<h4><i class="fa-solid ' + icon + '"></i> ' + escapeHtml(label) + '</h4>' + jump
-    + '</div>'
-    + '<div class="personal-overview-rows">' + innerHtml + '</div>'
+  return '<section class="phub-card ' + (cls || '') + '" data-block="' + key + '">'
+    + '<div class="phub-card-head"><h4><i class="fa-solid ' + icon + '"></i> ' + escapeHtml(label) + '</h4>' + jump + '</div>'
+    + innerHtml
     + '</section>';
+}
+
+function renderPersonalTodayBody(agendaReady, todayEvents, checklist) {
+  const now = new Date();
+  const dateBlock = '<div class="phub-today-date">'
+    + '<div class="phub-today-day">' + now.getDate() + '</div>'
+    + '<div class="phub-today-week">' + escapeHtml(PERSONAL_WEEKDAYS_VI[now.getDay()]) + '</div>'
+    + '<div class="phub-today-month">Tháng ' + (now.getMonth() + 1) + ', ' + now.getFullYear() + '</div>'
+    + '</div>';
+  let body;
+  if (!agendaReady) {
+    body = '<div class="phub-today-summary">Đang tải lịch của bạn...</div>' + skeletonListItems(2);
+  } else {
+    const summary = '<div class="phub-today-summary">Hôm nay bạn có <b>' + todayEvents.length + '</b> sự kiện và <b>' + checklist.open + '</b> việc riêng chưa xong.'
+      + (personalAgendaCache.failed ? ' <span style="color:var(--warning-color)">(Chưa tải được lịch — thử lại sau)</span>' : '') + '</div>';
+    const rows = todayEvents.slice(0, 5).map(ev => phubEventRow(ev, { compact: true })).join('');
+    const more = todayEvents.length > 5 ? '<div class="phub-muted">+ ' + (todayEvents.length - 5) + ' sự kiện nữa — xem ở tab Lịch riêng.</div>' : '';
+    const empty = todayEvents.length ? '' : '<div class="phub-muted">Hôm nay trống lịch.</div>';
+    body = summary + '<div class="phub-day-list">' + rows + '</div>' + empty + more
+      + '<div class="phub-toolbar"><span></span><span style="display:flex; gap:8px; flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-outline" onclick="openPersonalEventModal()"><i class="fa-solid fa-plus"></i> Thêm sự kiện</button>'
+      + '<button type="button" class="btn btn-outline" onclick="PERSONAL_SHIM.openCalendarSection()"><i class="fa-solid fa-calendar-days"></i> Mở lịch tháng</button>'
+      + '</span></div>';
+  }
+  return '<div class="phub-today">' + dateBlock + '<div class="phub-today-body">' + body + '</div></div>';
+}
+
+function renderPersonalChecklistMini(stats, undone) {
+  const progress = stats.total
+    ? '<div class="phub-progress-wrap"><div class="phub-progress-text"><span><b>' + stats.done + '</b>/' + stats.total + ' đã xong</span><span>' + stats.percent + '%</span></div>'
+      + '<div class="phub-progress"><span style="width:' + stats.percent + '%"></span></div></div>'
+    : '';
+  const rows = undone.length
+    ? undone.map(i =>
+        '<label class="personal-overview-row personal-overview-check">'
+        + '<input type="checkbox" onchange="event.stopPropagation(); togglePersonalChecklist(\'' + escapeHtml(escapeJs(i.id)) + '\', this.checked)">'
+        + '<span>' + escapeHtml(i.title || '') + '</span></label>').join('')
+    : '<div class="phub-muted">' + (stats.total ? 'Xong hết rồi — làm tốt lắm!' : 'Chưa có việc riêng nào.') + '</div>';
+  return progress + '<div class="personal-overview-rows" style="display:flex; flex-direction:column; gap:6px;">' + rows + '</div>'
+    + '<div class="phub-add"><input type="text" id="personal-overview-add" placeholder="Thêm việc riêng… rồi nhấn Enter" maxlength="200" onkeydown="onPersonalAddKey(event, this)"></div>';
+}
+
+function renderPersonalUpcomingMini(agendaReady, laterGroups) {
+  if (!agendaReady) return skeletonListItems(2);
+  const rows = [];
+  for (const g of laterGroups) {
+    for (const ev of g.events) {
+      if (rows.length >= 6) break;
+      rows.push('<div class="personal-overview-row" onclick="personalEditEvent(\'' + escapeHtml(escapeJs(ev.id)) + '\')">'
+        + '<span>' + escapeHtml(ev.title || '') + '</span>'
+        + '<span class="meta">' + escapeHtml(g.label + ' · ' + (personalIsAllDay(ev.startTime, ev.endTime) ? 'cả ngày' : personalTimeLabel(ev).split(' – ')[0])) + '</span></div>');
+    }
+    if (rows.length >= 6) break;
+  }
+  return rows.length ? '<div class="personal-overview-rows" style="display:flex; flex-direction:column; gap:6px;">' + rows.join('') + '</div>'
+    : '<div class="phub-muted">Không có sự kiện nào trong ' + PERSONAL_AGENDA_DAYS + ' ngày tới.</div>';
 }
 
 // Khối 4 — thay cho renderRelatedPanel cũ. CỐ TÌNH đi qua callGAS('listMyTasks') chứ không
@@ -5918,8 +6005,10 @@ async function hardDeletePersonalItem(id) {
 function togglePersonalArchivedView() {
   personalArchivedMode = !personalArchivedMode;
   personalActiveTagFilter = null;
+  clearPersonalSearch(false);
   renderPersonalTabs();
   renderPersonalTagFilterBar();
+  renderPersonalStatusStrip();
   renderPersonalItems();
   if (personalArchivedMode) loadPersonalArchived();
 }
@@ -5968,6 +6057,7 @@ function openPersonalIntegrationsModal() {
   renderSyncFolderPanel();
   renderCalendarConnectionPanel();
   if (typeof initCalendarAutoSync === 'function') initCalendarAutoSync();
+  loadPersonalCalendarConn().then(onPersonalCalendarConnLoaded);
 }
 
 
@@ -6023,12 +6113,246 @@ async function savePersonalLayoutPref() {
 }
 
 async function loadPersonalHub() {
+  renderPersonalGreeting();
   renderPersonalTabs();
-  await refreshPersonalItems();
+  renderPersonalStatusStrip();
+  loadPersonalCalendarConn().then(onPersonalCalendarConnLoaded);
+  loadPersonalAgenda(); // chip "Hôm nay" cần số sự kiện, kể cả khi đang ở tab khác Tổng quan/Lịch
+  // Đồng bộ thư mục tự chạy từ lúc mở app (personal-sync.js); gọi init() ở đây chỉ để chắc chắn nếu phiên đăng nhập tới muộn.
   if (window.PersonalSync && window.PersonalSync.isTauri() && window.PersonalSync.getRoot()) {
-    window.PersonalSync.startWatching();
+    window.PersonalSync.init().catch(() => {});
+  }
+  await refreshPersonalItems();
+}
+
+// Gọi mỗi lần quay lại Không Gian Riêng sau lần nạp đầu (xem switchSection): làm mới lời chào, trạng thái và lịch nếu đã cũ.
+function onPersonalSectionShown() {
+  renderPersonalGreeting();
+  renderPersonalStatusStrip();
+  if (!personalAgendaCache || Date.now() - personalAgendaCache.loadedAt > PERSONAL_AGENDA_STALE_MS) loadPersonalAgenda(true);
+}
+
+function personalHubVisible() {
+  const sec = document.getElementById('personal-section');
+  return !!(sec && sec.classList.contains('active'));
+}
+
+function renderPersonalGreeting() {
+  const el = document.getElementById('personal-greeting');
+  if (!el) return;
+  const name = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER.nickname) || '').trim();
+  el.textContent = personalGreeting(new Date().getHours()) + (name ? ', ' + name : '');
+  const sub = document.getElementById('personal-sub');
+  if (sub) sub.textContent = personalDateLabel(new Date()) + ' · Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.';
+}
+
+// -------------------- Thanh trạng thái: thư mục đồng bộ · Google Calendar · hôm nay --------------------
+async function loadPersonalCalendarConn() {
+  if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) { personalCalendarConn = null; return; }
+  try { personalCalendarConn = await API.calendarConnection.get(); }
+  catch (err) { personalCalendarConn = null; }
+}
+
+// Thông tin kết nối Google vừa tải/đổi: vẽ lại thanh trạng thái, và tab Lịch nếu đang mở (thanh công cụ của nó phụ thuộc kết nối).
+function onPersonalCalendarConnLoaded() {
+  renderPersonalStatusStrip();
+  if (personalHubVisible() && !personalArchivedMode && !personalSearchQuery && !personalActiveTagFilter && personalActiveTab === 'calendar_event') {
+    renderPersonalItems();
   }
 }
+
+function personalChipHtml(opts) {
+  return '<button type="button" class="phub-chip" onclick="' + opts.onclick + '" title="' + escapeHtml(opts.title || '') + '">'
+    + '<span class="phub-chip-icon"><i class="' + opts.icon + '"></i></span>'
+    + '<span class="phub-chip-text"><span class="phub-chip-label">' + escapeHtml(opts.label) + '</span>'
+    + '<span class="phub-chip-value">' + escapeHtml(opts.value) + '</span>'
+    + (opts.sub ? '<span class="phub-chip-sub">' + escapeHtml(opts.sub) + '</span>' : '') + '</span>'
+    + '<span class="phub-dot ' + (opts.dot || '') + '"></span></button>';
+}
+
+function personalFolderChip() {
+  const base = { onclick: 'openPersonalIntegrationsModal()', icon: 'fa-solid fa-folder-open', label: 'Thư mục đồng bộ' };
+  if (!window.PersonalSync || !window.PersonalSync.isTauri()) {
+    return personalChipHtml(Object.assign(base, { value: 'Chỉ có trên bản desktop', sub: 'Mở app WorkHub để dùng', title: 'Đồng bộ thư mục cần bản desktop' }));
+  }
+  const st = window.PersonalSync.getState();
+  if (!st.root) {
+    return personalChipHtml(Object.assign(base, { value: 'Chưa liên kết', sub: 'Chọn 1 thư mục trên máy để đồng bộ', title: 'Liên kết thư mục' }));
+  }
+  const name = personalFolderName(st.root);
+  if (st.phase === 'reconciling') return personalChipHtml(Object.assign(base, { value: name, sub: 'Đang đồng bộ…', dot: 'busy' }));
+  if (st.lastError || st.failures.length) {
+    return personalChipHtml(Object.assign(base, { value: name, sub: st.lastError || (st.failures.length + ' file chưa đồng bộ được'), dot: 'bad', title: 'Bấm để xem chi tiết lỗi' }));
+  }
+  return personalChipHtml(Object.assign(base, { value: name, sub: personalSyncedAtLabel(st.lastRunAt), dot: st.lastRunAt ? 'ok' : 'warn' }));
+}
+
+function personalCalendarChip() {
+  const base = { onclick: 'openPersonalIntegrationsModal()', icon: 'fa-brands fa-google', label: 'Google Calendar' };
+  if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) {
+    return personalChipHtml(Object.assign(base, { value: 'Chỉ có trên bản desktop', sub: 'Mở app WorkHub để dùng' }));
+  }
+  if (personalCalendarConn === undefined) return personalChipHtml(Object.assign(base, { value: 'Đang kiểm tra…' }));
+  if (!personalCalendarConn) {
+    return personalChipHtml(Object.assign(base, { value: 'Chưa kết nối', sub: 'Đồng bộ 2 chiều với lịch Google của bạn' }));
+  }
+  const email = personalCalendarConn.google_account_email || 'Đã kết nối';
+  if (typeof calendarSyncState !== 'undefined') {
+    if (calendarSyncState.running) return personalChipHtml(Object.assign(base, { value: email, sub: 'Đang đồng bộ…', dot: 'busy' }));
+    if (calendarSyncState.lastError) return personalChipHtml(Object.assign(base, { value: email, sub: calendarSyncState.lastError, dot: 'bad', title: 'Bấm để xem chi tiết' }));
+  }
+  const lastAt = (typeof calendarSyncState !== 'undefined' && calendarSyncState.lastAt)
+    || (personalCalendarConn.last_synced_at ? new Date(personalCalendarConn.last_synced_at).getTime() : null);
+  return personalChipHtml(Object.assign(base, { value: email, sub: personalSyncedAtLabel(lastAt), dot: lastAt ? 'ok' : 'warn' }));
+}
+
+function personalTodayChip() {
+  const stats = personalChecklistStats(personalItemsCache);
+  let todayCount = '…';
+  if (personalAgendaCache) {
+    const g = groupAgendaByDay(personalAgendaCache.events, { now: Date.now() }).find(x => x.isToday);
+    todayCount = String(g ? g.events.length : 0);
+  }
+  return personalChipHtml({
+    onclick: "switchPersonalTab('overview')", icon: 'fa-solid fa-sun', label: 'Hôm nay',
+    value: todayCount + ' sự kiện · ' + stats.open + ' việc chưa xong',
+    sub: personalItemsCache.filter(i => i.type === 'note').length + ' ghi chú · ' + personalItemsCache.filter(i => i.type === 'shortcut').length + ' lối tắt',
+    title: 'Về Tổng quan'
+  });
+}
+
+function renderPersonalStatusStrip() {
+  const el = document.getElementById('personal-status-strip');
+  if (!el) return;
+  el.style.display = personalArchivedMode ? 'none' : '';
+  el.innerHTML = personalTodayChip() + personalFolderChip() + personalCalendarChip();
+  // Chấm trạng thái trên nút "Tích hợp" ở hero: báo lỗi ngay cả khi không nhìn thanh trạng thái.
+  const btn = document.getElementById('personal-integrations-btn');
+  if (btn) {
+    const st = (window.PersonalSync && window.PersonalSync.isTauri()) ? window.PersonalSync.getState() : null;
+    const bad = !!((st && st.root && (st.lastError || st.failures.length)) || (typeof calendarSyncState !== 'undefined' && calendarSyncState.lastError));
+    let dot = btn.querySelector('.phub-dot');
+    if (bad && !dot) { dot = document.createElement('span'); dot.className = 'phub-dot bad'; btn.appendChild(dot); }
+    else if (!bad && dot) dot.remove();
+  }
+}
+
+// Engine/đồng bộ lịch có thể phát sự kiện dồn dập (mỗi file một lần) — gom lại thành 1 lần vẽ.
+function schedulePersonalStatusRender() {
+  if (personalStatusTimer) return;
+  personalStatusTimer = setTimeout(() => { personalStatusTimer = null; renderPersonalStatusStrip(); }, 250);
+}
+
+// -------------------- Lịch riêng: sự kiện cá nhân (kể cả sự kiện kéo từ Google) --------------------
+function loadPersonalAgenda(force) {
+  if (personalAgendaLoading) return personalAgendaLoading;
+  if (!force && personalAgendaCache && Date.now() - personalAgendaCache.loadedAt < PERSONAL_AGENDA_STALE_MS) return Promise.resolve(personalAgendaCache);
+  const me = PERSONAL_SHIM.me();
+  if (!me.email) return Promise.resolve(null);
+  personalAgendaLoading = (async () => {
+    try {
+      const from = new Date(); from.setHours(0, 0, 0, 0);
+      const to = new Date(from.getTime() + PERSONAL_AGENDA_DAYS * 86400000); to.setHours(23, 59, 59, 999);
+      const res = await window.callGAS('getEvents', {
+        startDate: from.toISOString(), endDate: to.toISOString(),
+        calendarType: 'personal', groupKey: PERSONAL_SHIM.agendaGroupKey(), email: me.email
+      });
+      const ok = !!(res && res.status === 'success' && Array.isArray(res.data));
+      personalAgendaCache = { events: ok ? res.data.filter(e => e.type !== 'task') : [], loadedAt: Date.now(), failed: !ok };
+    } catch (err) {
+      console.error('Lỗi tải lịch riêng:', err);
+      personalAgendaCache = { events: [], loadedAt: Date.now(), failed: true };
+    } finally {
+      personalAgendaLoading = null;
+    }
+    refreshPersonalViewsAfterAgenda();
+    return personalAgendaCache;
+  })();
+  return personalAgendaLoading;
+}
+
+function refreshPersonalViewsAfterAgenda() {
+  renderPersonalStatusStrip();
+  if (!personalHubVisible() || personalArchivedMode || personalActiveTagFilter) return;
+  renderPersonalTabs();
+  if (personalSearchQuery || personalActiveTab === 'overview' || personalActiveTab === 'calendar_event') renderPersonalItems();
+}
+
+// Gọi từ handleEventFormSubmit sau khi lưu sự kiện mở từ Không Gian Riêng.
+function onPersonalEventSaved() {
+  loadPersonalAgenda(true);
+}
+
+if (typeof window !== 'undefined') {
+  let lastCalendarSyncSeen = 0;
+  window.addEventListener('wh-calendar-sync', (e) => {
+    const d = (e && e.detail) || {};
+    loadPersonalCalendarConn().then(onPersonalCalendarConnLoaded);
+    // Lượt đồng bộ vừa kết thúc => sự kiện kéo về từ Google (hoặc vừa xoá) có thể đã đổi: nạp lại lịch.
+    if (d.running === false && d.lastAt && d.lastAt !== lastCalendarSyncSeen) {
+      lastCalendarSyncSeen = d.lastAt;
+      if (SECTION_LOADED.personal) loadPersonalAgenda(true);
+    }
+  });
+}
+
+// -------------------- Tìm kiếm --------------------
+function onPersonalSearchInput(value) {
+  const box = document.getElementById('personal-search-box');
+  if (box) box.classList.toggle('has-value', !!String(value || '').trim());
+  clearTimeout(personalSearchTimer);
+  personalSearchTimer = setTimeout(() => {
+    personalSearchQuery = String(value || '').trim();
+    if (personalSearchQuery) { personalArchivedMode = false; personalActiveTagFilter = null; }
+    renderPersonalTabs();
+    renderPersonalTagFilterBar();
+    renderPersonalItems();
+    if (personalSearchQuery && !personalAgendaCache) loadPersonalAgenda();
+  }, 140);
+}
+
+function onPersonalSearchKeydown(event) {
+  if (event.key === 'Escape') { clearPersonalSearch(); event.target.blur(); }
+}
+
+function clearPersonalSearch(rerender) {
+  const input = document.getElementById('personal-search');
+  if (input) input.value = '';
+  const box = document.getElementById('personal-search-box');
+  if (box) box.classList.remove('has-value');
+  clearTimeout(personalSearchTimer);
+  const had = !!personalSearchQuery;
+  personalSearchQuery = '';
+  if (rerender !== false && had) { renderPersonalTabs(); renderPersonalItems(); }
+}
+
+// Phím "/" nhảy vào ô tìm kiếm khi đang ở Không Gian Riêng (Ctrl+K đã dành cho tìm kiếm toàn app).
+document.addEventListener('keydown', function (e) {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!personalHubVisible()) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+  const input = document.getElementById('personal-search');
+  if (input) { e.preventDefault(); input.focus(); input.select(); }
+});
+
+// Số đếm trên tab: việc chưa xong, sự kiện 7 ngày tới, số ghi chú/lối tắt/ghim. Trả null = không hiện.
+function personalTabCount(type) {
+  if (type === 'overview') return null;
+  if (type === 'checklist') return personalChecklistStats(personalItemsCache).open || null;
+  if (type === 'calendar_event') {
+    if (!personalAgendaCache) return null;
+    const limit = Date.now() + 7 * 86400000;
+    const n = personalAgendaCache.events.filter(e => new Date(e.startTime).getTime() >= new Date().setHours(0, 0, 0, 0) && new Date(e.startTime).getTime() <= limit).length;
+    return n || null;
+  }
+  const n = personalItemsCache.filter(i => i.type === type).length;
+  return n || null;
+}
+
+const PERSONAL_ADD_LABEL = {
+  note: 'Thêm ghi chú', checklist: 'Thêm việc', shortcut: 'Thêm lối tắt', calendar_event: 'Thêm sự kiện'
+};
 
 function renderPersonalTabs() {
   const bar = document.getElementById('personal-hub-tabs');
@@ -6038,19 +6362,25 @@ function renderPersonalTabs() {
     bar.style.display = 'none';
   } else {
     bar.style.display = 'flex';
+    const inTab = !personalActiveTagFilter && !personalSearchQuery;
     bar.innerHTML = personalLayoutOrder.filter(type => !personalLayoutHidden.includes(type)).map(type => {
       const meta = PERSONAL_TAB_META[type];
       if (!meta) return '';
-      return `<button type="button" class="personal-tab ${!personalActiveTagFilter && type === personalActiveTab ? 'active' : ''}" data-type="${type}" onclick="switchPersonalTab('${type}')">
-      <i class="fa-solid ${meta.icon}"></i><span> ${meta.label}</span>
+      const count = personalTabCount(type);
+      return `<button type="button" class="personal-tab ${inTab && type === personalActiveTab ? 'active' : ''}" data-type="${type}" onclick="switchPersonalTab('${type}')">
+      <i class="fa-solid ${meta.icon}"></i><span> ${meta.label}</span>${count ? '<span class="personal-tab-count">' + count + '</span>' : ''}
     </button>`;
     }).join('');
   }
   const addBtn = document.getElementById('personal-add-btn');
   // 'overview' là bảng tổng hợp nhiều loại nên "Thêm mới" trống nghĩa — ẩn đi.
-  const hideAdd = personalArchivedMode || personalActiveTagFilter
+  const hideAdd = personalArchivedMode || personalActiveTagFilter || personalSearchQuery
     || personalActiveTab === 'pin' || personalActiveTab === 'overview';
-  if (addBtn) addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
+  if (addBtn) {
+    addBtn.style.display = hideAdd ? 'none' : 'inline-flex';
+    const label = PERSONAL_ADD_LABEL[personalActiveTab] || 'Thêm mới';
+    addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> ' + label;
+  }
   const archBtn = document.getElementById('personal-archive-toggle');
   if (archBtn) archBtn.classList.toggle('active', personalArchivedMode);
   const integBtn = document.getElementById('personal-integrations-btn');
@@ -6152,6 +6482,7 @@ async function submitPersonalCustomize() {
 
 function filterByPersonalTag(tag) {
   personalActiveTagFilter = (tag && tag !== personalActiveTagFilter) ? tag : null;
+  if (personalActiveTagFilter) clearPersonalSearch(false);
   renderPersonalTabs();
   renderPersonalTagFilterBar();
   renderPersonalItems();
@@ -6172,12 +6503,14 @@ async function refreshPersonalItems() {
   renderPersonalTabs();
   renderPersonalTagFilterBar();
   renderPersonalItems();
+  renderPersonalStatusStrip();
 }
 
 function switchPersonalTab(type) {
   personalActiveTab = type;
   personalActiveTagFilter = null;
   personalArchivedMode = false;
+  clearPersonalSearch(false);
   // Vào lại Tổng quan thì nạp lại khối việc nhóm (dữ liệu nhóm có thể đã đổi).
   if (type === 'overview') personalOverviewTasksCache = null;
   renderPersonalTabs();
@@ -6191,32 +6524,24 @@ function renderPersonalItems() {
   personalRenderToken++;                       // huỷ hiệu lực mọi fetch async đang bay
 
   if (personalArchivedMode) { renderPersonalArchivedList(); return; }
-  if (!personalActiveTagFilter && personalActiveTab === 'overview') { renderPersonalOverview(); return; }
+  if (personalSearchQuery) { renderPersonalGroupedResults(listEl, { query: personalSearchQuery }); return; }
+  if (personalActiveTagFilter) { renderPersonalGroupedResults(listEl, { tag: personalActiveTagFilter }); return; }
 
-  let items;
-  let meta;
-  if (personalActiveTagFilter) {
-    items = personalItemsCache.filter(i => (i.tags || []).includes(personalActiveTagFilter));
-    meta = { icon: 'fa-tag', empty: `Không có mục nào gắn thẻ #${personalActiveTagFilter}.` };
-  } else {
-    items = personalItemsCache.filter(i => i.type === personalActiveTab);
-    meta = PERSONAL_TAB_META[personalActiveTab];
-    if (personalActiveTab === 'calendar_event') {
-      items = items.slice().sort((a, b) => new Date((a.data || {}).start || 0) - new Date((b.data || {}).start || 0));
-    }
+  switch (personalActiveTab) {
+    case 'overview': renderPersonalOverview(); break;
+    case 'calendar_event': renderPersonalAgendaView(listEl); break;
+    case 'checklist': renderPersonalChecklistView(listEl); break;
+    case 'note': renderPersonalNotesView(listEl); break;
+    case 'shortcut': renderPersonalShortcutsView(listEl); break;
+    default: renderPersonalPinsView(listEl); break;
   }
+}
 
-  if (items.length === 0) {
-    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid ${meta.icon}"></i><p>${meta.empty}</p></div>`;
-    return;
-  }
-
-  // "Việc riêng" là dòng 1 checkbox + 1 câu, nhét vào lưới thẻ 260px thì phí chỗ:
-  // bọc trong .personal-dense-list (grid-column: 1/-1) để thành danh sách dày full-width.
-  const cards = items.map(item => renderPersonalItemCard(item)).join('');
-  listEl.innerHTML = (!personalActiveTagFilter && personalActiveTab === 'checklist')
-    ? `<div class="personal-dense-list">${cards}</div>`
-    : cards;
+function phubEmpty(icon, title, text, ctaLabel, ctaOnclick) {
+  return '<div class="phub-empty"><div class="phub-empty-icon"><i class="fa-solid ' + icon + '"></i></div>'
+    + '<h5>' + escapeHtml(title) + '</h5><p>' + escapeHtml(text) + '</p>'
+    + (ctaLabel ? '<button type="button" class="btn btn-primary" onclick="' + ctaOnclick + '"><i class="fa-solid fa-plus"></i> ' + escapeHtml(ctaLabel) + '</button>' : '')
+    + '</div>';
 }
 
 function renderPersonalItemTagsHtml(item) {
@@ -6227,44 +6552,238 @@ function renderPersonalItemTagsHtml(item) {
   ).join('') + `</div>`;
 }
 
-function renderPersonalItemCard(item) {
-  const data = item.data || {};
+function personalArchiveBtnHtml(item) {
   const safeId = escapeHtml(escapeJs(item.id));
   // Nút cũ là Xoá cứng (không cứu lại được). Giờ là Lưu trữ — đảo ngược được, xem lại
   // trong nút "Lưu trữ" ở đầu khu vực. Xoá vĩnh viễn chỉ có trong kho lưu trữ.
-  const archiveBtn = `<button type="button" class="personal-item-delete" title="Lưu trữ" onclick="event.stopPropagation(); archivePersonalItem('${safeId}')"><i class="fa-solid fa-box-archive"></i></button>`;
+  return `<button type="button" class="personal-item-delete" title="Lưu trữ" onclick="event.stopPropagation(); archivePersonalItem('${safeId}')"><i class="fa-solid fa-box-archive"></i></button>`;
+}
 
-  if (item.type === 'calendar_event') {
-    const start = data.start ? new Date(data.start) : null;
-    const dateStr = start ? start.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: data.allDay ? undefined : '2-digit', minute: data.allDay ? undefined : '2-digit' }) : '';
-    return `
-    <div class="personal-item-card" onclick="openPersonalItemModal('${safeId}')">
-      <div class="personal-item-body">
-        <strong><i class="fa-solid fa-calendar-days" style="color: var(--gold); margin-right:6px;"></i>${escapeHtml(item.title || '')}</strong>
-        <p>${escapeHtml(dateStr)}</p>
-        ${renderPersonalItemTagsHtml(item)}
-      </div>
-      <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
-    </div>`;
+// -------------------- Lịch riêng (agenda) --------------------
+function phubEventRow(ev, opts) {
+  const o = opts || {};
+  const safeId = escapeHtml(escapeJs(ev.id));
+  const isGoogle = ev.source === 'google';
+  const recurrenceLabel = { daily: 'Lặp hằng ngày', weekly: 'Lặp hằng tuần', monthly: 'Lặp hằng tháng' }[ev.recurrence];
+  const ended = new Date(ev.endTime).getTime() < Date.now();
+  const meta = [ev.location, ev.description].filter(Boolean).join(' · ');
+  const hl = (t) => (personalSearchQuery ? personalHighlightHtml(t, personalSearchQuery) : escapeHtml(t));
+  return '<div class="phub-ev ' + (o.compact ? 'phub-ev-compact ' : '') + (ended ? 'is-past' : '') + '" onclick="personalEditEvent(\'' + safeId + '\')" title="Bấm để sửa">'
+    + '<div class="phub-ev-time">' + escapeHtml(personalTimeLabel(ev)) + '</div>'
+    + '<div class="phub-ev-main"><div class="phub-ev-title">' + hl(ev.title || '(Không có tiêu đề)')
+    + (recurrenceLabel ? ' <i class="fa-solid fa-rotate" title="' + recurrenceLabel + '"></i>' : '')
+    + (isGoogle ? ' <i class="fa-brands fa-google" title="Đồng bộ từ Google Calendar"></i>' : '') + '</div>'
+    + (meta && !o.compact ? '<div class="phub-ev-meta">' + escapeHtml(meta) + '</div>' : '') + '</div>'
+    + (o.compact ? '' : '<div class="phub-ev-actions">'
+      + '<button type="button" class="personal-item-delete" title="Sửa" onclick="event.stopPropagation(); personalEditEvent(\'' + safeId + '\')"><i class="fa-solid fa-pen"></i></button>'
+      + '<button type="button" class="personal-item-delete" title="Xoá" onclick="event.stopPropagation(); personalDeleteEvent(\'' + safeId + '\', \'' + escapeHtml(escapeJs(ev.title || '')) + '\')"><i class="fa-solid fa-trash"></i></button>'
+      + '</div>')
+    + '</div>';
+}
+
+function renderPersonalAgendaView(listEl) {
+  const connected = !!personalCalendarConn;
+  const bar = '<div class="phub-agenda-bar" style="grid-column:1/-1;">'
+    + '<div class="phub-agenda-bar-info">Sự kiện cá nhân trong ' + PERSONAL_AGENDA_DAYS + ' ngày tới'
+    + (connected ? ' · đang đồng bộ với <b>' + escapeHtml(personalCalendarConn.google_account_email || 'Google Calendar') + '</b>' : ' · <button type="button" class="phub-link" onclick="openPersonalIntegrationsModal()">Kết nối Google Calendar</button>')
+    + '</div><div style="display:flex; gap:8px; flex-wrap:wrap;">'
+    + (connected ? '<button type="button" class="btn btn-outline" onclick="personalSyncCalendarThenReload()"><i class="fa-solid fa-rotate"></i> Đồng bộ ngay</button>' : '')
+    + '<button type="button" class="btn btn-outline" onclick="PERSONAL_SHIM.openCalendarSection()"><i class="fa-solid fa-calendar-days"></i> Lịch tháng</button>'
+    + '</div></div>';
+
+  if (!personalAgendaCache) {
+    loadPersonalAgenda();
+    listEl.innerHTML = bar + '<div style="grid-column:1/-1;">' + skeletonListItems(4) + '</div>';
+    return;
   }
+  const groups = groupAgendaByDay(personalAgendaCache.events, { now: Date.now() });
+  if (!groups.length) {
+    listEl.innerHTML = bar + phubEmpty('fa-calendar-days',
+      personalAgendaCache.failed ? 'Chưa tải được lịch' : 'Chưa có sự kiện nào sắp tới',
+      personalAgendaCache.failed ? 'Kiểm tra kết nối mạng rồi bấm “Đồng bộ ngay” hoặc mở lại tab này.' : 'Thêm sự kiện riêng — nếu đã kết nối Google Calendar, nó sẽ tự đẩy lên Google sau vài giây.',
+      'Thêm sự kiện', 'openPersonalEventModal()');
+    return;
+  }
+  listEl.innerHTML = bar + '<div class="phub-agenda">' + groups.map(g =>
+    '<section><div class="phub-day-head"><h5 class="' + (g.isToday ? 'is-today' : '') + '">' + escapeHtml(g.label) + '</h5>' + (g.dateText !== g.label ? '<span>' + escapeHtml(g.dateText) + '</span>' : '') + '</div>'
+    + '<div class="phub-day-list">' + g.events.map(ev => phubEventRow(ev)).join('') + '</div></section>').join('') + '</div>';
+}
 
-  if (item.type === 'checklist') {
-    return `
+async function personalSyncCalendarThenReload() {
+  if (typeof syncGoogleCalendarNow === 'function') await syncGoogleCalendarNow();
+  await loadPersonalAgenda(true);
+}
+
+// Mở form sự kiện CHUNG của app (cùng form với tab Lịch) nhưng ép loại "Cá nhân": đó mới là loại được đồng bộ lên Google.
+function openPersonalEventModal() {
+  eventModalForcedType = 'personal';
+  const form = document.getElementById('event-form');
+  if (form) form.reset();
+  resetEventModalUI();
+  const start = new Date(); start.setMinutes(0, 0, 0); start.setHours(start.getHours() + 1);
+  const end = new Date(start.getTime() + 3600000);
+  const pad = n => String(n).padStart(2, '0');
+  const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const ts = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('start-date', ds(start)); set('start-time', ts(start)); set('end-date', ds(end)); set('end-time', ts(end));
+  const modalTitle = document.getElementById('event-modal-title');
+  if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-calendar-plus" style="color: var(--gold);"></i> Thêm Sự Kiện Riêng';
+  openAppModal('add-event-modal');
+}
+
+function personalEditEvent(id) {
+  const ev = personalAgendaCache && personalAgendaCache.events.find(e => e.id === id);
+  if (!ev) { showToast('Không tìm thấy sự kiện — thử tải lại.', 'warning'); loadPersonalAgenda(true); return; }
+  eventModalForcedType = 'personal';
+  openEditEventObject(ev);
+}
+
+async function personalDeleteEvent(id, title) {
+  const ok = await personalConfirm({ title: 'Xoá sự kiện này?', html: '<b>' + escapeHtml(title || '') + '</b> sẽ vào thùng rác; nếu đã đồng bộ, nó cũng được xoá khỏi Google Calendar.', confirmText: 'Xoá' });
+  if (!ok) return;
+  const me = PERSONAL_SHIM.me();
+  const res = await window.callGAS('deleteEvent', { eventId: id, calendarType: 'personal', groupKey: PERSONAL_SHIM.agendaGroupKey(), email: me.email });
+  if (res.status !== 'success') { showToast('Lỗi: ' + res.message, 'error'); return; }
+  showToast('Đã xoá sự kiện', 'success');
+  await loadPersonalAgenda(true);
+}
+
+// -------------------- Việc riêng --------------------
+function renderPersonalChecklistRow(item) {
+  const data = item.data || {};
+  const safeId = escapeHtml(escapeJs(item.id));
+  const hl = (t) => (personalSearchQuery ? personalHighlightHtml(t, personalSearchQuery) : escapeHtml(t));
+  return `
     <div class="personal-item-card personal-checklist-row">
       <label class="personal-checklist-check">
         <input type="checkbox" ${data.done ? 'checked' : ''} onchange="togglePersonalChecklist('${safeId}', this.checked)">
-        <span class="${data.done ? 'personal-item-done' : ''}">${escapeHtml(item.title || '')}</span>
+        <span class="${data.done ? 'personal-item-done' : ''}">${hl(item.title || '')}</span>
       </label>
       ${renderPersonalItemTagsHtml(item)}
-      <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
+      <div class="personal-item-actions">
+        ${renderPersonalPinBtnHtml(item)}
+        <button type="button" class="personal-item-delete" title="Sửa" onclick="openPersonalItemModal('${safeId}')"><i class="fa-solid fa-pen"></i></button>
+        ${personalArchiveBtnHtml(item)}
+      </div>
     </div>`;
-  }
+}
 
-  if (item.type === 'pin') {
-    // Thẻ ghim-dự-án: giữ nguyên nhãn "Bỏ ghim" + icon X vì người dùng đọc nó là "gỡ lối
-    // tắt này đi", không phải "cho vào thùng". Hành vi bên dưới giờ là lưu trữ (cứu lại
-    // được). Cũng không có nút ghim-lên-đầu ở đây để tránh lẫn 2 khái niệm ghim.
-    return `
+function renderPersonalChecklistView(listEl) {
+  const all = personalItemsCache.filter(i => i.type === 'checklist');
+  const stats = personalChecklistStats(all);
+  const shown = all.filter(i => personalChecklistFilter === 'all' ? true : (personalChecklistFilter === 'done' ? !!(i.data || {}).done : !(i.data || {}).done));
+  const seg = ['all', 'open', 'done'].map(k => {
+    const label = { all: 'Tất cả', open: 'Chưa xong', done: 'Đã xong' }[k];
+    return '<button type="button" class="' + (personalChecklistFilter === k ? 'active' : '') + '" onclick="setPersonalChecklistFilter(\'' + k + '\')">' + label + '</button>';
+  }).join('');
+  const progress = '<div class="phub-progress-wrap" style="flex:1; min-width:200px;"><div class="phub-progress-text"><span><b>' + stats.done + '</b>/' + stats.total + ' đã xong</span><span>' + stats.percent + '%</span></div>'
+    + '<div class="phub-progress"><span style="width:' + stats.percent + '%"></span></div></div>';
+  const clearBtn = stats.done > 0
+    ? '<button type="button" class="phub-link" onclick="clearDonePersonalChecklist()"><i class="fa-solid fa-broom"></i> Dọn ' + stats.done + ' việc đã xong</button>' : '';
+  let rows;
+  if (!all.length) rows = phubEmpty('fa-list-check', 'Chưa có việc riêng nào', 'Ghi nhanh những việc cần làm — chỉ mình bạn thấy. Gõ vào ô trên rồi nhấn Enter.', null);
+  else if (!shown.length) rows = '<div class="phub-muted">Không có việc nào trong mục “' + { open: 'Chưa xong', done: 'Đã xong' }[personalChecklistFilter] + '”.</div>';
+  else rows = '<div class="personal-dense-list">' + shown.map(renderPersonalChecklistRow).join('') + '</div>';
+
+  listEl.innerHTML = '<div class="phub-card phub-card-wide">'
+    + '<div class="phub-toolbar">' + progress + '<div class="phub-seg" role="group" aria-label="Lọc việc">' + seg + '</div></div>'
+    + '<div class="phub-add"><input type="text" id="personal-checklist-add" placeholder="Thêm việc riêng… rồi nhấn Enter" maxlength="200" onkeydown="onPersonalAddKey(event, this)"></div>'
+    + rows
+    + (clearBtn ? '<div class="phub-toolbar"><span></span>' + clearBtn + '</div>' : '')
+    + '</div>';
+}
+
+function setPersonalChecklistFilter(filter) {
+  personalChecklistFilter = filter;
+  renderPersonalItems();
+}
+
+async function onPersonalAddKey(event, input) {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const title = String(input.value || '').trim();
+  if (!title) return;
+  input.disabled = true;
+  const res = await window.callGAS('savePersonalItem', { type: 'checklist', title, data: { done: false }, tags: [] });
+  if (res.status !== 'success') { input.disabled = false; showToast('Lỗi: ' + res.message, 'error'); return; }
+  personalItemsCache = sortPersonalItemsCache([res.data].concat(personalItemsCache));
+  renderPersonalTabs();
+  renderPersonalStatusStrip();
+  renderPersonalItems();
+  const again = document.getElementById(input.id);
+  if (again) again.focus();
+}
+
+async function clearDonePersonalChecklist() {
+  const done = personalItemsCache.filter(i => i.type === 'checklist' && (i.data || {}).done);
+  if (!done.length) return;
+  const ok = await personalConfirm({ title: 'Dọn ' + done.length + ' việc đã xong?', html: 'Các việc này được đưa vào Lưu trữ — khôi phục lại được bất cứ lúc nào.', icon: 'question', danger: false, confirmText: 'Dọn' });
+  if (!ok) return;
+  await Promise.all(done.map(i => window.callGAS('setPersonalItemFlags', { id: i.id, archived: true })));
+  showToast('Đã dọn ' + done.length + ' việc đã xong', 'success');
+  await refreshPersonalItems();
+}
+
+// -------------------- Ghi chú --------------------
+function renderPersonalNoteCard(item) {
+  const data = item.data || {};
+  const safeId = escapeHtml(escapeJs(item.id));
+  const hl = (t) => (personalSearchQuery ? personalHighlightHtml(t, personalSearchQuery) : escapeHtml(t));
+  return `
+  <div class="phub-note ${item.pinned ? 'is-pinned' : ''}" tabindex="0" role="button" onclick="openPersonalItemModal('${safeId}')" onkeydown="if(event.key==='Enter'){openPersonalItemModal('${safeId}')}">
+    <h5>${hl(item.title || 'Không tiêu đề')}</h5>
+    <p>${escapeHtml((data.text || '').slice(0, 260)) || '<em style="color:var(--text-muted)">Chưa có nội dung</em>'}</p>
+    ${renderPersonalItemTagsHtml(item)}
+    <div class="phub-note-foot"><span>Sửa ${escapeHtml(formatPersonalTimeAgo(item.updated_at))}</span></div>
+    <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${personalArchiveBtnHtml(item)}</div>
+  </div>`;
+}
+
+function renderPersonalNotesView(listEl) {
+  const notes = personalItemsCache.filter(i => i.type === 'note');
+  if (!notes.length) {
+    listEl.innerHTML = phubEmpty('fa-note-sticky', 'Chưa có ghi chú nào', 'Lưu ý tưởng, biên bản họp, nội dung cần nhớ… Chỉ mình bạn thấy và đồng bộ trên mọi máy.', 'Tạo ghi chú đầu tiên', 'openPersonalItemModal(null)');
+    return;
+  }
+  listEl.innerHTML = '<div class="phub-notes">' + notes.map(renderPersonalNoteCard).join('') + '</div>';
+}
+
+// -------------------- Lối tắt --------------------
+function renderPersonalShortcutTile(item) {
+  const data = item.data || {};
+  const safeId = escapeHtml(escapeJs(item.id));
+  const avatar = personalAvatar(item.title || data.url);
+  const hl = (t) => (personalSearchQuery ? personalHighlightHtml(t, personalSearchQuery) : escapeHtml(t));
+  return `
+  <div class="phub-tile" tabindex="0" role="link" onclick="openExternalUrl('${escapeHtml(escapeJs(data.url || '#'))}')" onkeydown="if(event.key==='Enter'){openExternalUrl('${escapeHtml(escapeJs(data.url || '#'))}')}">
+    <span class="phub-avatar" data-tone="${avatar.tone}">${escapeHtml(avatar.letter)}</span>
+    <span class="phub-tile-text"><span class="phub-tile-title" style="display:block">${hl(item.title || data.url || '')}</span><span class="phub-tile-domain" style="display:block">${escapeHtml(personalDomainOf(data.url))}</span></span>
+    <div class="personal-item-actions">
+      ${renderPersonalPinBtnHtml(item)}
+      <button type="button" class="personal-item-delete" title="Sửa" onclick="event.stopPropagation(); openPersonalItemModal('${safeId}')"><i class="fa-solid fa-pen"></i></button>
+      ${personalArchiveBtnHtml(item)}
+    </div>
+  </div>`;
+}
+
+function renderPersonalShortcutsView(listEl) {
+  const items = personalItemsCache.filter(i => i.type === 'shortcut');
+  if (!items.length) {
+    listEl.innerHTML = phubEmpty('fa-link', 'Chưa có lối tắt nào', 'Lưu các trang web hay dùng (VNDirect, Vietstock, báo cáo…) để mở nhanh bằng một cú bấm.', 'Thêm lối tắt đầu tiên', 'openPersonalItemModal(null)');
+    return;
+  }
+  listEl.innerHTML = '<div class="phub-tiles">' + items.map(renderPersonalShortcutTile).join('') + '</div>';
+}
+
+// -------------------- Đã ghim --------------------
+function renderPersonalPinCard(item) {
+  const data = item.data || {};
+  const safeId = escapeHtml(escapeJs(item.id));
+  // Thẻ ghim-dự-án: giữ nguyên nhãn "Bỏ ghim" + icon X vì người dùng đọc nó là "gỡ lối
+  // tắt này đi", không phải "cho vào thùng". Hành vi bên dưới giờ là lưu trữ (cứu lại
+  // được). Cũng không có nút ghim-lên-đầu ở đây để tránh lẫn 2 khái niệm ghim.
+  return `
     <div class="personal-item-card">
       <div class="personal-item-body" ${data.projectId ? `onclick="openPinnedProject('${escapeHtml(escapeJs(data.projectId))}')" style="cursor:pointer;"` : ''}>
         <i class="fa-solid fa-thumbtack" style="color: var(--gold);"></i>
@@ -6273,40 +6792,73 @@ function renderPersonalItemCard(item) {
       </div>
       <button type="button" class="personal-item-delete" title="Bỏ ghim" onclick="archivePersonalItem('${safeId}')"><i class="fa-solid fa-xmark"></i></button>
     </div>`;
-  }
+}
 
-  if (item.type === 'shortcut') {
-    return `
-    <div class="personal-item-card">
-      <div class="personal-item-body" onclick="openExternalUrl('${escapeHtml(escapeJs(data.url || '#'))}')" style="cursor:pointer;">
-        <i class="fa-solid fa-link" style="color: var(--gold);"></i>
-        <span>${escapeHtml(item.title || data.url || '')}</span>
-        ${renderPersonalItemTagsHtml(item)}
-      </div>
-      <div class="personal-item-actions">
-        ${renderPersonalPinBtnHtml(item)}
-        <button type="button" class="personal-item-delete" title="Sửa" onclick="openPersonalItemModal('${safeId}')"><i class="fa-solid fa-pen"></i></button>
-        ${archiveBtn}
-      </div>
-    </div>`;
+function renderPersonalPinsView(listEl) {
+  const pins = personalItemsCache.filter(i => i.type === 'pin');
+  if (!pins.length) {
+    listEl.innerHTML = phubEmpty('fa-thumbtack', 'Chưa ghim dự án nào', 'Bấm biểu tượng ghim trên danh sách dự án để lưu dự án vào đây và mở lại bằng một cú bấm.', null);
+    return;
   }
+  listEl.innerHTML = '<div class="phub-notes">' + pins.map(renderPersonalPinCard).join('') + '</div>';
+}
 
-  // note
-  return `
-  <div class="personal-item-card personal-note-card" onclick="openPersonalItemModal('${safeId}')">
-    <div class="personal-item-body">
-      <strong>${escapeHtml(item.title || 'Không tiêu đề')}</strong>
-      <p>${escapeHtml((data.text || '').slice(0, 140))}</p>
-      ${renderPersonalItemTagsHtml(item)}
-    </div>
-    <div class="personal-item-actions">${renderPersonalPinBtnHtml(item)}${archiveBtn}</div>
-  </div>`;
+// Giữ tên cũ: các nơi khác (vd. lưu trữ) có thể còn gọi renderPersonalItemCard cho 1 mục bất kỳ.
+function renderPersonalItemCard(item) {
+  if (item.type === 'checklist') return renderPersonalChecklistRow(item);
+  if (item.type === 'shortcut') return renderPersonalShortcutTile(item);
+  if (item.type === 'pin') return renderPersonalPinCard(item);
+  return renderPersonalNoteCard(item);
+}
+
+// -------------------- Kết quả tìm kiếm / lọc theo thẻ (gom theo loại) --------------------
+function renderPersonalGroupedResults(listEl, filter) {
+  const query = filter.query || '';
+  const match = (item) => filter.tag ? (item.tags || []).includes(filter.tag) : personalItemMatches(item, query);
+  const sections = [];
+  let total = 0;
+  [['note', 'Ghi chú'], ['checklist', 'Việc riêng'], ['shortcut', 'Lối tắt'], ['pin', 'Đã ghim']].forEach(([type, label]) => {
+    const found = personalItemsCache.filter(i => i.type === type && match(i));
+    if (!found.length) return;
+    total += found.length;
+    const rows = found.map(item => {
+      const safeId = escapeHtml(escapeJs(item.id));
+      const data = item.data || {};
+      const hl = (t) => (query ? personalHighlightHtml(t, query) : escapeHtml(t));
+      const onclick = type === 'shortcut' ? "openExternalUrl('" + escapeHtml(escapeJs(data.url || '#')) + "')"
+        : type === 'pin' ? (data.projectId ? "openPinnedProject('" + escapeHtml(escapeJs(data.projectId)) + "')" : '')
+        : "openPersonalItemModal('" + safeId + "')";
+      const meta = type === 'shortcut' ? personalDomainOf(data.url)
+        : type === 'checklist' ? (data.done ? 'đã xong' : 'chưa xong')
+        : 'sửa ' + formatPersonalTimeAgo(item.updated_at);
+      return '<div class="phub-result-row" onclick="' + onclick + '"><span>' + hl(item.title || 'Không tiêu đề') + '</span><span class="meta">' + escapeHtml(meta) + '</span></div>';
+    }).join('');
+    sections.push('<div class="phub-result-group"><h5><i class="fa-solid ' + PERSONAL_TAB_META[type].icon + '"></i> ' + label + ' (' + found.length + ')</h5><div class="phub-result-list">' + rows + '</div></div>');
+  });
+  if (query && personalAgendaCache) {
+    const evs = personalAgendaCache.events.filter(e => personalEventMatches(e, query));
+    if (evs.length) {
+      total += evs.length;
+      sections.push('<div class="phub-result-group"><h5><i class="fa-solid fa-calendar-days"></i> Sự kiện (' + evs.length + ')</h5><div class="phub-day-list">'
+        + evs.slice(0, 20).map(ev => '<div style="display:block">' + phubEventRow(Object.assign({}, ev, { description: '' }), {}) + '</div>').join('') + '</div></div>');
+    }
+  }
+  const head = filter.tag
+    ? 'Mục gắn thẻ <b>#' + escapeHtml(filter.tag) + '</b>'
+    : 'Kết quả cho “<b>' + escapeHtml(query) + '</b>”';
+  if (!total) {
+    listEl.innerHTML = phubEmpty('fa-magnifying-glass', 'Không tìm thấy gì',
+      filter.tag ? 'Không có mục nào gắn thẻ này.' : 'Thử từ khoá khác — tìm không cần gõ dấu (vd. “bao cao” khớp “Báo cáo”).', null);
+    return;
+  }
+  listEl.innerHTML = '<div class="phub-results"><div class="phub-results-head">' + head + ' — ' + total + ' mục</div>' + sections.join('') + '</div>';
 }
 
 function openPersonalItemModal(existingId) {
   const item = existingId ? personalItemsCache.find(i => i.id === existingId) : null;
   const type = item ? item.type : personalActiveTab;
   if (type === 'pin') return; // pins are only created via the "Ghim" affordance on shared lists
+  if (type === 'calendar_event' && !item) { openPersonalEventModal(); return; }
 
   document.getElementById('personal-item-id').value = existingId || '';
   document.getElementById('personal-item-type').value = type;
@@ -6389,6 +6941,8 @@ async function togglePersonalChecklist(id, done) {
   item.data = Object.assign({}, item.data, { done });
   await window.callGAS('savePersonalItem', { id, type: 'checklist', title: item.title, data: item.data, tags: item.tags || [] });
   renderPersonalItems();
+  renderPersonalTabs();          // số việc chưa xong trên tab + thanh trạng thái đổi theo
+  renderPersonalStatusStrip();
 }
 
 
@@ -6416,98 +6970,165 @@ function openPinnedProject(projectId) {
 // preview used for the rest of Personal Hub has no filesystem access, so this panel degrades
 // to an explanatory message there instead of throwing.
 
-let syncFolderStatusText = '';
+let syncFolderFilesCache = null;           // danh sách file đã đồng bộ (bảng personal_sync_files), để lọc không cần tải lại
+let syncFolderFilesTimer = null;
 
-async function renderSyncFolderPanel() {
+function personalFileIcon(name) {
+  const ext = (String(name).split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return 'fa-file-pdf';
+  if (['doc', 'docx', 'rtf', 'odt'].includes(ext)) return 'fa-file-word';
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return 'fa-file-excel';
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return 'fa-file-powerpoint';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'fa-file-image';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'fa-file-zipper';
+  if (['txt', 'md', 'json', 'log'].includes(ext)) return 'fa-file-lines';
+  if (['js', 'ts', 'py', 'html', 'css', 'sql'].includes(ext)) return 'fa-file-code';
+  return 'fa-file';
+}
+
+function renderSyncFolderPanel() {
   const listEl = document.getElementById('personal-sync-folder-panel');
   if (!listEl) return;
 
   if (!window.PersonalSync || !window.PersonalSync.isTauri()) {
-    listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-desktop"></i><p>Tính năng đồng bộ thư mục chỉ hoạt động trong bản desktop app (không dùng được ở chế độ xem trình duyệt).</p></div>`;
+    listEl.innerHTML = `<div class="whint-empty"><i class="fa-solid fa-desktop"></i><p>Đồng bộ thư mục chỉ hoạt động trong bản desktop app (không dùng được ở chế độ xem trình duyệt).</p></div>`;
     return;
   }
 
-  const root = window.PersonalSync.getRoot();
-
-  if (!root) {
+  const st = window.PersonalSync.getState();
+  if (!st.root) {
     listEl.innerHTML = `
-    <div class="empty-state">
-      <i class="fa-solid fa-folder-open"></i>
-      <p>Chưa liên kết thư mục nào. Chọn 1 thư mục trên máy để làm việc trực tiếp và tự đồng bộ 2 chiều với đám mây.</p>
-      <button type="button" class="btn btn-primary" onclick="personalSyncPickAndLink()"><i class="fa-solid fa-folder-plus"></i> Chọn thư mục</button>
+    <div class="whint-card whint-card-empty">
+      <span class="whint-badge whint-badge-off"><i class="fa-regular fa-circle"></i> Chưa liên kết</span>
+      <p class="whint-lead">Chọn 1 thư mục trên máy để làm việc trực tiếp trong đó — mọi thay đổi tự đồng bộ 2 chiều với đám mây và hiện ở các máy khác của bạn.</p>
+      <div class="whint-actions">
+        <button type="button" class="btn btn-primary" onclick="personalSyncPickAndLink()"><i class="fa-solid fa-folder-plus"></i> Chọn thư mục</button>
+      </div>
+      <details class="whint-how">
+        <summary>Đồng bộ thư mục hoạt động thế nào?</summary>
+        <ul>
+          <li>Thêm, sửa, xoá file trong thư mục → tự lên đám mây sau vài giây, kể cả khi bạn mở app sau đó.</li>
+          <li>File đổi ở máy khác → tự về thư mục này. Cả hai nơi cùng sửa một file → giữ cả hai (bản kia có đuôi “conflicted copy”).</li>
+          <li>Tên file tiếng Việt dùng bình thường. Mỗi file tối đa 200 MB; thư mục <code>.git</code>, <code>node_modules</code> và file tạm của Office được bỏ qua.</li>
+          <li>Chỉ mình bạn thấy các file này. Muốn chia sẻ với nhóm, bấm biểu tượng chia sẻ cạnh file.</li>
+        </ul>
+      </details>
     </div>`;
     return;
   }
 
   listEl.innerHTML = `
-  <div class="sync-folder-panel">
-    <div class="sync-folder-header">
-      <div>
-        <div class="sync-folder-path"><i class="fa-solid fa-folder-open"></i> ${escapeHtml(root)}</div>
-        <div class="sync-folder-status" id="sync-folder-status">${escapeHtml(syncFolderStatusText || 'Đã đồng bộ')}</div>
-      </div>
-      <div class="sync-folder-actions">
-        <button type="button" class="btn btn-outline" onclick="personalSyncManualReconcile()"><i class="fa-solid fa-rotate"></i> Đồng bộ lại</button>
-        <button type="button" class="btn btn-outline" onclick="personalSyncUnlinkFolder()"><i class="fa-solid fa-link-slash"></i> Bỏ liên kết</button>
-      </div>
+  <div class="whint-card" id="sync-folder-card">
+    <div id="sync-folder-summary"></div>
+    <div class="whint-actions">
+      <button type="button" class="btn btn-primary" onclick="personalSyncManualReconcile()"><i class="fa-solid fa-rotate"></i> Đồng bộ lại</button>
+      <button type="button" class="btn btn-outline" onclick="personalSyncOpenFolder()"><i class="fa-regular fa-folder-open"></i> Mở thư mục</button>
+      <button type="button" class="btn btn-outline" onclick="personalSyncChangeFolder()"><i class="fa-solid fa-right-left"></i> Đổi thư mục</button>
+      <button type="button" class="btn btn-outline whint-danger" onclick="personalSyncUnlinkFolder()"><i class="fa-solid fa-link-slash"></i> Bỏ liên kết</button>
     </div>
-    <div id="sync-folder-file-list" class="sync-folder-file-list"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải danh sách...</p></div></div>
+    <div class="whint-files-tools">
+      <label class="whint-files-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="sync-folder-search" placeholder="Tìm file đã đồng bộ…" oninput="renderSyncFolderFileList()" autocomplete="off"></label>
+      <span class="whint-files-count" id="sync-folder-count"></span>
+    </div>
+    <div id="sync-folder-file-list" class="whint-files"><div class="whint-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách...</div></div>
   </div>`;
+  renderSyncFolderSummary();
+  loadSyncFolderFiles();
+}
 
+// Phần đầu thẻ: huy hiệu trạng thái + đường dẫn + số liệu + lỗi. Vẽ lại tại chỗ mỗi khi engine báo thay đổi.
+function renderSyncFolderSummary() {
+  const el = document.getElementById('sync-folder-summary');
+  if (!el || !window.PersonalSync) return;
+  const st = window.PersonalSync.getState();
+  let badge;
+  if (st.phase === 'reconciling') {
+    const p = st.progress && st.progress.total ? ' ' + st.progress.done + '/' + st.progress.total : '';
+    badge = `<span class="whint-badge whint-badge-busy"><i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ…${p}</span>`;
+  } else if (st.lastError || st.failures.length) {
+    badge = `<span class="whint-badge whint-badge-bad"><i class="fa-solid fa-circle-exclamation"></i> Cần chú ý</span>`;
+  } else if (st.lastRunAt) {
+    badge = `<span class="whint-badge whint-badge-ok"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(personalSyncedAtLabel(st.lastRunAt))}</span>`;
+  } else {
+    badge = `<span class="whint-badge whint-badge-warn"><i class="fa-regular fa-clock"></i> Chưa đồng bộ lượt nào</span>`;
+  }
+  const c = st.counts;
+  const lastRun = (c.uploaded || c.downloaded || c.deleted || c.conflicts)
+    ? `↑ ${c.uploaded} lên · ↓ ${c.downloaded} về · ✕ ${c.deleted} xoá` + (c.conflicts ? ` · ⚠ ${c.conflicts} xung đột` : '')
+    : 'Không có thay đổi';
+  const needsConfirm = !!(st.lastError && st.lastError.indexOf('Phát hiện bất thường') === 0);
+  const errorLine = st.lastError
+    ? `<div class="whint-line whint-line-bad"><i class="fa-solid fa-circle-exclamation"></i> <span>${escapeHtml(st.lastError)}</span></div>`
+      + (needsConfirm ? `<div class="whint-actions"><button type="button" class="btn btn-outline whint-danger" onclick="personalSyncForceReconcile()"><i class="fa-solid fa-triangle-exclamation"></i> Tôi hiểu — vẫn tiếp tục đồng bộ</button></div>` : '')
+    : '';
+  const fails = st.failures.length
+    ? `<ul class="whint-fails">${st.failures.slice(0, 5).map(f => `<li><b>${escapeHtml(f.path)}</b><em>${escapeHtml(f.message)}</em></li>`).join('')}</ul>`
+      + (st.failures.length > 5 ? `<div class="whint-hint">… và ${st.failures.length - 5} file khác. Sẽ tự thử lại ở lượt đồng bộ sau.</div>` : `<div class="whint-hint">Sẽ tự thử lại ở lượt đồng bộ sau, hoặc bấm “Đồng bộ lại”.</div>`)
+    : '';
+  el.innerHTML = `
+    <div class="whint-head">${badge}</div>
+    <div class="whint-path"><i class="fa-solid fa-folder-open"></i><span>${escapeHtml(st.root)}</span></div>
+    <dl class="whint-stats" style="margin-top:12px;">
+      <div><dt>Đang theo dõi</dt><dd>${st.trackedCount} file</dd></div>
+      <div><dt>Lượt gần nhất</dt><dd>${escapeHtml(lastRun)}</dd></div>
+      <div><dt>Tự động</dt><dd>Ngay khi có thay đổi + mỗi 10 phút</dd></div>
+    </dl>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">${errorLine}${fails}</div>`;
+}
+
+async function loadSyncFolderFiles() {
+  try {
+    syncFolderFilesCache = await API.personalSync.listFiles();
+  } catch (err) {
+    const el = document.getElementById('sync-folder-file-list');
+    if (el) el.innerHTML = `<div class="whint-line whint-line-bad" style="padding:12px"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi tải danh sách: ${escapeHtml(err.message || String(err))}</div>`;
+    return;
+  }
   renderSyncFolderFileList();
 }
 
-async function renderSyncFolderFileList() {
+function renderSyncFolderFileList() {
   const el = document.getElementById('sync-folder-file-list');
-  if (!el) return;
-  try {
-    const files = await API.personalSync.listFiles();
-    if (files.length === 0) {
-      el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-file"></i><p>Chưa có file nào được đồng bộ.</p></div>`;
-      return;
-    }
-    el.innerHTML = files
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-      .map(f => `
-      <div class="sync-file-row">
-        <i class="fa-solid fa-file"></i>
-        <span class="sync-file-path">${escapeHtml(f.relative_path)}</span>
-        <span class="sync-file-size">${formatFileSize(f.size)}</span>
-        <button type="button" class="sync-file-push" title="Đẩy lên khu chung của nhóm" onclick="personalSyncPushToTeam('${escapeHtml(escapeJs(f.relative_path))}')">
-          <i class="fa-solid fa-share-from-square"></i>
-        </button>
-      </div>`).join('');
-  } catch (err) {
-    el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Lỗi tải danh sách: ${escapeHtml(err.message || String(err))}</p></div>`;
+  if (!el || !syncFolderFilesCache) return;
+  const input = document.getElementById('sync-folder-search');
+  const q = input ? input.value.trim() : '';
+  const all = syncFolderFilesCache;
+  const files = all.filter(f => !q || personalItemMatches({ title: f.relative_path }, q))
+    .sort((a, b) => new Date(b.updated_at || b.remote_updated_at || 0) - new Date(a.updated_at || a.remote_updated_at || 0));
+  const totalSize = all.reduce((sum, f) => sum + (Number(f.size) || 0), 0);
+  const countEl = document.getElementById('sync-folder-count');
+  if (countEl) countEl.textContent = (q ? files.length + '/' : '') + all.length + ' file · ' + personalFormatBytes(totalSize);
+  if (!all.length) {
+    el.innerHTML = `<div class="whint-empty"><i class="fa-regular fa-file"></i><p>Chưa có file nào được đồng bộ. Thêm file vào thư mục đã liên kết, chúng sẽ tự lên đây.</p></div>`;
+    return;
   }
+  if (!files.length) {
+    el.innerHTML = `<div class="whint-empty"><p>Không có file nào khớp “${escapeHtml(q)}”.</p></div>`;
+    return;
+  }
+  el.innerHTML = files.slice(0, 300).map(f => {
+    const slash = f.relative_path.lastIndexOf('/');
+    const dir = slash >= 0 ? f.relative_path.slice(0, slash) : '';
+    const name = slash >= 0 ? f.relative_path.slice(slash + 1) : f.relative_path;
+    const when = f.updated_at || f.remote_updated_at;
+    return `
+      <div class="whint-file">
+        <i class="fa-regular ${personalFileIcon(name)}"></i>
+        <span class="whint-file-name" title="${escapeHtml(f.relative_path)}">${q ? personalHighlightHtml(name, q) : escapeHtml(name)}${dir ? `<small>${escapeHtml(dir)}</small>` : ''}</span>
+        <span class="whint-file-size">${escapeHtml(personalFormatBytes(f.size))}</span>
+        <span class="whint-file-when">${escapeHtml(when ? formatPersonalTimeAgo(when) : '')}</span>
+        <button type="button" class="whint-file-share" title="Đẩy lên khu chung của nhóm" aria-label="Đẩy lên khu chung của nhóm" onclick="personalSyncPushToTeam('${escapeHtml(escapeJs(f.relative_path))}')"><i class="fa-solid fa-share-from-square"></i></button>
+      </div>`;
+  }).join('') + (files.length > 300 ? `<div class="whint-hint" style="padding:10px 12px">Hiện 300 file mới nhất — dùng ô tìm kiếm để lọc.</div>` : '');
 }
 
-function formatFileSize(bytes) {
-  bytes = Number(bytes) || 0;
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function updateSyncFolderStatus(status, detail) {
-  const LABELS = {
-    reconciling: 'Đang đồng bộ...',
-    reconciled: 'Đã đồng bộ',
-    uploaded: 'Đã tải lên: ' + (detail || ''),
-    downloaded: 'Đã tải về: ' + (detail || ''),
-    deleted: 'Đã xoá: ' + (detail || ''),
-    'deleted-remote': 'Đã xoá (từ máy khác): ' + (detail || ''),
-    conflict: 'Phát hiện xung đột, đã giữ lại bản sao: ' + (detail && detail.relPath ? detail.relPath : detail || ''),
-    error: 'Lỗi đồng bộ'
-  };
-  syncFolderStatusText = LABELS[status] || status;
-  const statusEl = document.getElementById('sync-folder-status');
-  if (statusEl) statusEl.textContent = syncFolderStatusText;
-  // Trước kiểm tra personalActiveTab === 'sync_folder'; sync_folder không còn là tab.
-  // Kiểm tra chính phần tử đích có trong DOM mới là điều kiện đúng (modal đang mở).
-  if (['uploaded', 'downloaded', 'deleted', 'deleted-remote', 'reconciled'].includes(status)
-      && document.getElementById('sync-folder-file-list')) {
-    renderSyncFolderFileList();
+// Engine phát sự kiện dồn dập (mỗi file một lần): vẽ lại phần tóm tắt ngay, danh sách file thì gom lại.
+function updateSyncFolderStatus(status) {
+  renderSyncFolderSummary();
+  schedulePersonalStatusRender();
+  if (['uploaded', 'downloaded', 'deleted', 'deleted-remote', 'reconciled'].includes(status) && document.getElementById('sync-folder-file-list')) {
+    clearTimeout(syncFolderFilesTimer);
+    syncFolderFilesTimer = setTimeout(loadSyncFolderFiles, 500);
   }
 }
 
@@ -6519,30 +7140,90 @@ async function personalSyncPickAndLink() {
   const path = await window.PersonalSync.pickFolder();
   if (!path) return;
   const listEl = document.getElementById('personal-sync-folder-panel');
-  if (listEl) listEl.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang liên kết và đồng bộ lần đầu, có thể mất một lúc tuỳ số lượng file...</p></div>`;
+  if (listEl) listEl.innerHTML = `<div class="whint-card"><div class="whint-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang liên kết và đồng bộ lần đầu — có thể mất một lúc tuỳ số lượng file…</div></div>`;
   try {
     await window.PersonalSync.linkFolder(path);
-    showToast('Đã liên kết thư mục và đồng bộ xong', 'success');
+    const st = window.PersonalSync.getState();
+    showToast(st.failures.length ? 'Đã liên kết thư mục — ' + st.failures.length + ' file chưa đồng bộ được' : 'Đã liên kết thư mục và đồng bộ xong', st.failures.length ? 'warning' : 'success');
   } catch (err) {
     showToast('Lỗi liên kết thư mục: ' + (err.message || err), 'error');
   }
   renderSyncFolderPanel();
+  renderPersonalStatusStrip();
+}
+
+async function personalSyncChangeFolder() {
+  const ok = await personalConfirm({
+    title: 'Đổi thư mục đồng bộ?',
+    html: 'File trên đám mây được giữ nguyên và sẽ tải về thư mục mới. File ở thư mục cũ trên máy không bị xoá.',
+    icon: 'question', danger: false, confirmText: 'Chọn thư mục mới'
+  });
+  if (!ok) return;
+  const path = await window.PersonalSync.pickFolder();
+  if (!path) return;
+  await window.PersonalSync.unlinkFolder();
+  const listEl = document.getElementById('personal-sync-folder-panel');
+  if (listEl) listEl.innerHTML = `<div class="whint-card"><div class="whint-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ thư mục mới…</div></div>`;
+  try {
+    await window.PersonalSync.linkFolder(path);
+    showToast('Đã đổi thư mục đồng bộ', 'success');
+  } catch (err) {
+    showToast('Lỗi liên kết thư mục: ' + (err.message || err), 'error');
+  }
+  renderSyncFolderPanel();
+  renderPersonalStatusStrip();
 }
 
 async function personalSyncUnlinkFolder() {
-  if (!await personalConfirm({ title: 'Bỏ liên kết thư mục này?', html: 'File đã đồng bộ trên đám mây vẫn được giữ nguyên.', confirmText: 'Bỏ liên kết' })) return;
+  if (!await personalConfirm({ title: 'Bỏ liên kết thư mục này?', html: 'File đã đồng bộ trên đám mây và file trong thư mục trên máy đều được giữ nguyên.', confirmText: 'Bỏ liên kết' })) return;
   await window.PersonalSync.unlinkFolder();
+  syncFolderFilesCache = null;
   renderSyncFolderPanel();
+  renderPersonalStatusStrip();
 }
 
 async function personalSyncManualReconcile() {
   try {
-    await window.PersonalSync.fullReconcile();
-    showToast('Đã đồng bộ lại', 'success');
+    await window.PersonalSync.fullReconcile({ deep: true });
+    const st = window.PersonalSync.getState();
+    showToast(st.failures.length ? 'Đã đồng bộ lại — ' + st.failures.length + ' file chưa đồng bộ được' : 'Đã đồng bộ lại', st.failures.length ? 'warning' : 'success');
   } catch (err) {
     showToast('Lỗi đồng bộ: ' + (err.message || err), 'error');
   }
-  renderSyncFolderFileList();
+  renderSyncFolderSummary();
+  loadSyncFolderFiles();
+}
+
+// Sau cảnh báo "bất thường" (thư mục trống/biến mất): chỉ chạy tiếp khi người dùng xác nhận đã kiểm tra.
+async function personalSyncForceReconcile() {
+  const ok = await personalConfirm({
+    title: 'Vẫn tiếp tục đồng bộ?',
+    html: 'Các file đã bị xoá khỏi thư mục trên máy sẽ <b>bị xoá luôn khỏi đám mây</b>. Chỉ tiếp tục nếu đúng là bạn đã chủ động xoá chúng.',
+    confirmText: 'Tiếp tục đồng bộ'
+  });
+  if (!ok) return;
+  try {
+    await window.PersonalSync.fullReconcile({ deep: true, force: true });
+    showToast('Đã đồng bộ xong', 'success');
+  } catch (err) {
+    showToast('Lỗi đồng bộ: ' + (err.message || err), 'error');
+  }
+  renderSyncFolderSummary();
+  loadSyncFolderFiles();
+}
+
+async function personalSyncOpenFolder() {
+  const root = window.PersonalSync && window.PersonalSync.getRoot();
+  if (!root) return;
+  try {
+    if (window.__TAURI__ && window.__TAURI__.opener && window.__TAURI__.opener.revealItemInDir) {
+      await window.__TAURI__.opener.revealItemInDir(root);
+    } else {
+      await window.__TAURI__.core.invoke('plugin:opener|reveal_item_in_dir', { paths: [root] });
+    }
+  } catch (err) {
+    showToast('Không mở được thư mục: ' + (err.message || err), 'error');
+  }
 }
 
 function personalSyncBlobToBase64(blob) {

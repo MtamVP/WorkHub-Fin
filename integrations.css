@@ -1,0 +1,109 @@
+/* Thẻ "Tích hợp" của Không Gian Riêng (Google Calendar + Thư mục đồng bộ). File GIỐNG HỆT ở cả 3 app vì
+   calendar-connect.js (dùng chung) dựng markup này; chỉ dùng token màu có sẵn của từng app (--gold, --card-bg...)
+   nên tự theo bảng màu Fin / Sci / Org và chế độ sáng/tối. Tiền tố whint- = "WorkHub integration". */
+
+.whint-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--card-bg-elevated, var(--card-bg));
+}
+.whint-card + .whint-card { margin-top: 12px; }
+
+.whint-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+
+.whint-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 700; letter-spacing: 0.01em; white-space: nowrap;
+}
+.whint-badge-ok   { color: var(--success-color); background: color-mix(in srgb, var(--success-color) 14%, transparent); }
+.whint-badge-warn { color: var(--warning-color); background: color-mix(in srgb, var(--warning-color) 16%, transparent); }
+.whint-badge-bad  { color: var(--danger-color);  background: color-mix(in srgb, var(--danger-color) 14%, transparent); }
+.whint-badge-busy { color: var(--gold);          background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.whint-badge-off  { color: var(--text-muted);    background: var(--hover-bg); }
+
+.whint-account { display: flex; align-items: center; gap: 7px; font-size: 13.5px; word-break: break-all; }
+.whint-account i { color: var(--gold); }
+.whint-hint { flex-basis: 100%; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.whint-lead { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); max-width: 60ch; }
+
+.whint-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0; }
+.whint-stats > div {
+  padding: 9px 11px; border-radius: var(--radius-sm);
+  background: var(--card-bg); border: 1px solid var(--border-light, var(--border-color));
+  min-width: 0;
+}
+.whint-stats dt { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.whint-stats dd { margin: 4px 0 0; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.whint-line { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.whint-line i { margin-top: 3px; flex-shrink: 0; }
+.whint-line-warn { color: var(--warning-color); }
+.whint-line-bad  { color: var(--danger-color); }
+
+.whint-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.whint-danger:hover { color: var(--danger-color); border-color: var(--danger-color); }
+
+.whint-how { font-size: 12.5px; color: var(--text-secondary); border-top: 1px dashed var(--border-color); padding-top: 10px; }
+.whint-how summary { cursor: pointer; font-weight: 600; color: var(--text-secondary); }
+.whint-how summary:hover { color: var(--text-primary); }
+.whint-how ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.55; }
+
+.whint-picker { border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; background: var(--card-bg); }
+.whint-picker-title { font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
+.whint-check { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 13px; cursor: pointer; }
+.whint-check input { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; }
+.whint-check small { color: var(--text-muted); }
+
+.whint-loading, .whint-empty { padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); }
+.whint-empty i { display: block; font-size: 22px; margin-bottom: 8px; color: var(--text-muted); }
+.whint-empty p { margin: 0; }
+.whint-card-empty { align-items: flex-start; }
+
+/* Thư mục đồng bộ -------------------------------------------------------------------------------------------- */
+.whint-path {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--text-secondary);
+  padding: 7px 10px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border-light, var(--border-color));
+}
+.whint-path i { color: var(--gold); flex-shrink: 0; }
+.whint-path span { overflow-wrap: anywhere; min-width: 0; }
+
+.whint-fails { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.whint-fails li {
+  display: flex; gap: 8px; align-items: baseline; font-size: 12px; padding: 6px 9px; border-radius: var(--radius-sm);
+  color: var(--text-secondary); background: color-mix(in srgb, var(--danger-color) 8%, transparent);
+}
+.whint-fails b { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
+.whint-fails em { font-style: normal; color: var(--danger-color); flex-shrink: 0; }
+
+.whint-files-tools { display: flex; align-items: center; gap: 10px; }
+.whint-files-search {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 34px;
+  border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--card-bg);
+}
+.whint-files-search i { color: var(--text-muted); font-size: 12px; }
+.whint-files-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; }
+.whint-files-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.whint-files { display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: var(--radius-sm); max-height: 280px; overflow-y: auto; background: var(--card-bg); }
+.whint-file {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto 32px; align-items: center; gap: 10px;
+  padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border-light, var(--border-color));
+}
+.whint-file:last-child { border-bottom: 0; }
+.whint-file:hover { background: var(--hover-bg); }
+.whint-file > i { color: var(--text-muted); text-align: center; }
+.whint-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whint-file-name small { display: block; color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.whint-file-size, .whint-file-when { color: var(--text-muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.whint-file-share {
+  width: 28px; height: 28px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.whint-file-share:hover { color: var(--gold); background: var(--hover-bg); }
+
+@media (max-width: 560px) {
+  .whint-file { grid-template-columns: 22px minmax(0, 1fr) 32px; }
+  .whint-file-size, .whint-file-when { display: none; }
+}

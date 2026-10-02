@@ -156,6 +156,19 @@ async function getUserId(emailOrUsername) {
     return data ? data.id : null;
 }
 
+// Giờ nhập trong form là GIỜ ĐỊA PHƯƠNG của người dùng. events.start_time/end_time là timestamptz và DB chạy UTC, nên chuỗi
+// trần 'YYYY-MM-DD HH:mm' bị hiểu là UTC => giờ lệch đúng bằng độ lệch múi giờ của máy (và đẩy sai giờ lên Google Calendar).
+// Gửi mốc tuyệt đối (ISO, có 'Z') thì mọi múi giờ đều đúng. Không parse được thì giữ nguyên chuỗi như cũ.
+function toEventInstant(dateStr, timeStr) {
+    const d = new Date(dateStr + 'T' + timeStr);
+    return isNaN(d.getTime()) ? (dateStr + ' ' + timeStr) : d.toISOString();
+}
+
+// Khoá Supabase Storage chỉ nhận ASCII an toàn -- tên file tiếng Việt phải mã hoá (lib/sync-decision.js). Chưa nạp lib thì giữ nguyên.
+function personalStorageKey(relativePath) {
+    return typeof encodeSyncStorageKey === 'function' ? encodeSyncStorageKey(relativePath) : relativePath;
+}
+
 function genId(prefix) {
     return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 }
@@ -1259,8 +1272,8 @@ const API = {
             const { error } = await sbClient.from('events').insert({
                 id: genId("EV"),
                 title: eventData.title,
-                start_time: eventData.startDate + ' ' + eventData.startTime,
-                end_time: eventData.endDate + ' ' + eventData.endTime,
+                start_time: toEventInstant(eventData.startDate, eventData.startTime),
+                end_time: toEventInstant(eventData.endDate, eventData.endTime),
                 description: eventData.description,
                 location: eventData.location,
                 calendar_type: calendarType,
@@ -1276,8 +1289,8 @@ const API = {
         updateEvent: async (eventId, eventData, calendarType, groupKey, email) => {
             let query = sbClient.from('events').update({
                 title: eventData.title,
-                start_time: eventData.startDate + ' ' + eventData.startTime,
-                end_time: eventData.endDate + ' ' + eventData.endTime,
+                start_time: toEventInstant(eventData.startDate, eventData.startTime),
+                end_time: toEventInstant(eventData.endDate, eventData.endTime),
                 description: eventData.description,
                 location: eventData.location,
                 recurrence: eventData.recurrence || 'none',
@@ -1410,7 +1423,7 @@ const API = {
                 (syncRows || []).forEach(r => { syncedMap[r.event_id] = r.synced_version; });
             }
             return events.filter(e => {
-                if (!e.google_event_id) return true; // chưa từng đồng bộ -- ứng viên tạo mới bên Google
+                if (!e.google_event_id) return !e.deleted_at; // chưa từng đồng bộ -- ứng viên tạo mới bên Google (đã xoá thì bỏ qua)
                 const syncedVersion = syncedMap[e.id];
                 return syncedVersion === undefined || e.version > syncedVersion;
             });
@@ -2399,19 +2412,20 @@ const API = {
             if (error) throw error;
         },
         uploadBytes: async (userId, relativePath, blob) => {
-            const path = userId + '/' + relativePath;
+            const path = userId + '/' + personalStorageKey(relativePath);
             const { error } = await sbClient.storage.from('personal_files').upload(path, blob, { upsert: true });
             if (error) throw error;
         },
         downloadBytes: async (userId, relativePath) => {
-            const path = userId + '/' + relativePath;
+            const path = userId + '/' + personalStorageKey(relativePath);
             const { data, error } = await sbClient.storage.from('personal_files').download(path);
             if (error) throw error;
             return data; // Blob
         },
         deleteBytes: async (userId, relativePath) => {
-            const path = userId + '/' + relativePath;
-            await sbClient.storage.from('personal_files').remove([path]);
+            const path = userId + '/' + personalStorageKey(relativePath);
+            const { error } = await sbClient.storage.from('personal_files').remove([path]);
+            if (error) throw error;
         },
         subscribe: function (handler) {
             if (!sbClient) return null;
@@ -3418,6 +3432,10 @@ async function _dispatchAction(action, params = {}) {
         const entityId = params.taskId || params.id || params.eventId || params.projectId || null;
 
         if (MUTATING_ACTIONS.has(action)) window.lastLocalMutationAt = Date.now();
+
+        if ((action === 'createEvent' || action === 'updateEvent' || action === 'deleteEvent') && typeof window.scheduleGoogleCalendarPush === 'function') {
+            window.scheduleGoogleCalendarPush();
+        }
 
         if (action !== 'getNotifications' && action !== 'syncLounge' && !action.startsWith('get')) {
             API.system.logAction(traceId, action, finalMessage, 'success', params.email, params.groupKey, entityId);
