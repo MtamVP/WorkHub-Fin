@@ -1,0 +1,201 @@
+/* stocksheet/valuation.css — thành phần dùng chung của 2 trang Tổng Hợp CP và Định Giá CP:
+   bảng so sánh, thẻ kết luận, khoảng giá (football field), bảng kịch bản, nhóm chỉ số, biểu đồ, form nâng cao.
+   Chỉ dùng token của /finance-shared.css (sáng + tối, accent xanh rừng, nhãn vàng trầm) — không có màu cứng riêng
+   ngoài 2 màu trung tính của thanh khoảng giá. Màu KẾT LUẬN luôn đi kèm biểu tượng + chữ (không dựa vào màu đơn thuần). */
+
+/* Khung chứa không được co theo nội dung (bảng rộng/biểu đồ sẽ đẩy cả trang rộng ra trên màn hình hẹp) */
+.asset-container.desk { width: 100%; }
+.vl-card, .vl-group, .vl-hero, .vl-hero-main, .vl-hero-side, .vl-table-wrap, .vl-two > *, .vl-result-grid > * { min-width: 0; }
+.vl-chartbox canvas { max-width: 100%; }
+
+.pnl-up-text { color: var(--success-color); }
+.pnl-down-text { color: var(--danger-color); }
+.pnl-flat-text { color: var(--text-muted); }
+.vl-muted { color: var(--text-muted); font-size: 0.74rem; }
+.vl-empty { padding: 26px 18px; text-align: center; color: var(--text-muted); font-size: 0.86rem; background: var(--bg-color-2); border-radius: var(--radius-md); }
+.vl-link { color: var(--finance-accent); font-weight: 600; text-decoration: none; cursor: pointer; background: none; border: none; padding: 0; font: inherit; font-weight: 600; }
+.vl-link:hover { text-decoration: underline; }
+.vl-link:focus-visible, .vl-chip:focus-visible, .vl-seg button:focus-visible, .vl-sort:focus-visible, .vl-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* ---- Thanh chuyển giữa "Bảng so sánh" và "Chi tiết mã" ---- */
+.vl-seg { display: inline-flex; background: var(--bg-color-2); border: 1px solid var(--border-color); border-radius: var(--radius-pill); padding: 3px; gap: 2px; }
+.vl-seg button { border: none; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.82rem; font-weight: 600; padding: 7px 16px; border-radius: var(--radius-pill); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: var(--transition-fast); }
+.vl-seg button:hover { color: var(--text-primary); }
+.vl-seg button[aria-pressed="true"] { background: var(--card-bg); color: var(--finance-accent); box-shadow: var(--shadow-soft); }
+.vl-viewbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+
+/* ---- Nhãn kết luận + nhãn trạng thái ---- */
+.vl-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+.vl-pill-cheap { background: var(--success-bg); color: var(--success-color); }
+.vl-pill-fair { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+.vl-pill-expensive { background: var(--danger-bg); color: var(--danger-color); }
+.vl-pill-none { background: var(--hover-bg); color: var(--text-muted); }
+.vl-tag { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: var(--radius-pill); font-size: 0.64rem; font-weight: 700; letter-spacing: 0.02em; background: var(--gold-dim); color: var(--gold-light); white-space: nowrap; }
+.vl-tag-watch { background: var(--hover-bg); color: var(--text-secondary); }
+
+/* ---- Dải tóm tắt + bộ lọc ---- */
+.vl-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; margin-bottom: 14px; }
+.vl-sum { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 13px 16px; display: flex; flex-direction: column; gap: 4px; }
+.vl-sum-label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.vl-sum-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.35rem; font-weight: 600; color: var(--text-primary); }
+.vl-sum-value small { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-body); font-weight: 500; margin-left: 4px; }
+.vl-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.vl-chip { border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font: inherit; font-size: 0.78rem; font-weight: 600; padding: 6px 13px; border-radius: var(--radius-pill); cursor: pointer; transition: var(--transition-fast); }
+.vl-chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.vl-chip[aria-pressed="true"] { background: var(--finance-accent-subtle); border-color: var(--finance-accent-line); color: var(--finance-accent); }
+.vl-search { margin-left: auto; min-width: 190px; padding: 7px 12px; font: inherit; font-size: 0.82rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary); }
+.vl-search:focus { outline: none; border-color: var(--gold); background: var(--card-bg); box-shadow: 0 0 0 3px var(--gold-dim); }
+
+/* ---- Bảng so sánh ---- */
+.vl-table-wrap { overflow-x: auto; }
+.vl-ov { width: 100%; border-collapse: collapse; font-size: 0.8125rem; min-width: 820px; }
+.vl-ov thead th { text-align: right; font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; padding: 0; border-bottom: 1px solid var(--border-color); white-space: nowrap; background: var(--card-bg); position: sticky; top: 0; }
+.vl-ov thead th:first-child, .vl-ov thead th.left { text-align: left; }
+.vl-sort { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 11px 13px; width: 100%; justify-content: flex-end; font: inherit; text-transform: inherit; letter-spacing: inherit; font-weight: 700; color: inherit; }
+.vl-ov thead th:first-child .vl-sort, .vl-ov thead th.left .vl-sort { justify-content: flex-start; }
+.vl-sort:hover { color: var(--text-primary); }
+.vl-ov thead th[aria-sort="ascending"], .vl-ov thead th[aria-sort="descending"] { color: var(--finance-accent); }
+.vl-ov tbody td { padding: 11px 13px; border-bottom: 1px solid var(--border-color); text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vl-ov tbody td:first-child, .vl-ov tbody td.left { text-align: left; font-family: var(--font-body); }
+.vl-ov tbody tr:last-child td { border-bottom: none; }
+.vl-row { cursor: pointer; transition: background-color var(--dur) var(--ease); }
+.vl-row:hover td { background: var(--bg-color-2); }
+.vl-sym { font-weight: 700; font-size: 0.92rem; color: var(--text-primary); margin-right: 6px; }
+.vl-px-src { font-size: 0.6rem; color: var(--text-muted); font-family: var(--font-body); display: block; font-weight: 500; }
+.vl-sec { font-family: var(--font-body); font-size: 0.74rem; color: var(--text-secondary); }
+
+/* ---- Hero + thẻ kết luận ---- */
+.vl-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); margin-bottom: 18px; overflow: hidden; }
+.vl-hero-main { padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.vl-hero-id { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vl-hero-symbol { font-family: var(--font-display); font-size: 2rem; font-weight: 400; color: var(--text-primary); letter-spacing: 0.01em; line-height: 1; }
+.vl-chipmeta { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); background: var(--hover-bg); padding: 3px 11px; border-radius: var(--radius-pill); }
+.vl-hero-price { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.vl-hero-price b { font-family: var(--font-display); font-size: 1.7rem; font-weight: 400; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vl-hero-price span { font-size: 0.72rem; color: var(--text-muted); }
+.vl-hero-sentence { margin: 0; font-size: 0.86rem; color: var(--text-secondary); line-height: 1.55; max-width: 52ch; }
+.vl-hero-side { padding: 22px 24px; background: var(--bg-color-2); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.vl-hero-fairlabel { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.vl-hero-fair { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vl-hero-fair b { font-family: var(--font-display); font-size: 2rem; font-weight: 400; color: var(--finance-accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+
+/* ---- Thanh khoảng nhỏ + football field ---- */
+.vl-range { position: relative; padding-top: 22px; }
+.vl-range-track, .vl-ff-track { position: relative; height: 18px; background: var(--hover-bg); border-radius: 5px; }
+.vl-range-track { height: 14px; }
+.vl-range-price { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.68rem; color: var(--text-primary); white-space: nowrap; }
+.vl-range-ends { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
+.vl-ff-bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; background: var(--finance-accent-line); border: 1px solid var(--finance-accent); box-sizing: border-box; }
+.vl-ff-bar-history { background: var(--gold-dim); border-color: var(--gold); }
+.vl-ff-bar-range { background: color-mix(in srgb, var(--text-muted) 22%, transparent); border-color: var(--text-muted); }
+.vl-ff-base { position: absolute; top: 1px; bottom: 1px; width: 3px; margin-left: -1.5px; background: var(--text-primary); border-radius: 2px; }
+.vl-ff-price { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--danger-color); border-radius: 1px; z-index: 2; }
+.vl-ff { display: flex; flex-direction: column; }
+.vl-ff-row { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 14px; align-items: center; padding: 7px 0; border-bottom: 1px dashed var(--border-color); }
+.vl-ff-row:last-of-type { border-bottom: none; }
+.vl-ff-axis { padding: 0 0 6px; border-bottom: none; }
+.vl-ff-axis .vl-ff-track { background: transparent; height: 20px; }
+.vl-ff-pricetag { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.68rem; font-weight: 700; color: var(--danger-color); background: var(--danger-bg); padding: 1px 8px; border-radius: var(--radius-pill); white-space: nowrap; }
+.vl-ff-label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vl-ff-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); }
+.vl-ff-range { font-size: 0.7rem; color: var(--text-secondary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vl-ff-note { font-size: 0.64rem; color: var(--text-muted); }
+.vl-ff-legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: 0.7rem; color: var(--text-muted); }
+.vl-ff-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.vl-lg { display: inline-block; }
+.vl-lg-bar { width: 18px; height: 9px; border-radius: 3px; background: var(--finance-accent-line); border: 1px solid var(--finance-accent); }
+.vl-lg-base { width: 3px; height: 12px; background: var(--text-primary); border-radius: 2px; }
+.vl-lg-price { width: 2px; height: 12px; background: var(--danger-color); }
+
+/* ---- Khối nội dung (card) ---- */
+.vl-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 18px 20px; margin-bottom: 18px; }
+.vl-card-title { margin: 0 0 14px; font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.vl-card-title i { color: var(--text-muted); }
+.vl-card-title .vl-muted { margin-left: auto; font-weight: 500; }
+.vl-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.vl-two > .vl-card { margin-bottom: 0; }
+.vl-two { margin-bottom: 18px; }
+
+/* ---- Bảng kịch bản ---- */
+.vl-scen { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.vl-scen th { text-align: left; font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; padding: 8px 12px; border-bottom: 1px solid var(--border-color); }
+.vl-scen th.num, .vl-scen td.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vl-scen td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+.vl-scen td small { display: block; font-size: 0.68rem; margin-top: 1px; font-family: var(--font-body); }
+.vl-scen td.num small { text-align: right; }
+.vl-scen tfoot td { border-bottom: none; font-weight: 700; background: var(--bg-color-2); }
+.vl-scen tfoot td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.vl-scen tfoot td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.vl-strong { font-weight: 700; color: var(--text-primary); }
+.vl-m-name { font-weight: 700; }
+.vl-m-weight { font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); }
+.vl-scen td:first-child small { color: var(--text-muted); }
+
+/* ---- Nhóm chỉ số ---- */
+.vl-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.vl-group { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); padding: 16px 18px; }
+.vl-group h4 { margin: 0 0 8px; font-size: 0.7rem; font-weight: 700; color: var(--gold); letter-spacing: 0.08em; text-transform: uppercase; }
+.vl-metric { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); align-items: baseline; }
+.vl-metric:last-child { border-bottom: none; }
+.vl-metric-label { font-size: 0.78rem; color: var(--text-secondary); }
+.vl-metric-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); text-align: right; }
+.vl-metric-sub { grid-column: 1 / -1; font-size: 0.7rem; color: var(--text-muted); text-align: right; }
+.vl-metric-sub .pnl-pill { padding: 1px 8px; font-size: 0.66rem; }
+
+/* ---- Dải lịch sử + biểu đồ ---- */
+.vl-chartbox { position: relative; height: 270px; }
+.vl-stats { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.8rem; color: var(--text-secondary); }
+.vl-stats b { font-family: var(--font-mono); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vl-hint { font-size: 0.74rem; color: var(--text-muted); margin: 10px 0 0; line-height: 1.5; }
+.vl-note { display: flex; gap: 9px; align-items: flex-start; background: var(--bg-color-2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 0.76rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.5; }
+.vl-note i { color: var(--gold); margin-top: 2px; }
+.vl-thesis { white-space: pre-wrap; font-size: 0.86rem; line-height: 1.65; color: var(--text-primary); margin: 0 0 14px; }
+.vl-log { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.vl-log th { text-align: left; font-size: 0.63rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; padding: 6px 10px; border-bottom: 1px solid var(--border-color); }
+.vl-log td { padding: 7px 10px; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vl-log td:first-child, .vl-log td.left { font-family: var(--font-body); }
+.vl-log tr:last-child td { border-bottom: none; }
+
+/* ---- Áp dụng vào danh mục ---- */
+.vl-apply { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 13px; align-items: end; }
+.vl-apply .input-field label { text-transform: none; font-size: 0.74rem; letter-spacing: 0; display: flex; align-items: center; gap: 7px; }
+.vl-apply-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.vl-status { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* ---- Form nâng cao (trang Định Giá) ---- */
+.vl-adv { margin-top: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-color-2); }
+.vl-adv > summary { cursor: pointer; padding: 12px 16px; font-size: 0.8rem; font-weight: 700; color: var(--text-primary); list-style: none; display: flex; align-items: center; gap: 9px; }
+.vl-adv > summary::-webkit-details-marker { display: none; }
+.vl-adv > summary::before { content: '▸'; color: var(--gold); transition: transform var(--dur) var(--ease); }
+.vl-adv[open] > summary::before { transform: rotate(90deg); }
+.vl-adv-body { padding: 4px 16px 16px; }
+.vl-adv-body .stock-section-title { margin-top: 18px; }
+.vl-scen-form { display: grid; grid-template-columns: 110px repeat(3, minmax(0, 1fr)); gap: 10px 12px; align-items: center; }
+.vl-scen-form .head { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; text-align: right; }
+.vl-scen-form .rowlabel { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.vl-sel { width: 100%; padding: 9px 12px; background: var(--bg-color-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); cursor: pointer; }
+.vl-sel:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+.vl-textarea { width: 100%; min-height: 92px; padding: 10px 12px; background: var(--bg-color-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: inherit; font-size: 0.86rem; color: var(--text-primary); resize: vertical; line-height: 1.55; }
+.vl-textarea:focus { outline: none; border-color: var(--gold); background: var(--card-bg); box-shadow: 0 0 0 3px var(--gold-dim); }
+.vl-field-hint { font-size: 0.68rem; color: var(--text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.vl-qform { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; align-items: end; margin-bottom: 12px; }
+.vl-qlist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.vl-qitem { display: inline-flex; align-items: center; gap: 8px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-pill); padding: 4px 6px 4px 12px; font-size: 0.76rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vl-qitem button { border: none; background: transparent; cursor: pointer; color: var(--text-muted); width: 22px; height: 22px; border-radius: 50%; }
+.vl-qitem button:hover { background: var(--danger-bg); color: var(--danger-color); }
+.vl-livebtn { font-size: 0.72rem; }
+.vl-result-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+
+@media (max-width: 960px) {
+  .vl-groups { grid-template-columns: minmax(0, 1fr); }
+  .vl-two, .vl-result-grid { grid-template-columns: minmax(0, 1fr); }
+  .vl-hero { grid-template-columns: minmax(0, 1fr); }
+  .vl-hero-side { border-left: none; border-top: 1px solid var(--border-color); }
+  .vl-summary { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .vl-ff-row { grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
+  .vl-search { margin-left: 0; width: 100%; }
+  .vl-scen-form { grid-template-columns: 82px repeat(3, minmax(0, 1fr)); gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .vl-adv > summary::before, .vl-row, .vl-chip, .vl-seg button { transition: none; } }

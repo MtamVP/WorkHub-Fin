@@ -52,13 +52,16 @@ export function heldQuantities(txns: Txn[], actions: Action[]): Map<string, Map<
   return result;
 }
 
-// Giá mục tiêu suy ra từ Định Giá CP: trung bình giá theo P/E và P/B mục tiêu (phần dương). Khớp api.js.
+// Giá mục tiêu suy ra từ Định Giá CP. Hồ sơ mới có sẵn fair_value (giá hợp lý theo mẫu ngành) -> dùng luôn; hồ sơ cũ: trung bình giá
+// theo P/E và P/B mục tiêu (phần dương), đọc cả khoá v1/v2/v3 lẫn snake_case thời Google Sheet. Khớp api.js (_valuationTarget).
 export function valuationTarget(d: any): number | null {
-  const v1 = Number(d && d.v1) || 0;
+  const fair = Number(d && d.fair_value);
+  if (fair > 0) return fair;
+  const v1 = Number(d && (d.v1 || d.charter_capital)) || 0;
   if (!v1) return null;
-  const eps = ((Number(d.v3) || 0) / v1) * 10000;
-  const bvps = ((Number(d.v2) || 0) / v1) * 10000;
-  const parts = [(Number(d.targetPE) || 0) * eps, (Number(d.targetPB) || 0) * bvps].filter((p) => p > 0);
+  const eps = ((Number(d.v3 || d.lnst) || 0) / v1) * 10000;
+  const bvps = ((Number(d.v2 || d.equity) || 0) / v1) * 10000;
+  const parts = [(Number(d.targetPE || d.target_pe) || 0) * eps, (Number(d.targetPB || d.target_pb) || 0) * bvps].filter((p) => p > 0);
   return parts.length ? parts.reduce((s, p) => s + p, 0) / parts.length : null;
 }
 

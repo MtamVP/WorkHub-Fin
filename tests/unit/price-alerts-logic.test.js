@@ -41,6 +41,11 @@ describe('valuationTarget', () => {
     expect(valuationTarget({})).toBeNull();
     expect(valuationTarget(null)).toBeNull();
   });
+  it('ưu tiên fair_value của hồ sơ mới; đọc được hồ sơ cũ chỉ có snake_case', () => {
+    expect(valuationTarget({ fair_value: 33000, v1: 1000, v2: 2000, v3: 150, targetPE: 12, targetPB: 1.2 })).toBe(33000);
+    expect(valuationTarget({ charter_capital: 1000, equity: 2000, lnst: 150, target_pe: 12, target_pb: 1.2 })).toBe(21000);
+    expect(valuationTarget({ fair_value: 0, v1: 1000, v2: 2000, v3: 150, targetPE: 12 })).toBe(18000);
+  });
 });
 
 describe('isStalePrice', () => {

@@ -2,4 +2,4 @@
    Toàn bộ component dùng chung (input-field-grid, stat-tile, target-card, calc-wrapper...)
    đã chuyển sang /finance-shared.css — file này chỉ còn override thật sự riêng của trang. */
 
-.asset-container { max-width: 900px; }
+.asset-container { max-width: 1100px; }

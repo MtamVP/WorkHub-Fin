@@ -39,7 +39,7 @@ async function historyFor(symbol: string, from: string, to: string): Promise<Ser
   if (primary.length) return inRange(primary);
   if (INDEX_CODES.has(symbol)) return [];
   const fallback = parseFinfo(
-    await getJson(`https://api-finfo.vndirect.com.vn/v4/stock_prices?q=code:${symbol}~date:gte:${from}~date:lte:${to}&sort=date&size=500`),
+    await getJson(`https://api-finfo.vndirect.com.vn/v4/stock_prices?q=code:${symbol}~date:gte:${from}~date:lte:${to}&sort=date&size=2000`),
   );
   return inRange(fallback);
 }

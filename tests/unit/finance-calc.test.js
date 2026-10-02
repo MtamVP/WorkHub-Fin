@@ -47,6 +47,10 @@ describe('_valuationTarget (api.js)', () => {
     expect(vt(null)).toBeNull();
     expect(vt({ v1: 0, v2: 1, v3: 1, targetPE: 5 })).toBeNull();
   });
+  it('ưu tiên fair_value của hồ sơ mới; hồ sơ cũ snake_case vẫn ra giá mục tiêu', () => {
+    expect(vt({ fair_value: 33000, v1: 1000, v2: 2000, v3: 150, targetPE: 12, targetPB: 1.2 })).toBe(33000);
+    expect(vt({ charter_capital: 1000, equity: 2000, lnst: 150, target_pe: 12, target_pb: 1.2 })).toBe(21000);
+  });
 });
 
 describe('_priceMeta (api.js)', () => {

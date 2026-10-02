@@ -1,9 +1,58 @@
-/* --- FILE: /stocksheet/script.js --- */
+/* --- FILE: /stocksheet/script.js ---
+   Tổng Hợp Cổ Phiếu: (1) Bảng so sánh mọi mã đã định giá — kết luận Rẻ / Hợp lý / Đắt theo giá hiện tại;
+   (2) Chi tiết một mã — khoảng giá theo từng phương pháp, 3 kịch bản, chỉ số chất lượng & tăng trưởng, dải P/E lịch sử,
+   luận điểm + nhật ký đổi mục tiêu, áp dụng giá mục tiêu / giá muốn mua vào danh mục.
+   Mọi phép tính nằm ở /lib/valuation-calc.js (có kiểm thử); file này chỉ lấy dữ liệu và vẽ. */
 
-document.addEventListener('DOMContentLoaded', function() {
+const VC = ValuationCalc;
+const VU = ValuationUI;
+
+const state = {
+    view: 'overview',
+    items: [],              // mỗi mã 1 dòng đã phân tích (xem analyzeItem)
+    overviewLoaded: false,
+    filter: 'all',
+    query: '',
+    sort: { key: 'upside', dir: -1 },
+    detail: null,           // { symbol, year, rows, quarters, live, series, a, hist }
+    charts: []
+};
+
+document.addEventListener('DOMContentLoaded', function () {
     applyThemeIcon();
-    loadStockList();
+    bindOverviewEvents();
+    loadOverview().then(function () {
+        const m = /^#([A-Za-z0-9]{1,12})(?:\/(\d{4}))?$/.exec(location.hash || '');
+        if (m) openDetail(m[1].toUpperCase(), m[2] ? Number(m[2]) : null);
+    });
 });
+
+// ---------- tiện ích ----------
+async function call(action, params) {
+    const r = await callGAS(action, params || {});
+    if (!r || r.status !== 'success') throw new Error((r && r.message) || 'Lỗi không xác định');
+    return r.data;
+}
+function cssVar(name) {
+    // Đọc trên .asset-container (không phải <html>) vì bảng màu sáng cố định được khai báo trên body/.asset-container.
+    const scope = document.querySelector('.asset-container') || document.documentElement;
+    return getComputedStyle(scope).getPropertyValue(name).trim();
+}
+function fmtDate(iso) {
+    if (!iso) return '';
+    const p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] : '';
+}
+function showToast(message, type = 'success') {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    const icon = type === 'success' ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-exclamation"></i>';
+    toast.innerHTML = `${icon} <span>${VU.esc(message)}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+}
 
 // --- Giao diện sáng / tối (Bàn Tài Sản) ---
 function applyThemeIcon() {
@@ -16,200 +65,574 @@ function toggleDeskTheme() {
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('user-theme', next); } catch (e) {}
     applyThemeIcon();
-    if (document.getElementById('stock-select') && document.getElementById('stock-select').value) loadStockDetail();
+    if (state.view === 'detail' && state.detail) renderDetail(); // biểu đồ đọc màu theo theme nên vẽ lại
 }
 
-// 1. TẢI DANH SÁCH CỔ PHIẾU VÀO DROPDOWN
-async function loadStockList() {
-    const select = document.getElementById('stock-select');
-    select.innerHTML = '<option>Đang tải...</option>';
-    
+// ---------- chuyển chế độ xem ----------
+function showView(view) {
+    state.view = view;
+    document.getElementById('view-overview').style.display = view === 'overview' ? '' : 'none';
+    document.getElementById('view-detail').style.display = view === 'detail' ? '' : 'none';
+    document.getElementById('seg-overview').setAttribute('aria-pressed', String(view === 'overview'));
+    document.getElementById('seg-detail').setAttribute('aria-pressed', String(view === 'detail'));
+    if (view === 'overview') {
+        try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    } else if (state.detail) {
+        renderDetail(); // canvas vừa hiện ra: vẽ lại để biểu đồ lấy đúng kích thước
+    }
+}
+async function refreshAll() {
+    await loadOverview();
+    if (state.view === 'detail' && document.getElementById('stock-select').value) await loadStockDetail({ force: true });
+}
+
+// =====================================================================
+// 1. BẢNG SO SÁNH
+// =====================================================================
+function analyzeItem(item) {
+    const data = Object.assign({}, item.data, { year: item.year, symbol: item.symbol });
+    const prev = item.prev ? VC.normalize(Object.assign({}, item.prev, { year: item.year - 1 })) : null;
+    const a = VC.analyze(data, { prev: prev, quarters: item.quarters, price: item.price });
+    return {
+        symbol: item.symbol, year: item.year, held: item.held, watched: item.watched,
+        priceSource: item.priceSource, priceDate: item.priceDate, updatedAt: item.updatedAt, a: a
+    };
+}
+
+async function loadOverview() {
+    const wrap = document.getElementById('ov-table-wrap');
+    wrap.innerHTML = '<div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải bảng định giá…</div>';
     try {
-        const response = await callGAS('getStockList');
-        if (response.status === 'success') {
-            const stocks = response.data;
-            let html = '<option value="">-- Chọn mã cổ phiếu --</option>';
-            stocks.forEach(stock => {
-                html += `<option value="${stock}">${stock}</option>`;
-            });
-            select.innerHTML = html;
-        } else {
-            select.innerHTML = '<option>Lỗi tải danh sách</option>';
-        }
+        const raw = await call('getStockOverview');
+        state.items = raw.map(analyzeItem);
+        state.overviewLoaded = true;
+        fillSymbolSelect();
+        renderOverview();
     } catch (e) {
         console.error(e);
-        select.innerHTML = '<option>Lỗi kết nối</option>';
+        wrap.innerHTML = `<div class="vl-empty">Không tải được dữ liệu: ${VU.esc(e.message)}</div>`;
     }
 }
 
-// 2. KHI CHỌN MÃ: tải danh sách năm có dữ liệu, rồi tải chi tiết + biểu đồ xu hướng
-async function loadStockDetail() {
+function fillSymbolSelect() {
+    const select = document.getElementById('stock-select');
+    const current = select.value;
+    const symbols = state.items.map(i => i.symbol).sort();
+    select.innerHTML = '<option value="">-- Chọn mã cổ phiếu --</option>' + symbols.map(s => `<option value="${VU.esc(s)}">${VU.esc(s)}</option>`).join('');
+    if (current && symbols.includes(current)) select.value = current;
+}
+
+const VERDICT_RANK = { cheap: 0, fair: 1, expensive: 2, none: 3 };
+function rowOf(it) {
+    const a = it.a, m = a.m;
+    return {
+        it: it, symbol: it.symbol, year: it.year, price: a.price, fair: a.v.fair, upside: a.verdict.upsidePct,
+        verdict: VERDICT_RANK[a.verdict.key], pe: m.pe, pb: m.pb, roe: m.roe, divYield: m.divYield, sector: a.n.sector
+    };
+}
+const COLUMNS = [
+    { key: 'symbol', label: 'Mã', left: true }, { key: 'year', label: 'Năm' }, { key: 'price', label: 'Giá hiện tại' },
+    { key: 'fair', label: 'Giá hợp lý' }, { key: 'upside', label: 'Tiềm năng' }, { key: 'verdict', label: 'Kết luận', left: true },
+    { key: 'pe', label: 'P/E' }, { key: 'pb', label: 'P/B' }, { key: 'roe', label: 'ROE' }, { key: 'divYield', label: 'Cổ tức' },
+    { key: 'sector', label: 'Ngành', left: true }
+];
+
+function filteredRows() {
+    const q = state.query.trim().toUpperCase();
+    let rows = state.items.map(rowOf);
+    rows = rows.filter(r => {
+        if (q && r.symbol.indexOf(q) === -1) return false;
+        switch (state.filter) {
+            case 'held': return r.it.held;
+            case 'watched': return r.it.watched;
+            case 'cheap': return r.it.a.verdict.key === 'cheap';
+            case 'fair': return r.it.a.verdict.key === 'fair';
+            case 'expensive': return r.it.a.verdict.key === 'expensive';
+            default: return true;
+        }
+    });
+    const { key, dir } = state.sort;
+    rows.sort((x, y) => {
+        const a = x[key], b = y[key];
+        const an = a === null || a === undefined || (typeof a === 'number' && !isFinite(a));
+        const bn = b === null || b === undefined || (typeof b === 'number' && !isFinite(b));
+        if (an && bn) return x.symbol < y.symbol ? -1 : 1;
+        if (an) return 1;   // thiếu dữ liệu luôn xuống cuối, bất kể chiều sắp xếp
+        if (bn) return -1;
+        const c = typeof a === 'string' ? a.localeCompare(b, 'vi') : a - b;
+        return c * dir || (x.symbol < y.symbol ? -1 : 1);
+    });
+    return rows;
+}
+
+function renderOverview() {
+    const items = state.items;
+    const count = k => items.filter(i => i.a.verdict.key === k).length;
+    const tile = (label, value, sub) => `<div class="vl-sum"><span class="vl-sum-label">${label}</span><span class="vl-sum-value">${value}${sub ? `<small>${sub}</small>` : ''}</span></div>`;
+    document.getElementById('ov-summary').innerHTML =
+        tile('Mã đã định giá', items.length, items.filter(i => i.held).length ? `${items.filter(i => i.held).length} đang nắm` : '') +
+        tile('Đang rẻ', count('cheap'), 'giá ≤ 80% giá hợp lý') +
+        tile('Hợp lý', count('fair'), '80% – 110%') +
+        tile('Đang đắt', count('expensive'), '> 110%');
+
+    const chips = [['all', 'Tất cả'], ['held', 'Đang nắm'], ['watched', 'Theo dõi'], ['cheap', 'Rẻ'], ['fair', 'Hợp lý'], ['expensive', 'Đắt']];
+    document.getElementById('ov-filters').innerHTML = chips.map(c =>
+        `<button type="button" class="vl-chip" data-filter="${c[0]}" aria-pressed="${state.filter === c[0]}">${c[1]}</button>`).join('') +
+        `<input type="search" class="vl-search" id="ov-search" placeholder="Tìm mã…" aria-label="Tìm mã cổ phiếu" value="${VU.esc(state.query)}">`;
+    const search = document.getElementById('ov-search');
+    search.addEventListener('input', function () {
+        state.query = this.value;
+        renderOverviewTable();
+    });
+    renderOverviewTable();
+
+    const live = items.filter(i => i.priceSource).length;
+    document.getElementById('ov-hint').textContent = items.length
+        ? `Giá hiện tại: ${live}/${items.length} mã lấy từ giá thị trường (Bàn Tài Sản hoặc đóng cửa gần nhất), còn lại dùng giá lưu trong hồ sơ. Kết luận chỉ là công cụ tham khảo dựa trên giả định bạn nhập, không phải khuyến nghị đầu tư.`
+        : '';
+}
+
+function renderOverviewTable() {
+    const wrap = document.getElementById('ov-table-wrap');
+    if (!state.items.length) {
+        wrap.innerHTML = `<div class="stock-empty-state"><i class="fa-solid fa-calculator"></i><p>Chưa có mã nào được định giá.<br><a class="vl-link" href="/stocksheet/autosheet/">Mở Định Giá CP để thêm mã đầu tiên →</a></p></div>`;
+        return;
+    }
+    const rows = filteredRows();
+    const head = COLUMNS.map(c => {
+        const active = state.sort.key === c.key;
+        const aria = active ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none';
+        const arrow = active ? (state.sort.dir > 0 ? '▲' : '▼') : '';
+        return `<th scope="col" class="${c.left ? 'left' : ''}" aria-sort="${aria}"><button type="button" class="vl-sort" data-sort="${c.key}">${c.label} <span aria-hidden="true">${arrow}</span></button></th>`;
+    }).join('');
+    const body = rows.map(r => {
+        const a = r.it.a, m = a.m;
+        const tags = (r.it.held ? '<span class="vl-tag"><i class="fa-solid fa-wallet"></i> Đang nắm</span>' : '') +
+            (r.it.watched ? ' <span class="vl-tag vl-tag-watch"><i class="fa-solid fa-eye"></i> Theo dõi</span>' : '');
+        const src = r.it.priceSource ? `Thị trường ${fmtDate(r.it.priceDate)}` : 'Giá lưu trong hồ sơ';
+        const up = a.verdict.upsidePct;
+        return `<tr class="vl-row" tabindex="0" role="link" data-symbol="${VU.esc(r.symbol)}" aria-label="Xem chi tiết ${VU.esc(r.symbol)}">
+            <td><span class="vl-sym">${VU.esc(r.symbol)}</span>${tags}</td>
+            <td>${r.year}</td>
+            <td>${VU.vnd(r.price)}<span class="vl-px-src">${VU.esc(src)}</span></td>
+            <td>${VU.vnd(r.fair)}</td>
+            <td>${VU.isNum(up) ? `<span class="pnl-pill ${VU.signedClass(up)}">${VU.esc(VU.pct(up, 0, true))}</span>` : VU.NA}</td>
+            <td class="left">${VU.verdictPill(a.verdict)}</td>
+            <td>${VU.mult(m.pe)}</td><td>${VU.mult(m.pb, 2)}</td><td>${VU.pct(m.roe)}</td><td>${VU.pct(m.divYield)}</td>
+            <td class="left vl-sec">${VU.esc(VC.SECTORS[a.n.sector].label)}</td>
+        </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table class="vl-ov"><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLUMNS.length}" class="left" style="padding:22px;color:var(--text-muted)">Không có mã nào khớp bộ lọc.</td></tr>`}</tbody></table>`;
+}
+
+function bindOverviewEvents() {
+    document.getElementById('ov-filters').addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-filter]');
+        if (!btn) return;
+        state.filter = btn.getAttribute('data-filter');
+        this.querySelectorAll('[data-filter]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        renderOverviewTable();
+    });
+    const wrap = document.getElementById('ov-table-wrap');
+    wrap.addEventListener('click', function (e) {
+        const sort = e.target.closest('[data-sort]');
+        if (sort) {
+            const key = sort.getAttribute('data-sort');
+            state.sort = state.sort.key === key ? { key: key, dir: -state.sort.dir } : { key: key, dir: (key === 'symbol' || key === 'sector' || key === 'verdict') ? 1 : -1 };
+            renderOverviewTable();
+            const again = wrap.querySelector(`[data-sort="${key}"]`);
+            if (again) again.focus();
+            return;
+        }
+        const row = e.target.closest('[data-symbol]');
+        if (row) openDetail(row.getAttribute('data-symbol'));
+    });
+    wrap.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const row = e.target.closest('tr[data-symbol]');
+        if (row) { e.preventDefault(); openDetail(row.getAttribute('data-symbol')); }
+    });
+}
+
+// =====================================================================
+// 2. CHI TIẾT MỘT MÃ
+// =====================================================================
+function onSymbolChange() {
+    const yearSelect = document.getElementById('stock-year-select');
+    yearSelect.dataset.symbol = '';
+    loadStockDetail({ force: true });
+}
+
+async function openDetail(symbol, year) {
+    state.detail = null; // tránh vẽ lại mã cũ trong lúc chờ tải mã mới
+    showView('detail');
+    const select = document.getElementById('stock-select');
+    select.value = symbol;
+    if (select.value !== symbol) { showToast('Mã ' + symbol + ' chưa có hồ sơ định giá', 'error'); return; }
+    document.getElementById('stock-year-select').dataset.symbol = '';
+    await loadStockDetail({ force: true, year: year });
+    try { history.replaceState(null, '', '#' + symbol + (year ? '/' + year : '')); } catch (e) {}
+}
+
+function peersFor(symbol, sector) {
+    return VC.peerStats(state.items.map(i => ({
+        symbol: i.symbol, sector: i.a.n.sector, pe: i.a.m.pe, pb: i.a.m.pb, roe: i.a.m.roe, divYield: i.a.m.divYield
+    })), sector, symbol);
+}
+
+function analyzeDetail(d) {
+    const row = d.rows.find(r => r.year === d.year);
+    const prevRow = d.rows.find(r => r.year === d.year - 1);
+    const prev = prevRow ? VC.normalize(Object.assign({}, prevRow.data, { year: prevRow.year })) : null;
+    d.a = VC.analyze(Object.assign({}, row.data, { year: d.year, symbol: d.symbol }), {
+        prev: prev, quarters: d.quarters, price: d.live ? d.live.price : 0
+    });
+    d.hist = VC.historicalMultiples(d.rows, d.series || []);
+    d.peers = peersFor(d.symbol, d.a.n.sector);
+}
+
+async function loadStockDetail(opts) {
+    opts = opts || {};
     const symbol = document.getElementById('stock-select').value;
     const displayDiv = document.getElementById('sheet-display');
     const spinner = document.getElementById('loading-spinner');
     const yearLabel = document.getElementById('stock-year-label');
     const yearSelect = document.getElementById('stock-year-select');
-    const trendWrapper = document.getElementById('trend-chart-wrapper');
-
     const emptyState = document.getElementById('stock-empty-state');
 
     if (!symbol) {
         displayDiv.style.display = 'none';
         yearLabel.style.display = 'none';
         yearSelect.style.display = 'none';
-        trendWrapper.style.display = 'none';
-        if (emptyState) emptyState.style.display = 'flex';
+        emptyState.style.display = 'flex';
+        state.detail = null;
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    const reuse = state.detail && state.detail.symbol === symbol && !opts.force;
+    if (reuse) {
+        state.detail.year = Number(yearSelect.value);
+        analyzeDetail(state.detail);
+        renderDetail();
         return;
     }
 
-    if (emptyState) emptyState.style.display = 'none';
     displayDiv.style.display = 'none';
     spinner.style.display = 'block';
-
     try {
-        // Nếu người dùng vừa đổi mã (chưa có danh sách năm cho mã này), tải lại danh sách năm
-        if (yearSelect.dataset.symbol !== symbol) {
-            const yearsResp = await callGAS('getStockYears', { symbol: symbol });
-            const years = yearsResp.data || [];
-            yearSelect.dataset.symbol = symbol;
-            yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
-            yearLabel.style.display = years.length ? 'inline-flex' : 'none';
-            yearSelect.style.display = years.length ? 'inline-block' : 'none';
-        }
+        const [rows, quarters, live] = await Promise.all([
+            call('getStockHistory', { symbol: symbol }),
+            call('getStockQuarters', { symbol: symbol }),
+            call('getStockLivePrices', { symbols: [symbol] })
+        ]);
+        const sorted = (rows || []).slice().sort((a, b) => a.year - b.year);
+        if (!sorted.length) throw new Error('Chưa có dữ liệu định giá cho mã này.');
+        const years = sorted.map(r => r.year).sort((a, b) => b - a);
+        yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+        yearSelect.dataset.symbol = symbol;
+        const want = opts.year && years.includes(opts.year) ? opts.year : years[0];
+        yearSelect.value = String(want);
+        yearLabel.style.display = 'inline-flex';
+        yearSelect.style.display = 'inline-block';
 
-        const selectedYear = yearSelect.value || '';
-        const response = await callGAS('getStockDetail', { symbol: symbol, year: selectedYear });
-
+        state.detail = { symbol: symbol, year: want, rows: sorted, quarters: quarters || [], live: (live || {})[symbol] || null, series: null };
+        analyzeDetail(state.detail);
+        spinner.style.display = 'none';
+        renderDetail();
+        loadPriceHistory(state.detail); // chạy nền: có giá lịch sử thì vẽ lại thêm dải P/E
+    } catch (e) {
         spinner.style.display = 'none';
         displayDiv.style.display = 'block';
-
-        if (response.status === 'success' && response.data && response.data.symbol) {
-            renderStockDetail(response.data);
-            showToast("Đã tải dữ liệu mã " + symbol, "success");
-        } else {
-            displayDiv.innerHTML = `<p style="color:var(--danger-color); text-align:center; padding:30px;">Chưa có dữ liệu định giá cho mã này.</p>`;
-        }
-
-        await loadTrendChart(symbol);
-    } catch (e) {
-        spinner.style.display = 'none';
-        alert("Lỗi kết nối: " + e.message);
+        displayDiv.innerHTML = `<div class="vl-empty">${VU.esc(e.message)}</div>`;
+        state.detail = null;
     }
 }
 
-// --- 3. VẼ GIAO DIỆN CHI TIẾT ĐỊNH GIÁ (stat card, không dùng bảng hàng-cột nữa) ---
-function renderStockDetail(d) {
-    d = d || {};
-    const num = (v, digits) => (v === undefined || v === null || v === '') ? '--' : Number(v).toLocaleString('vi-VN', { maximumFractionDigits: digits !== undefined ? digits : 2 });
-
-    document.getElementById('hero-symbol').textContent = d.symbol || '--';
-    document.getElementById('hero-year').textContent = d.year ? `Năm ${d.year}` : '';
-    document.getElementById('hero-price').textContent = num(d.price, 0);
-
-    // Tách 2 nhóm — Quy mô & Lợi nhuận (3 ô) / Định giá (4 ô) — để mỗi hàng luôn chia hết, không lẻ dòng
-    const scaleStats = [
-        { icon: 'fa-building-columns', label: 'Vốn điều lệ', value: num(d.charter_capital, 0) },
-        { icon: 'fa-scale-balanced', label: 'Vốn chủ sở hữu', value: num(d.equity, 0) },
-        { icon: 'fa-sack-dollar', label: 'Lợi nhuận sau thuế', value: num(d.lnst, 0) }
-    ];
-    const valuationStats = [
-        { icon: 'fa-book', label: 'Giá trị sổ sách', value: num(d.book_value) },
-        { icon: 'fa-chart-line', label: 'EPS', value: num(d.eps) },
-        { icon: 'fa-divide', label: 'P/E', value: num(d.pe) },
-        { icon: 'fa-percent', label: 'P/B', value: num(d.pb) }
-    ];
-    const renderStatTiles = (stats) => stats.map(f => `
-        <div class="stat-tile">
-            <span class="stat-tile-icon"><i class="fa-solid ${f.icon}"></i></span>
-            <span class="stat-tile-label">${f.label}</span>
-            <span class="stat-tile-value">${f.value}</span>
-        </div>`).join('');
-    document.getElementById('fundamentals-grid-scale').innerHTML = renderStatTiles(scaleStats);
-    document.getElementById('fundamentals-grid-valuation').innerHTML = renderStatTiles(valuationStats);
-
-    const returnPe = Number(d.return_pe);
-    const returnPb = Number(d.return_pb);
-    document.getElementById('target-grid').innerHTML = `
-        ${renderTargetCard('Theo P/E', d.target_pe, d.price_per_pe, returnPe, num)}
-        ${renderTargetCard('Theo P/B', d.target_pb, d.price_per_pb, returnPb, num)}
-    `;
-}
-
-function renderTargetCard(title, targetMultiple, priceTarget, returnPct, num) {
-    const hasReturn = !isNaN(returnPct);
-    const cls = !hasReturn ? '' : (returnPct > 0 ? 'pnl-up' : (returnPct < 0 ? 'pnl-down' : 'pnl-flat'));
-    const icon = !hasReturn ? 'fa-minus' : (returnPct > 0 ? 'fa-arrow-up' : (returnPct < 0 ? 'fa-arrow-down' : 'fa-minus'));
-    return `
-        <div class="target-card">
-            <div class="target-card-title">${title} <span class="target-multiple">(x${num(targetMultiple, 1)})</span></div>
-            <div class="target-card-price">${num(priceTarget, 0)}</div>
-            <div class="target-card-return"><span class="pnl-pill ${cls}"><i class="fa-solid ${icon}"></i>${hasReturn ? (returnPct > 0 ? '+' : '') + returnPct.toFixed(1) + '%' : '--'}</span></div>
-        </div>`;
-}
-
-// 2b. BIỂU ĐỒ XU HƯỚNG ĐỊNH GIÁ QUA CÁC NĂM
-let trendChartInstance = null;
-async function loadTrendChart(symbol) {
-    const wrapper = document.getElementById('trend-chart-wrapper');
+async function loadPriceHistory(d) {
     try {
-        const response = await callGAS('getStockHistory', { symbol: symbol });
-        const history = response.data || [];
-        if (history.length < 2) { wrapper.style.display = 'none'; return; }
-        wrapper.style.display = 'block';
-
-        const canvas = document.getElementById('valuationTrendChart');
-        const ctx = canvas.getContext('2d');
-        if (trendChartInstance) trendChartInstance.destroy();
-
-        const labels = history.map(h => h.year);
-        const peData = history.map(h => Number(h.data && h.data.pe) || 0);
-        const pbData = history.map(h => Number(h.data && h.data.pb) || 0);
-        const priceData = history.map(h => Number(h.data && h.data.price) || 0);
-
-        trendChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [
-                    { label: 'P/E', data: peData, borderColor: cssVar('--finance-accent'), yAxisID: 'y', tension: 0.3 },
-                    { label: 'P/B', data: pbData, borderColor: cssVar('--info-color'), yAxisID: 'y', tension: 0.3 },
-                    { label: 'Giá (VND)', data: priceData, borderColor: cssVar('--success-color'), yAxisID: 'y1', tension: 0.3 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: cssVar('--text-primary') } } },
-                scales: {
-                    x: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--border-color') } },
-                    y: { type: 'linear', position: 'left', ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--border-color') } },
-                    y1: { type: 'linear', position: 'right', ticks: { color: cssVar('--text-secondary') }, grid: { drawOnChartArea: false } }
-                }
-            }
-        });
+        const today = new Date();
+        const iso = (t) => t.toISOString().slice(0, 10);
+        const minYear = d.rows[0].year;
+        const earliest = new Date(today.getTime() - 2590 * 86400000);   // Edge Function giới hạn ~2.600 ngày
+        let from = new Date(Date.UTC(minYear - 1, 11, 1));
+        if (from < earliest) from = earliest;
+        const series = await call('getAssetPriceHistory', { symbols: [d.symbol], from: iso(from), to: iso(today) });
+        if (!state.detail || state.detail !== d) return; // người dùng đã chuyển sang mã khác
+        d.series = series[d.symbol] || [];
+        analyzeDetail(d);
+        if (state.view === 'detail') renderDetail();
     } catch (e) {
-        console.error('Lỗi loadTrendChart:', e);
-        wrapper.style.display = 'none';
+        console.warn('Không lấy được giá lịch sử:', e.message);
+        if (state.detail === d) { d.historyError = e.message; if (state.view === 'detail') renderDetail(); }
     }
 }
 
-function cssVar(name) {
-    // Đọc trên .asset-container (không phải <html>) vì bảng màu sáng cố định được khai báo trên
-    // body/.asset-container — đọc từ <html> sẽ luôn ra giá trị theme tối cũ.
-    const scope = document.querySelector('.asset-container') || document.documentElement;
-    return getComputedStyle(scope).getPropertyValue(name).trim();
+// ---------- vẽ chi tiết ----------
+function destroyCharts() { state.charts.forEach(c => { try { c.destroy(); } catch (e) {} }); state.charts = []; }
+
+function compareSub(kind, d) {
+    const m = d.a.m;
+    const parts = [];
+    const pos = VC.bandPosition(d.hist, kind, m[kind]);
+    if (pos) parts.push(`${pos.label} · phân vị ${VU.dec(pos.percentile, 0)}% · TB ${VU.mult(pos.mean, kind === 'pb' ? 2 : 1)} (${pos.n} năm)`);
+    if (d.peers && VU.isNum(d.peers[kind])) parts.push(`Cùng ngành (${d.peers.n} mã): trung vị ${VU.mult(d.peers[kind], kind === 'pb' ? 2 : 1)}`);
+    return parts.map(VU.esc).join('<br>');
 }
 
-// --- 4. HÀM HIỂN THỊ THÔNG BÁO (TOAST) ---
-function showToast(message, type = 'success') {
-    // Xóa toast cũ nếu có
-    const existingToast = document.querySelector('.toast-notification');
-    if (existingToast) existingToast.remove();
+function renderDetail() {
+    destroyCharts();
+    const d = state.detail;
+    const display = document.getElementById('sheet-display');
+    if (!d) return;
+    const a = d.a, n = a.n, m = a.m, v = a.v, verdict = a.verdict;
+    const item = state.items.find(i => i.symbol === d.symbol);
+    const unitLabel = VC.UNIT_LABELS[n.unit];
 
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    const icon = type === 'success' ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-exclamation"></i>';
-    toast.innerHTML = `${icon} <span>${message}</span>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    const priceNote = d.live
+        ? `Giá ${d.live.source === 'portfolio' ? 'trong Bàn Tài Sản' : 'đóng cửa'} ${fmtDate(d.live.date)}`
+        : 'Giá lưu trong hồ sơ (chưa lấy được giá thị trường)';
+    const status = (item && item.held ? '<span class="vl-tag"><i class="fa-solid fa-wallet"></i> Đang nắm</span>' : '') +
+        (item && item.watched ? '<span class="vl-tag vl-tag-watch"><i class="fa-solid fa-eye"></i> Đang theo dõi</span>' : '');
+
+    // --- Hero + kết luận ---
+    const hero = VU.heroHtml({
+        symbol: d.symbol, meta: [`Số liệu năm ${d.year}`, VC.SECTORS[n.sector].label],
+        statusHtml: status, priceNote: priceNote, a: a
+    });
+
+    // --- Khoảng giá (football field) ---
+    const ffRows = v.methods.map(x => ({ label: x.label, low: x.bear, base: x.base, high: x.bull, kind: 'method', note: x.note }));
+    const impPe = VC.impliedFromBand(d.hist.pe, m.eps), impPb = VC.impliedFromBand(d.hist.pb, m.bvps);
+    if (impPe) ffRows.push({ label: 'Dải P/E lịch sử', low: impPe.low, base: impPe.base, high: impPe.high, kind: 'history', note: `TB ${VU.mult(d.hist.pe.mean)} ± 1σ × EPS` });
+    if (impPb) ffRows.push({ label: 'Dải P/B lịch sử', low: impPb.low, base: impPb.base, high: impPb.high, kind: 'history', note: `TB ${VU.mult(d.hist.pb.mean, 2)} ± 1σ × BVPS` });
+    const last252 = (d.series || []).slice(-252).map(r => Number(r[1])).filter(x => x > 0);
+    if (last252.length > 20) ffRows.push({ label: 'Biên độ giá 52 tuần', low: Math.min.apply(null, last252), base: null, high: Math.max.apply(null, last252), kind: 'range', note: 'thấp nhất – cao nhất' });
+    const football = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-ruler-horizontal"></i> Khoảng giá theo từng phương pháp<span class="vl-muted">đơn vị: VND/cổ phiếu</span></h3>
+        ${VU.footballHtml(VC.football(ffRows, a.price), a.price)}</div>`;
+
+    // --- Kịch bản ---
+    const notes = VU.dataNotes(n, m).concat(d.historyError ? ['Chưa lấy được giá lịch sử nên chưa có dải P/E, P/B (' + d.historyError + ').'] : []);
+    const scen = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-layer-group"></i> Ba kịch bản<span class="vl-muted">% so với giá hiện tại</span></h3>
+        ${VU.scenarioTableHtml(v, a.price)}
+        ${v.scenarios.bear.auto.pe || v.scenarios.bear.auto.pb ? '<p class="vl-hint">Kịch bản xấu/tốt bạn chưa nhập nên mặc định bội số cơ sở −/+20%. Chỉnh trong Định Giá CP › Kịch bản & nâng cao.</p>' : ''}
+        ${notes.map(t => `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>${VU.esc(t)}</span></div>`).join('')}</div>`;
+
+    // --- Nhóm chỉ số ---
+    const R = VU.metricRow, tag = VU.growthTag;
+    const groupA = [
+        R('Vốn điều lệ', VU.dec(n.charter, 0)),
+        R('Vốn chủ sở hữu', VU.dec(n.equity, 0), m.bvpsGrowth !== null ? tag(m.bvpsGrowth, 'BVPS so năm trước') : ''),
+        R('Lợi nhuận sau thuế', VU.dec(n.lnst, 0), tag(m.lnstGrowth, 'so năm trước')),
+        n.revenue !== null ? R('Doanh thu', VU.dec(n.revenue, 0), m.netMargin !== null ? `Biên lợi nhuận ròng ${VU.pct(m.netMargin)}` : '') : '',
+        n.assets !== null ? R('Tổng tài sản', VU.dec(n.assets, 0), m.equityMultiplier !== null ? `Đòn bẩy (TS/VCSH) ${VU.dec(m.equityMultiplier, 1)}x` : '') : ''
+    ].join('');
+    const basisText = m.basis === 'shares' ? 'Số nhập tay' : 'Ước tính từ vốn điều lệ ÷ 10.000';
+    const groupB = [
+        R('EPS', VU.vnd(m.eps), tag(m.epsGrowth, 'so năm trước'), 'Lợi nhuận sau thuế / số cổ phiếu'),
+        m.ttm ? R('EPS 4 quý gần nhất (TTM)', VU.vnd(m.ttm.eps), `${m.ttm.from} → ${m.ttm.to}`) : '',
+        R('Giá trị sổ sách (BVPS)', VU.vnd(m.bvps), tag(m.bvpsGrowth, 'so năm trước')),
+        n.dps !== null ? R('Cổ tức tiền / cổ phiếu', VU.vnd(n.dps), m.payout !== null ? `Tỷ lệ chi trả ${VU.pct(m.payout, 0)}` : '') : '',
+        m.shares ? R('Số cổ phiếu', VU.dec(m.shares, 0), basisText) : ''
+    ].join('');
+    const roeSub = (m.roeBasis === 'avg' ? 'Trên vốn chủ bình quân' : 'Trên vốn chủ cuối kỳ') + (d.peers && VU.isNum(d.peers.roe) ? `<br>Cùng ngành: trung vị ${VU.pct(d.peers.roe)}` : '');
+    const groupC = [
+        R('ROE', VU.pct(m.roe), roeSub),
+        m.roa !== null ? R('ROA', VU.pct(m.roa)) : '',
+        R('P/E', VU.mult(m.pe), compareSub('pe', d)),
+        m.ttm && m.ttm.pe ? R('P/E TTM', VU.mult(m.ttm.pe), 'trên EPS 4 quý gần nhất') : '',
+        R('P/B', VU.mult(m.pb, 2), compareSub('pb', d)),
+        m.ps !== null ? R('P/S', VU.mult(m.ps, 2)) : '',
+        m.peg !== null ? R('PEG', VU.dec(m.peg, 2), 'P/E ÷ tăng trưởng EPS (< 1 thường được coi là rẻ so với tăng trưởng)') : '',
+        m.divYield !== null ? R('Tỷ suất cổ tức', VU.pct(m.divYield)) : ''
+    ].join('');
+    const groups = `<div class="vl-groups">
+        <div class="vl-group"><h4>Quy mô & lợi nhuận · ${VU.esc(unitLabel)}</h4>${groupA}</div>
+        <div class="vl-group"><h4>Trên mỗi cổ phiếu · VND</h4>${groupB}</div>
+        <div class="vl-group"><h4>Chất lượng & định giá</h4>${groupC}</div>
+    </div>`;
+
+    // --- Biểu đồ ---
+    const hasBand = d.hist.pe && d.hist.pe.n >= 3 && (d.series || []).length > 30 && m.eps > 0;
+    const bandHeader = d.hist.pe && d.hist.pe.n >= 3
+        ? `<div class="vl-stats"><span>P/E trung bình <b>${VU.mult(d.hist.pe.mean)}</b></span><span>Độ lệch chuẩn <b>${VU.dec(d.hist.pe.sd, 1)}</b></span><span>Thấp nhất – cao nhất <b>${VU.mult(d.hist.pe.min)} – ${VU.mult(d.hist.pe.max)}</b></span><span>Số năm <b>${d.hist.pe.n}</b></span></div>` : '';
+    const bandBody = hasBand
+        ? `<div class="vl-chartbox"><canvas id="chart-band" aria-label="Giá cổ phiếu so với dải P/E lịch sử"></canvas></div><p class="vl-hint">Ba đường ngang = EPS hiện tại × (P/E trung bình − 1σ, trung bình, + 1σ) của chính mã này. Giá nằm trên đường trên nghĩa là đang đắt hơn thông lệ lịch sử của nó.</p>`
+        : `<div class="vl-empty">${(d.series === null && !d.historyError) ? '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải giá lịch sử…' : 'Cần ít nhất 3 năm hồ sơ (EPS dương) cùng giá lịch sử để vẽ dải P/E. Hiện có ' + (d.hist.pe ? d.hist.pe.n : 0) + ' năm. Thêm các năm trước ở Định Giá CP.'}</div>`;
+    const charts = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-chart-line"></i> Giá so với dải P/E lịch sử</h3>${bandHeader}${bandBody}</div>
+        <div class="vl-two">
+            <div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-divide"></i> P/E và P/B cuối mỗi năm</h3><div class="vl-chartbox"><canvas id="chart-multiples" aria-label="P/E và P/B theo năm"></canvas></div></div>
+            <div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-seedling"></i> EPS và BVPS theo năm</h3><div class="vl-chartbox"><canvas id="chart-fundamentals" aria-label="EPS và BVPS theo năm"></canvas></div></div>
+        </div>`;
+
+    // --- Luận điểm + nhật ký mục tiêu ---
+    const log = n.targetLog.slice().reverse();
+    const logHtml = log.length ? `<div class="vl-table-wrap"><table class="vl-log"><thead><tr><th>Ngày</th><th>Người đổi</th><th>Giá hợp lý</th><th>Giá lúc đó</th><th>P/E mục tiêu</th><th>P/B mục tiêu</th></tr></thead><tbody>${log.map(e => `<tr>
+        <td class="left">${VU.esc(String(e.at || '').slice(0, 10).split('-').reverse().join('/'))}</td><td class="left">${VU.esc(String(e.by || '').split('@')[0] || VU.NA)}</td>
+        <td>${VU.vnd(e.fair)}</td><td>${VU.vnd(e.price)}</td><td>${VU.mult(e.pe)}</td><td>${VU.mult(e.pb, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="vl-hint">Chưa có lịch sử — nhật ký sẽ ghi lại mỗi lần giá hợp lý đổi trên 0,5% khi bạn lưu ở Định Giá CP.</p>';
+    const thesis = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-lightbulb"></i> Luận điểm đầu tư & lịch sử đổi mục tiêu</h3>
+        ${n.thesis ? `<p class="vl-thesis">${VU.esc(n.thesis)}</p>` : '<p class="vl-hint" style="margin-top:0">Chưa có luận điểm — ghi lý do mua/không mua ở Định Giá CP để sau này đối chiếu.</p>'}
+        ${logHtml}</div>`;
+
+    // --- Áp dụng vào danh mục ---
+    const fairR = v.fair > 0 ? Math.round(v.fair) : '';
+    const buyR = v.fair > 0 ? Math.round(v.fair * 0.8) : '';
+    const apply = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-paper-plane"></i> Áp dụng vào danh mục của tôi</h3>
+        <div class="vl-apply">
+            <div class="input-field"><label for="ap-target"><input type="checkbox" id="ap-do-target" checked> Giá mục tiêu (bán/chốt)</label><input type="text" inputmode="numeric" class="input-val" id="ap-target" value="${fairR}"></div>
+            <div class="input-field"><label for="ap-mos">Biên an toàn muốn có (%)</label><input type="text" inputmode="decimal" class="input-val" id="ap-mos" value="20" oninput="syncBuyBelow()"></div>
+            <div class="input-field"><label for="ap-buy"><input type="checkbox" id="ap-do-buy" checked> Giá muốn mua (cảnh báo khi giá ≤)</label><input type="text" inputmode="numeric" class="input-val" id="ap-buy" value="${buyR}"></div>
+        </div>
+        <div class="vl-apply-actions"><button type="button" class="btn-save" onclick="applyToPortfolio()"><i class="fa-solid fa-check"></i> Áp dụng</button>
+            <span class="vl-muted">Mã đang nắm: ghi vào giá mục tiêu của mã. Giá muốn mua: thêm/cập nhật mục Theo Dõi (cảnh báo email và desktop chạy như cũ).</span></div>
+        <div class="vl-apply-actions" style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:14px">
+            <a class="btn-refresh" href="/stocksheet/autosheet/#${VU.esc(d.symbol)}/${d.year}"><i class="fa-solid fa-pen"></i> Sửa định giá ${d.year}</a>
+            <button type="button" class="btn-refresh" onclick="deleteCurrentValuation()" style="color:var(--danger-color)"><i class="fa-solid fa-trash"></i> Xoá hồ sơ năm ${d.year}</button></div>
+    </div>`;
+
+    display.style.display = 'block';
+    display.innerHTML = hero + football + scen + groups + charts + thesis + apply +
+        '<p class="vl-hint">Kết quả là công cụ tham khảo dựa trên số liệu và giả định bạn nhập; không phải khuyến nghị đầu tư.</p>';
+
+    drawCharts(d, hasBand);
+}
+
+function chartBase() {
+    return {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { color: cssVar('--text-primary'), boxWidth: 12, font: { size: 11 } } } },
+    };
+}
+function axis(extra) {
+    return Object.assign({ ticks: { color: cssVar('--text-secondary'), font: { size: 10 } }, grid: { color: cssVar('--border-color') } }, extra || {});
+}
+
+function drawCharts(d, hasBand) {
+    if (typeof Chart === 'undefined') return;
+    const m = d.a.m;
+    const accent = cssVar('--finance-accent'), gold = cssVar('--gold'), info = cssVar('--info-color'), danger = cssVar('--danger-color'), muted = cssVar('--text-muted');
+
+    // 1) Giá so với dải P/E lịch sử
+    const bandCanvas = document.getElementById('chart-band');
+    if (bandCanvas && hasBand) {
+        const series = d.series.filter((r, i) => i % 2 === 0 || i === d.series.length - 1);
+        const labels = series.map(r => r[0]);
+        const st = d.hist.pe;
+        const line = (mult) => labels.map(() => Math.round(mult * m.eps));
+        const datasets = [
+            { label: 'Giá đóng cửa', data: series.map(r => r[1]), borderColor: accent, borderWidth: 1.6, pointRadius: 0, tension: 0 },
+            { label: 'P/E TB + 1σ', data: line(st.mean + st.sd), borderColor: danger, borderDash: [5, 4], borderWidth: 1.2, pointRadius: 0 },
+            { label: 'P/E TB', data: line(st.mean), borderColor: gold, borderDash: [5, 4], borderWidth: 1.4, pointRadius: 0 }
+        ];
+        if (st.mean - st.sd > 0) datasets.push({ label: 'P/E TB − 1σ', data: line(st.mean - st.sd), borderColor: info, borderDash: [5, 4], borderWidth: 1.2, pointRadius: 0 });
+        state.charts.push(new Chart(bandCanvas.getContext('2d'), {
+            type: 'line', data: { labels: labels, datasets: datasets },
+            options: Object.assign(chartBase(), { scales: { x: axis({ ticks: { color: cssVar('--text-secondary'), font: { size: 10 }, maxTicksLimit: 8 } }), y: axis() } })
+        }));
+    }
+
+    // 2) P/E và P/B cuối mỗi năm — ưu tiên số tính lại bằng giá đóng cửa thật, thiếu thì dùng giá lưu trong hồ sơ
+    const stored = d.rows.map(r => {
+        const a = VC.analyze(Object.assign({}, r.data, { year: r.year }));
+        return { year: r.year, pe: a.m.pe, pb: a.m.pb, eps: a.m.eps, bvps: a.m.bvps };
+    });
+    const byYearHist = {};
+    d.hist.byYear.forEach(x => { byYearHist[x.year] = x; });
+    const mult = stored.map(s => {
+        const h = byYearHist[s.year];
+        return { year: s.year, pe: h && h.pe !== null ? h.pe : s.pe, pb: h && h.pb !== null ? h.pb : s.pb };
+    });
+    const mc = document.getElementById('chart-multiples');
+    if (mc) {
+        if (mult.length < 2) emptyChart(mc, 'Cần ít nhất 2 năm hồ sơ');
+        else state.charts.push(new Chart(mc.getContext('2d'), {
+            type: 'line',
+            data: { labels: mult.map(x => x.year), datasets: [
+                { label: 'P/E', data: mult.map(x => x.pe), borderColor: accent, backgroundColor: accent, yAxisID: 'y', tension: 0.25, spanGaps: true },
+                { label: 'P/B', data: mult.map(x => x.pb), borderColor: gold, backgroundColor: gold, yAxisID: 'y1', tension: 0.25, spanGaps: true }
+            ] },
+            options: Object.assign(chartBase(), { scales: {
+                x: axis(), y: axis({ position: 'left', title: { display: true, text: 'P/E (lần)', color: muted, font: { size: 10 } } }),
+                y1: axis({ position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'P/B (lần)', color: muted, font: { size: 10 } } })
+            } })
+        }));
+    }
+
+    // 3) EPS và BVPS theo năm
+    const fc = document.getElementById('chart-fundamentals');
+    if (fc) {
+        if (stored.length < 2) emptyChart(fc, 'Cần ít nhất 2 năm hồ sơ');
+        else state.charts.push(new Chart(fc.getContext('2d'), {
+            type: 'bar',
+            data: { labels: stored.map(x => x.year), datasets: [
+                { type: 'bar', label: 'EPS (VND)', data: stored.map(x => x.eps === null ? null : Math.round(x.eps)), backgroundColor: accent, borderRadius: 4, yAxisID: 'y' },
+                { type: 'line', label: 'BVPS (VND)', data: stored.map(x => x.bvps === null ? null : Math.round(x.bvps)), borderColor: gold, backgroundColor: gold, yAxisID: 'y1', tension: 0.25 }
+            ] },
+            options: Object.assign(chartBase(), { scales: {
+                x: axis(), y: axis({ position: 'left' }), y1: axis({ position: 'right', grid: { drawOnChartArea: false } })
+            } })
+        }));
+    }
+}
+function emptyChart(canvas, text) {
+    const box = canvas.parentElement;
+    box.innerHTML = `<div class="vl-empty" style="height:100%;display:flex;align-items:center;justify-content:center">${VU.esc(text)}</div>`;
+}
+
+// ---------- hành động ----------
+function numberFrom(id) {
+    const el = document.getElementById(id);
+    return el ? (parseFloat(String(el.value).replace(/[^0-9.]/g, '')) || 0) : 0;
+}
+function syncBuyBelow() {
+    const d = state.detail;
+    if (!d || !(d.a.v.fair > 0)) return;
+    const mos = Math.min(Math.max(numberFrom('ap-mos'), 0), 90);
+    document.getElementById('ap-buy').value = Math.round(d.a.v.fair * (1 - mos / 100));
+}
+
+async function applyToPortfolio() {
+    const d = state.detail;
+    if (!d) return;
+    const target = document.getElementById('ap-do-target').checked ? numberFrom('ap-target') : 0;
+    const buy = document.getElementById('ap-do-buy').checked ? numberFrom('ap-buy') : 0;
+    if (!(target > 0) && !(buy > 0)) { showToast('Hãy tick và nhập ít nhất một mức giá', 'error'); return; }
+    const item = state.items.find(i => i.symbol === d.symbol);
+    const lines = [];
+    if (target > 0) lines.push(`• Giá mục tiêu: ${VU.vnd(target)}${item && item.held ? ' (ghi vào mã đang nắm)' : ' (ghi vào mục Theo Dõi)'}`);
+    if (buy > 0) lines.push(`• Giá muốn mua: ${VU.vnd(buy)} (mục Theo Dõi${item && item.watched ? ', cập nhật mục có sẵn' : ', thêm mới'})`);
+    if (!window.confirm(`Áp dụng cho ${d.symbol} trong Bàn Tài Sản của bạn?\n\n${lines.join('\n')}`)) return;
+    try {
+        const msg = await call('pushStockToPortfolio', { symbol: d.symbol, targetPrice: target, buyBelow: buy });
+        showToast(msg, 'success');
+        loadOverview(); // cập nhật nhãn Đang nắm / Theo dõi
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function deleteCurrentValuation() {
+    const d = state.detail;
+    if (!d) return;
+    if (!window.confirm(`Xoá hồ sơ định giá ${d.symbol} năm ${d.year}? Thao tác này không hoàn tác được.`)) return;
+    try {
+        await call('deleteStockValuation', { symbol: d.symbol, year: d.year });
+        showToast(`Đã xoá ${d.symbol} (${d.year})`, 'success');
+        const remaining = d.rows.filter(r => r.year !== d.year);
+        await loadOverview();
+        if (!remaining.length) {
+            state.detail = null;
+            document.getElementById('stock-select').value = '';
+            document.getElementById('sheet-display').style.display = 'none';
+            document.getElementById('stock-empty-state').style.display = 'flex';
+            document.getElementById('stock-year-label').style.display = 'none';
+            document.getElementById('stock-year-select').style.display = 'none';
+            showView('overview');
+        } else {
+            await loadStockDetail({ force: true });
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
 }

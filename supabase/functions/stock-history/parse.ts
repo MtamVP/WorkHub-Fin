@@ -4,7 +4,7 @@ export const SYMBOL_RE = /^[A-Z0-9]{1,12}$/;
 // Chỉ số: giá trả về là điểm chỉ số (không phải nghìn đồng) nên không nhân 1000.
 export const INDEX_CODES = new Set(["VNINDEX", "VN30", "HNXINDEX", "HNX30", "UPCOMINDEX"]);
 export const MAX_SYMBOLS = 25;
-export const MAX_RANGE_DAYS = 400;
+export const MAX_RANGE_DAYS = 2600; // ~7 năm: đủ cho dải P/E-P/B lịch sử của trang Định Giá (1 lần gọi dchart ~1.400 phiên)
 
 export type Series = Array<[string, number]>;
 

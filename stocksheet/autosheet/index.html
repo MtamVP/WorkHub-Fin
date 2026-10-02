@@ -26,7 +26,8 @@
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.7">
-    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1789060000000">
+    <link rel="stylesheet" href="/stocksheet/autosheet/style.css?v=1791800000000">
+    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791800000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -64,9 +65,10 @@
             <h1>Định giá cổ phiếu</h1>
             <span class="desk-who">
                 <span class="av"><i class="fa-solid fa-calculator"></i></span>
-                Máy tính P/E · P/B
+                P/E · P/B · DDM · 3 kịch bản
             </span>
             <div class="desk-byline-actions">
+                <a class="btn-refresh" id="link-summary" href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Xem ở Tổng hợp CP</a>
                 <button onclick="saveToSheet()" class="btn-save btn-save-cloud" id="btn-save-sheet"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu vào Supabase</button>
                 <button onclick="resetData()" class="btn-refresh"><i class="fa-solid fa-rotate-right"></i> Nhập lại</button>
             </div>
@@ -77,37 +79,73 @@
             <div class="stock-header" style="gap: 20px;">
                 <div class="stock-header-field">
                     <label for="stock-symbol">Mã Cổ Phiếu:</label>
-                    <input type="text" id="stock-symbol" class="stock-header-input" placeholder="VD: SHS" style="text-transform: uppercase;">
+                    <input type="text" id="stock-symbol" class="stock-header-input" placeholder="VD: SHS" style="text-transform: uppercase;" autocomplete="off">
                 </div>
 
                 <div class="stock-header-field">
                     <label for="stock-year">Năm:</label>
                     <input type="number" id="stock-year" class="stock-header-input year-input" value="2026">
                 </div>
+
+                <div class="stock-header-field">
+                    <label for="stock-sector">Ngành (mẫu định giá):</label>
+                    <select id="stock-sector" class="vl-sel" style="min-width:210px"></select>
+                </div>
+
+                <div class="stock-header-field">
+                    <label for="stock-unit">Đơn vị các số liệu bên dưới:</label>
+                    <select id="stock-unit" class="vl-sel" style="min-width:150px"></select>
+                </div>
             </div>
+            <p class="vl-hint" id="ctx-line" style="margin:-10px 0 14px"></p>
 
             <h3 class="stock-section-title"><i class="fa-solid fa-pen-to-square"></i> Chỉ Số Đầu Vào</h3>
             <div class="input-field-grid">
                 <div class="input-field">
-                    <label for="val-1">Vốn điều lệ</label>
-                    <input type="text" class="input-val" id="val-1" placeholder="Nhập số...">
+                    <label for="val-1">Vốn điều lệ <span class="vl-field-hint unit-text"></span></label>
+                    <input type="text" class="input-val" id="val-1" placeholder="Nhập số..." inputmode="decimal">
                 </div>
                 <div class="input-field">
-                    <label for="val-2">Vốn chủ sở hữu</label>
-                    <input type="text" class="input-val" id="val-2" placeholder="Nhập số...">
+                    <label for="val-2">Vốn chủ sở hữu <span class="vl-field-hint unit-text"></span></label>
+                    <input type="text" class="input-val" id="val-2" placeholder="Nhập số..." inputmode="decimal">
                 </div>
                 <div class="input-field">
-                    <label for="val-3">Lợi nhuận sau thuế</label>
-                    <input type="text" class="input-val" id="val-3" placeholder="Nhập số...">
+                    <label for="val-3">Lợi nhuận sau thuế <span class="vl-field-hint unit-text"></span></label>
+                    <input type="text" class="input-val" id="val-3" placeholder="Nhập số..." inputmode="decimal" data-signed="1">
                 </div>
                 <div class="input-field">
-                    <label for="val-6" class="input-field-highlight-label">Giá cổ phiếu hiện tại</label>
-                    <input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá...">
+                    <label for="val-6" class="input-field-highlight-label">Giá cổ phiếu hiện tại (VND) <button type="button" class="vl-link vl-livebtn" id="btn-live" onclick="fetchLivePrice()"><i class="fa-solid fa-bolt"></i> Lấy giá thị trường</button></label>
+                    <input type="text" class="input-val highlight-input" id="val-6" placeholder="Nhập giá..." inputmode="decimal">
                 </div>
             </div>
 
+            <details class="vl-adv" id="adv-extra">
+                <summary>Bổ sung để có thêm chỉ số chuyên môn (tuỳ chọn)</summary>
+                <div class="vl-adv-body">
+                    <div class="input-field-grid">
+                        <div class="input-field">
+                            <label for="val-shares">Số cổ phiếu lưu hành <span class="vl-field-hint">(cổ phiếu, đã trừ cổ phiếu quỹ)</span></label>
+                            <input type="text" class="input-val" id="val-shares" placeholder="Để trống = vốn điều lệ ÷ 10.000" inputmode="decimal">
+                        </div>
+                        <div class="input-field">
+                            <label for="val-rev">Doanh thu <span class="vl-field-hint unit-text"></span></label>
+                            <input type="text" class="input-val" id="val-rev" placeholder="Biên lợi nhuận, P/S" inputmode="decimal">
+                        </div>
+                        <div class="input-field">
+                            <label for="val-assets">Tổng tài sản <span class="vl-field-hint unit-text"></span></label>
+                            <input type="text" class="input-val" id="val-assets" placeholder="ROA, đòn bẩy" inputmode="decimal">
+                        </div>
+                        <div class="input-field">
+                            <label for="val-dps">Cổ tức tiền / cổ phiếu <span class="vl-field-hint">(VND, cả năm)</span></label>
+                            <input type="text" class="input-val" id="val-dps" placeholder="Tỷ suất, DDM" inputmode="decimal">
+                        </div>
+                    </div>
+                    <p class="vl-hint">Đơn vị chọn ở trên áp dụng cho vốn điều lệ, vốn chủ, lợi nhuận, doanh thu, tổng tài sản. Có số cổ phiếu thực thì EPS/BVPS tính trên số đó thay vì suy từ vốn điều lệ.</p>
+                </div>
+            </details>
+
             <h3 class="stock-section-title"><i class="fa-solid fa-calculator"></i> Chỉ Số Tính Toán</h3>
-            <div class="stat-grid">
+            <div class="stat-grid stat-grid-4">
                 <div class="stat-tile">
                     <span class="stat-tile-icon"><i class="fa-solid fa-book"></i></span>
                     <span class="stat-tile-label">Giá trị sổ sách</span>
@@ -129,36 +167,98 @@
                     <span class="stat-tile-value output-val result" id="val-8">0</span>
                 </div>
             </div>
+            <div class="stat-grid" id="calc-extra" style="margin-top:11px"></div>
 
-            <div class="target-section">
-                <h3 class="stock-section-title"><i class="fa-solid fa-bullseye"></i> Target</h3>
-                <div class="target-grid">
-                    <div class="target-card">
-                        <div class="target-card-title">Theo P/E</div>
-                        <input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E...">
-                        <div class="target-card-price-label">Price Target</div>
-                        <div class="target-card-price output-val" id="price-per-pe">0</div>
-                        <div class="target-card-price-label">Return (%) — Lợi nhuận</div>
-                        <div class="output-val percent" id="return-pe">0%</div>
-                    </div>
-                    <div class="target-card">
-                        <div class="target-card-title">Theo P/B</div>
-                        <input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B...">
-                        <div class="target-card-price-label">Price Target</div>
-                        <div class="target-card-price output-val" id="price-per-pb">0</div>
-                        <div class="target-card-price-label">Return (%) — Lợi nhuận</div>
-                        <div class="output-val percent" id="return-pb">0%</div>
-                    </div>
+            <h3 class="stock-section-title"><i class="fa-solid fa-bullseye"></i> Mục Tiêu (kịch bản cơ sở)</h3>
+            <div class="input-field-grid">
+                <div class="input-field">
+                    <label for="target-pe">P/E mục tiêu</label>
+                    <input type="text" class="input-val target-input" id="target-pe" placeholder="Nhập P/E..." inputmode="decimal">
+                </div>
+                <div class="input-field">
+                    <label for="target-pb">P/B mục tiêu</label>
+                    <input type="text" class="input-val target-input" id="target-pb" placeholder="Nhập P/B..." inputmode="decimal">
+                </div>
+                <div class="input-field">
+                    <label for="growth-base">Tăng trưởng EPS dự phóng 1 năm (%) <span class="vl-field-hint">(trống = dùng EPS hiện tại)</span></label>
+                    <input type="text" class="input-val target-input" id="growth-base" placeholder="VD: 15" inputmode="decimal" data-signed="1">
                 </div>
             </div>
 
+            <details class="vl-adv" id="adv-scen">
+                <summary>Kịch bản xấu / tốt, cổ tức (DDM) và dữ liệu quý (TTM)</summary>
+                <div class="vl-adv-body">
+                    <h3 class="stock-section-title"><i class="fa-solid fa-layer-group"></i> Ba kịch bản</h3>
+                    <div class="vl-scen-form">
+                        <span></span><span class="head">Xấu</span><span class="head">Cơ sở</span><span class="head">Tốt</span>
+
+                        <span class="rowlabel">P/E mục tiêu</span>
+                        <input type="text" class="input-val" id="pe-bear" placeholder="tự động" inputmode="decimal" aria-label="P/E kịch bản xấu">
+                        <span class="vl-muted" id="base-pe" style="text-align:right">—</span>
+                        <input type="text" class="input-val" id="pe-bull" placeholder="tự động" inputmode="decimal" aria-label="P/E kịch bản tốt">
+
+                        <span class="rowlabel">P/B mục tiêu</span>
+                        <input type="text" class="input-val" id="pb-bear" placeholder="tự động" inputmode="decimal" aria-label="P/B kịch bản xấu">
+                        <span class="vl-muted" id="base-pb" style="text-align:right">—</span>
+                        <input type="text" class="input-val" id="pb-bull" placeholder="tự động" inputmode="decimal" aria-label="P/B kịch bản tốt">
+
+                        <span class="rowlabel">Tăng trưởng EPS (%)</span>
+                        <input type="text" class="input-val" id="growth-bear" placeholder="tự động" inputmode="decimal" data-signed="1" aria-label="Tăng trưởng kịch bản xấu">
+                        <span class="vl-muted" id="base-growth" style="text-align:right">—</span>
+                        <input type="text" class="input-val" id="growth-bull" placeholder="tự động" inputmode="decimal" data-signed="1" aria-label="Tăng trưởng kịch bản tốt">
+                    </div>
+                    <p class="vl-hint">Số mờ trong ô là giá trị tự động. Để trống thì xấu/tốt tự lấy bội số cơ sở −/+20% và tăng trưởng cơ sở −/+10 điểm. Có tăng trưởng thì định giá trên EPS dự phóng; BVPS dự phóng = BVPS + EPS dự phóng − cổ tức.</p>
+
+                    <h3 class="stock-section-title"><i class="fa-solid fa-hand-holding-dollar"></i> Chiết khấu cổ tức (DDM)</h3>
+                    <div class="input-field-grid">
+                        <div class="input-field">
+                            <label for="val-ke">Lợi suất yêu cầu ke (%/năm)</label>
+                            <input type="text" class="input-val" id="val-ke" placeholder="VD: 12" inputmode="decimal">
+                        </div>
+                        <div class="input-field">
+                            <label for="val-gdiv">Tăng trưởng cổ tức dài hạn g (%)</label>
+                            <input type="text" class="input-val" id="val-gdiv" placeholder="VD: 4" inputmode="decimal" data-signed="1">
+                        </div>
+                    </div>
+                    <p class="vl-hint">Cần có cổ tức/cổ phiếu ở mục bổ sung và ke &gt; g. Giá trị = cổ tức × (1+g) ÷ (ke − g).</p>
+
+                    <h3 class="stock-section-title"><i class="fa-solid fa-calendar-days"></i> Dữ liệu quý (để tính EPS và P/E 4 quý gần nhất)</h3>
+                    <div class="vl-qform">
+                        <div class="input-field"><label for="q-year">Năm</label><input type="number" class="input-val" id="q-year" value="2026" style="text-align:center"></div>
+                        <div class="input-field"><label for="q-quarter">Quý</label>
+                            <select id="q-quarter" class="vl-sel"><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select></div>
+                        <div class="input-field"><label for="q-lnst">LNST quý <span class="vl-field-hint unit-text"></span></label><input type="text" class="input-val" id="q-lnst" inputmode="decimal" data-signed="1"></div>
+                        <div class="input-field"><label for="q-rev">Doanh thu quý <span class="vl-field-hint">(tuỳ chọn)</span></label><input type="text" class="input-val" id="q-rev" inputmode="decimal"></div>
+                        <div class="input-field"><label>&nbsp;</label><button type="button" class="btn-refresh" onclick="addQuarter()"><i class="fa-solid fa-plus"></i> Thêm / sửa quý</button></div>
+                    </div>
+                    <div class="vl-qlist" id="q-list"></div>
+                    <p class="vl-hint" id="q-ttm"></p>
+                </div>
+            </details>
+
+            <h3 class="stock-section-title"><i class="fa-solid fa-lightbulb"></i> Luận Điểm Đầu Tư</h3>
+            <textarea class="vl-textarea" id="val-thesis" maxlength="2000" placeholder="Vì sao đáng mua / không mua? Rủi ro chính? Điều gì sẽ làm bạn đổi ý?" aria-label="Luận điểm đầu tư"></textarea>
+
         </div>
+
+        <h3 class="stock-section-title" style="margin-top:26px"><i class="fa-solid fa-flag-checkered"></i> Kết Quả Định Giá</h3>
+        <div class="vl-card" id="result-card" style="margin-bottom:0">
+            <div id="res-hero"></div>
+            <div class="vl-result-grid" style="margin-top:16px">
+                <div><h3 class="vl-card-title"><i class="fa-solid fa-layer-group"></i> Ba kịch bản<span class="vl-muted">% so với giá hiện tại</span></h3><div id="res-scen"></div></div>
+                <div><h3 class="vl-card-title"><i class="fa-solid fa-ruler-horizontal"></i> Khoảng giá<span class="vl-muted">VND/cổ phiếu</span></h3><div id="res-ff"></div></div>
+            </div>
+            <div id="res-notes"></div>
+        </div>
+        <p class="vl-hint">Kết quả là công cụ tham khảo dựa trên số liệu và giả định bạn nhập; không phải khuyến nghị đầu tư.</p>
 
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791500000000"></script>
-    <script src="script.js?v=1789060000000"></script>
+    <script src="../../api.js?v=1791800000000"></script>
+    <script src="../../lib/valuation-calc.js?v=1791800000000"></script>
+    <script src="../valuation-ui.js?v=1791800000000"></script>
+    <script src="script.js?v=1791800000000"></script>
 
 </body>
 </html>

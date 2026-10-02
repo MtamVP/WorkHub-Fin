@@ -16,7 +16,7 @@ describe('stock-history: validateRequest', () => {
     [{ symbols: ['A;DROP'], from: '2026-01-01', to: '2026-01-02' }, /không hợp lệ/],
     [{ symbols: ['SSI'], from: '01/01/2026', to: '2026-01-02' }, /Ngày/],
     [{ symbols: ['SSI'], from: '2026-02-01', to: '2026-01-01' }, /Khoảng ngày/],
-    [{ symbols: ['SSI'], from: '2024-01-01', to: '2026-01-01' }, new RegExp('tối đa ' + MAX_RANGE_DAYS)],
+    [{ symbols: ['SSI'], from: '2015-01-01', to: '2026-01-01' }, new RegExp('tối đa ' + MAX_RANGE_DAYS)],
     [{ symbols: Array.from({ length: MAX_SYMBOLS + 1 }, (_, i) => 'A' + i), from: '2026-01-01', to: '2026-01-02' }, new RegExp('Tối đa ' + MAX_SYMBOLS)],
   ])('từ chối yêu cầu xấu %#', (body, re) => {
     expect(validateRequest(body).error).toMatch(re);

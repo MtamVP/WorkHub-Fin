@@ -1805,12 +1805,16 @@ const API = {
         // --- Danh mục hiện tại: khối lượng + giá vốn (từ sổ lệnh) ghép với giá TT (nhập tay/tự động) ---
         // Giá mục tiêu suy ra từ trang Định Giá CP: trung bình các giá theo P/E và P/B mục tiêu (chỉ lấy
         // phần dương). EPS/BVPS dùng đúng công thức của stocksheet/autosheet/script.js (mệnh giá 10.000).
+        // Hồ sơ lưu từ máy tính định giá mới có sẵn fair_value (giá hợp lý theo mẫu ngành + kịch bản cơ sở) -> dùng luôn.
+        // Hồ sơ cũ chưa có: tính lại như trước, đọc cả khoá v1/v2/v3 lẫn snake_case của dữ liệu thời Google Sheet.
         _valuationTarget: (d) => {
-            const v1 = Number(d && d.v1) || 0;
+            const fair = Number(d && d.fair_value);
+            if (fair > 0) return fair;
+            const v1 = Number(d && (d.v1 || d.charter_capital)) || 0;
             if (!v1) return null;
-            const eps = (Number(d.v3) || 0) / v1 * 10000;
-            const bvps = (Number(d.v2) || 0) / v1 * 10000;
-            const parts = [(Number(d.targetPE) || 0) * eps, (Number(d.targetPB) || 0) * bvps].filter(p => p > 0);
+            const eps = (Number(d.v3 || d.lnst) || 0) / v1 * 10000;
+            const bvps = (Number(d.v2 || d.equity) || 0) / v1 * 10000;
+            const parts = [(Number(d.targetPE || d.target_pe) || 0) * eps, (Number(d.targetPB || d.target_pb) || 0) * bvps].filter(p => p > 0);
             return parts.length ? parts.reduce((s, p) => s + p, 0) / parts.length : null;
         },
 
@@ -2766,11 +2770,156 @@ const API = {
             const symbol = String(payload.symbol || '').trim().toUpperCase();
             const year = Number(payload.year) || new Date().getFullYear();
             if (!symbol) throw new Error("Thiếu mã cổ phiếu");
+            const { email: _omit, ...record } = payload; // email chỉ để xác định người lưu, không nằm trong hồ sơ
             const { error } = await sbClient.from('finance_stock_valuations').upsert({
-                symbol, year, data: { ...payload, symbol, year }, updated_by: email || null, updated_at: new Date().toISOString()
+                symbol, year, data: { ...record, symbol, year }, updated_by: email || null, updated_at: new Date().toISOString()
             }, { onConflict: 'symbol,year' });
             if (error) throw error;
             return `Lưu định giá "${symbol}" (${year}) thành công!`;
+        },
+
+        // Xoá 1 hồ sơ (mã, năm) — dùng để dọn dữ liệu nhập thử. Dữ liệu quý của mã giữ nguyên (còn dùng cho các năm khác).
+        deleteValuation: async (symbol, year) => {
+            const sym = String(symbol || '').trim().toUpperCase();
+            if (!sym || !(Number(year) > 0)) throw new Error("Thiếu mã hoặc năm");
+            const { error } = await sbClient.from('finance_stock_valuations').delete().eq('symbol', sym).eq('year', Number(year));
+            if (error) throw error;
+            return `Đã xoá định giá ${sym} (${year})`;
+        },
+
+        // Mọi hồ sơ định giá (mỗi mã nhiều năm, năm mới trước). Chỉ số/kết luận do lib/valuation-calc.js tính ở trình duyệt.
+        getAllValuations: async () => {
+            const { data, error } = await sbClient.from('finance_stock_valuations')
+                .select('symbol, year, data, updated_at, updated_by').order('symbol').order('year', { ascending: false });
+            if (error) throw error;
+            return (data || []).slice().sort((a, b) => (a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0) || (b.year - a.year));
+        },
+
+        // Dữ liệu quý (LNST, doanh thu) của 1 mã để tính TTM; cùng đơn vị với báo cáo năm.
+        getQuarters: async (symbol) => {
+            const { data, error } = await sbClient.from('finance_stock_quarters').select('*')
+                .eq('symbol', String(symbol || '').trim().toUpperCase())
+                .order('year', { ascending: false }).order('quarter', { ascending: false });
+            if (error) throw error;
+            return (data || []).slice().sort((a, b) => (b.year - a.year) || (b.quarter - a.quarter));
+        },
+        saveQuarter: async (payload, email) => {
+            const symbol = String(payload.symbol || '').trim().toUpperCase();
+            const year = Number(payload.year), quarter = Number(payload.quarter);
+            if (!symbol) throw new Error("Thiếu mã cổ phiếu");
+            if (!(year >= 2000 && year <= 2100)) throw new Error("Năm không hợp lệ");
+            if (![1, 2, 3, 4].includes(quarter)) throw new Error("Quý phải từ 1 đến 4");
+            const lnst = Number(payload.lnst);
+            if (payload.lnst === '' || payload.lnst === null || payload.lnst === undefined || !isFinite(lnst)) throw new Error("Thiếu lợi nhuận sau thuế của quý");
+            const rev = payload.revenue === '' || payload.revenue === null || payload.revenue === undefined ? null : Number(payload.revenue);
+            if (rev !== null && !isFinite(rev)) throw new Error("Doanh thu không hợp lệ");
+            const { error } = await sbClient.from('finance_stock_quarters').upsert({
+                symbol, year, quarter, lnst, revenue: rev, updated_by: email || null, updated_at: new Date().toISOString()
+            }, { onConflict: 'symbol,year,quarter' });
+            if (error) throw error;
+            return `Đã lưu Q${quarter}/${year} của ${symbol}`;
+        },
+        deleteQuarter: async (symbol, year, quarter) => {
+            const { error } = await sbClient.from('finance_stock_quarters').delete()
+                .eq('symbol', String(symbol || '').trim().toUpperCase()).eq('year', Number(year)).eq('quarter', Number(quarter));
+            if (error) throw error;
+            return "Đã xoá quý";
+        },
+
+        // Giá hiện tại của nhiều mã: ưu tiên giá trong Bàn Tài Sản của người dùng (cron cập nhật, còn mới), thiếu thì lấy giá đóng cửa
+        // gần nhất từ máy chủ (stock-history). Trả { SYMBOL: { price, date, source: 'portfolio' | 'market' } }; mã không lấy được thì vắng mặt.
+        getLivePrices: async (symbols, email) => {
+            const clean = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
+            const out = {};
+            if (!clean.length) return out;
+            const userId = email ? await getUserId(email) : null;
+            if (userId) {
+                const { data } = await sbClient.from('finance_holdings_price')
+                    .select('symbol, market_price, locked, price_date, price_source, updated_at').eq('user_id', userId).in('symbol', clean);
+                (data || []).forEach(r => {
+                    const price = Number(r.market_price) || 0;
+                    const meta = API.asset._priceMeta({ price, locked: !!r.locked, priceDate: r.price_date, priceSource: r.price_source, updatedAt: r.updated_at }, price);
+                    if (price > 0 && !meta.stale) out[r.symbol] = { price, date: meta.date, source: 'portfolio' };
+                });
+            }
+            const missing = clean.filter(s => !out[s]);
+            const to = new Date().toISOString().slice(0, 10);
+            const from = new Date(Date.now() - 12 * 86400000).toISOString().slice(0, 10);
+            for (let i = 0; i < missing.length; i += 20) {
+                try {
+                    const series = await API.asset.getPriceHistory(missing.slice(i, i + 20), from, to);
+                    Object.keys(series || {}).forEach(sym => {
+                        const rows = series[sym] || [];
+                        if (!rows.length) return;
+                        const [date, close] = rows[rows.length - 1];
+                        if (Number(close) > 0) out[sym] = { price: Number(close), date, source: 'market' };
+                    });
+                } catch (e) { /* không lấy được giá thị trường -> bảng dùng giá đã lưu trong hồ sơ */ }
+            }
+            return out;
+        },
+
+        // Bảng so sánh: mỗi mã 1 dòng (năm mới nhất + năm liền trước nếu có để tính tăng trưởng), kèm giá hiện tại,
+        // dữ liệu quý, và cờ đang nắm / đang theo dõi của người dùng.
+        getOverview: async (email) => {
+            const rows = await API.stock.getAllValuations();
+            const { data: qrows } = await sbClient.from('finance_stock_quarters').select('symbol, year, quarter, lnst, revenue');
+            const quartersBy = {};
+            (qrows || []).forEach(q => { (quartersBy[q.symbol] = quartersBy[q.symbol] || []).push(q); });
+            const latest = {};
+            rows.forEach(r => { // rows đã xếp theo mã, năm giảm dần
+                const cur = latest[r.symbol];
+                if (!cur) latest[r.symbol] = { row: r, prev: null };
+                else if (!cur.prev && r.year === cur.row.year - 1) cur.prev = r;
+            });
+            const symbols = Object.keys(latest);
+            const userId = email ? await getUserId(email) : null;
+            let held = new Set(), watched = new Set();
+            if (userId && symbols.length) {
+                try { held = new Set((await API.asset.computeHoldings(userId)).map(h => h.symbol)); } catch (e) { /* bỏ nhãn đang nắm */ }
+                const { data: wl } = await sbClient.from('finance_watchlist').select('symbol').eq('user_id', userId);
+                watched = new Set((wl || []).map(w => w.symbol));
+            }
+            const live = await API.stock.getLivePrices(symbols, email);
+            return symbols.map(symbol => {
+                const { row, prev } = latest[symbol];
+                const lp = live[symbol];
+                return {
+                    symbol, year: row.year, data: row.data, prev: prev ? prev.data : null, quarters: quartersBy[symbol] || [],
+                    price: lp ? lp.price : 0, priceSource: lp ? lp.source : null, priceDate: lp ? lp.date : null,
+                    held: held.has(symbol), watched: watched.has(symbol), updatedAt: row.updated_at, updatedBy: row.updated_by
+                };
+            });
+        },
+
+        // Áp dụng kết quả định giá vào danh mục của NGƯỜI DÙNG: giá mục tiêu -> mã đang nắm (ngưỡng cảnh báo mục tiêu) và/hoặc mục theo dõi;
+        // giá muốn mua -> Theo Dõi (thêm mới nếu chưa có). Dùng lại đúng các hàm đã có nên cảnh báo email/desktop chạy như cũ.
+        pushToPortfolio: async (email, symbol, levels) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const sym = String(symbol || '').trim().toUpperCase();
+            if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+            const target = Number(levels && levels.targetPrice) || 0;
+            const buy = Number(levels && levels.buyBelow) || 0;
+            if (!(target > 0) && !(buy > 0)) throw new Error("Chưa có mức giá nào để áp dụng");
+            const held = (await API.asset.computeHoldings(userId)).some(h => h.symbol === sym);
+            const { data: wl } = await sbClient.from('finance_watchlist').select('id').eq('user_id', userId).eq('symbol', sym).maybeSingle();
+            const done = [];
+            if (target > 0 && held) {
+                await API.asset.setHoldingLevel(email, sym, 'target', target);
+                done.push('đặt giá mục tiêu cho mã đang nắm');
+            }
+            if (wl) {
+                const patch = {};
+                if (buy > 0) patch.buyBelow = buy;
+                if (target > 0) patch.targetPrice = target;
+                await API.asset.watchlist.update(email, wl.id, patch);
+                done.push('cập nhật mục Theo Dõi');
+            } else if (buy > 0 || (target > 0 && !held)) {
+                await API.asset.watchlist.add(email, { symbol: sym, buyBelow: buy, targetPrice: target, note: 'Từ Định Giá CP' });
+                done.push('thêm vào Theo Dõi');
+            }
+            return `${sym}: đã ${done.join(' và ')}`;
         }
     },
     settings: {
@@ -3034,7 +3183,7 @@ const API = {
         _PK: { // upsert onConflict column(s) per table -- most default to 'id'
             app_settings: 'key', finance_stocks: 'symbol', user_status: 'uid',
             lounge_players: 'email', task_assignees: 'task_id,user_email',
-            finance_holdings_price: 'user_id,symbol'
+            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol'
         },
         listLocal: async () => {
             if (!window.__TAURI__ || !window.__TAURI__.fs) return [];
@@ -3072,8 +3221,8 @@ const API = {
                 'project_milestones', 'files', 'events', 'app_settings', 'fin_roles', 'sci_roles',
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_holdings_price', 'finance_benchmark_prices',
-                'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stocks',
-                'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
+                'finance_watchlist', 'finance_allocation_targets', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -3531,6 +3680,7 @@ const MUTATING_ACTIONS = new Set([
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
+    'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
@@ -3675,6 +3825,13 @@ async function _dispatchAction(action, params = {}) {
             case 'getStockDetail': result = await API.stock.getStockDetail(params.symbol, params.year); break;
             case 'getStockHistory': result = await API.stock.getStockHistory(params.symbol); break;
             case 'saveStockValuation': result = await API.stock.saveStockValuation(params, params.email); break;
+            case 'deleteStockValuation': result = await API.stock.deleteValuation(params.symbol, params.year); break;
+            case 'getStockOverview': result = await API.stock.getOverview(params.email); break;
+            case 'getStockQuarters': result = await API.stock.getQuarters(params.symbol); break;
+            case 'saveStockQuarter': result = await API.stock.saveQuarter(params, params.email); break;
+            case 'deleteStockQuarter': result = await API.stock.deleteQuarter(params.symbol, params.year, params.quarter); break;
+            case 'getStockLivePrices': result = await API.stock.getLivePrices(params.symbols, params.email); break;
+            case 'pushStockToPortfolio': result = await API.stock.pushToPortfolio(params.email, params.symbol, { targetPrice: params.targetPrice, buyBelow: params.buyBelow }); break;
 
             case 'getMyFinRoles': result = await API.finRoles.getMyRoles(params.email); break;
             case 'listFinRoles': result = await API.finRoles.listAll(); break;
