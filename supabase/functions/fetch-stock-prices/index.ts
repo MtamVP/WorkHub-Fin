@@ -1,4 +1,5 @@
-// Edge Function: fetch-stock-prices (v3) -- bản lưu trong repo của hàm đang chạy trên Supabase.
+// Edge Function: fetch-stock-prices (v4) -- bản lưu trong repo của hàm đang chạy trên Supabase.
+// v4: lấy giá cả mã trong danh sách theo dõi (finance_watchlist) + tự chụp NAV mỗi ngày giao dịch (finance_nav_history, xem nav.ts).
 // Triển khai: Supabase MCP deploy_edge_function (verify_jwt = true), file này là nguồn; sửa ở đây rồi deploy lại.
 // - Lấy giá đóng cửa/giá gần nhất cho mọi mã CP đang được theo dõi trong finance_transactions và
 //   cập nhật finance_holdings_price (bỏ qua các cặp user/mã đã khóa giá).
@@ -11,6 +12,7 @@
 // dùng SERVICE_ROLE_KEY do Supabase cấp cho hàm. Body tuỳ chọn {dryRun:true, symbols:[...]} chỉ để
 // chẩn đoán nguồn (tối đa 5 mã, KHÔNG ghi dữ liệu).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildNavRows, heldQuantities, isWeekday } from "./nav.ts";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
 const SYMBOL_RE = /^[A-Z0-9]{1,12}$/;
@@ -120,6 +122,41 @@ async function syncVnIndex(supabase: any): Promise<{ rows: number; latest: strin
   return { rows: written, latest: rows.length ? rows[rows.length - 1].price_date : latestRow?.price_date ?? null };
 }
 
+async function snapshotNav(supabase: any, latestIndexDate: string | null): Promise<{ date: string | null; rows: number; skipped?: string; error?: string }> {
+  const today = vnDate(Math.floor(Date.now() / 1000));
+  if (!isWeekday(today)) return { date: today, rows: 0, skipped: "cuối tuần" };
+  if (latestIndexDate !== today) return { date: today, rows: 0, skipped: "chưa có phiên hôm nay" };
+  try {
+    const [{ data: txns }, { data: actions }, { data: priceRows }, { data: assets }, { data: flows }] = await Promise.all([
+      supabase.from("finance_transactions").select("user_id, symbol, type, quantity, trade_date, created_at").is("deleted_at", null),
+      supabase.from("finance_corporate_actions").select("user_id, symbol, action_type, ratio, ex_date, created_at").is("deleted_at", null),
+      supabase.from("finance_holdings_price").select("user_id, symbol, market_price"),
+      supabase.from("finance_assets").select("user_id, cash, debt"),
+      supabase.from("finance_cash_flows").select("user_id, flow_type, amount").is("deleted_at", null).in("flow_type", ["deposit", "withdrawal"]),
+    ]);
+    const held = heldQuantities((txns ?? []) as any, (actions ?? []) as any);
+    const prices = new Map<string, Map<string, number>>();
+    for (const r of priceRows ?? []) {
+      if (!prices.has(r.user_id)) prices.set(r.user_id, new Map());
+      prices.get(r.user_id)!.set(r.symbol, Number(r.market_price) || 0);
+    }
+    const assetMap = new Map<string, { cash: number; debt: number }>();
+    for (const a of assets ?? []) assetMap.set(a.user_id, { cash: Number(a.cash) || 0, debt: Number(a.debt) || 0 });
+    const contributed = new Map<string, number>();
+    for (const f of flows ?? []) contributed.set(f.user_id, (contributed.get(f.user_id) ?? 0) + (f.flow_type === "withdrawal" ? -Number(f.amount) : Number(f.amount)));
+    // Chỉ chụp cho user ĐÃ có dòng finance_assets (đã từng dùng Bàn Tài Sản): tránh tạo dữ liệu cho tài khoản chưa dùng
+    const rows = buildNavRows(today, held, prices, assetMap, contributed).filter((r) => assetMap.has(r.user_id));
+    if (!rows.length) return { date: today, rows: 0 };
+    const { error } = await supabase.from("finance_nav_history").upsert(rows, { onConflict: "user_id,snapshot_date" });
+    if (error) return { date: today, rows: 0, error: error.message };
+    // Giữ finance_assets.nav (trang Tổng hợp team đọc cột này) khớp với NAV mới
+    for (const r of rows) await supabase.from("finance_assets").update({ nav: r.nav }).eq("user_id", r.user_id);
+    return { date: today, rows: rows.length };
+  } catch (e) {
+    return { date: today, rows: 0, error: String((e as Error).message || e) };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
@@ -151,6 +188,14 @@ Deno.serve(async (req: Request) => {
     if (!t.symbol || !t.user_id) continue;
     if (!usersBySymbol.has(t.symbol)) usersBySymbol.set(t.symbol, new Set());
     usersBySymbol.get(t.symbol)!.add(t.user_id as string);
+  }
+
+  // Mã trong DANH SÁCH THEO DÕI (chưa mua) cũng cần giá để canh giá muốn mua / hiện upside.
+  const { data: watchRows } = await supabase.from("finance_watchlist").select("symbol, user_id");
+  for (const w of watchRows ?? []) {
+    if (!w.symbol || !w.user_id) continue;
+    if (!usersBySymbol.has(w.symbol)) usersBySymbol.set(w.symbol, new Set());
+    usersBySymbol.get(w.symbol)!.add(w.user_id as string);
   }
 
   // Giá đang lưu (để kiểm tra độ hợp lý của nguồn dự phòng) + tập (user:symbol) đã khóa
@@ -195,9 +240,13 @@ Deno.serve(async (req: Request) => {
 
   const index = await syncVnIndex(supabase);
 
+  // Chụp NAV mỗi ngày giao dịch (chỉ khi VN-Index đã có phiên của chính hôm nay -> loại cuối tuần/ngày lễ/trước giờ mở cửa).
+  // Ghi đè cùng 1 dòng trong ngày nên dòng cuối phiên là NAV chốt phiên.
+  const nav = await snapshotNav(supabase, index.latest);
+
   const status = {
     ranAt: new Date().toISOString(), startedAt,
-    symbols: usersBySymbol.size, priced, rowsUpdated, rowsSkippedLocked, failed, sources, index,
+    symbols: usersBySymbol.size, priced, rowsUpdated, rowsSkippedLocked, failed, sources, index, nav,
   };
   await supabase.from("app_settings").upsert({
     key: "price_fetch_status", value: JSON.stringify(status), updated_by: "cron", updated_at: status.ranAt,

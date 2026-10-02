@@ -11,7 +11,7 @@
 // ALERT_FROM_EMAIL (tuỳ chọn, mặc định "WorkHub <onboarding@resend.dev>" -- chỉ gửi được tới email chủ tài khoản Resend;
 // muốn gửi cho nhiều người phải xác minh tên miền ở Resend rồi đặt địa chỉ gửi thuộc tên miền đó).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildEmail, evaluateAlerts, heldQuantities, valuationTarget, vnDate, type Alert, type PriceRow } from "./logic.ts";
+import { buildEmail, evaluateAlerts, evaluateWatchAlerts, heldQuantities, valuationTarget, vnDate, type Alert, type PriceRow, type WatchRow } from "./logic.ts";
 
 // App desktop gọi hàm này từ trình duyệt nhúng (origin http://tauri.localhost) -> trình duyệt gửi yêu cầu
 // "hỏi đường" OPTIONS trước; thiếu header CORS thì lời gọi bị chặn ("Failed to send a request to the Edge Function").
@@ -80,10 +80,11 @@ Deno.serve(async (req: Request) => {
   if (!eligible.length) return json({ users: 0, alerts: 0, sent: 0, failed: 0 });
   const eligibleIds = eligible.map((u) => u.id as string);
 
-  const [{ data: txns }, { data: actions }, { data: priceRows }] = await Promise.all([
+  const [{ data: txns }, { data: actions }, { data: priceRows }, { data: watchRows }] = await Promise.all([
     supabase.from("finance_transactions").select("user_id, symbol, type, quantity, trade_date, created_at").in("user_id", eligibleIds).is("deleted_at", null),
     supabase.from("finance_corporate_actions").select("user_id, symbol, action_type, ratio, ex_date, created_at").in("user_id", eligibleIds).is("deleted_at", null),
     supabase.from("finance_holdings_price").select("user_id, symbol, market_price, locked, target_price, stop_loss, price_date, updated_at").in("user_id", eligibleIds),
+    supabase.from("finance_watchlist").select("user_id, symbol, buy_below").in("user_id", eligibleIds),
   ]);
   const held = heldQuantities((txns ?? []) as any, (actions ?? []) as any);
 
@@ -102,7 +103,11 @@ Deno.serve(async (req: Request) => {
   let totalAlerts = 0, sent = 0, failed = 0;
   for (const u of eligible) {
     const rows = ((priceRows ?? []) as PriceRow[]).filter((r) => r.user_id === u.id);
-    const alerts = evaluateAlerts(rows, held.get(u.id as string) ?? new Map(), valuations, now);
+    const heldOfUser = held.get(u.id as string) ?? new Map();
+    const alerts = [
+      ...evaluateAlerts(rows, heldOfUser, valuations, now),
+      ...evaluateWatchAlerts(((watchRows ?? []) as WatchRow[]).filter((w) => w.user_id === u.id), rows, heldOfUser, now),
+    ];
     if (!alerts.length) continue;
     totalAlerts += alerts.length;
 

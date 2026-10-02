@@ -131,13 +131,11 @@ function fileStamp() {
 }
 
 function downloadCsvFile(filename, rows) {
-    const blob = new Blob([FinCalc.buildCsv(rows)], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast(`Đã xuất ${filename}`, 'success');
+    const bytes = new TextEncoder().encode(FinCalc.buildCsv(rows));
+    // App desktop: hộp thoại "Lưu thành" của hệ điều hành (anchor-download không chắc chạy trong WebView); trình duyệt: tải xuống thường
+    saveBytesToDisk(filename, bytes, 'text/csv;charset=utf-8;')
+        .then(saved => { if (saved) showToast(`Đã xuất ${filename}`, 'success'); })
+        .catch(e => showToast('Lỗi xuất file: ' + escapeAssetHtml(e.message || String(e)), 'error'));
 }
 
 function exportHoldingsCsv() {
@@ -161,9 +159,9 @@ async function exportLedgerCsv() {
         if (resp.status !== 'success') throw new Error(resp.message);
         const txns = resp.data || [];
         if (!txns.length) { showToast('Chưa có lệnh giao dịch để xuất.', 'error'); return; }
-        const rows = [['Ngày', 'Loại', 'Mã', 'Khối lượng', 'Giá', 'Phí', 'Giá trị', 'Lãi/lỗ đã chốt (FIFO)', 'Ghi chú']];
+        const rows = [['Ngày', 'Loại', 'Mã', 'Khối lượng', 'Giá', 'Phí', 'Thuế', 'Giá trị', 'Lãi/lỗ đã chốt (FIFO, gộp)', 'Ghi chú']];
         txns.slice().reverse().forEach(t => rows.push([
-            t.trade_date, t.type === 'buy' ? 'Mua' : 'Bán', t.symbol, t.quantity, t.price, t.fee || 0,
+            t.trade_date, t.type === 'buy' ? 'Mua' : 'Bán', t.symbol, t.quantity, t.price, t.fee || 0, t.tax || 0,
             Math.round((Number(t.quantity) || 0) * (Number(t.price) || 0)),
             t.type === 'sell' && t.realized_pnl !== null && t.realized_pnl !== undefined ? Math.round(t.realized_pnl) : '',
             t.note || ''

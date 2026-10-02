@@ -8,7 +8,7 @@ let isAssetManager = false;
 let navChartInstance = null;
 let allocationChartInstance = null;
 let benchmarkChartInstance = null;
-const TAB_LOADED = { holdings: false, ledger: false, performance: false };
+const TAB_LOADED = { holdings: false, ledger: false, performance: false, watchlist: false, reports: false };
 const LEDGER_SUB_LOADED = { cashflow: false, corporate: false };
 const ALLOCATION_COLOR_VARS = ['--series-1', '--series-2', '--series-3', '--series-4'];
 
@@ -50,6 +50,7 @@ function pickTxnType(btn) {
     btn.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
     const hidden = document.getElementById('txn-type');
     if (hidden) hidden.value = btn.dataset.v;
+    if (typeof updateTxnFeePreview === 'function') updateTxnFeePreview();
 }
 function resetTxnTypeSeg() {
     const seg = document.querySelector('#txn-form .seg');
@@ -57,6 +58,7 @@ function resetTxnTypeSeg() {
     seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === 'buy')));
     const hidden = document.getElementById('txn-type');
     if (hidden) hidden.value = 'buy';
+    if (typeof updateTxnFeePreview === 'function') updateTxnFeePreview();
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -150,7 +152,7 @@ async function setupTargetUserSwitcher() {
         wrap.style.display = 'flex';
         select.addEventListener('change', async () => {
             targetEmail = select.value;
-            TAB_LOADED.ledger = false; TAB_LOADED.performance = false;
+            TAB_LOADED.ledger = false; TAB_LOADED.performance = false; TAB_LOADED.watchlist = false; TAB_LOADED.reports = false;
             switchAssetTab('holdings');
             await loadCashDebt();
             await loadKpis();
@@ -164,7 +166,7 @@ async function setupTargetUserSwitcher() {
 
 // --- TAB SWITCHING ---
 function switchAssetTab(tab) {
-    ['holdings', 'ledger', 'performance'].forEach(t => {
+    ['holdings', 'watchlist', 'ledger', 'performance', 'reports'].forEach(t => {
         const panel = document.getElementById('tab-' + t);
         const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
         if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -173,6 +175,9 @@ function switchAssetTab(tab) {
 
     if (tab === 'ledger' && !TAB_LOADED.ledger) { loadLedger(); TAB_LOADED.ledger = true; }
     if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
+    if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
+    else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
+    if (tab === 'reports' && !TAB_LOADED.reports) { initReportsTab(); TAB_LOADED.reports = true; }
 }
 
 // --- SỔ LỆNH: chuyển sub-tab (Giao Dịch CP / Dòng Tiền / Hành Động DN) ---
@@ -560,14 +565,14 @@ async function togglePriceLockUI(btn) {
 async function loadLedger() {
     const tbody = document.getElementById('ledger-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
         const response = await callGAS('listAssetTransactions', { email: targetEmail });
         const txns = response.data || [];
 
         if (txns.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-receipt"></i>Chưa có lệnh giao dịch nào.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><i class="fa-solid fa-receipt"></i>Chưa có lệnh giao dịch nào — thêm lệnh ở form trên, hoặc “Nhập từ sao kê”.</td></tr>';
             return;
         }
 
@@ -586,13 +591,14 @@ async function loadLedger() {
                     <td class="text-right">${Number(t.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(t.price).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(t.fee || 0).toLocaleString('en-US')}</td>
+                    <td class="text-right">${Number(t.tax || 0) > 0 ? Number(t.tax).toLocaleString('en-US') : '<span style="color:var(--text-muted);">—</span>'}</td>
                     <td class="text-right">${pnlCell}</td>
-                    <td>${escapeAssetHtml(t.note || '')}</td>
+                    <td>${escapeAssetHtml(t.note || '')}${t.import_batch ? ' <span class="tl-badge mute" title="Nhập từ sao kê">sao kê</span>' : ''}</td>
                     <td><button class="icon-btn danger" title="Xóa" onclick="deleteTxn('${t.id}')"><i class="fa-solid fa-trash"></i></button></td>
                 </tr>`;
         }).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="empty-state text-danger">Lỗi: ${e.message}</td></tr>`;
     }
 }
 
@@ -601,15 +607,18 @@ async function handleTxnSubmit(e) {
     const btn = e.target.querySelector('button[type="submit"]');
     const originalHtml = btn.innerHTML;
 
-    const txn = {
+    let txn = {
         type: document.getElementById('txn-type').value,
         symbol: document.getElementById('txn-symbol').value,
         quantity: document.getElementById('txn-quantity').value,
         price: document.getElementById('txn-price').value,
         fee: document.getElementById('txn-fee').value || 0,
+        tax: document.getElementById('txn-tax') ? (document.getElementById('txn-tax').value || 0) : 0,
         tradeDate: document.getElementById('txn-date').value,
         note: document.getElementById('txn-note').value
     };
+    // Phí/thuế để trống -> tự tính theo biểu phí (nếu đang bật); điền số thì dùng đúng số đó
+    if (typeof applyAutoFeesToTxn === 'function') txn = applyAutoFeesToTxn(txn);
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
@@ -620,6 +629,8 @@ async function handleTxnSubmit(e) {
             showToast(response.message, 'success');
             e.target.reset();
             document.getElementById('txn-date').value = new Date().toISOString().slice(0, 10);
+            if (typeof updateTxnFeePreview === 'function') updateTxnFeePreview();
+            TAB_LOADED.reports = false;
             await loadLedger();
             await loadHoldings();
             await loadKpis();

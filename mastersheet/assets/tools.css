@@ -1,0 +1,105 @@
+/* Bàn Tài Sản — công cụ mới: nhập sao kê, biểu phí, danh sách theo dõi, báo cáo lãi/lỗ theo năm, cân bằng danh mục, xuất báo cáo tháng.
+   Chỉ dùng token màu/kích thước có sẵn (finance-shared.css) nên tự theo giao diện sáng/tối. Tiền tố tl- = "tools". */
+
+/* ---- Thẻ nội dung ---- */
+.tl-card {
+  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  padding: 18px 20px; margin-bottom: 18px; box-shadow: var(--shadow-soft);
+}
+.tl-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.tl-card-head h3 { margin: 0; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 9px; color: var(--text-primary); }
+.tl-card-head h3 i { color: var(--gold); }
+.tl-card-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tl-select, .tl-input {
+  height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg-color-2); color: var(--text-primary); font: inherit; font-size: 0.85rem;
+}
+.tl-input.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.tl-select:focus, .tl-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+.tl-hint { font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; margin: 8px 0 0; }
+.tl-hint b { color: var(--text-secondary); }
+.tl-empty { padding: 26px 12px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+.tl-empty i { display: block; font-size: 1.5rem; margin-bottom: 8px; opacity: 0.5; }
+
+/* ---- Ô số liệu tóm tắt ---- */
+.tl-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tl-kpi { padding: 11px 13px; border: 1px solid var(--border-light, var(--border-color)); border-radius: var(--radius-sm); background: var(--bg-color-2); min-width: 0; }
+.tl-kpi .k { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.tl-kpi .v { display: block; margin-top: 4px; font-size: 1.05rem; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tl-kpi .s { display: block; margin-top: 2px; font-size: 0.7rem; color: var(--text-muted); }
+.tl-kpi.big { grid-column: span 2; }
+.tl-up { color: var(--success-color); } .tl-down { color: var(--danger-color); }
+
+/* ---- Bảng chi tiết có thể thu gọn ---- */
+.tl-details { margin-top: 14px; }
+.tl-details > summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); padding: 6px 0; }
+.tl-details > summary:hover { color: var(--text-primary); }
+.tl-details[open] > summary { margin-bottom: 8px; }
+
+/* ---- Huy hiệu / tín hiệu ---- */
+.tl-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: var(--radius-pill); font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.tl-badge.ok { color: var(--success-color); background: var(--success-bg); }
+.tl-badge.bad { color: var(--danger-color); background: var(--danger-bg); }
+.tl-badge.warn { color: var(--warning-color); background: var(--warning-bg); }
+.tl-badge.info { color: var(--info-color, var(--finance-accent)); background: var(--info-bg, var(--finance-accent-subtle)); }
+.tl-badge.mute { color: var(--text-muted); background: var(--bg-color-2); border: 1px solid var(--border-color); }
+tr.tl-row-signal td { background: color-mix(in srgb, var(--success-color) 9%, transparent); }
+
+/* ---- Nút công cụ phụ ---- */
+.tl-link { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 0.8rem; padding: 2px 4px; display: inline-flex; align-items: center; gap: 5px; }
+.tl-link:hover { color: var(--gold); }
+.tl-danger:hover { color: var(--danger-color); }
+
+/* ---- Biểu phí & tuỳ chọn dưới form lệnh ---- */
+.tl-fee-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: -4px 0 14px; }
+.tl-check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; }
+.tl-check input { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; }
+.tl-fee-panel { display: none; gap: 12px; align-items: end; flex-wrap: wrap; padding: 12px 14px; margin: 0 0 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); }
+.tl-fee-panel.open { display: flex; }
+.tl-fee-panel label { display: flex; flex-direction: column; gap: 5px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.tl-fee-panel .tl-input { width: 110px; }
+
+/* ---- Hộp thoại nhập sao kê ---- */
+.tl-modal .modal-card { max-width: 980px; }
+.tl-modal .modal-body { display: flex; flex-direction: column; gap: 16px; }
+.tl-drop {
+  border: 2px dashed var(--border-strong); border-radius: var(--radius-md); padding: 30px 20px; text-align: center; cursor: pointer;
+  color: var(--text-secondary); transition: border-color .15s ease, background .15s ease;
+}
+.tl-drop:hover, .tl-drop.drag { border-color: var(--gold); background: var(--gold-dim); }
+.tl-drop i { font-size: 1.8rem; color: var(--gold); display: block; margin-bottom: 10px; }
+.tl-drop b { color: var(--text-primary); }
+.tl-drop small { display: block; margin-top: 6px; color: var(--text-muted); }
+.tl-steps { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); }
+.tl-steps span { padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border-color); }
+.tl-steps span.on { color: var(--on-gold, #1A1407); background: var(--gold); border-color: var(--gold); font-weight: 700; }
+.tl-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.tl-map label { display: flex; flex-direction: column; gap: 5px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.tl-map label.req.missing { color: var(--danger-color); }
+.tl-map .tl-select { width: 100%; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.tl-opts { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+.tl-summary { display: flex; gap: 8px; flex-wrap: wrap; }
+.tl-preview { max-height: 300px; overflow: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.tl-preview table { margin: 0; }
+.tl-preview td.err { color: var(--danger-color); font-size: 0.75rem; }
+.tl-result { padding: 14px 16px; border-radius: var(--radius-sm); border: 1px solid color-mix(in srgb, var(--success-color) 40%, transparent); background: var(--success-bg); display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tl-result.bad { border-color: color-mix(in srgb, var(--danger-color) 40%, transparent); background: var(--danger-bg); }
+
+/* ---- Cân bằng danh mục ---- */
+.tl-rebal-opts { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.tl-rebal-opts label { display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; color: var(--text-secondary); }
+.tl-rebal-opts .tl-input { width: 72px; }
+.tl-sumline { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--text-secondary); margin: 10px 0; }
+.tl-warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--warning-color); background: var(--warning-bg); margin-bottom: 8px; }
+.tl-act { font-weight: 700; font-family: var(--font-mono); }
+.tl-act.buy { color: var(--success-color); } .tl-act.sell { color: var(--danger-color); }
+
+/* ---- Báo cáo cuối tháng ---- */
+.tl-month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: end; margin-bottom: 12px; }
+.tl-month-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.tl-month-grid .tl-select { width: 100%; text-transform: none; font-weight: 500; letter-spacing: 0; }
+.tl-note-list { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.tl-note-list li { font-size: 0.78rem; color: var(--warning-color); display: flex; gap: 8px; }
+
+@media (max-width: 720px) { .tl-kpi.big { grid-column: span 1; } .tl-modal .modal-card { max-width: 100%; } }
+@media print { .tl-card-tools, .tl-link, .tl-fee-row, .tl-fee-panel { display: none !important; } }

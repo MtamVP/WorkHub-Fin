@@ -222,6 +222,21 @@
             }
         });
 
+        // Mã trong DANH SÁCH THEO DÕI (chưa mua) chạm giá muốn mua: mỗi mức báo tối đa 1 lần/ngày, bỏ qua giá đã cũ và mã đã giữ.
+        var watch;
+        try { watch = await window.callGAS('getWatchlist', { email: email }); }
+        catch (e) { watch = null; }
+        if (watch && watch.status === 'success' && Array.isArray(watch.data)) {
+            watch.data.forEach(function (w) {
+                if (w.signal !== 'buy' || w.held) return;
+                var key = w.symbol + ':buy:' + w.buyBelow;
+                if (notified.has(key)) return;
+                fire('Tới giá muốn mua: ' + w.symbol, 'Giá ' + fmt(w.price) + ' ≤ mức muốn mua ' + fmt(w.buyBelow) + ' — mã trong danh sách theo dõi.');
+                notified.add(key);
+                changed = true;
+            });
+        }
+
         if (changed) saveNotifiedTo(priceAlertsKey(), notified);
     }
 

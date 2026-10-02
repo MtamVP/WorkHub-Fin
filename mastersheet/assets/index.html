@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.7">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791800000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,8 +120,10 @@
         <!-- Tab nav -->
         <div class="task-view-toggle asset-tab-toggle">
             <button class="view-toggle-btn active" data-tab="holdings" onclick="switchAssetTab('holdings')"><i class="fa-solid fa-layer-group"></i> Danh Mục</button>
+            <button class="view-toggle-btn" data-tab="watchlist" onclick="switchAssetTab('watchlist')"><i class="fa-solid fa-eye"></i> Theo Dõi</button>
             <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh</button>
             <button class="view-toggle-btn" data-tab="performance" onclick="switchAssetTab('performance')"><i class="fa-solid fa-chart-area"></i> Hiệu Suất</button>
+            <button class="view-toggle-btn" data-tab="reports" onclick="switchAssetTab('reports')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
         </div>
 
         <!-- Tab: Danh Mục -->
@@ -163,6 +166,54 @@
             </div>
         </section>
 
+        <!-- Tab: Theo Dõi (mã chưa mua) -->
+        <section id="tab-watchlist" class="asset-tab-panel" style="display:none;">
+            <form id="watch-form" class="txn-form">
+                <h3 class="txn-form-title"><i class="fa-solid fa-eye"></i> Thêm Mã Vào Danh Sách Theo Dõi</h3>
+                <div class="txn-form-grid">
+                    <div class="txn-field">
+                        <label for="watch-symbol">Mã</label>
+                        <input type="text" id="watch-symbol" placeholder="VD: FPT" required maxlength="12" style="text-transform:uppercase;">
+                    </div>
+                    <div class="txn-field">
+                        <label for="watch-buy">Giá muốn mua (≤)</label>
+                        <input type="number" id="watch-buy" placeholder="0" min="0" step="any">
+                    </div>
+                    <div class="txn-field">
+                        <label for="watch-target">Giá mục tiêu (tùy chọn)</label>
+                        <input type="number" id="watch-target" placeholder="Mặc định: Định Giá CP" min="0" step="any">
+                    </div>
+                    <div class="txn-field txn-field-wide">
+                        <label for="watch-note">Ghi chú</label>
+                        <input type="text" id="watch-note" placeholder="Lý do theo dõi..." maxlength="300">
+                    </div>
+                    <div class="txn-field">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Thêm</button>
+                    </div>
+                </div>
+            </form>
+            <p class="guide-text">
+                * <b>Cách dùng:</b> thêm mã bạn chưa mua và đặt <b>giá muốn mua</b>. Giá thị trường tự cập nhật như mã đang giữ; khi giá chạm mức đó, hàng được tô sáng và (nếu bạn bật “Gửi email khi giá chạm mục tiêu / cắt lỗ” ở tab Danh Mục) app gửi email cả khi đã tắt app. Mua rồi thì cảnh báo tự dừng.
+            </p>
+            <div class="spreadsheet-wrapper">
+                <table class="excel-table asset-table" id="watch-table">
+                    <thead>
+                        <tr>
+                            <th>Mã</th><th class="text-right">Giá TT</th><th class="text-right">Giá muốn mua</th>
+                            <th class="text-right" title="Giá hiện tại so với giá muốn mua">Cách mức mua</th>
+                            <th class="text-right" title="Mặc định lấy từ trang Định Giá CP, có thể nhập đè">Giá mục tiêu</th>
+                            <th class="text-right">Upside</th><th class="text-right" title="Biến động giá kể từ lúc thêm vào danh sách">Từ khi theo dõi</th>
+                            <th>Ghi chú</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="watch-body">
+                        <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- Tab: Sổ Lệnh -->
         <section id="tab-ledger" class="asset-tab-panel" style="display:none;">
             <div class="task-view-toggle ledger-sub-toggle">
@@ -196,8 +247,12 @@
                             <input type="number" id="txn-price" placeholder="0" min="0" step="any" required>
                         </div>
                         <div class="txn-field">
-                            <label for="txn-fee">Phí (tùy chọn)</label>
+                            <label for="txn-fee">Phí giao dịch</label>
                             <input type="number" id="txn-fee" placeholder="0" min="0" step="any">
+                        </div>
+                        <div class="txn-field">
+                            <label for="txn-tax" title="Thuế thu nhập cá nhân khi bán chứng khoán (mặc định 0,1% giá trị bán)">Thuế bán</label>
+                            <input type="number" id="txn-tax" placeholder="0" min="0" step="any">
                         </div>
                         <div class="txn-field">
                             <label for="txn-date">Ngày</label>
@@ -213,10 +268,21 @@
                         </div>
                     </div>
                 </form>
+                <div class="tl-fee-row">
+                    <label class="tl-check"><input type="checkbox" id="txn-auto-fees" checked onchange="onAutoFeesToggle(this)"> Tự tính phí & thuế bán theo biểu phí khi để trống</label>
+                    <button type="button" class="tl-link" onclick="toggleFeePanel()"><i class="fa-solid fa-sliders"></i> Biểu phí</button>
+                </div>
+                <div class="tl-fee-panel" id="fee-panel">
+                    <label>Phí mua (%)<input type="number" class="tl-input num" id="fee-buy-rate" min="0" max="5" step="0.01" onchange="onFeeSettingsChange()"></label>
+                    <label>Phí bán (%)<input type="number" class="tl-input num" id="fee-sell-rate" min="0" max="5" step="0.01" onchange="onFeeSettingsChange()"></label>
+                    <label>Thuế bán (%)<input type="number" class="tl-input num" id="fee-tax-rate" min="0" max="5" step="0.01" onchange="onFeeSettingsChange()"></label>
+                    <span class="tl-hint" style="max-width:360px">Mặc định 0,15% phí và 0,1% thuế bán. Chỉ áp dụng cho lệnh mới/nhập sao kê khi ô phí để trống; lưu trên máy này.</span>
+                </div>
                 <p class="guide-text">
-                    * <b>Lưu ý:</b> Giá vốn/lãi-lỗ đã chốt được tính theo phương pháp FIFO (lô mua cũ nhất bán trước) — chuẩn kế toán, không phải giá vốn bình quân đơn giản.
+                    * <b>Lưu ý:</b> Giá vốn/lãi-lỗ đã chốt được tính theo phương pháp FIFO (lô mua cũ nhất bán trước) — chuẩn kế toán, không phải giá vốn bình quân đơn giản. Cột “Lãi/lỗ đã chốt” là <b>gộp</b> (chưa trừ phí/thuế); báo cáo ròng sau phí & thuế nằm ở tab Báo Cáo.
                 </p>
                 <div class="export-bar export-bar-inline">
+                    <button type="button" class="btn-tool" onclick="openImportModal()" title="Nhập hàng loạt từ file sao kê của công ty chứng khoán (Excel/CSV)"><i class="fa-solid fa-file-import"></i> Nhập từ sao kê</button>
                     <button type="button" class="btn-tool" onclick="exportLedgerCsv()" title="Tải toàn bộ lệnh giao dịch dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
                     <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
                 </div>
@@ -225,12 +291,12 @@
                         <thead>
                             <tr>
                                 <th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">KL</th>
-                                <th class="text-right">Giá</th><th class="text-right">Phí</th>
-                                <th class="text-right">Lãi/lỗ đã chốt (FIFO)</th><th>Ghi chú</th><th></th>
+                                <th class="text-right">Giá</th><th class="text-right">Phí</th><th class="text-right">Thuế</th>
+                                <th class="text-right" title="Gộp: giá bán − giá vốn FIFO, chưa trừ phí/thuế">Lãi/lỗ đã chốt (FIFO)</th><th>Ghi chú</th><th></th>
                             </tr>
                         </thead>
                         <tbody id="ledger-body">
-                            <tr><td colspan="9" class="empty-state">Đang tải...</td></tr>
+                            <tr><td colspan="10" class="empty-state">Đang tải...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -429,16 +495,103 @@
             </div>
         </section>
 
+        <!-- Tab: Báo Cáo -->
+        <section id="tab-reports" class="asset-tab-panel" style="display:none;">
+            <div class="tl-card" id="rpt-realized">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-scale-balanced"></i> Lãi/Lỗ Đã Chốt Theo Năm</h3>
+                    <div class="tl-card-tools">
+                        <select id="rpt-year" class="tl-select" onchange="loadRealizedReport()" aria-label="Chọn năm"></select>
+                        <button type="button" class="btn-tool" onclick="exportRealizedCsv()"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
+                        <button type="button" class="btn-tool" onclick="printCurrentTab()"><i class="fa-solid fa-print"></i> In / PDF</button>
+                    </div>
+                </div>
+                <div id="rpt-realized-warn"></div>
+                <div class="tl-kpis" id="rpt-realized-kpis"></div>
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="rpt-bysymbol">
+                        <thead><tr><th>Mã</th><th class="text-right">KL bán</th><th class="text-right">Tiền thu</th><th class="text-right">Giá vốn</th><th class="text-right">Phí + thuế</th><th class="text-right">Lãi/lỗ ròng</th><th class="text-right">% trên vốn</th><th class="text-right">Thắng/Thua</th></tr></thead>
+                        <tbody id="rpt-bysymbol-body"><tr><td colspan="8" class="empty-state">Đang tải...</td></tr></tbody>
+                    </table>
+                </div>
+                <details class="tl-details">
+                    <summary>Chi tiết từng lệnh bán</summary>
+                    <div class="spreadsheet-wrapper">
+                        <table class="excel-table asset-table" id="rpt-sales">
+                            <thead><tr><th>Ngày</th><th>Mã</th><th class="text-right">KL</th><th class="text-right">Giá bán</th><th class="text-right">Giá vốn BQ</th><th class="text-right">Phí mua</th><th class="text-right">Phí bán</th><th class="text-right">Thuế</th><th class="text-right">Lãi/lỗ ròng</th><th class="text-right">Ngày giữ</th></tr></thead>
+                            <tbody id="rpt-sales-body"></tbody>
+                        </table>
+                    </div>
+                </details>
+                <p class="tl-hint">* <b>Ròng</b> = giá bán − giá vốn FIFO − phí mua của đúng lô đã bán − phí bán − thuế bán. Cổ tức tiền (tab Dòng Tiền) cộng riêng. Số liệu tham khảo để kê khai — thuế cổ tức khấu trừ tại nguồn chưa được tính.</p>
+            </div>
+
+            <div class="tl-card" id="rpt-rebalance">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-sliders"></i> Cân Bằng Danh Mục</h3>
+                    <div class="tl-card-tools">
+                        <input type="text" id="rebal-new-symbol" class="tl-input" style="width:90px;text-transform:uppercase" placeholder="Mã…" maxlength="12" onkeydown="if(event.key==='Enter'){addRebalanceSymbol()}">
+                        <button type="button" class="btn-tool" onclick="addRebalanceSymbol()"><i class="fa-solid fa-plus"></i> Thêm mã</button>
+                        <button type="button" class="btn-tool" onclick="fillRebalanceFromCurrent()" title="Điền mục tiêu = tỷ trọng hiện tại để chỉnh từ đó"><i class="fa-solid fa-wand-magic-sparkles"></i> Lấy tỷ trọng hiện tại</button>
+                        <button type="button" class="btn-save" onclick="saveRebalanceTargets()"><i class="fa-solid fa-floppy-disk"></i> Lưu mục tiêu</button>
+                    </div>
+                </div>
+                <div class="tl-rebal-opts">
+                    <label><input type="checkbox" id="rebal-cash" checked onchange="renderRebalance()"> Tính cả tiền mặt vào NAV</label>
+                    <label>Dung sai <input type="number" class="tl-input num" id="rebal-tol" value="1" min="0" step="0.5" onchange="renderRebalance()"> đ.%</label>
+                    <label>Lô <input type="number" class="tl-input num" id="rebal-lot" value="100" min="1" step="1" onchange="renderRebalance()"> cổ phiếu</label>
+                </div>
+                <div id="rebal-warn"></div>
+                <div class="spreadsheet-wrapper">
+                    <table class="excel-table asset-table" id="rebal-table">
+                        <thead><tr><th>Mã</th><th class="text-right">Giá TT</th><th class="text-right">KL đang có</th><th class="text-right">Tỷ trọng hiện tại</th><th class="text-right">Mục tiêu</th><th class="text-right">Chênh lệch</th><th>Gợi ý</th><th></th></tr></thead>
+                        <tbody id="rebal-body"><tr><td colspan="8" class="empty-state">Đang tải...</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="tl-sumline" id="rebal-sum"></div>
+                <p class="tl-hint">* Gợi ý làm tròn theo lô và ước tính phí/thuế theo Biểu phí ở Sổ Lệnh; mã đặt 0% thì bán hết. Mã có trong danh sách Theo Dõi dùng giá của danh sách đó. <b>Chỉ là gợi ý</b> — không tự đặt lệnh.</p>
+            </div>
+
+            <div class="tl-card" id="rpt-monthly">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-file-powerpoint"></i> Dữ Liệu Báo Cáo Cuối Tháng</h3>
+                </div>
+                <div class="tl-month-grid">
+                    <label>Tháng báo cáo<select id="rpt-month" class="tl-select"></select></label>
+                    <div><button type="button" class="btn-save" id="rpt-month-btn" onclick="buildMonthlyReport()"><i class="fa-solid fa-table-list"></i> Tạo dữ liệu báo cáo</button></div>
+                </div>
+                <div id="rpt-month-result"></div>
+            </div>
+        </section>
+
         <p class="guide-text">
             * <b>Hướng dẫn:</b> Khối lượng và giá vốn ở tab "Danh Mục" được tính tự động từ tab "Sổ Lệnh" — thêm lệnh mua/bán để cập nhật danh mục. Giá TT tự động cập nhật mỗi 5 phút trong phiên giao dịch; bạn vẫn có thể nhập tay và khóa giá của từng mã.
         </p>
     </div>
 
+    <div class="modal-overlay tl-modal" id="import-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-import" style="color: var(--gold);"></i> Nhập Sổ Lệnh Từ Sao Kê</h3>
+                <button type="button" class="icon-btn" onclick="closeImportModal()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="import-body"></div>
+            <div class="modal-footer" id="import-footer"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791500000000"></script>
+    <script src="../../api.js?v=1791800000000"></script>
     <script src="../../lib/finance-calc.js?v=2"></script>
-    <script src="script.js?v=1791300000000"></script>
-    <script src="insights.js?v=1791400000000"></script>
+    <script src="../../lib/portfolio-calc.js?v=1791800000000"></script>
+    <script src="../../lib/statement-import.js?v=1791800000000"></script>
+    <script src="../../lib/xlsx-writer.js?v=1791800000000"></script>
+    <script src="../../lib/monthly-report.js?v=1791800000000"></script>
+    <script src="script.js?v=1791800000000"></script>
+    <script src="insights.js?v=1791800000000"></script>
+    <script src="ledger-tools.js?v=1791800000000"></script>
+    <script src="watchlist.js?v=1791800000000"></script>
+    <script src="reports.js?v=1791800000000"></script>
 
 </body>
 </html>
