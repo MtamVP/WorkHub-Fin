@@ -444,8 +444,37 @@ fn stop_oauth_loopback(state: State<OAuthListenerState>) -> Result<(), String> {
     Ok(())
 }
 
+// Bản desktop không dùng Service Worker. Hồ sơ WebView2 của người dùng cũ còn giữ Service Worker đăng ký
+// từ các bản trước (không tự cập nhật được trong WebView2) và phát lại trang đã lưu -- hiện màn đăng nhập
+// cũ hoặc "không có bản lưu ngoại tuyến". Xoá 1 lần, TRƯỚC khi WebView2 khởi động (lúc đó chưa khoá file).
+// Chỉ ghi dấu hoàn tất khi xoá thành công, để lần mở sau thử lại nếu bị khoá.
+fn purge_stale_webview_cache() {
+    const IDENTIFIER: &str = "com.workhub.fin";
+    const MARKER: &str = "webview-purge-v1.done";
+    let Some(local) = std::env::var_os("LOCALAPPDATA") else { return };
+    let root = std::path::PathBuf::from(local).join(IDENTIFIER);
+    let marker = root.join(MARKER);
+    if marker.exists() {
+        return;
+    }
+    let profile = root.join("EBWebView").join("Default");
+    let mut all_ok = true;
+    for dir in ["Service Worker", "Cache", "Code Cache"] {
+        match std::fs::remove_dir_all(profile.join(dir)) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => all_ok = false,
+        }
+    }
+    if all_ok {
+        let _ = std::fs::create_dir_all(&root);
+        let _ = std::fs::write(&marker, b"1");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    purge_stale_webview_cache();
     let migrations = vec![Migration {
         version: 1,
         description: "init offline sync tables",

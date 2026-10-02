@@ -3437,11 +3437,18 @@ async function _dispatchAction(action, params = {}) {
 };
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('Đã kích hoạt thành công. Phạm vi:', reg.scope))
-            .catch(err => console.error('Lỗi kích hoạt:', err));
-    });
+    if (window.__TAURI__) {
+        // Bản desktop (Tauri) KHÔNG dùng Service Worker: nó phát lại trang đã lưu nên app dễ hiện giao diện cũ
+        // hoặc "không có bản lưu ngoại tuyến" sau mỗi lần cập nhật. Gỡ mọi đăng ký + cache còn sót.
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+        if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+    } else {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Đã kích hoạt thành công. Phạm vi:', reg.scope))
+                .catch(err => console.error('Lỗi kích hoạt:', err));
+        });
+    }
 }
 
 (function initPwaInstallPrompt() {

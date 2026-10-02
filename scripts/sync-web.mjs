@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dest = path.join(root, 'tauri-dist');
 const EXCLUDE_TOP_LEVEL = new Set([
   'src-tauri', 'node_modules', 'tauri-dist', '.git', '.wrangler', '.claude',
-  'package.json', 'package-lock.json', '.gitignore', 'wrangler.toml', 'scripts', 'supabase',
+  'package.json', 'package-lock.json', '.gitignore', 'wrangler.toml', 'scripts', 'supabase', 'tests',
 ]);
 
 fs.rmSync(dest, { recursive: true, force: true });
