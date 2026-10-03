@@ -58,18 +58,22 @@ if (!selfKey) {
 
 const otherKeys = Object.values(SELF_KEY_BY_NAME).filter(k => k !== selfKey);
 
-// 1. calendar-connect.js -- so tuyệt đối, fail nếu khác.
-const selfCalHash = md5('self/calendar-connect.js');
-for (const otherKey of otherKeys) {
-  const otherDir = APP_DIR_BY_NAME[Object.keys(SELF_KEY_BY_NAME).find(n => SELF_KEY_BY_NAME[n] === otherKey)];
-  const otherPath = path.join(otherDir, 'calendar-connect.js');
-  if (!fs.existsSync(otherPath)) { console.warn(`check-drift: thiếu ${otherPath}, bỏ qua so sánh calendar-connect.js.`); continue; }
-  const otherHash = md5(otherPath);
-  if (otherHash !== selfCalHash) {
-    console.error(`LỆCH: calendar-connect.js khác giữa ${selfName} và ${otherDir} (md5 ${selfCalHash} != ${otherHash}). File này được kỳ vọng giống hệt byte-for-byte cả 3 app.`);
-    failed = true;
-  } else {
-    console.log(`OK: calendar-connect.js giống hệt giữa ${selfName} và ${otherDir}.`);
+// 1. Các file dùng chung -- so tuyệt đối byte-for-byte, fail nếu khác. (Bản v4 của giao diện Không Gian Riêng: personal-hub.css và
+//    lib/personal-ui-helpers.js giống hệt cả 3 app; khác biệt màu nhấn nằm ở token --phub-* trong style.css của từng app.)
+const SHARED_FILES = ['calendar-connect.js', 'personal-hub.css', 'lib/personal-ui-helpers.js'];
+for (const rel of SHARED_FILES) {
+  const selfHash = md5(path.join('self', rel));
+  for (const otherKey of otherKeys) {
+    const otherDir = APP_DIR_BY_NAME[Object.keys(SELF_KEY_BY_NAME).find(n => SELF_KEY_BY_NAME[n] === otherKey)];
+    const otherPath = path.join(otherDir, rel);
+    if (!fs.existsSync(otherPath)) { console.warn(`check-drift: thiếu ${otherPath}, bỏ qua so sánh ${rel}.`); continue; }
+    const otherHash = md5(otherPath);
+    if (otherHash !== selfHash) {
+      console.error(`LỆCH: ${rel} khác giữa ${selfName} và ${otherDir} (md5 ${selfHash} != ${otherHash}). File này được kỳ vọng giống hệt byte-for-byte cả 3 app.`);
+      failed = true;
+    } else {
+      console.log(`OK: ${rel} giống hệt giữa ${selfName} và ${otherDir}.`);
+    }
   }
 }
 

@@ -5756,8 +5756,9 @@ const PERSONAL_SHIM = {
   openModal: (id) => openAppModal(id),
   closeModal: (id) => closeAppModal(id),
   accent: 'var(--gold)',
-  me: () => ({ email: CURRENT_USER.email, groupKey: CURRENT_USER.groupKey }),
+  me: () => ({ email: CURRENT_USER.email, groupKey: CURRENT_USER.groupKey, nickname: CURRENT_USER.nickname || '' }),
   goToMyTasks: () => switchSection('mytasks'),
+  openTaskSection: () => switchSection('task'),
   agendaGroupKey: () => activeGroup,
   openCalendarSection: () => switchSection('calendar')
 };
@@ -6140,7 +6141,7 @@ function personalHubVisible() {
 function renderPersonalGreeting() {
   const el = document.getElementById('personal-greeting');
   if (!el) return;
-  const name = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER.nickname) || '').trim();
+  const name = String(PERSONAL_SHIM.me().nickname || '').trim();
   el.textContent = personalGreeting(new Date().getHours()) + (name ? ', ' + name : '');
   const sub = document.getElementById('personal-sub');
   if (sub) sub.textContent = personalDateLabel(new Date()) + ' · Chỉ mình bạn thấy — đồng bộ theo tài khoản trên mọi máy, dùng chung cho cả Fin / Sci / Org.';
@@ -6414,7 +6415,7 @@ let draggedPersonalTabKey = null;
 
 function openPersonalCustomizeModal() {
   renderPersonalCustomizeList();
-  openAppModal('personal-customize-modal');
+  PERSONAL_SHIM.openModal('personal-customize-modal');
 }
 
 function renderPersonalCustomizeList() {
@@ -6471,7 +6472,7 @@ async function submitPersonalCustomize() {
     return;
   }
   await savePersonalLayoutPref();
-  closeAppModal('personal-customize-modal');
+  PERSONAL_SHIM.closeModal('personal-customize-modal');
   if (personalLayoutHidden.includes(personalActiveTab)) {
     personalActiveTab = personalLayoutOrder.find(t => !personalLayoutHidden.includes(t));
   }
@@ -6629,7 +6630,7 @@ function openPersonalEventModal() {
   set('start-date', ds(start)); set('start-time', ts(start)); set('end-date', ds(end)); set('end-time', ts(end));
   const modalTitle = document.getElementById('event-modal-title');
   if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-calendar-plus" style="color: var(--gold);"></i> Thêm Sự Kiện Riêng';
-  openAppModal('add-event-modal');
+  PERSONAL_SHIM.openModal('add-event-modal');
 }
 
 function personalEditEvent(id) {
@@ -6885,7 +6886,7 @@ function openPersonalItemModal(existingId) {
   }
 
   document.getElementById('personal-item-modal-title').textContent = existingId ? 'Sửa mục cá nhân' : 'Thêm ' + PERSONAL_TAB_META[type].label.toLowerCase();
-  openAppModal('personal-item-modal');
+  PERSONAL_SHIM.openModal('personal-item-modal');
 }
 
 function toDatetimeLocalValue(date) {
@@ -6927,7 +6928,7 @@ async function submitPersonalItemForm(event) {
   if (id) payload.id = id;
   const res = await window.callGAS('savePersonalItem', payload);
   if (res.status === 'success') {
-    closeAppModal('personal-item-modal');
+    PERSONAL_SHIM.closeModal('personal-item-modal');
     showToast('Đã lưu', 'success');
     await refreshPersonalItems();
   } else {
@@ -6961,7 +6962,7 @@ async function pinToPersonalHub(projectId, projectName) {
 }
 
 function openPinnedProject(projectId) {
-  switchSection('task');
+  PERSONAL_SHIM.openTaskSection();
   selectProjectFromManager(projectId);
 }
 
@@ -7248,9 +7249,9 @@ async function personalSyncPushToTeam(relativePath) {
       fileData: dataUrl.split(',')[1],
       fileName: fileName,
       mimeType: blob.type || 'application/octet-stream',
-      groupKey: activeGroup,
+      groupKey: PERSONAL_SHIM.agendaGroupKey(),
       description: 'Đẩy từ Không Gian Riêng',
-      email: CURRENT_USER.email
+      email: PERSONAL_SHIM.me().email
     });
     if (res.status === 'success') {
       showToast('Đã đẩy "' + fileName + '" lên nhóm', 'success');
