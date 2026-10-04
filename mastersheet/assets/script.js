@@ -661,10 +661,10 @@ async function handleTxnSubmit(e) {
             await loadKpis();
             if (TAB_LOADED.performance) loadPerformanceChart();
         } else {
-            showToast('Lỗi: ' + String(response.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: '), 'error');
+            showToast('Lỗi: ' + String(response.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: ').replace(/^RESTRICTED:\s*/, 'Mã hạn chế: '), 'error');
         }
     } catch (err) {
-        showToast('Lỗi: ' + String(err.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: '), 'error');
+        showToast('Lỗi: ' + String(err.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: ').replace(/^RESTRICTED:\s*/, 'Mã hạn chế: '), 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHtml;

@@ -3,7 +3,7 @@
    mà thành viên đã ghi khi vượt giới hạn. Phép tính ở /lib/limits-calc.js (có kiểm thử); việc chặn/ghi lý do thực hiện ở api.js khi ghi lệnh.
    Dùng global của group.js (GR, grCall, grRender) và assets/risk.js (rkEsc, rkNum, rkPct, rkVnd, rkKpi, rkBar). */
 
-const GL = { rows: [], exceptions: [], log: [], recon: [], actor: null, loaded: false, error: '' };
+const GL = { rows: [], exceptions: [], log: [], recon: [], restricted: [], actor: null, loaded: false, error: '' };
 
 const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 
@@ -11,11 +11,11 @@ const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 async function glLoad() {
     GL.loaded = false; GL.error = '';
     try {
-        const [rows, ex, actor, log, recon] = await Promise.all([
+        const [rows, ex, actor, log, recon, restricted] = await Promise.all([
             grCall('listLimits'), grCall('listLimitExceptions', { days: 365 }).catch(() => []), grCall('getLimitActor', { email: (GR.data && GR.data.members[0] && GR.data.members[0].email) || '' }).catch(() => ({ isManager: false })),
-            grCall('listComplianceLog', { days: 120 }).catch(() => []), grCall('listAllReconciliations', { days: 400 }).catch(() => []),
+            grCall('listComplianceLog', { days: 120 }).catch(() => []), grCall('listAllReconciliations', { days: 400 }).catch(() => []), grCall('listRestricted').catch(() => []),
         ]);
-        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.log = log; GL.recon = recon; GL.loaded = true;
+        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.log = log; GL.recon = recon; GL.restricted = restricted || []; GL.loaded = true;
     } catch (e) { GL.error = e.message || String(e); }
 }
 
@@ -84,6 +84,8 @@ function grLimitsHtml() {
         <p class="tl-hint">Mọi tỷ lệ tính trên NAV (gồm tiền mặt). Giới hạn riêng cho một mã/ngành thay thế giới hạn chung của nhóm cho mã/ngành đó; thành viên có thể tự siết chặt thêm bằng giới hạn cá nhân. “Chặn” = thành viên không ghi được lệnh, chỉ quản lý ghi đè kèm lý do.</p>`;
     }
 
+    html += glRestrictedHtml(manager);
+
     // Ngoại lệ
     html += `<div class="ce-group-title">Ngoại lệ đã ghi nhận <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(12 tháng gần nhất)</small></div>`;
     html += GL.exceptions.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Ngày</th><th>Thành viên</th><th>Mã</th><th>Giới hạn</th><th>Trước → sau lệnh</th><th>Lý do</th><th></th></tr></thead><tbody>
@@ -150,6 +152,37 @@ function glReconcileHtml() {
         ${rows.map(r => `<tr><td><b>${rkEsc(r.p.name)}</b></td><td>${cell(r.pos)}</td><td>${cell(r.trd)}</td><td>${r.last ? rkEsc(r.st.text) : '—'}</td>
             <td>${r.st.level === 'never' ? '<span class="tl-badge mute">Chưa đối soát</span>' : (r.st.level === 'stale' ? '<span class="tl-badge warn">Đã lâu (>' + Reconcile.STALE_DAYS + ' ngày)</span>' : ((r.pos && r.pos.mismatched) || (r.trd && r.trd.mismatched) ? '<span class="tl-badge bad">Còn lệch</span>' : '<span class="tl-badge ok"><i class="fa-solid fa-check"></i> Khớp</span>'))}</td></tr>`).join('')}
         </tbody></table></div><p class="tl-hint">${bad ? `<b>${bad}</b> thành viên chưa đối soát hoặc đã quá ${Reconcile.STALE_DAYS} ngày. ` : ''}Đối soát định kỳ (mỗi tháng) với sao kê của công ty chứng khoán là bước kiểm soát cơ bản: nếu sổ lệnh lệch thì mọi con số lãi/lỗ, rủi ro và giới hạn ở đây đều sai theo.</p>`;
+}
+
+// Danh sách hạn chế mã: cấm cả mua lẫn bán (khác "cấm mã" của giới hạn đầu tư chỉ chặn mua và cho quản lý ghi đè). Trigger DB chặn thật; không xoá, chỉ gỡ (dấu vết).
+function glRestrictedHtml(manager) {
+    const active = GL.restricted.filter(r => r.active), off = GL.restricted.filter(r => !r.active);
+    const scope = (r) => r.user_id ? rkEsc(glMemberName(r.user_id)) : 'Mọi thành viên';
+    const row = (r) => `<tr><td><b>${rkEsc(r.symbol)}</b></td><td>${scope(r)}</td><td class="gr-reason">${rkEsc(r.reason)}</td><td>${glDate(r.created_at)}</td>
+        ${manager ? `<td><button type="button" class="btn-tool" onclick="glRestrictToggle('${r.id}', ${r.active ? 'false' : 'true'})">${r.active ? '<i class="fa-solid fa-lock-open"></i> Gỡ hạn chế' : '<i class="fa-solid fa-lock"></i> Bật lại'}</button></td>` : ''}</tr>`;
+    let html = `<div class="ce-group-title">Danh sách hạn chế mã <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(cấm cả mua lẫn bán, kể cả quản lý)</small></div>`;
+    html += active.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mã</th><th>Áp dụng cho</th><th>Lý do</th><th>Từ ngày</th>${manager ? '<th></th>' : ''}</tr></thead><tbody>${active.map(row).join('')}</tbody></table></div>`
+        : '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-lock-open"></i>Không có mã nào đang bị hạn chế.</div>';
+    if (off.length) html += `<details class="tl-details"><summary>Đã gỡ (${off.length})</summary><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><tbody>${off.map(row).join('')}</tbody></table></div></details>`;
+    if (manager) {
+        html += `<form class="lm-form" onsubmit="glRestrictAdd(event)">
+            <label>Mã<input type="text" id="gl-rs-symbol" class="tl-input" maxlength="12" placeholder="VD: FPT" required></label>
+            <label>Áp dụng cho<select id="gl-rs-user" class="tl-select"><option value="">Mọi thành viên</option>${GR.portfolios.map(p => `<option value="${rkEsc(p.id)}">${rkEsc(p.name)}</option>`).join('')}</select></label>
+            <label class="lm-wide">Lý do (bắt buộc)<input type="text" id="gl-rs-reason" class="tl-input" maxlength="500" placeholder="VD: đang nắm thông tin chưa công bố về doanh nghiệp" required></label>
+            <button type="submit" class="btn-tool"><i class="fa-solid fa-ban"></i> Thêm hạn chế</button>
+        </form>`;
+    }
+    html += '<p class="tl-hint">Mã bị hạn chế không ghi được lệnh mua hoặc bán, kể cả quản lý ghi hộ; máy chủ chặn thật nên không lách được bằng gọi API trực tiếp. Lệnh nhập từ sao kê hoặc điều chỉnh đối soát (việc đã xảy ra ở công ty chứng khoán) vẫn ghi được nhưng hiện ở mục Kiểm tra độc lập của tab Duyệt Lệnh để quản lý xem xét.</p>';
+    return html;
+}
+async function glRestrictAdd(e) {
+    e.preventDefault();
+    const restricted = { symbol: document.getElementById('gl-rs-symbol').value.trim(), reason: document.getElementById('gl-rs-reason').value.trim(), userId: document.getElementById('gl-rs-user').value || null };
+    try { showToast(await grCall('addRestricted', { restricted, email: (GL.actor && GL.actor.actorEmail) || '' }), 'success'); await glReload(); } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
+}
+async function glRestrictToggle(id, on) {
+    if (!on && !confirm('Gỡ hạn chế này? Thành viên sẽ giao dịch được mã này trở lại.')) return;
+    try { showToast(await grCall('setRestrictedActive', { id, active: on, email: (GL.actor && GL.actor.actorEmail) || '' }), 'success'); await glReload(); } catch (err) { showToast('Lỗi: ' + err.message, 'error'); }
 }
 
 function grLimitsAfterRender() { glKindChanged(); }

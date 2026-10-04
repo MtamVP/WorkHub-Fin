@@ -200,7 +200,7 @@ async function rcConfirmFix() {
         } else {
             const qty = Number(document.getElementById('rc-fix-qty').value), price = Number(document.getElementById('rc-fix-price').value), type = document.getElementById('rc-fix-type').value;
             if (!(qty > 0) || !(price > 0)) throw new Error('Nhập khối lượng và giá lớn hơn 0');
-            await rcCall('addAssetTransaction', { txn: { type, symbol: f.symbol, quantity: qty, price, tradeDate: date, fee: 0, tax: 0, note: `Đối soát ${rcDate(RC.asOf)}: điều chỉnh theo sao kê`, skipLimitCheck: true, skipApprovalCheck: true } });
+            await rcCall('addAssetTransaction', { txn: { type, symbol: f.symbol, quantity: qty, price, tradeDate: date, fee: 0, tax: 0, note: `Đối soát ${rcDate(RC.asOf)}: điều chỉnh theo sao kê`, skipLimitCheck: true, skipApprovalCheck: true, skipRestrictedCheck: true } });
         }
         showToast('Đã ghi điều chỉnh. Đang so khớp lại…', 'success');
         RC.fixing = null;

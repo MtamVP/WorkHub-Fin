@@ -9,6 +9,7 @@
 --     kiểm tra độc lập hằng ngày của approval-watch đã ghi nhận chúng với kind 'reconcile'.
 --   * khi quy định đang bật, không sửa được mã/chiều/khối lượng/giá/chủ của lệnh đã ghi (app không có chức năng sửa; sửa trực tiếp là cách lách), và không khôi phục
 --     lệnh đã xoá mà không qua kiểm tra như lệnh mới.
+--   * danh sách hạn chế (finance_restricted_symbols, finance-restricted-migration.sql): chặn cả mua lẫn bán, kể cả quản lý; lệnh nhập sao kê/đối soát vào mã hạn chế ghi dòng kiểm tra kind 'restricted'.
 --   * cấm mã (finance_limits kind 'blocked_symbol', mode 'block', scope member hoặc user của chính người đó): chặn MUA, chỉ quản lý/admin được ghi (app vẫn bắt quản lý ghi lý do).
 --     Các loại giới hạn khác cần vị thế/FIFO nên vẫn do app kiểm + kiểm tra độc lập hằng ngày của check-limits.
 -- Service role (current_user_id() null) bỏ qua. Muốn khôi phục sao lưu có lệnh lớn khi quy định đang bật: tắt quy định trong lúc khôi phục.
@@ -20,7 +21,7 @@ begin
     execute format('alter table public.finance_approval_audit drop constraint %I', c);
   end loop;
 end $$;
-alter table public.finance_approval_audit add constraint finance_approval_audit_kind_check check (kind in ('unapproved','reconcile','import'));
+alter table public.finance_approval_audit add constraint finance_approval_audit_kind_check check (kind in ('unapproved','reconcile','import','restricted'));
 
 create or replace function public.fn_finance_transactions_enforce() returns trigger
 language plpgsql security definer set search_path to 'public' as $fn$
@@ -50,6 +51,20 @@ begin
   v_side := case when new.type = 'sell' then 'sell' else 'buy' end;
   reconcile := coalesce(new.note, '') like 'Đối soát%';
   mgr := public.current_user_has_fin_role('asset_manager') or public.current_user_group() = 'admin';
+  v_val := coalesce(new.quantity, 0) * coalesce(new.price, 0);
+  select a.nav into v_nav from public.finance_assets a where a.user_id = new.user_id;
+  v_pct := case when coalesce(v_nav, 0) > 0 then v_val / v_nav * 100 else null end;
+
+  -- Danh sách hạn chế (finance-restricted-migration.sql): cấm cả MUA lẫn BÁN, kể cả quản lý. Lệnh nhập sao kê / đối soát (việc đã xảy ra) không chặn nhưng ghi dòng kiểm tra kind 'restricted'.
+  if exists (select 1 from public.finance_restricted_symbols x where x.active and x.symbol = v_sym and (x.user_id is null or x.user_id = new.user_id)) then
+    if new.import_batch is not null or reconcile then
+      insert into public.finance_approval_audit (txn_id, user_id, symbol, side, trade_date, quantity, price, value, nav_ref, pct, reasons, kind)
+      values (new.id, new.user_id, v_sym, v_side, new.trade_date, new.quantity, new.price, v_val, nullif(v_nav, 0), v_pct, array['restricted'], 'restricted')
+      on conflict (txn_id) do nothing;
+      return new;
+    end if;
+    raise exception 'RESTRICTED: Mã % đang trong danh sách hạn chế của nhóm, không được mua hoặc bán; quản lý cần gỡ hạn chế trước.', v_sym using errcode = '42501';
+  end if;
 
   -- Cấm mã (block): chặn MUA, chỉ quản lý / admin được ghi
   if v_side = 'buy' and not reconcile and not mgr and exists (
@@ -62,9 +77,6 @@ begin
   if pol.id is null or not pol.active then return new; end if;
   if reconcile then return new; end if;
 
-  v_val := coalesce(new.quantity, 0) * coalesce(new.price, 0);
-  select a.nav into v_nav from public.finance_assets a where a.user_id = new.user_id;
-  v_pct := case when coalesce(v_nav, 0) > 0 then v_val / v_nav * 100 else null end;
   by_pct := coalesce(pol.threshold_pct, 0) > 0 and v_pct is not null and v_pct > pol.threshold_pct + 1e-9;
   by_vnd := coalesce(pol.threshold_vnd, 0) > 0 and v_val > pol.threshold_vnd + 1e-9;
   need := v_val > 0 and (by_pct or by_vnd);

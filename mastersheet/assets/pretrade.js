@@ -19,16 +19,16 @@ async function ptContext(force) {
     if (!force && PT.ctx && Date.now() - PT.ctxAt < PT_CTX_TTL) return PT.ctx;
     if (PT.ctxLoading) return PT.ctxLoading;
     PT.ctxLoading = (async () => {
-        const [rows, actor, hv, cd, approval] = await Promise.all([
+        const [rows, actor, hv, cd, approval, restricted] = await Promise.all([
             lmCall('listLimits').catch(() => []), lmCall('getLimitActor').catch(() => ({})),
             callGAS('getHoldingsView', { email: targetEmail }), callGAS('getCashDebt', { email: targetEmail }),
-            lmCall('getApprovalPolicy').catch(() => null),
+            lmCall('getApprovalPolicy').catch(() => null), lmCall('listRestricted').catch(() => []),
         ]);
         const holdings = ((hv && hv.data) || []).map(h => ({ symbol: h.symbol, value: Number(h.marketValue) || 0, price: Number(h.marketPrice) || 0 }));
         const cash = Number(cd && cd.data ? cd.data.cash : 0) || 0, debt = Number(cd && cd.data ? cd.data.debt : 0) || 0;
         const limits = LimitsCalc.applicable(rows || [], actor.targetId, 'member');
         const mv = holdings.reduce((s, h) => s + h.value, 0);
-        PT.ctx = { holdings, cash, debt, limits, nav: mv + cash - debt, approval };
+        PT.ctx = { holdings, cash, debt, limits, nav: mv + cash - debt, approval, restricted: (restricted || []).filter(r => r.active && (!r.user_id || r.user_id === actor.targetId)) };
         PT.ctxAt = Date.now();
         return PT.ctx;
     })();
@@ -121,6 +121,9 @@ async function ptRender() {
         chk.violations.forEach(v => lines.push(flagLine(v.mode === 'warn' ? 'warn' : 'bad', `${v.text} — ${LimitsCalc.MODES[v.mode].label.toLowerCase()}`)));
         chk.near.forEach(v => lines.push(flagLine('info', v.text)));
     }
+    // Danh sách hạn chế: mã bị cấm thì không ghi được lệnh
+    const rs = (ctx.restricted || []).find(r => r.symbol === x.symbol);
+    if (rs) lines.unshift(flagLine('bad', `${x.symbol} đang trong danh sách hạn chế của nhóm (${rs.reason}): không được mua hoặc bán cho tới khi quản lý gỡ hạn chế.`));
     // Duyệt lệnh lớn: báo trước nếu lệnh sẽ phải qua quản lý duyệt
     let approvalHtml = '';
     if (ctx.approval && ctx.approval.active && typeof ApprovalCalc !== 'undefined' && qty > 0 && price > 0) {

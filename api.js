@@ -1612,6 +1612,11 @@ const API = {
             }
 
             const tradeDate = txn.tradeDate || new Date().toISOString().slice(0, 10);
+            // Danh sách hạn chế: mã bị cấm mua/bán thì không ghi được, kể cả quản lý (phải gỡ hạn chế trước). Lệnh điều chỉnh đối soát (việc đã xảy ra) bỏ qua; máy chủ ghi dòng kiểm tra.
+            if (!txn.skipRestrictedCheck) {
+                const rs = await API.asset.restricted.find(userId, symbol);
+                if (rs) throw new Error('RESTRICTED: Mã ' + symbol + ' đang trong danh sách hạn chế của nhóm (' + rs.reason + '); không được mua hoặc bán. Quản lý cần gỡ hạn chế trước.');
+            }
             // Giới hạn đầu tư: lệnh vượt giới hạn phải kèm lý do, hoặc bị chặn (chỉ quản lý ghi đè). Bỏ qua khi không có giới hạn nào đang bật.
             let gatedViolations = [], overrideUsed = false;
             if (!txn.skipLimitCheck && typeof LimitsCalc !== 'undefined') {
@@ -2438,6 +2443,54 @@ const API = {
                 }
                 return "Đã lưu danh mục chuẩn chiến lược (tiền mặt chuẩn " + (Math.round(v.cashPct * 10) / 10) + "%)";
             },
+        },
+
+        // --- Danh sách hạn chế mã (finance-restricted-migration.sql): quản lý / admin cấm cả MUA lẫn BÁN một mã cho mọi thành viên hoặc một người (thông tin chưa công bố, xung đột lợi ích...).
+        //     Trigger DB chặn thật; ở đây kiểm trước để báo lỗi sớm. Không xoá, chỉ tắt (danh sách là dấu vết). ---
+        restricted: {
+            list: async () => {
+                const { data, error } = await sbClient.from('finance_restricted_symbols').select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+                return data || [];
+            },
+            // Hạn chế đang bật áp dụng cho `userId` với mã `symbol` (null nếu không có)
+            find: async (userId, symbol) => {
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!sym) return null;
+                const { data, error } = await sbClient.from('finance_restricted_symbols').select('*').eq('symbol', sym).eq('active', true);
+                if (error) throw error;
+                return (data || []).find(r => !r.user_id || r.user_id === userId) || null;
+            },
+            // input: { symbol, reason, userId (tuỳ chọn: bỏ trống = mọi thành viên) }
+            add: async (email, input) => {
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin mới đặt được danh sách hạn chế");
+                const symbol = String((input && input.symbol) || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(symbol)) throw new Error("Mã không hợp lệ");
+                const reason = String((input && input.reason) || '').trim();
+                if (reason.length < 5) throw new Error("Ghi lý do hạn chế (ít nhất 5 ký tự)");
+                const row = { symbol, reason: reason.slice(0, 500), user_id: (input && input.userId) || null, active: true };
+                const { error } = await sbClient.from('finance_restricted_symbols').insert(row);
+                if (error) {
+                    if (error.code === '23505') {
+                        // đã có (có thể đang tắt): bật lại với lý do mới
+                        let q = sbClient.from('finance_restricted_symbols').update({ active: true, reason: row.reason }).eq('symbol', symbol);
+                        q = row.user_id ? q.eq('user_id', row.user_id) : q.is('user_id', null);
+                        const { error: e2 } = await q;
+                        if (e2) throw e2;
+                        return "Đã bật lại hạn chế " + symbol;
+                    }
+                    throw error;
+                }
+                return "Đã đưa " + symbol + " vào danh sách hạn chế";
+            },
+            setActive: async (email, id, active) => {
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin mới sửa được danh sách hạn chế");
+                const { error } = await sbClient.from('finance_restricted_symbols').update({ active: !!active }).eq('id', id);
+                if (error) throw error;
+                return active ? "Đã bật hạn chế" : "Đã gỡ hạn chế";
+            }
         },
 
         // --- Duyệt lệnh lớn trước khi đặt (lib/approval-calc.js). Quy tắc hai người và hạn dùng được trigger DB (finance-approval-migration.sql) ép thật;
@@ -4224,7 +4277,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'finance_restricted_symbols', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4684,7 +4737,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
-    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addRestricted', 'setRestrictedActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'reviewApprovalAudit', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
@@ -4845,6 +4898,9 @@ async function _dispatchAction(action, params = {}) {
             case 'getStockPortfolioSymbols': result = await API.stock.getPortfolioSymbols(params.email); break;
             case 'listLimits': result = await API.asset.limits.list(); break;
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
+            case 'listRestricted': result = await API.asset.restricted.list(); break;
+            case 'addRestricted': result = await API.asset.restricted.add(params.email, params.restricted); break;
+            case 'setRestrictedActive': result = await API.asset.restricted.setActive(params.email, params.id, params.active); break;
             case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
             case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;

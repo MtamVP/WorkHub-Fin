@@ -27,6 +27,15 @@ describe('finance-approval-enforce-migration.sql khớp ApprovalCalc', () => {
     const rc = fs.readFileSync(path.resolve(__dirname, '../../mastersheet/assets/reconcile.js'), 'utf8');
     expect(rc).toContain('Đối soát ${rcDate(RC.asOf)}');
   });
+  it('danh sách hạn chế: chặn cả mua lẫn bán bằng RESTRICTED (giao diện nhận ra), nhập/đối soát ghi dòng kiểm tra restricted', () => {
+    expect(sql).toContain("raise exception 'RESTRICTED: ");
+    expect(sql).toContain("'restricted')");
+    expect(sql).toContain("kind in ('unapproved','reconcile','import','restricted')");
+    const ui = fs.readFileSync(path.resolve(__dirname, '../../mastersheet/assets/script.js'), 'utf8');
+    expect(ui).toContain('RESTRICTED');
+    const mig = fs.readFileSync(path.resolve(__dirname, '../../finance-restricted-migration.sql'), 'utf8');
+    expect(mig).toContain('create table if not exists finance_restricted_symbols');
+  });
   it('service role (không có người dùng) bỏ qua, và có thông điệp APPROVAL_REQUIRED mà giao diện nhận ra', () => {
     expect(sql).toContain('if me is null then return new; end if;');
     expect(sql).toContain("'APPROVAL_REQUIRED: ");
