@@ -2494,6 +2494,32 @@ const API = {
             return { navHistory, bench, benchKey: key, benchError };
         },
 
+        // Dữ liệu thô cho phân tích nguồn gốc lợi nhuận (tính toán ở lib/attribution-calc.js): sổ lệnh, hành động DN, dòng tiền, NAV đã chụp,
+        // giá lịch sử của MỌI mã từng giao dịch + VN-Index từ trước mốc `from`. Lỗi giá không làm hỏng phần còn lại (historyError).
+        getAttributionInputs: async (email, from) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const [txns, cashFlows, navHistory, actions] = await Promise.all([
+                API.asset.listTransactions(email), API.asset.cashFlow.list(email), API.asset.getNavHistory(email), API.asset.corporateAction.list(email)
+            ]);
+            const symbols = [...new Set(txns.map(t => t.symbol))].slice(0, 60);
+            const first = txns.reduce((m, t) => (!m || String(t.trade_date) < m ? String(t.trade_date).slice(0, 10) : m), null);
+            const to = new Date().toISOString().slice(0, 10);
+            const floor = new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10);
+            let start = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '')) ? String(from) : (first || to);
+            if (first && start > first && !from) start = first;
+            const hFrom = new Date(new Date(start + 'T00:00:00Z').getTime() - 12 * 86400000).toISOString().slice(0, 10);
+            let histories = {}, historyError = null;
+            if (symbols.length) {
+                try {
+                    for (let i = 0; i < symbols.length; i += 20) {
+                        Object.assign(histories, await API.asset.getPriceHistory(symbols.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), hFrom < floor ? floor : hFrom, to));
+                    }
+                } catch (e) { historyError = e.message || String(e); }
+            }
+            return { txns, cashFlows, navHistory, actions, histories, historyError, firstTxnDate: first, from: start, to };
+        },
+
         // Gom dữ liệu thô cho tab Rủi Ro (tính toán ở lib/risk-calc.js): danh mục hiện tại, tiền/nợ, giá lịch sử các mã đang giữ + VN-Index,
         // sự kiện doanh nghiệp để điều chỉnh giá (lỗi ở các phần phụ KHÔNG làm hỏng cả báo cáo), lịch sử NAV đã chụp.
         getRiskInputs: async (email, windowDays) => {
@@ -4083,6 +4109,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getPerfInputs': result = await API.asset.getPerfInputs(params.email, params.benchKey); break;
+            case 'getAttributionInputs': result = await API.asset.getAttributionInputs(params.email, params.from); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;

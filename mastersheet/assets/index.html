@@ -527,6 +527,18 @@
                 <div id="pp-body"></div>
             </div>
 
+            <div class="tl-card" id="attr-card" style="margin-top:18px">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-diagram-successor"></i> Nguồn Gốc Lợi Nhuận</h3>
+                    <div class="tl-card-tools">
+                        <select id="at-range" class="tl-select" aria-label="Khoảng thời gian" onchange="atChangeRange()"><option value="mtd">Tháng này</option><option value="qtd">Quý này</option><option value="ytd" selected>Từ đầu năm</option><option value="1y">12 tháng</option><option value="all">Từ đầu</option></select>
+                        <button type="button" class="btn-tool" onclick="loadAttribution(true)"><i class="fa-solid fa-rotate"></i> Tính lại</button>
+                    </div>
+                </div>
+                <p class="tl-hint" style="margin:-6px 0 12px">Lãi hay lỗ đến từ đâu: mã nào, ngành nào, bao nhiêu là do thị trường chung lên xuống và bao nhiêu là do bạn chọn mã và canh thời điểm. Kèm kết quả theo từng loại quyết định trong Nhật Ký.</p>
+                <div id="at-body"></div>
+            </div>
+
             <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
                 <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi 5 phút trong phiên — chỉ dùng khi cần sửa)</span></h3>
                 <form id="benchmark-form" class="grant-form-grid">
@@ -674,6 +686,7 @@
     <script src="../../lib/corporate-events.js?v=1791900000000"></script>
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
+    <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
@@ -687,6 +700,7 @@
     <script src="events.js?v=1791900000000"></script>
     <script src="risk.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
+    <script src="attribution.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

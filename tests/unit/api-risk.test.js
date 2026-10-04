@@ -110,3 +110,27 @@ describe('API.asset.getPerfInputs', () => {
     expect(r.navHistory).toHaveLength(2);
   });
 });
+
+describe('API.asset.getAttributionInputs', () => {
+  const t = (id, symbol, d) => ({ id, user_id: USER, type: 'buy', symbol, quantity: 100, price: 10000, fee: 0, tax: 0, trade_date: d, created_at: d + 'T01:00:00Z', deleted_at: null });
+  it('gom sổ lệnh, dòng tiền, NAV, hành động DN và giá lịch sử của mọi mã từng giao dịch (kèm VN-Index)', async () => {
+    const calls = [];
+    const fns = { 'stock-history': async (b) => { calls.push(b); return { data: { ok: true, series: Object.fromEntries(b.symbols.map(s => [s, series(30, 100)])) }, error: null }; } };
+    const { API } = boot({ finance_transactions: [t('a', 'FPT', day(-60)), t('b', 'HPG', day(-20))], finance_cash_flows: [{ id: 'f', user_id: USER, flow_type: 'dividend', symbol: 'FPT', amount: 5, flow_date: day(-10), created_at: day(-10) + 'T00:00:00Z', deleted_at: null }] }, { functions: fns });
+    const r = await API.asset.getAttributionInputs(EMAIL);
+    expect(r.txns).toHaveLength(2);
+    expect(r.cashFlows).toHaveLength(1);
+    expect(Object.keys(r.histories).sort()).toEqual(['FPT', 'HPG', 'VNINDEX']);
+    expect(r.firstTxnDate).toBe(day(-60));
+    expect(calls[0].from < day(-60)).toBe(true);
+    expect(r.historyError).toBeNull();
+  });
+  it('lỗi giá được báo riêng; chưa có lệnh thì không gọi nguồn', async () => {
+    const bad = boot({ finance_transactions: [t('a', 'FPT', day(-5))] }, { functions: { 'stock-history': async () => ({ data: null, error: { message: 'hỏng' } }) } });
+    const r = await bad.API.asset.getAttributionInputs(EMAIL);
+    expect(r.historyError).toMatch(/hỏng/);
+    expect(r.txns).toHaveLength(1);
+    const none = boot({}, { functions: { 'stock-history': async () => { throw new Error('không được gọi'); } } });
+    expect((await none.API.asset.getAttributionInputs(EMAIL)).txns).toEqual([]);
+  });
+});

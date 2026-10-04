@@ -214,3 +214,11 @@ td.jn-reason::before { content: none; }
 @media (max-width: 640px) { .rk-sector-row { grid-template-columns: 1fr auto; } .rk-sector-row .rk-bar { grid-column: 1 / -1; order: 3; } }
 #tab-risk .spreadsheet-wrapper { overflow-x: auto; }
 .rk-warn.good { border-color: var(--success-color); background: var(--success-bg); } .rk-warn.good i { color: var(--success-color); }
+
+/* ---- Nguồn gốc lợi nhuận (attribution.js) ---- */
+.at-table td, .at-table th { white-space: nowrap; }
+.at-syms { white-space: normal !important; color: var(--text-muted); font-size: 0.78rem; max-width: 300px; }
+.at-dec-block { margin: 0 0 14px; }
+.at-dec-title { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin: 6px 0 6px; }
+.at-dec-title small { font-weight: 500; color: var(--text-muted); }
+#attr-card .spreadsheet-wrapper { overflow-x: auto; }
