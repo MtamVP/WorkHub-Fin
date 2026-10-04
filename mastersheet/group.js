@@ -195,6 +195,10 @@ function grRender() {
     if (GR.tab === 'members') {
         body.innerHTML = grMembersHtml();
         grDrawMembersChart();
+    } else if (GR.tab === 'activity' && typeof gaActivityHtml === 'function') {
+        body.innerHTML = gaActivityHtml();
+    } else if (GR.tab === 'report' && typeof gaReportHtml === 'function') {
+        body.innerHTML = gaReportHtml();
     } else if (GR.tab === 'limits' && typeof grLimitsHtml === 'function') {
         body.innerHTML = grLimitsHtml();
         if (typeof grLimitsAfterRender === 'function') grLimitsAfterRender();

@@ -125,3 +125,68 @@ describe('memberTable', () => {
     expect(rows[2].overlapWithGroupPct).toBe(0);
   });
 });
+
+describe('blotter: sổ lệnh chung', () => {
+  const input = { members: M, txns: TXNS };
+  it('gộp lệnh mọi thành viên, bỏ lệnh đã xoá, mới nhất trước, có tên và giá trị', () => {
+    const rows = GroupCalc.blotter(input, {});
+    expect(rows).toHaveLength(6);
+    expect(rows[0]).toMatchObject({ date: '2026-03-01', name: 'binh', type: 'sell', symbol: 'HPG', value: 100 * 27000 });
+    expect(rows.map(r => r.date)).toEqual([...rows.map(r => r.date)].sort().reverse());
+    expect(rows.find(r => r.symbol === 'ZZZ')).toBeUndefined();
+  });
+  it('lọc theo khoảng ngày, thành viên, mã, chiều (không phân biệt hoa thường)', () => {
+    expect(GroupCalc.blotter(input, { from: '2026-02-01', to: '2026-02-28' })).toHaveLength(3);
+    expect(GroupCalc.blotter(input, { userId: 'u1' })).toHaveLength(2);
+    expect(GroupCalc.blotter(input, { symbol: 'fpt' })).toHaveLength(2);
+    expect(GroupCalc.blotter(input, { side: 'sell' })).toHaveLength(1);
+    expect(GroupCalc.blotter(input, { from: '2026-12-01' })).toEqual([]);
+  });
+  it('gắn ngoại lệ giới hạn theo lệnh, và theo lô nhập sao kê', () => {
+    const txns = TXNS.concat([tx('imp1', 'u1', 'buy', 'VHM', 10, 70000, '2026-04-01', { import_batch: 'IMP_a' })]);
+    const exceptions = [
+      { txn_id: '3', user_id: 'u2', reason: 'Cơ hội đặc biệt', mode: 'reason', override: false },
+      { txn_id: null, user_id: 'u1', reason: 'Bổ sung sao kê', mode: 'block', override: true, metrics: { importBatch: 'IMP_a' } },
+    ];
+    const rows = GroupCalc.blotter({ members: M, txns }, { exceptions });
+    expect(rows.find(r => r.id === '3').exception).toMatchObject({ reason: 'Cơ hội đặc biệt', override: false });
+    expect(rows.find(r => r.id === 'imp1')).toMatchObject({ imported: true, exception: { reason: 'Bổ sung sao kê', override: true } });
+    expect(rows.find(r => r.id === '1').exception).toBeNull();
+  });
+});
+
+describe('flow: dòng giao dịch của nhóm', () => {
+  const rows = GroupCalc.blotter({ members: M, txns: TXNS.concat([
+    tx('7', 'u3', 'buy', 'FPT', 20, 105000, '2026-02-10'),          // FPT: An, binh, Chi đều mua => đồng thuận mua
+    tx('8', 'u1', 'sell', 'SSI', 50, 32000, '2026-03-05'),          // SSI: Chi mua, An bán => trái chiều
+  ]) }, {});
+  const f = GroupCalc.flow(rows, P);
+  it('tổng mua/bán và số lệnh', () => {
+    expect(f.totals.trades).toBe(8);
+    expect(f.totals.buyValue).toBe(100 * 100000 + 100 * 90000 + 50 * 90000 + 400 * 25000 + 200 * 30000 + 20 * 105000);
+    expect(f.totals.sellValue).toBe(100 * 27000 + 50 * 32000);
+    expect(f.totals.net).toBe(f.totals.buyValue - f.totals.sellValue);
+  });
+  it('phân loại: đồng thuận mua, trái chiều', () => {
+    expect(f.consensusBuy.map(s => s.symbol)).toEqual(['FPT']);
+    expect(f.consensusBuy[0].buyers.sort()).toEqual(['An', 'Chi', 'binh']);
+    expect(f.conflicts.map(s => s.symbol)).toEqual(['SSI']);
+    expect(f.symbols.find(s => s.symbol === 'HPG').stance).toBe('mixed');   // cùng một người mua rồi bán => hỗn hợp, không phải trái chiều
+    expect(f.symbols.find(s => s.symbol === 'VCB').stance).toBe('buy');
+  });
+  it('sắp mã theo giá trị giao dịch giảm dần', () => {
+    expect(f.symbols.map(s => s.traded)).toEqual([...f.symbols.map(s => s.traded)].sort((a, b) => b - a));
+  });
+  it('mỗi thành viên: số lệnh, mua/bán, vòng quay theo NAV hiện tại', () => {
+    const an = f.members.find(m => m.name === 'An');
+    expect(an.trades).toBe(3);
+    expect(an.buyValue).toBe(100 * 100000 + 100 * 90000);
+    expect(an.sellValue).toBe(50 * 32000);
+    expect(an.turnoverPct).toBeCloseTo((an.buyValue + an.sellValue) / 2 / P[0].nav * 100, 6);
+  });
+  it('kỳ rỗng: không lỗi', () => {
+    const e = GroupCalc.flow([], P);
+    expect(e.totals).toEqual({ trades: 0, buyValue: 0, sellValue: 0, net: 0 });
+    expect(e.symbols).toEqual([]);
+  });
+});

@@ -283,3 +283,16 @@ td.jn-reason::before { content: none; }
 .pt-flag.bad { border-color: var(--danger-color); background: var(--danger-bg); } .pt-flag.bad i { color: var(--danger-color); }
 .pt-flag.warn { border-color: var(--warning-color); background: var(--warning-bg); } .pt-flag.warn i { color: var(--warning-color); }
 .pt-flag.ok i { color: var(--success-color); } .pt-flag.info i { color: var(--text-muted); }
+
+/* ---- Toàn Nhóm: Hoạt Động + Báo Cáo (group-activity.js, lib/group-report.js) ---- */
+.ga-filters { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin: 0 0 14px; }
+.ga-filters label { display: flex; flex-direction: column; gap: 5px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.ga-signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 4px 0 4px; }
+.ga-signals > div { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.gr-report { display: flex; flex-direction: column; gap: 22px; }
+.gr-report section { display: flex; flex-direction: column; gap: 10px; }
+.gr-report h2 { margin: 0; font-size: 1.25rem; } .gr-report h3 { margin: 0; font-size: 0.95rem; letter-spacing: 0.02em; } .gr-report h4 { margin: 8px 0 0; font-size: 0.82rem; color: var(--text-secondary); }
+.gr-rep-head p { margin: 4px 0 0; font-size: 0.82rem; color: var(--text-muted); }
+.gr-rep-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 0.88rem; line-height: 1.55; }
+.gr-rep-table { overflow-x: auto; }
+.gr-report .tl-kpis { margin-bottom: 0; }

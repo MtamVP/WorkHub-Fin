@@ -791,7 +791,8 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
     background: #fff; color: #1C1915;
   }
   .desk-topbar, .asset-tab-toggle, .ledger-sub-toggle, .export-bar, .price-lock-btn, .txn-form, .balance-section,
-  #benchmark-admin-panel, .desk-sync, .desk-iconbtn, #target-user-switcher, .toast-notification { display: none !important; }
+  #benchmark-admin-panel, .desk-sync, .desk-iconbtn, #target-user-switcher, .toast-notification, .no-print { display: none !important; }
+  .gr-report { gap: 16px; } .gr-report section { break-inside: avoid-page; }
   .price-input { border: none; background: transparent; padding: 0; width: auto; }
   .spreadsheet-wrapper, .allocation-card, .asset-hero { box-shadow: none; break-inside: avoid; }
   .holdings-layout { grid-template-columns: minmax(0, 1fr) 280px; }
