@@ -1629,6 +1629,7 @@ const API = {
                 }
             }
             // Duyệt lệnh lớn: lệnh vượt ngưỡng phải có đề xuất đã duyệt, còn hạn, khớp người/mã/chiều/khối lượng. Không có quy định nào đang bật thì bỏ qua.
+            // Đây là kiểm trước để báo lỗi sớm và rõ ràng; chốt chặn thật là trigger fn_finance_transactions_enforce ở DB (lặp lại đúng luật này, không lách được bằng gọi API trực tiếp).
             let approvalReq = null;
             if (!txn.skipApprovalCheck && typeof ApprovalCalc !== 'undefined') {
                 const ap = await API.asset.orders.checkTrade(email, { type: txn.type === 'sell' ? 'sell' : 'buy', symbol, quantity, price });
@@ -1650,10 +1651,13 @@ const API = {
             // làm thay đổi thứ tự tiêu thụ lô FIFO của những lệnh bán đó.
             await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
-            // Đề xuất đã duyệt được dùng: đánh dấu đã thực hiện (lỗi ở đây KHÔNG làm hỏng lệnh đã lưu)
+            // Đề xuất đã duyệt được dùng: trigger DB (finance-approval-enforce-migration.sql) đã tiêu thụ nó ngay khi ghi lệnh; chỉ khi chưa có đề xuất nào gắn lệnh này mới đánh dấu tại đây
+            // (lỗi ở đây KHÔNG làm hỏng lệnh đã lưu)
             if (approvalReq && inserted) {
-                try { await API.asset.orders.markExecuted(approvalReq.id, inserted.id); }
-                catch (e) { return "Đã lưu lệnh giao dịch, nhưng chưa đánh dấu được đề xuất đã thực hiện: " + e.message; }
+                try {
+                    const { data: used } = await sbClient.from('finance_order_requests').select('id').eq('txn_id', inserted.id).limit(1);
+                    if (!used || !used.length) await API.asset.orders.markExecuted(approvalReq.id, inserted.id);
+                } catch (e) { return "Đã lưu lệnh giao dịch, nhưng chưa đánh dấu được đề xuất đã thực hiện: " + e.message; }
             }
             // Ghi nhận ngoại lệ giới hạn (lý do bắt buộc đã kiểm ở trên): lỗi ở đây KHÔNG làm hỏng lệnh đã lưu
             if (gatedViolations.length && inserted) {
