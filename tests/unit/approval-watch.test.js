@@ -61,6 +61,31 @@ describe('findUnapproved', () => {
   });
 });
 
+describe('findUnapproved: nghi chia nhỏ lệnh', () => {
+  const POL = { active: true, threshold_pct: null, threshold_vnd: 50e6, valid_days: 3, active_since: '2026-09-01T00:00:00Z' };
+  const part = (id, o = {}) => tx(id, Object.assign({ quantity: 1000, price: 20000, created_at: '2026-10-01T0' + id.slice(1) + ':00:00Z' }, o));   // 20tr mỗi lệnh
+  const go = (txns, over = {}) => run(Object.assign({ policy: POL, txns, navRows: [] }, over));
+  it('3 lệnh 20tr cùng người/mã/chiều/ngày (từng lệnh dưới 50tr, tổng 60tr): gắn cờ lệnh muộn nhất với tổng khối lượng và giá trị', () => {
+    const f = go([part('t1'), part('t2'), part('t3')]);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ txn_id: 't3', symbol: 'FPT', side: 'buy', quantity: 3000, value: 60e6, kind: 'split', reasons: ['vnd', 'split', 'n=3'] });
+    expect(f[0].price).toBeCloseTo(20000, 9);
+  });
+  it('không cờ khi tổng chưa vượt ngưỡng, khác ngày / chiều / mã / người, hoặc có lệnh đã gắn đề xuất', () => {
+    expect(go([part('t1'), part('t2')])).toEqual([]);                                                                   // 40tr
+    expect(go([part('t1'), part('t2', { trade_date: '2026-10-02' }), part('t3', { trade_date: '2026-10-03' })])).toEqual([]);
+    expect(go([part('t1'), part('t2', { type: 'sell' }), part('t3', { symbol: 'VCB' })])).toEqual([]);
+    expect(go([part('t1'), part('t2'), part('t3', { user_id: 'u2' })])).toEqual([]);
+    expect(go([part('t1'), part('t2'), part('t3')], { requests: [{ txn_id: 't2' }] })).toEqual([]);
+  });
+  it('lệnh vốn đã bị gắn cờ riêng không bị đếm lại; nhập sao kê và đối soát không tính vào nhóm', () => {
+    const f = go([part('t1', { quantity: 3000 }), part('t2'), part('t3')]);
+    expect(f.map(x => x.kind)).toEqual(['unapproved']);                                                                 // lệnh 60tr gắn cờ riêng; 2 lệnh còn lại chỉ 40tr
+    expect(go([part('t1'), part('t2'), part('t3', { import_batch: 'b' })])).toEqual([]);
+    expect(go([part('t1'), part('t2'), part('t3', { note: 'Đối soát 30/09: điều chỉnh theo sao kê' })])).toEqual([]);   // chỉ còn 2 lệnh 40tr thật
+  });
+});
+
 describe('email', () => {
   it('đề xuất chờ duyệt: tiêu đề theo số lượng, thoát HTML trong lý do', () => {
     const one = buildPendingEmail([{ name: 'An', side: 'buy', symbol: 'FPT', quantity: 1000, price_ref: 100000, value: 100e6, order_pct: 20, reason: 'Lý do <b>x</b>' }]);

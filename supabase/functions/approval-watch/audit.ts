@@ -4,7 +4,7 @@
 export interface Libs { ApprovalCalc: any }
 export interface AuditFlag {
   txn_id: string; user_id: string; symbol: string; side: string; trade_date: string; quantity: number; price: number; value: number;
-  nav_ref: number | null; pct: number | null; reasons: string[]; kind: "unapproved" | "reconcile";
+  nav_ref: number | null; pct: number | null; reasons: string[]; kind: "unapproved" | "reconcile" | "split";
 }
 
 const num = (v: unknown) => { const n = Number(v); return isFinite(n) ? n : 0; };
@@ -52,6 +52,33 @@ export function findUnapproved(libs: Libs, input: { policy: any; txns: any[]; re
       kind: String(t.note || "").startsWith("Đối soát") ? "reconcile" : "unapproved",
     });
   }
+  // Chia nhỏ lệnh: nhiều lệnh cùng người/mã/chiều/ngày, từng lệnh dưới ngưỡng nhưng TỔNG vượt ngưỡng, và không lệnh nào có đề xuất duyệt gắn -- cách né ngưỡng từng lệnh.
+  // Gắn cờ lệnh ghi muộn nhất của nhóm, với khối lượng/giá trị là tổng cả nhóm; reasons có thêm "split" và "n=<số lệnh>".
+  const flagged = new Set(out.map((f) => f.txn_id));
+  const groups = new Map<string, any[]>();
+  for (const t of input.txns ?? []) {
+    if (t.deleted_at || t.import_batch || String(t.note || "").startsWith("Đối soát")) continue;
+    if (!t.created_at || Date.parse(t.created_at) < since) continue;
+    if (covered.has(String(t.id)) || flagged.has(String(t.id))) continue;
+    const key = [t.user_id, String(t.symbol).toUpperCase(), t.type === "sell" ? "sell" : "buy", String(t.trade_date).slice(0, 10)].join("|");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+  groups.forEach((list) => {
+    if (list.length < 2) return;
+    const qty = list.reduce((s, t) => s + num(t.quantity), 0);
+    const value = list.reduce((s, t) => s + num(t.quantity) * num(t.price), 0);
+    if (!(qty > 0)) return;
+    const last = list.slice().sort((a, b) => (String(a.created_at) < String(b.created_at) ? -1 : 1))[list.length - 1];
+    const date = String(last.trade_date).slice(0, 10);
+    const nav = navAt(String(last.user_id), date);
+    const n = ApprovalCalc.needsApproval(pol, nav ?? 0, { quantity: qty, price: value / qty });
+    if (!n.needed) return;
+    out.push({
+      txn_id: String(last.id), user_id: String(last.user_id), symbol: String(last.symbol).toUpperCase(), side: last.type === "sell" ? "sell" : "buy", trade_date: date,
+      quantity: qty, price: value / qty, value: n.value, nav_ref: nav, pct: n.pct, reasons: [n.byPct ? "pct" : "", n.byVnd ? "vnd" : "", "split", "n=" + list.length].filter(Boolean), kind: "split",
+    });
+  });
   return out;
 }
 
@@ -68,7 +95,7 @@ export function buildPendingEmail(rows: { name: string; side: string; symbol: st
 
 export function buildAuditEmail(rows: { name: string; side: string; symbol: string; value: number; pct: number | null; trade_date: string; kind: string }[]): { subject: string; html: string; text: string } {
   const subject = `WorkHub: ${rows.length} lệnh lớn đã ghi mà không qua duyệt`;
-  const line = (r: typeof rows[0]) => `${r.name}: ${r.side === "sell" ? "bán" : "mua"} ${r.symbol} ${vnd(r.value)}${r.pct === null ? "" : ` (${(Math.round(num(r.pct) * 10) / 10).toLocaleString("vi-VN")}% NAV)`} ngày ${r.trade_date}${r.kind === "reconcile" ? " — lệnh điều chỉnh đối soát" : ""}`;
+  const line = (r: typeof rows[0]) => `${r.name}: ${r.side === "sell" ? "bán" : "mua"} ${r.symbol} ${vnd(r.value)}${r.pct === null ? "" : ` (${(Math.round(num(r.pct) * 10) / 10).toLocaleString("vi-VN")}% NAV)`} ngày ${r.trade_date}${r.kind === "reconcile" ? " — lệnh điều chỉnh đối soát" : (r.kind === "split" ? " — nhiều lệnh nhỏ cùng ngày cộng lại vượt ngưỡng (nghi chia nhỏ lệnh)" : "")}`;
   const html = head("Lệnh lớn đã ghi mà không có đề xuất được duyệt") + '<p style="margin:0 0 10px">Kiểm tra độc lập hằng ngày phát hiện:</p>' + rows.map((r) => `<div style="border:1px solid #e3e3e6;border-radius:8px;padding:10px 12px;margin:0 0 10px"><b>${esc(line(r))}</b></div>`).join("") + foot;
   const text = "Kiểm tra độc lập hằng ngày phát hiện lệnh lớn đã ghi mà không có đề xuất được duyệt:\n" + rows.map(line).join("\n") + "\n\nMở WorkHub Fin → Toàn Nhóm → Duyệt Lệnh để xem xét.";
   return { subject, html, text };

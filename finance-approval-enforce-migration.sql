@@ -21,7 +21,7 @@ begin
     execute format('alter table public.finance_approval_audit drop constraint %I', c);
   end loop;
 end $$;
-alter table public.finance_approval_audit add constraint finance_approval_audit_kind_check check (kind in ('unapproved','reconcile','import','restricted'));
+alter table public.finance_approval_audit add constraint finance_approval_audit_kind_check check (kind in ('unapproved','reconcile','import','restricted','split'));
 
 create or replace function public.fn_finance_transactions_enforce() returns trigger
 language plpgsql security definer set search_path to 'public' as $fn$

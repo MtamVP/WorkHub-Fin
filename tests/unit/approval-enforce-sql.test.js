@@ -30,7 +30,7 @@ describe('finance-approval-enforce-migration.sql khớp ApprovalCalc', () => {
   it('danh sách hạn chế: chặn cả mua lẫn bán bằng RESTRICTED (giao diện nhận ra), nhập/đối soát ghi dòng kiểm tra restricted', () => {
     expect(sql).toContain("raise exception 'RESTRICTED: ");
     expect(sql).toContain("'restricted')");
-    expect(sql).toContain("kind in ('unapproved','reconcile','import','restricted')");
+    expect(sql).toContain("kind in ('unapproved','reconcile','import','restricted','split')");
     const ui = fs.readFileSync(path.resolve(__dirname, '../../mastersheet/assets/script.js'), 'utf8');
     expect(ui).toContain('RESTRICTED');
     const mig = fs.readFileSync(path.resolve(__dirname, '../../finance-restricted-migration.sql'), 'utf8');
