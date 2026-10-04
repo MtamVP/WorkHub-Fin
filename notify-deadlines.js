@@ -240,6 +240,41 @@
         if (changed) saveNotifiedTo(priceAlertsKey(), notified);
     }
 
+    // Duyệt lệnh lớn (chỉ Fin): quản lý được báo bằng thông báo hệ điều hành khi có đề xuất lệnh mới chờ duyệt hoặc có lệnh lớn ghi mà không qua duyệt.
+    // Khoá localStorage ghi nhớ id đã báo (không báo lại sau khi khởi động lại app); người đề xuất không bị báo đề xuất của chính mình. Chỉ báo khi app đang chạy;
+    // khi app tắt thì email của Edge Function approval-watch lo (nếu quản lý bật email cảnh báo).
+    var APPROVAL_KEY = 'wh_notified_approvals_v1';
+    async function checkApprovals() {
+        var email = localStorage.getItem('userEmail') || localStorage.getItem('currentUser');
+        if (!email || typeof window.callGAS !== 'function') return;
+        try {
+            var actorRes = await window.callGAS('getLimitActor', { email: email });
+            if (!actorRes || actorRes.status !== 'success' || !actorRes.data || !actorRes.data.isManager) return;
+            var me = actorRes.data.actorId;
+            var res = await window.callGAS('listAllOrderRequests', { days: 3 });
+            var audit = await window.callGAS('listApprovalAudit', { days: 7 });
+            var seen = loadNotifiedFrom(APPROVAL_KEY), changed = false, firstRun = seen.size === 0 && !localStorage.getItem(APPROVAL_KEY + ':init');
+            var fresh = ((res && res.status === 'success' && res.data) || []).filter(function (r) { return r.status === 'pending' && r.user_id !== me && r.created_by !== me && !seen.has('r:' + r.id); });
+            var open = ((audit && audit.status === 'success' && audit.data) || []).filter(function (a) { return a.status === 'open' && !seen.has('a:' + a.id); });
+            fresh.forEach(function (r) { seen.add('r:' + r.id); changed = true; });
+            open.forEach(function (a) { seen.add('a:' + a.id); changed = true; });
+            // Lần đầu chạy trên máy này: chỉ ghi nhớ, không báo dồn các đề xuất cũ
+            if (!firstRun) {
+                if (fresh.length === 1) {
+                    var r = fresh[0];
+                    fire('Đề xuất lệnh chờ duyệt', (r.side === 'sell' ? 'Bán ' : 'Mua ') + r.symbol + ' ' + Number(r.quantity).toLocaleString('vi-VN') + ' cp — ' + Math.round(r.value / 1e6).toLocaleString('vi-VN') + ' triệu đồng');
+                } else if (fresh.length > 1) {
+                    fire('Đề xuất lệnh chờ duyệt', 'Có ' + fresh.length + ' đề xuất lệnh đang chờ bạn duyệt (Toàn Nhóm → Duyệt Lệnh).');
+                }
+                if (open.length) fire('Lệnh lớn không qua duyệt', open.length + ' lệnh lớn đã ghi mà không có đề xuất được duyệt — cần xem xét (Toàn Nhóm → Duyệt Lệnh).');
+            }
+            if (changed || firstRun) {
+                saveNotifiedTo(APPROVAL_KEY, seen);
+                localStorage.setItem(APPROVAL_KEY + ':init', '1');
+            }
+        } catch (e) { /* mạng/quyền: bỏ qua, lần sau thử lại */ }
+    }
+
     async function start() {
         // Xin quyền thông báo TRƯỚC, đợi xong mới chạy check()/checkPersonalEvents() --
         // trước đây gọi 2 hàm này song song không đợi nhau, nên checkPersonalEvents() (vốn
@@ -250,10 +285,12 @@
         checkPersonalEvents();
         checkPersonalCalendarReminders();
         checkPriceAlerts();
+        checkApprovals();
         setInterval(check, POLL_MS);
         setInterval(checkPersonalEvents, POLL_MS);
         setInterval(checkPersonalCalendarReminders, POLL_MS);
         setInterval(checkPriceAlerts, PRICE_POLL_MS);
+        setInterval(checkApprovals, POLL_MS);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

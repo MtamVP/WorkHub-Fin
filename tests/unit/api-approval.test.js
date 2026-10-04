@@ -139,6 +139,17 @@ describe('orders: đề xuất, duyệt, huỷ', () => {
     expect(adm.fake.table('finance_approval_policy')[0].self_approvers).toEqual(['u-2', 'u-1']);
     expect((await adm.API.asset.approvalPolicy.get()).selfApprovers).toEqual(['u-2', 'u-1']);
   });
+  it('kiểm tra độc lập: liệt kê bản ghi; chỉ quản lý đánh dấu đã xem xét và phải ghi chú', async () => {
+    const rows = [{ id: 'a1', user_id: 'u-1', symbol: 'FPT', side: 'buy', value: 100e6, status: 'open', detected_at: new Date().toISOString() }, { id: 'a0', user_id: 'u-1', symbol: 'VCB', side: 'buy', value: 90e6, status: 'open', detected_at: '2024-01-01T00:00:00Z' }];
+    const m = boot(MEMBER, { finance_approval_audit: rows });
+    expect((await m.API.asset.approvalAudit.list(30)).map(r => r.id)).toEqual(['a1']);
+    await expect(m.API.asset.approvalAudit.review(MEMBER.email, 'a1', 'đã xem')).rejects.toThrow(/Chỉ quản lý/);
+    const c = boot(MANAGER, { finance_approval_audit: rows });
+    await expect(c.API.asset.approvalAudit.review(MANAGER.email, 'a1', 'x')).rejects.toThrow(/ít nhất 3/);
+    expect(await c.API.asset.approvalAudit.review(MANAGER.email, 'a1', 'Đã nhắc nhở, lần sau gửi đề xuất')).toMatch(/Đã đánh dấu/);
+    expect(c.fake.table('finance_approval_audit').find(r => r.id === 'a1')).toMatchObject({ status: 'reviewed', review_note: 'Đã nhắc nhở, lần sau gửi đề xuất' });
+    await expect(c.API.asset.approvalAudit.review(MANAGER.email, 'a1', 'lần hai ok')).rejects.toThrow(/đã được xem xét/);
+  });
   it('huỷ đề xuất đang chờ; không huỷ được đề xuất đã thực hiện', async () => {
     const c = boot(MEMBER, { finance_order_requests: [approved({ id: 'a', status: 'pending' }), approved({ id: 'b', status: 'executed' })] });
     expect(await c.API.asset.orders.cancel('a')).toMatch(/huỷ/);

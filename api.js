@@ -2469,6 +2469,25 @@ const API = {
                 return p.active ? "Đã bật quy định duyệt lệnh lớn" : "Đã lưu quy định duyệt lệnh (đang tắt)";
             }
         },
+        // Kết quả kiểm tra ĐỘC LẬP hằng ngày của Edge Function approval-watch: lệnh lớn đã ghi vào sổ mà không có đề xuất đã duyệt (finance_approval_audit). Quản lý đánh dấu đã xem xét kèm ghi chú.
+        approvalAudit: {
+            list: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 90) * 86400000).toISOString();
+                const { data, error } = await sbClient.from('finance_approval_audit').select('*').gte('detected_at', since).order('detected_at', { ascending: false }).limit(300);
+                if (error) throw error;
+                return data || [];
+            },
+            review: async (email, id, note) => {
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin được đánh dấu đã xem xét");
+                const text = String(note || '').trim();
+                if (text.length < 3) throw new Error("Ghi chú xem xét cần ít nhất 3 ký tự");
+                const { data, error } = await sbClient.from('finance_approval_audit').update({ status: 'reviewed', review_note: text.slice(0, 500) }).eq('id', id).eq('status', 'open').select('id');
+                if (error) throw error;
+                if (!data || !data.length) throw new Error("Bản ghi đã được xem xét");
+                return "Đã đánh dấu đã xem xét";
+            }
+        },
         orders: {
             _today: () => new Date().toISOString().slice(0, 10),
             // NAV hiện tại của danh mục (giá trị mã + tiền mặt - nợ), cùng cách tính với giới hạn đầu tư
@@ -4200,7 +4219,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4661,7 +4680,7 @@ const MUTATING_ACTIONS = new Set([
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
+    'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'reviewApprovalAudit', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
@@ -4827,6 +4846,8 @@ async function _dispatchAction(action, params = {}) {
             case 'listPolicy': result = await API.asset.policy.list(); break;
             case 'getApprovalPolicy': result = await API.asset.approvalPolicy.get(); break;
             case 'setSelfApprovers': result = await API.asset.approvalPolicy.setSelfApprovers(params.email, params.ids); break;
+            case 'listApprovalAudit': result = await API.asset.approvalAudit.list(params.days); break;
+            case 'reviewApprovalAudit': result = await API.asset.approvalAudit.review(params.email, params.id, params.note); break;
             case 'saveApprovalPolicy': result = await API.asset.approvalPolicy.save(params.email, params.policy); break;
             case 'checkTradeApproval': result = await API.asset.orders.checkTrade(params.email, params.trade); break;
             case 'createOrderRequest': result = await API.asset.orders.create(params.email, params.request); break;

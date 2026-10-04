@@ -4,7 +4,7 @@
    và do trigger DB finance_order_requests kiểm thật. Việc ghi lệnh yêu cầu đề xuất đã duyệt do api.js (addTransaction) ép.
    Dùng global của group.js (GR, grCall, grRender), group-limits.js (GL, glDate) và assets/risk.js (rkEsc, rkNum, rkVnd, rkKpi). */
 
-const GQ = { state: 'idle', error: '', policy: null, rows: [], draft: null, saving: false, busy: '' };
+const GQ = { state: 'idle', error: '', policy: null, rows: [], audit: [], draft: null, saving: false, busy: '' };
 
 function gqToday() { return new Date().toISOString().slice(0, 10); }
 function gqManager() { return !!(typeof GL !== 'undefined' && GL.actor && GL.actor.isManager); }
@@ -21,7 +21,7 @@ function gqPending() { return GQ.rows.filter(r => ApprovalCalc.effectiveStatus(r
 function gqUpdateBadge() {
     const b = document.getElementById('grp-appr-badge');
     if (!b) return;
-    const n = gqPending().length;
+    const n = gqPending().length + GQ.audit.filter(a => a.status === 'open').length;
     b.textContent = n ? String(n) : '';
     b.style.display = n ? '' : 'none';
 }
@@ -32,8 +32,8 @@ async function gqLoad(force) {
     GQ.state = 'loading'; GQ.error = '';
     if (GR.tab === 'approvals') grRender();
     try {
-        const [policy, rows] = await Promise.all([grCall('getApprovalPolicy'), grCall('listAllOrderRequests', { days: 120 })]);
-        GQ.policy = policy; GQ.rows = rows; GQ.draft = null; GQ.state = 'ok';
+        const [policy, rows, audit] = await Promise.all([grCall('getApprovalPolicy'), grCall('listAllOrderRequests', { days: 120 }), grCall('listApprovalAudit', { days: 90 }).catch(() => [])]);
+        GQ.policy = policy; GQ.rows = rows; GQ.audit = audit; GQ.draft = null; GQ.state = 'ok';
     } catch (e) { GQ.state = 'error'; GQ.error = e.message || String(e); }
     gqUpdateBadge();
     if (GR.tab === 'approvals') grRender();
@@ -139,6 +139,28 @@ function gqQueueHtml() {
         }).join('')}</tbody></table></div>`;
 }
 
+async function gqReview(id) {
+    const noteEl = document.getElementById('gq-rv-' + id);
+    const note = noteEl ? noteEl.value.trim() : '';
+    if (note.length < 3) { showToast('Ghi chú xem xét cần ít nhất 3 ký tự.', 'error'); return; }
+    try { showToast(await grCall('reviewApprovalAudit', { id, note, email: (GL.actor && GL.actor.actorEmail) || '' }), 'success'); await gqLoad(true); } catch (e) { showToast('Lỗi: ' + e.message, 'error'); }
+}
+
+// Kiểm tra độc lập hằng ngày (Edge Function approval-watch): lệnh lớn đã ghi vào sổ mà không có đề xuất được duyệt
+function gqAuditHtml() {
+    const open = GQ.audit.filter(a => a.status === 'open'), done = GQ.audit.filter(a => a.status === 'reviewed');
+    if (!open.length && !done.length) return `<div class="ce-group-title">Kiểm tra độc lập</div><p class="tl-hint" style="margin:0">Mỗi chiều ngày làm việc, hệ thống đối chiếu sổ lệnh với các đề xuất đã duyệt. Chưa có lệnh lớn nào ghi mà không qua duyệt${GQ.policy && GQ.policy.active ? '' : ' (quy định đang tắt nên chưa kiểm)'}.</p>`;
+    const manager = gqManager();
+    const row = (a, withForm) => `<tr><td><b>${rkEsc(gqName(a.user_id))}</b></td><td><span class="txn-type-badge ${a.side === 'sell' ? 'sell' : 'buy'}">${a.side === 'sell' ? 'Bán' : 'Mua'}</span> <b>${rkEsc(a.symbol)}</b> ${rkNum(a.quantity, 0)} × ${rkNum(a.price, 0)}</td>
+        <td class="text-right">${rkVnd(a.value)}<span class="symbol-sub">${a.pct === null || a.pct === undefined ? '' : rkNum(a.pct, 1) + '% NAV'}</span></td><td>${glDate(a.trade_date + 'T00:00:00')}${a.kind === 'reconcile' ? '<span class="symbol-sub">điều chỉnh đối soát</span>' : ''}</td>
+        <td>${withForm ? (manager ? `<div class="gq-act"><input type="text" id="gq-rv-${a.id}" class="tl-input" maxlength="500" placeholder="Ghi chú xem xét (vì sao chấp nhận / đã nhắc nhở…)"><button type="button" class="btn-tool" onclick="gqReview('${a.id}')"><i class="fa-solid fa-check"></i> Đã xem xét</button></div>` : '<span class="tl-hint" style="margin:0">Chờ quản lý xem xét</span>')
+            : `<span class="gq-reason">${rkEsc(a.review_note || '')}</span><span class="symbol-sub">${rkEsc(gqName(a.reviewed_by))} · ${glDate(a.reviewed_at)}</span>`}</td></tr>`;
+    return `<div class="ce-group-title">Kiểm tra độc lập: lệnh lớn ghi không qua duyệt${open.length ? ` (${open.length} chưa xem xét)` : ''}</div>
+        <p class="tl-hint" style="margin:0 0 8px">Phát hiện bởi lần kiểm hằng ngày ở máy chủ (không phụ thuộc app): lệnh vượt ngưỡng đã vào sổ mà không có đề xuất được duyệt gắn với nó. Chưa chắc là sai phạm (có thể duyệt miệng) nhưng cần ai đó xem và ghi lại.</p>
+        ${open.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Thành viên</th><th>Lệnh đã ghi</th><th class="text-right">Giá trị</th><th>Ngày</th><th>Xem xét</th></tr></thead><tbody>${open.map(a => row(a, true)).join('')}</tbody></table></div>` : '<div class="tl-empty" style="padding:10px"><i class="fa-solid fa-circle-check"></i>Không còn lệnh nào chờ xem xét.</div>'}
+        ${done.length ? `<details class="tl-details"><summary>Đã xem xét (${done.length})</summary><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Thành viên</th><th>Lệnh đã ghi</th><th class="text-right">Giá trị</th><th>Ngày</th><th>Kết luận</th></tr></thead><tbody>${done.map(a => row(a, false)).join('')}</tbody></table></div></details>` : ''}`;
+}
+
 function gqHistoryHtml() {
     const today = gqToday();
     const rows = GQ.rows.filter(r => ApprovalCalc.effectiveStatus(r, today) !== 'pending').sort((a, b) => ((b.decided_at || b.created_at) < (a.decided_at || a.created_at) ? -1 : 1)).slice(0, 80);
@@ -162,5 +184,5 @@ function grApprovalHtml() {
         rkKpi('Đã thực hiện', String(s.executed), '120 ngày qua'),
         rkKpi('Bị từ chối', String(s.rejected), '120 ngày qua'),
         rkKpi('Hết hạn / huỷ', String(s.expired + s.cancelled), 'không dùng tới'),
-    ].join('')}</div>` + gqQueueHtml() + gqHistoryHtml() + `<div style="margin-top:22px">${gqPolicyHtml()}</div>` + gqExemptHtml();
+    ].join('')}</div>` + gqQueueHtml() + `<div style="margin-top:22px">${gqAuditHtml()}</div>` + gqHistoryHtml() + `<div style="margin-top:22px">${gqPolicyHtml()}</div>` + gqExemptHtml();
 }
