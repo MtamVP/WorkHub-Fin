@@ -2587,6 +2587,38 @@ const API = {
             };
         },
 
+        // Dữ liệu thô cho tab Lịch (tính toán ở lib/calendar-calc.js): sổ lệnh, hành động DN, dòng tiền, danh mục hiện tại (kèm giá vốn), sự kiện doanh nghiệp
+        // đã/sắp công bố của mọi mã từng giao dịch, và quý báo cáo mới nhất của các mã đang giữ (từ bảng đệm số liệu tự làm mới). Lỗi phần phụ không làm hỏng cả báo cáo.
+        getCalendarInputs: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const [txns, actions, cashFlows, holdings, dis] = await Promise.all([
+                API.asset.listTransactions(email), API.asset.corporateAction.list(email), API.asset.cashFlow.list(email), API.asset.getHoldingsView(email),
+                sbClient.from('finance_event_dismissals').select('event_id').eq('user_id', userId)
+            ]);
+            const scope = CorporateEvents.queryScope(txns);
+            let events = [], eventsError = null;
+            if (scope.symbols.length) {
+                try { events = (await API.asset.events._fetchEvents(scope.symbols, scope.since)).events; } catch (e) { eventsError = e.message || String(e); }
+            }
+            const held = holdings.map(h => h.symbol);
+            let latestQuarter = {};
+            if (held.length) {
+                try {
+                    const cache = await API.stock.getFinancialsCache(held);
+                    Object.keys(cache).forEach(s => {
+                        const qs = (cache[s].quarters || []).slice().sort((a, b) => (b.year * 4 + b.quarter) - (a.year * 4 + a.quarter));
+                        if (qs.length) latestQuarter[s] = qs[0].year + 'Q' + qs[0].quarter;
+                    });
+                } catch (e) { /* chưa có bảng đệm: coi như chưa theo dõi báo cáo */ }
+            }
+            return {
+                today: new Date().toISOString().slice(0, 10), txns, actions, cashFlows, events, eventsError, latestQuarter,
+                dismissed: (dis.data || []).map(r => r.event_id),
+                holdings: holdings.map(h => ({ symbol: h.symbol, quantity: h.quantity, marketValue: h.marketValue, costValue: h.costValue }))
+            };
+        },
+
         // Dữ liệu thô cho phân tích hiệu quả so với chuẩn (tính toán ở lib/perf-calc.js): lịch sử NAV + giá chuẩn (VN-Index hoặc VN30)
         // phủ từ trước ngày chụp NAV đầu tiên. Lỗi lấy giá chuẩn không làm hỏng phần còn lại (benchError).
         getPerfInputs: async (email, benchKey) => {
@@ -4407,6 +4439,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getBenchSeries': result = await API.asset.getBenchSeries(params.benchKey, params.from); break;
             case 'getGroupData': result = await API.asset.getGroupData(); break;
             case 'getMarketInputs': result = await API.asset.getMarketInputs(params.symbols, params.windowDays); break;
+            case 'getCalendarInputs': result = await API.asset.getCalendarInputs(params.email); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;

@@ -246,3 +246,11 @@ td.jn-reason::before { content: none; }
 #lim-modal textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary); font: inherit; font-size: 0.86rem; resize: vertical; box-sizing: border-box; }
 #lim-modal textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
 .gr-table td.gr-reason { white-space: normal; min-width: 220px; max-width: 420px; }
+
+/* ---- Lịch sự kiện (calendar.js) ---- */
+.cal-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.cal-row { display: grid; grid-template-columns: 78px 1fr; gap: 14px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); align-items: start; }
+.cal-date { display: flex; flex-direction: column; align-items: center; padding: 4px 0; border-right: 1px solid var(--border-color); font-variant-numeric: tabular-nums; }
+.cal-date b { font-family: var(--font-mono); font-size: 0.95rem; } .cal-date small { font-size: 0.64rem; color: var(--text-muted); text-align: center; }
+.cal-main { min-width: 0; } .cal-detail { margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
+@media (max-width: 560px) { .cal-row { grid-template-columns: 62px 1fr; gap: 10px; } }

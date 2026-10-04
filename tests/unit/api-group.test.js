@@ -114,3 +114,37 @@ describe('API.asset.getBenchSeries', () => {
     expect(calls[0].from).toBe(new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10));   // mốc xa nhất Edge Function cho phép
   });
 });
+
+describe('API.asset.getCalendarInputs', () => {
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const tx = (id, symbol, d) => ({ id, user_id: 'u1', type: 'buy', symbol, quantity: 100, price: 100000, fee: 0, tax: 0, trade_date: d, created_at: d + 'T01:00:00Z', deleted_at: null });
+  const price = (symbol) => ({ user_id: 'u1', symbol, market_price: 110000, price_date: day(0), price_source: 'x', updated_at: new Date().toISOString(), locked: false });
+  const SEED = {
+    users: [{ id: 'u1', email: 'an@x.vn', nickname: 'An', group_key: 'finance', active: true }],
+    finance_transactions: [tx('a', 'FPT', day(-200)), tx('b', 'HPG', day(-100))], finance_holdings_price: [price('FPT'), price('HPG')],
+    finance_financials_cache: [{ symbol: 'FPT', payload: { quarters: [{ year: 2026, quarter: 1, lnst: 1 }, { year: 2026, quarter: 2, lnst: 2 }] } }],
+    finance_event_dismissals: [{ user_id: 'u1', event_id: 'dx' }],
+  };
+  it('gom sổ lệnh, dòng tiền, danh mục (kèm giá vốn), sự kiện, quý báo cáo mới nhất và mã đã ẩn', async () => {
+    const calls = [];
+    const { API } = boot(SEED, { functions: { 'stock-events': async (b) => { calls.push(b); return { data: { ok: true, events: [{ id: 'e1', symbol: 'FPT', kind: 'cash_dividend', exDate: day(10), payDate: day(20), dps: 1000 }], errors: {} }, error: null }; } } });
+    const r = await API.asset.getCalendarInputs('an@x.vn');
+    expect(r.today).toBe(day(0));
+    expect(r.txns).toHaveLength(2);
+    expect(r.holdings.map(h => h.symbol).sort()).toEqual(['FPT', 'HPG']);
+    expect(r.holdings[0].costValue).toBeGreaterThan(0);
+    expect(r.events).toHaveLength(1);
+    expect(calls[0].symbols).toEqual(['FPT', 'HPG']);
+    expect(calls[0].since).toBe(day(-200));
+    expect(r.latestQuarter).toEqual({ FPT: '2026Q2' });
+    expect(r.dismissed).toEqual(['dx']);
+    expect(r.eventsError).toBeNull();
+  });
+  it('lỗi sự kiện được báo riêng, phần còn lại vẫn trả về', async () => {
+    const { API } = boot(SEED, { functions: { 'stock-events': async () => ({ data: null, error: { message: 'nguồn lỗi' } }) } });
+    const r = await API.asset.getCalendarInputs('an@x.vn');
+    expect(r.eventsError).toMatch(/nguồn lỗi/);
+    expect(r.events).toEqual([]);
+    expect(r.holdings).toHaveLength(2);
+  });
+});
