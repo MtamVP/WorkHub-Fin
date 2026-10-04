@@ -110,3 +110,13 @@ Nguồn đều là điểm cuối công khai, không cam kết dịch vụ.
 - Chính sách duyệt lệnh hiện TẮT (bật trong cài đặt chính sách khi cần).
 - `check-limits` đang chạy bản cũ hơn kho mã; triển khai lại khi cần các cập nhật gần đây.
 - Lịch sử lãi phi rủi ro theo ngày chỉ bắt đầu từ 03/10/2026.
+
+## 11. Đang chờ áp dụng lên Supabase (viết xong ở kho mã 04/10/2026, CHƯA áp dụng)
+
+Thứ tự khuyến nghị; mỗi bước kiểm xong mới sang bước sau.
+
+1. **`finance-approval-enforce-migration.sql`** (tên migration `fin_limit_block_enforce`): trigger chặn MUA vượt giới hạn vị thế ở chế độ Chặn + loại dòng kiểm tra `limit`. Áp dụng phần từ khối `do $$` đến hết (bỏ các dòng chú thích đầu tệp nếu muốn). Kiểm: khối `DO` thử bằng `set local role authenticated` (một thành viên mua vượt `max_symbol_pct` chế độ block bị từ chối `LIMIT_BLOCKED`; quản lý không bị chặn; lệnh có `import_batch` ghi dòng kiểm tra `limit`), kết thúc bằng `raise exception` để huỷ dữ liệu thử.
+2. **`finance-market-snapshot-migration.sql`** (tên `fin_market_snapshot`): hai bảng `finance_market_snapshot`, `finance_sector_stats` + cron `market-snapshot-daily`.
+3. **Triển khai lại `market-data-sync`** (gồm tệp mới `peers.ts`; gửi TẤT CẢ tệp: `index.ts`, `logic.ts`, `peers.ts`). Chạy thử: `{"mode":"snapshot"}` rồi kiểm `select count(*) from finance_market_snapshot;` (kỳ vọng ~1.500) và `select icb2_code, n from finance_sector_stats;` (kỳ vọng ~20 ngành + `ALL`).
+4. Sau bước 3 thẻ "So với ngành" (Định Giá CP) và cột "So với ngành" (Toàn Nhóm > Định Lượng) tự có dữ liệu; trước đó chúng tự ẩn, không báo lỗi.
+5. `check-limits` v1 trên máy chủ cũ hơn kho mã: triển khai lại (gửi tất cả tệp) khi muốn cập nhật.
