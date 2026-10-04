@@ -94,6 +94,7 @@ function renderIdeas() {
     html += rows.length ? `<div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-ov id-table"><thead><tr><th class="left">Mã · ý tưởng</th><th class="left">Trạng thái</th><th>Giá ghi nhận → mục tiêu</th><th>Kết quả</th><th>Tự tin</th><th>Phiếu</th><th>Thảo luận</th></tr></thead><tbody>
         ${rows.map(i => idRow(i)).join('')}</tbody></table></div>` : '<div class="stock-empty-state"><i class="fa-solid fa-lightbulb"></i><p>Chưa có ý tưởng nào khớp. Bấm “Ý tưởng mới” để ghi lại luận điểm đầu tiên của bạn.</p></div>';
     html += idScoreboardHtml();
+    html += idCapabilityHtml();
     html += '<p class="vl-hint">Mọi ý tưởng — kể cả bị bác — được theo dõi kết quả so với VN-Index kể từ lúc ghi nhận giá, để nhóm biết cả quyết định duyệt lẫn bác đúng hay sai. Kết quả chỉ để học hỏi, không phải khuyến nghị đầu tư.</p>';
     root.innerHTML = html;
 }
@@ -123,6 +124,22 @@ function idScoreboardHtml() {
         ${sb.map(s => `<tr><td class="left"><b>${idEsc(s.name)}</b></td><td>${s.total}</td><td>${s.approvalRatePct === null ? '—' : idPct(s.approvalRatePct, 0)}</td><td>${s.closed}</td><td>${s.winRatePct === null ? '—' : idPct(s.winRatePct, 0)}</td>
             <td class="${idCls(s.avgClosedReturnPct)}">${idPct(s.avgClosedReturnPct, 1, true)}</td><td class="${idCls(s.avgClosedAlphaPct)}">${idPct(s.avgClosedAlphaPct, 1, true)}</td><td class="${idCls(s.avgOpenReturnPct)}">${idPct(s.avgOpenReturnPct, 1, true)}</td></tr>`).join('')}
         </tbody></table></div><p class="vl-hint">Tỷ lệ duyệt = số ý tưởng được duyệt ÷ số ý tưởng đã có quyết định. Mẫu nhỏ cho kết quả rất nhiễu; chỉ nên đọc xu hướng khi mỗi người có từ vài chục ý tưởng đã đóng.</p></div>`;
+}
+
+// Bản đồ năng lực: ai giỏi ngành nào (alpha TB của các ý tưởng họ đề xuất) và phiếu bầu của ai hay đúng. Phép tính ở IdeaFlow.capability (có kiểm thử).
+function idCapabilityHtml() {
+    const cap = IdeaFlow.capability(ID.ideas, ID.evals, ID.raw.votes, ID.raw.members, typeof FinCalc !== 'undefined' ? FinCalc.sectorOf : null);
+    if (!cap.rows.length && !cap.voting.length) return '';
+    const cell = (r) => `<span class="id-cap ${r.n >= cap.minSectorN ? (r.avgAlpha > 0 ? 'up' : 'down') : 'weak'}" title="${idEsc(r.name)}: ${r.n} ý tưởng, ${idPct(r.beatPct, 0)} thắng VN-Index${r.n < cap.minSectorN ? ' (mẫu nhỏ)' : ''}">${idEsc(r.name)} <b>${idPct(r.avgAlpha, 1, true)}</b> <small>${r.n}</small></span>`;
+    let html = `<div class="vl-card" style="margin-top:18px"><h3 class="vl-card-title"><i class="fa-solid fa-map" aria-hidden="true"></i> Bản đồ năng lực <span class="vl-muted">alpha trung bình so với VN-Index của ý tưởng do từng người đề xuất, theo ngành</span></h3>`;
+    html += cap.sectors.length ? `<div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-ov id-table"><thead><tr><th class="left">Ngành</th><th>Ý tưởng</th><th class="left">Ai đề xuất (alpha · số ý tưởng)</th><th class="left">Nên nghe</th></tr></thead><tbody>
+        ${cap.sectors.slice(0, 12).map(sc => `<tr><td class="left"><b>${idEsc(sc.sector)}</b></td><td>${sc.n}</td><td class="left id-caps">${sc.authors.map(cell).join(' ')}</td>
+            <td class="left">${sc.best ? `<span class="pnl-up">${idEsc(sc.best.name)}</span>` : '<span class="vl-muted">chưa đủ dữ liệu</span>'}${sc.weakest ? ` <span class="vl-muted">· thận trọng với ý kiến của ${idEsc(sc.weakest.name)}</span>` : ''}</td></tr>`).join('')}
+        </tbody></table></div><p class="vl-hint">Một người cần ít nhất ${cap.minSectorN} ý tưởng trong một ngành mới được gọi là “nên nghe” ở ngành đó; dưới mức này chỉ là dấu hiệu (chữ mờ). Alpha tính theo chiều của ý tưởng, kể cả ý tưởng bị bác. Không phải xếp hạng con người: mỗi người có thời điểm và phong cách khác nhau.</p>` : '<p class="vl-hint">Chưa có ý tưởng nào có đủ giá để tính alpha.</p>';
+    if (cap.voting.length) html += `<h4 class="id-sub">Phiếu bầu của ai hay đúng?</h4><div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-ov id-table"><thead><tr><th class="left">Thành viên</th><th>Số phiếu đã có kết quả</th><th>Đúng</th><th>Ủng hộ đúng</th><th>Phản đối đúng</th></tr></thead><tbody>
+        ${cap.voting.map(v => `<tr><td class="left"><b>${idEsc(v.name)}</b></td><td>${v.n}</td><td class="${v.n >= 8 ? idCls(v.accuracyPct - 50) : ''}">${idPct(v.accuracyPct, 0)}</td><td>${v.forAccPct === null ? '—' : idPct(v.forAccPct, 0) + ` <small>(${v.forN})</small>`}</td><td>${v.againstAccPct === null ? '—' : idPct(v.againstAccPct, 0) + ` <small>(${v.againstN})</small>`}</td></tr>`).join('')}
+        </tbody></table></div><p class="vl-hint">Ủng hộ đúng khi ý tưởng sau đó hơn VN-Index; phản đối đúng khi kém. Không tính phiếu cho ý tưởng của chính mình và phiếu trắng. 50% = ngang tung đồng xu; cần nhiều phiếu mới đáng kể.</p>`;
+    return html + '</div>';
 }
 
 function idSetFilter(f) { ID.filter = f; renderIdeas(); }

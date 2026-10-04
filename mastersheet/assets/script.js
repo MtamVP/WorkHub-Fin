@@ -166,7 +166,7 @@ async function setupTargetUserSwitcher() {
 
 // --- TAB SWITCHING ---
 function switchAssetTab(tab) {
-    ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'risk', 'calendar', 'reports'].forEach(t => {
+    ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'mirror', 'risk', 'calendar', 'reports'].forEach(t => {
         const panel = document.getElementById('tab-' + t);
         const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
         if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -181,6 +181,7 @@ function switchAssetTab(tab) {
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
     if (tab === 'risk') { loadRisk(); if (typeof loadLimitsPanel === 'function') loadLimitsPanel(true); }   // dữ liệu giữ trong phiên; nút "Tính lại" để lấy mới
+    if (tab === 'mirror' && typeof loadMirror === 'function') loadMirror();
     if (tab === 'calendar' && typeof loadCalendar === 'function') loadCalendar();
     if (tab === 'reports' && !TAB_LOADED.reports) { initReportsTab(); TAB_LOADED.reports = true; }
 }

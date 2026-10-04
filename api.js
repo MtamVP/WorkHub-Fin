@@ -2718,6 +2718,30 @@ const API = {
             return { txns, cashFlows, navHistory, actions, histories, historyError, firstTxnDate: first, from: start, to };
         },
 
+        // Dữ liệu thô cho "Gương Quyết Định" (lib/decision-mirror.js): sổ lệnh, hành động DN, nhật ký quyết định và giá lịch sử của mọi mã từng giao dịch
+        // (+ VN-Index) từ 45 ngày trước lệnh/quyết định đầu tiên tới nay -- cần để đo diễn biến giá trước và sau từng lệnh.
+        getMirrorInputs: async (email) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const [txns, actions, decisions] = await Promise.all([API.asset.listTransactions(email), API.asset.corporateAction.list(email), API.asset.journal.list(email)]);
+            const symbols = [...new Set(txns.map(t => t.symbol).concat(decisions.map(d => d.symbol)).filter(Boolean))].slice(0, 60);
+            const dates = txns.map(t => String(t.trade_date).slice(0, 10)).concat(decisions.map(d => String(d.decided_at).slice(0, 10))).filter(Boolean).sort();
+            const today = new Date().toISOString().slice(0, 10);
+            const floor = new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10);
+            const first = dates[0] || today;
+            let from = new Date(new Date(first + 'T00:00:00Z').getTime() - 45 * 86400000).toISOString().slice(0, 10);
+            if (from < floor) from = floor;
+            let histories = {}, historyError = null;
+            if (symbols.length) {
+                try {
+                    for (let i = 0; i < symbols.length; i += 20) {
+                        Object.assign(histories, await API.asset.getPriceHistory(symbols.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), from, today));
+                    }
+                } catch (e) { historyError = e.message || String(e); }
+            }
+            return { txns, actions, decisions, histories, historyError, today, from };
+        },
+
         // Chuỗi giá chuẩn (VN-Index hoặc VN30) từ trước ngày `from` ~20 ngày tới nay, cho các phân tích hiệu quả cấp nhóm.
         getBenchSeries: async (benchKey, from) => {
             const key = ['VNINDEX', 'VN30'].includes(benchKey) ? benchKey : 'VNINDEX';
@@ -4513,6 +4537,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getPerfInputs': result = await API.asset.getPerfInputs(params.email, params.benchKey); break;
+            case 'getMirrorInputs': result = await API.asset.getMirrorInputs(params.email); break;
             case 'getAttributionInputs': result = await API.asset.getAttributionInputs(params.email, params.from); break;
             case 'getBenchSeries': result = await API.asset.getBenchSeries(params.benchKey, params.from); break;
             case 'getGroupData': result = await API.asset.getGroupData(); break;

@@ -171,3 +171,57 @@ describe('scoreboard / voteTally / openChallenges', () => {
     expect(F.openChallenges([c(1, 'b', 'challenge', 1), c(2, 'x', 'answer', 2)], 'a').map(x => x.id)).toEqual([1]);   // chỉ tác giả trả lời mới tính
   });
 });
+
+describe('capability: bản đồ năng lực của nhóm', () => {
+  const idea = (id, userId, symbol) => ({ id, userId, symbol });
+  const ev = (alphaPct) => ({ status: 'open', alphaPct });
+  const sectorOf = (s) => ({ VCB: 'Ngân hàng', TCB: 'Ngân hàng', MBB: 'Ngân hàng', FPT: 'Công nghệ', CMG: 'Công nghệ' }[s] || 'Chưa phân ngành');
+  const members = { a: 'An', b: 'Bình' };
+  const ideas = [idea('1', 'a', 'VCB'), idea('2', 'a', 'TCB'), idea('3', 'a', 'MBB'), idea('4', 'b', 'VCB'), idea('5', 'b', 'TCB'), idea('6', 'b', 'MBB'), idea('7', 'a', 'FPT'), idea('8', 'b', 'FPT')];
+  const evals = { 1: ev(10), 2: ev(6), 3: ev(5), 4: ev(-8), 5: ev(-2), 6: ev(3), 7: ev(-4), 8: ev(12) };
+  const cap = F.capability(ideas, evals, [], members, sectorOf);
+  it('alpha trung bình theo (thành viên, ngành) và tỷ lệ thắng thị trường', () => {
+    const an = cap.rows.find(r => r.userId === 'a' && r.sector === 'Ngân hàng');
+    expect(an.n).toBe(3);
+    expect(an.avgAlpha).toBeCloseTo(7, 6);
+    expect(an.beatPct).toBe(100);
+    const binh = cap.rows.find(r => r.userId === 'b' && r.sector === 'Ngân hàng');
+    expect(binh.avgAlpha).toBeCloseTo((-8 - 2 + 3) / 3, 6);
+    expect(binh.beatPct).toBeCloseTo(100 / 3, 6);
+  });
+  it('mạnh nhất / yếu nhất chỉ xét người có đủ số ý tưởng trong ngành', () => {
+    const bank = cap.sectors.find(s => s.sector === 'Ngân hàng');
+    expect(bank.best.userId).toBe('a');
+    expect(bank.weakest.userId).toBe('b');
+    const tech = cap.sectors.find(s => s.sector === 'Công nghệ');
+    expect(tech.n).toBe(2);
+    expect(tech.best).toBeNull();                 // mỗi người chỉ 1 ý tưởng: chưa đủ để gọi là mạnh
+    expect(tech.weakest).toBeNull();
+    expect(cap.sectors[0].sector).toBe('Ngân hàng');   // sắp theo số ý tưởng
+  });
+  it('bỏ ý tưởng chưa có đánh giá hoặc thiếu alpha', () => {
+    const c = F.capability(ideas, { 1: { status: 'nodata' }, 2: { status: 'open', alphaPct: null } }, [], members, sectorOf);
+    expect(c.rows).toEqual([]);
+    expect(c.sectors).toEqual([]);
+  });
+  it('độ chính xác của phiếu: ủng hộ đúng khi alpha dương, phản đối đúng khi alpha âm; bỏ phiếu cho ý tưởng của chính mình, phiếu trắng và alpha = 0', () => {
+    const votes = [
+      { idea_id: '1', user_id: 'b', vote: 'for' },        // alpha +10: đúng
+      { idea_id: '4', user_id: 'a', vote: 'against' },    // alpha -8: đúng
+      { idea_id: '2', user_id: 'b', vote: 'against' },    // alpha +6: sai
+      { idea_id: '1', user_id: 'a', vote: 'for' },        // tự bỏ phiếu: bỏ
+      { idea_id: '3', user_id: 'b', vote: 'abstain' },    // phiếu trắng: bỏ
+      { idea_id: '5', user_id: 'a', vote: 'for' },        // alpha -2: sai
+    ];
+    const v = F.capability(ideas, evals, votes, members, sectorOf).voting;
+    const b = v.find(x => x.userId === 'b'), a = v.find(x => x.userId === 'a');
+    expect(b).toMatchObject({ n: 2, correct: 1, forN: 1, forCorrect: 1, againstN: 1, againstCorrect: 0 });
+    expect(b.accuracyPct).toBe(50);
+    expect(a).toMatchObject({ n: 2, correct: 1 });
+    expect(F.capability(ideas, { 1: ev(0) }, [{ idea_id: '1', user_id: 'b', vote: 'for' }], members, sectorOf).voting).toEqual([]);
+  });
+  it('không truyền sectorOf: mọi mã vào "Chưa phân ngành"; dữ liệu rỗng không lỗi', () => {
+    expect(F.capability(ideas, evals, [], members).sectors).toHaveLength(1);
+    expect(F.capability(null, null, null, null).rows).toEqual([]);
+  });
+});

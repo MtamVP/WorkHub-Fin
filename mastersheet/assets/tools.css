@@ -302,3 +302,30 @@ td.jn-reason::before { content: none; }
 .gl-day { width: 14px; height: 22px; border-radius: 3px; background: var(--border-color); }
 .gl-day.ok { background: var(--success-bg); border: 1px solid var(--success-color); opacity: 0.7; }
 .gl-day.bad { background: var(--danger-color); }
+
+/* ---- Gương Quyết Định (mirror.js) ---- */
+.mr-findings { display: flex; flex-direction: column; gap: 10px; }
+.mr-find { padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); display: flex; flex-direction: column; gap: 6px; }
+.mr-find.warn { border-color: var(--warning-color); } .mr-find.ok { border-color: var(--success-color); }
+.mr-find-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mr-find-head b { font-size: 0.92rem; flex: 1; min-width: 200px; }
+.mr-n { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); } .mr-n.weak { color: var(--warning-color); }
+.mr-find-body { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; }
+.mr-find-tip { font-size: 0.8rem; color: var(--text-primary); line-height: 1.55; } .mr-find-tip i { color: var(--gold); margin-right: 4px; }
+.mr-meter { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.mr-meter .k { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.mr-meter small { color: var(--text-muted); font-size: 0.72rem; }
+.mr-quad { display: grid; grid-template-columns: 150px 1fr 1fr; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.mr-quad-h { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: 0.03em; }
+.mr-quad-h.side { justify-content: flex-start; text-align: left; }
+.mr-cell { padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); display: flex; flex-direction: column; gap: 4px; }
+.mr-cell b { font-size: 1.4rem; font-family: var(--font-mono); } .mr-cell span { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.4; }
+.mr-cell.ok { border-color: var(--success-color); background: var(--success-bg); } .mr-cell.warn { border-color: var(--warning-color); background: var(--warning-bg); } .mr-cell.bad { border-color: var(--danger-color); background: var(--danger-bg); }
+@media (max-width: 640px) { .mr-quad { grid-template-columns: 1fr 1fr; } .mr-quad-h.side { grid-column: 1 / -1; } .mr-quad > .mr-quad-h:first-child { display: none; } }
+
+/* ---- Bản đồ năng lực (stocksheet/ideas-ui.js) ---- */
+.id-caps { display: flex; gap: 6px; flex-wrap: wrap; }
+.id-cap { display: inline-flex; gap: 5px; align-items: baseline; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-color); font-size: 0.74rem; }
+.id-cap.up { color: var(--success-color); border-color: var(--success-color); } .id-cap.down { color: var(--danger-color); border-color: var(--danger-color); } .id-cap.weak { color: var(--text-muted); opacity: 0.75; }
+.id-cap small { color: var(--text-muted); }
+.id-sub { margin: 16px 0 8px; font-size: 0.82rem; color: var(--text-secondary); }

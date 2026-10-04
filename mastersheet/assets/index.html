@@ -124,6 +124,7 @@
             <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh <span class="jn-badge" id="ce-badge" style="display:none;" title="Sự kiện doanh nghiệp chưa ghi"></span></button>
             <button class="view-toggle-btn" data-tab="journal" onclick="switchAssetTab('journal')"><i class="fa-solid fa-book-open"></i> Nhật Ký <span class="jn-badge" id="jn-badge" style="display:none;"></span></button>
             <button class="view-toggle-btn" data-tab="performance" onclick="switchAssetTab('performance')"><i class="fa-solid fa-chart-area"></i> Hiệu Suất</button>
+            <button class="view-toggle-btn" data-tab="mirror" onclick="switchAssetTab('mirror')"><i class="fa-solid fa-user-check"></i> Gương</button>
             <button class="view-toggle-btn" data-tab="risk" onclick="switchAssetTab('risk')"><i class="fa-solid fa-shield-halved"></i> Rủi Ro</button>
             <button class="view-toggle-btn" data-tab="calendar" onclick="switchAssetTab('calendar')"><i class="fa-solid fa-calendar-days"></i> Lịch</button>
             <button class="view-toggle-btn" data-tab="reports" onclick="switchAssetTab('reports')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
@@ -594,6 +595,16 @@
             </div>
         </section>
 
+        <!-- Tab: Gương Quyết Định -->
+        <section id="tab-mirror" class="asset-tab-panel" style="display:none;">
+            <div class="tl-card">
+                <div class="tl-card-head"><h3><i class="fa-solid fa-user-check"></i> Gương Quyết Định</h3>
+                    <div class="tl-card-tools"><button type="button" class="btn-tool" onclick="loadMirror(true)"><i class="fa-solid fa-rotate"></i> Tính lại</button></div></div>
+                <p class="tl-hint" style="margin:-6px 0 12px">Soi chính cách bạn ra quyết định: mức tự tin có đáng tin không, có chốt lời sớm / giữ lỗ lâu, mua đuổi, bán hoảng loạn, điểm vào/ra có hơn thị trường, và bán xong giá đi đâu. Tính từ sổ lệnh, Nhật Ký và giá lịch sử của bạn.</p>
+                <div id="mr-body"></div>
+            </div>
+        </section>
+
         <!-- Tab: Lịch -->
         <section id="tab-calendar" class="asset-tab-panel" style="display:none;">
             <div class="tl-card">
@@ -725,6 +736,7 @@
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
     <script src="../../lib/decision-journal.js?v=1791900000000"></script>
+    <script src="../../lib/decision-mirror.js?v=1791900000000"></script>
     <script src="../../lib/monthly-report.js?v=1791900000000"></script>
     <script src="../../lib/save-file.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
@@ -736,6 +748,7 @@
     <script src="risk.js?v=1791900000000"></script>
     <script src="risk-advanced.js?v=1791900000000"></script>
     <script src="calendar.js?v=1791900000000"></script>
+    <script src="mirror.js?v=1791900000000"></script>
     <script src="limits.js?v=1791900000000"></script>
     <script src="pretrade.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
