@@ -265,7 +265,7 @@ async function fillDecisionFromValuation() {
     note.textContent = 'Đang lấy định giá…';
     try {
         const snap = await jnValuationSnapshot(symbol, jnReadNum('jn-price'));
-        if (!snap) { note.textContent = `Chưa có định giá cho ${symbol} — mở Tổng Hợp CP / Định Giá CP để lập định giá. Vẫn gợi ý cắt lỗ và thời hạn mặc định.`; }
+        if (!snap) { note.textContent = `Chưa có định giá cho ${symbol} — mở Nghiên Cứu / Định Giá CP để lập định giá. Vẫn gợi ý cắt lỗ và thời hạn mặc định.`; }
         const action = document.getElementById('jn-action').value;
         const price = jnReadNum('jn-price') || (snap && snap.price) || 0;
         const plan = DecisionJournal.suggestPlan(action, price, snap);

@@ -199,7 +199,7 @@ function renderOverview() {
 
     const live = items.filter(i => i.priceSource).length;
     document.getElementById('ov-hint').textContent = items.length
-        ? `Giá hiện tại: ${live}/${items.length} mã lấy từ giá thị trường (Bàn Tài Sản hoặc đóng cửa gần nhất), còn lại dùng giá lưu trong hồ sơ. Kết luận chỉ là công cụ tham khảo dựa trên giả định bạn nhập, không phải khuyến nghị đầu tư.`
+        ? `Giá hiện tại: ${live}/${items.length} mã lấy từ giá thị trường (Danh Mục hoặc đóng cửa gần nhất), còn lại dùng giá lưu trong hồ sơ. Kết luận chỉ là công cụ tham khảo dựa trên giả định bạn nhập, không phải khuyến nghị đầu tư.`
         : '';
 }
 
@@ -401,7 +401,7 @@ function renderDetail() {
     const unitLabel = VC.UNIT_LABELS[n.unit];
 
     const priceNote = d.live
-        ? `Giá ${d.live.source === 'portfolio' ? 'trong Bàn Tài Sản' : 'đóng cửa'} ${fmtDate(d.live.date)}`
+        ? `Giá ${d.live.source === 'portfolio' ? 'trong Danh Mục' : 'đóng cửa'} ${fmtDate(d.live.date)}`
         : 'Giá lưu trong hồ sơ (chưa lấy được giá thị trường)';
     const status = (item && item.held ? '<span class="vl-tag"><i class="fa-solid fa-wallet"></i> Đang nắm</span>' : '') +
         (item && item.watched ? '<span class="vl-tag vl-tag-watch"><i class="fa-solid fa-eye"></i> Đang theo dõi</span>' : '');
@@ -617,7 +617,7 @@ async function applyToPortfolio() {
     const lines = [];
     if (target > 0) lines.push(`• Giá mục tiêu: ${VU.vnd(target)}${item && item.held ? ' (ghi vào mã đang nắm)' : ' (ghi vào mục Theo Dõi)'}`);
     if (buy > 0) lines.push(`• Giá muốn mua: ${VU.vnd(buy)} (mục Theo Dõi${item && item.watched ? ', cập nhật mục có sẵn' : ', thêm mới'})`);
-    if (!window.confirm(`Áp dụng cho ${d.symbol} trong Bàn Tài Sản của bạn?\n\n${lines.join('\n')}`)) return;
+    if (!window.confirm(`Áp dụng cho ${d.symbol} trong Danh Mục của bạn?\n\n${lines.join('\n')}`)) return;
     try {
         const msg = await call('pushStockToPortfolio', { symbol: d.symbol, targetPrice: target, buyBelow: buy });
         showToast(msg, 'success');

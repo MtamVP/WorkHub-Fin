@@ -218,7 +218,7 @@ async function scWatch(symbol) {
     const it = state.items.find(i => i.symbol === symbol);
     if (!it || !(it.a.v.fair > 0)) return;
     const fair = Math.round(it.a.v.fair), buy = Math.round(it.a.v.fair * VC.CHEAP_RATIO);
-    if (!window.confirm(`Thêm ${symbol} vào Theo Dõi trong Bàn Tài Sản?\n\n• Giá mục tiêu: ${VU.vnd(fair)} (giá hợp lý)\n• Báo khi giá ≤ ${VU.vnd(buy)} (${Math.round(VC.CHEAP_RATIO * 100)}% giá hợp lý)`)) return;
+    if (!window.confirm(`Thêm ${symbol} vào Theo Dõi trong Danh Mục?\n\n• Giá mục tiêu: ${VU.vnd(fair)} (giá hợp lý)\n• Báo khi giá ≤ ${VU.vnd(buy)} (${Math.round(VC.CHEAP_RATIO * 100)}% giá hợp lý)`)) return;
     try {
         const msg = await call('pushStockToPortfolio', { symbol: symbol, targetPrice: fair, buyBelow: buy });
         showToast(msg, 'success');

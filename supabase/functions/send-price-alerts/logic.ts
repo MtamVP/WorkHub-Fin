@@ -123,7 +123,7 @@ export function buildEmail(alerts: Alert[], nickname: string | null): { subject:
       ? `• ${a.symbol}: giá ${fmt(a.price)} ≤ giá muốn mua ${fmt(a.threshold)} — mã trong danh sách theo dõi, cân nhắc mua theo kế hoạch.`
       : `• ${a.symbol}: giá ${fmt(a.price)} ≤ ngưỡng cắt lỗ ${fmt(a.threshold)} — cân nhắc cắt lỗ.`;
   const greeting = nickname ? `Chào ${nickname},` : "Chào bạn,";
-  const text = `${greeting}\n\n${alerts.map(lineText).join("\n")}\n\nĐây là cảnh báo tự động từ WorkHub Finance (mỗi mức chỉ báo 1 lần/ngày). Bạn có thể tắt email cảnh báo trong tab Danh Mục của Bàn Tài Sản.`;
+  const text = `${greeting}\n\n${alerts.map(lineText).join("\n")}\n\nĐây là cảnh báo tự động từ WorkHub Finance (mỗi mức chỉ báo 1 lần/ngày). Bạn có thể tắt email cảnh báo trong tab Danh Mục của Investment Workbench.`;
   const row = (a: Alert) => {
     const isTarget = a.kind === "target";
     const color = isTarget ? "#12855A" : a.kind === "buy" ? "#2A62C9" : "#C23B3B";
@@ -137,6 +137,6 @@ export function buildEmail(alerts: Alert[], nickname: string | null): { subject:
     `<p>${escapeHtml(greeting)}</p>` +
     `<table style="border-collapse:collapse;width:100%;font-size:14px"><thead><tr style="text-align:left;color:#6b655a;font-size:12px">` +
     `<th style="padding:6px 14px">Mã</th><th style="padding:6px 14px">Sự kiện</th><th style="padding:6px 14px;text-align:right">Giá hiện tại</th><th style="padding:6px 14px;text-align:right">Mức đặt</th></tr></thead><tbody>${alerts.map(row).join("")}</tbody></table>` +
-    `<p style="color:#6b655a;font-size:12px;margin-top:16px">Cảnh báo tự động từ WorkHub Finance — mỗi mức chỉ báo 1 lần/ngày. Tắt email cảnh báo trong tab Danh Mục của Bàn Tài Sản.</p></div>`;
+    `<p style="color:#6b655a;font-size:12px;margin-top:16px">Cảnh báo tự động từ WorkHub Finance — mỗi mức chỉ báo 1 lần/ngày. Tắt email cảnh báo trong tab Danh Mục của Investment Workbench.</p></div>`;
   return { subject, html, text };
 }
