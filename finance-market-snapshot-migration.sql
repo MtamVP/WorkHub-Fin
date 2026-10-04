@@ -1,4 +1,4 @@
--- ẢNH CHỤP CẢ THỊ TRƯỜNG + THỐNG KÊ THEO NGÀNH để định giá tương đối. CHƯA áp dụng lên Supabase (viết 04/10/2026; chờ cho phép áp dụng migration "fin_market_snapshot").
+-- ẢNH CHỤP CẢ THỊ TRƯỜNG + THỐNG KÊ THEO NGÀNH để định giá tương đối. đã áp dụng lên Supabase ngày 05/10/2026 (migration "fin_market_snapshot").
 -- Chạy lại an toàn. Chỉ service role (Edge Function market-data-sync, mode "snapshot") ghi; nhóm finance / admin đọc.
 --  finance_market_snapshot : mỗi mã niêm yết một dòng (P/E, P/B, P/S, vốn hoá, cổ tức, ROE, tăng trưởng, beta, thanh khoản... theo tên ngắn như finance_stock_ratios) + ngành ICB cấp 2.
 --  finance_sector_stats    : mỗi ngành ICB cấp 2 (và 'ALL' = toàn thị trường) một dòng: số mã, trung vị và 11 điểm phân vị (p0, p10, ..., p100) của P/E, P/B, P/S, ROE, tỷ suất cổ tức,

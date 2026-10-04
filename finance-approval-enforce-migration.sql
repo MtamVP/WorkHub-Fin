@@ -1,5 +1,5 @@
 -- ÉP DUYỆT LỆNH Ở MÁY CHỦ (đã áp dụng trên Supabase qua MCP apply_migration "fin_approval_enforce"). Chạy lại an toàn.
--- LƯU Ý: khối "giới hạn theo vị thế ở chế độ chặn" (max_symbol_pct / max_position_vnd) và kind kiểm tra mới 'limit' mới được viết ngày 04/10/2026, CHƯA áp dụng lên Supabase (chờ người dùng cho phép áp dụng migration "fin_limit_block_enforce").
+-- LƯU Ý: khối "giới hạn theo vị thế ở chế độ chặn" (max_symbol_pct / max_position_vnd) và kind kiểm tra mới 'limit' đã áp dụng lên Supabase ngày 05/10/2026 (migration "fin_limit_block_enforce"), kiểm bằng 9 ca DO có huỷ dữ liệu.
 -- Trước đây việc "lệnh lớn phải có đề xuất đã duyệt" chỉ nằm trong code app (api.js addTransaction); ai gọi thẳng API Supabase thì lách được.
 -- Trigger fn_finance_transactions_enforce (BEFORE INSERT/UPDATE trên finance_transactions) lặp lại luật đó ở DB:
 --   * quy định duyệt lệnh đang BẬT và lệnh vượt ngưỡng (% NAV theo finance_assets.nav và/hoặc số tiền) => phải có đề xuất đã duyệt, còn hạn, của đúng người/mã/chiều,

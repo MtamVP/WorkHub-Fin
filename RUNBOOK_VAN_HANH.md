@@ -21,12 +21,12 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 | market-rates-daily | `30 10 * * 1-5` | market-data-sync `rates` | lợi suất TPCP |
 | market-health-daily | `45 10 * * 1-5` | market-data-sync `health` | kiểm hai nguồn giá + email cảnh báo mới |
 | market-ratios-daily | `0 11 * * 1-5` | market-data-sync `ratios` | P/E, P/B, beta, khối ngoại… |
-| market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành (CHƯA bật: cần áp dụng `finance-market-snapshot-migration.sql` và triển khai lại hàm) |
+| market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành |
 | cleanup_system_logs | `0 3 1 * *` | SQL | dọn nhật ký hệ thống |
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)
 
-`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v4 · `storage-proxy` v7.
+`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v5 · `storage-proxy` v7.
 
 Secrets (đặt trong Supabase → Edge Functions → Secrets, KHÔNG ghi vào kho mã): `RESEND_API_KEY`, `ALERT_FROM_EMAIL`. Chỉ cần cho email cảnh báo.
 
@@ -111,12 +111,9 @@ Nguồn đều là điểm cuối công khai, không cam kết dịch vụ.
 - `check-limits` đang chạy bản cũ hơn kho mã; triển khai lại khi cần các cập nhật gần đây.
 - Lịch sử lãi phi rủi ro theo ngày chỉ bắt đầu từ 03/10/2026.
 
-## 11. Đang chờ áp dụng lên Supabase (viết xong ở kho mã 04/10/2026, CHƯA áp dụng)
+## 11. Đã áp dụng ngày 05/10/2026 (theo yêu cầu của chủ dự án)
 
-Thứ tự khuyến nghị; mỗi bước kiểm xong mới sang bước sau.
-
-1. **`finance-approval-enforce-migration.sql`** (tên migration `fin_limit_block_enforce`): trigger chặn MUA vượt giới hạn vị thế ở chế độ Chặn + loại dòng kiểm tra `limit`. Áp dụng phần từ khối `do $$` đến hết (bỏ các dòng chú thích đầu tệp nếu muốn). Kiểm: khối `DO` thử bằng `set local role authenticated` (một thành viên mua vượt `max_symbol_pct` chế độ block bị từ chối `LIMIT_BLOCKED`; quản lý không bị chặn; lệnh có `import_batch` ghi dòng kiểm tra `limit`), kết thúc bằng `raise exception` để huỷ dữ liệu thử.
-2. **`finance-market-snapshot-migration.sql`** (tên `fin_market_snapshot`): hai bảng `finance_market_snapshot`, `finance_sector_stats` + cron `market-snapshot-daily`.
-3. **Triển khai lại `market-data-sync`** (gồm tệp mới `peers.ts`; gửi TẤT CẢ tệp: `index.ts`, `logic.ts`, `peers.ts`). Chạy thử: `{"mode":"snapshot"}` rồi kiểm `select count(*) from finance_market_snapshot;` (kỳ vọng ~1.500) và `select icb2_code, n from finance_sector_stats;` (kỳ vọng ~20 ngành + `ALL`).
-4. Sau bước 3 thẻ "So với ngành" (Định Giá CP) và cột "So với ngành" (Toàn Nhóm > Định Lượng) tự có dữ liệu; trước đó chúng tự ẩn, không báo lỗi.
-5. `check-limits` v1 trên máy chủ cũ hơn kho mã: triển khai lại (gửi tất cả tệp) khi muốn cập nhật.
+- `fin_market_snapshot` (2 bảng + cron `market-snapshot-daily`) và `fin_limit_block_enforce` (trigger chặn MUA vượt giới hạn vị thế, dòng kiểm tra `limit`) đã áp dụng.
+- `market-data-sync` v5 (có `peers.ts`) đã triển khai; chạy thử `{"mode":"snapshot"}`: 1.523 mã, 18 ngành + `ALL`, trung vị P/E toàn thị trường 9,94x.
+- Trigger đã kiểm bằng khối `DO` có huỷ dữ liệu (9 ca): mua nhỏ cho phép; mua vượt 10% NAV bị chặn `LIMIT_BLOCKED`; bán không bị chặn; quản lý không bị chặn; chế độ "phải ghi lý do" không chặn; giới hạn riêng cho mã thay thế giới hạn chung; cộng dồn vị thế vượt `max_position_vnd` bị chặn; nhập sao kê vượt giới hạn không chặn và ghi 1 dòng kiểm tra `limit`. Sau kiểm không còn dữ liệu thử.
+- Còn lại: `check-limits` v1 trên máy chủ cũ hơn kho mã (triển khai lại khi cần). 523 mã trong ảnh chụp chưa có ngành ICB (phần lớn UPCoM nhỏ) nên không vào thống kê ngành.
