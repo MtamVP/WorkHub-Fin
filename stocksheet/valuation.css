@@ -306,3 +306,6 @@
 .vl-peer-dot.good { background: var(--success-color, #3aa675); }
 .vl-peer-dot.bad { background: var(--danger-color); }
 @media (max-width: 600px) { .vl-peer-row { grid-template-columns: 48px 1fr 64px; } .vl-peer-row small { grid-column: 1 / -1; } }
+
+.mk-flag { color: var(--danger-color) !important; max-width: 340px; white-space: normal; }
+.mk-flag i { margin-right: 3px; }

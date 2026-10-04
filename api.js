@@ -2449,7 +2449,7 @@ const API = {
         // --- Dữ liệu thị trường miễn phí + giám sát vận hành (finance-market-data-migration.sql; Edge Function market-data-sync):
         //     phân ngành ICB cho toàn bộ mã niêm yết, lợi suất trái phiếu chính phủ theo ngày (lãi phi rủi ro), cảnh báo chất lượng dữ liệu giá, nhật ký chạy của các hàm định kỳ. ---
         market: {
-            _p: null, _at: 0,
+            _p: null, _at: 0, _uni: null, _uniAt: 0,
             // Nạp phân ngành ICB một lần mỗi phiên (cache localStorage 24 giờ) rồi đăng ký vào FinCalc; lỗi nào cũng chỉ bỏ qua (bảng tự gõ vẫn dùng được).
             ensureMeta: async (force) => {
                 const M = API.asset.market;
@@ -2570,6 +2570,23 @@ const API = {
                 const bySymbol = {}; (snap.data || []).forEach(r => { bySymbol[r.symbol] = { icb2_code: r.icb2_code, metrics: r.metrics || {} }; });
                 const stats = {}; let asOf = null; (st.data || []).forEach(r => { stats[r.icb2_code] = { n: r.n, as_of: r.as_of, stats: r.stats || {} }; if (r.as_of && (!asOf || r.as_of > asOf)) asOf = r.as_of; });
                 return { bySymbol, stats, asOf };
+            },
+            // Toàn bộ ảnh chụp thị trường cho sàng lọc (lib/market-screener.js): { snapshot: [{symbol, icb2_code, metrics}], stats: {icb2_code: {n, as_of, stats}}, meta: {SYM: {name, exchange}}, asOf }.
+            // Cache trong phiên 30 phút (khoảng 1.500 dòng, vài trăm KB). Rỗng nếu chưa có ảnh chụp.
+            marketUniverse: async (force) => {
+                const M = API.asset.market;
+                if (!force && M._uni && Date.now() - M._uniAt < 30 * 60000) return M._uni;
+                const [snap, st, meta] = await Promise.all([
+                    API.asset._fetchAll(() => sbClient.from('finance_market_snapshot').select('symbol, icb2_code, daily_date, metrics').order('symbol')),
+                    sbClient.from('finance_sector_stats').select('icb2_code, n, as_of, stats'),
+                    API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('symbol, name, exchange').order('symbol')).catch(() => []),
+                ]);
+                if (st.error) throw st.error;
+                const stats = {}; let asOf = null; (st.data || []).forEach(r => { stats[r.icb2_code] = { n: r.n, as_of: r.as_of, stats: r.stats || {} }; if (r.as_of && (!asOf || r.as_of > asOf)) asOf = r.as_of; });
+                const metaBy = {}; (meta || []).forEach(r => { metaBy[r.symbol] = { name: r.name || '', exchange: r.exchange || '' }; });
+                M._uni = { snapshot: (snap || []).map(r => ({ symbol: r.symbol, icb2_code: r.icb2_code, metrics: r.metrics || {} })), stats, meta: metaBy, asOf };
+                M._uniAt = Date.now();
+                return M._uni;
             },
             healthList: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 60) * 86400000).toISOString();
@@ -5077,6 +5094,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
             case 'getDailyAverages': result = await API.asset.getDailyAverages(params.symbols, params.from, params.to); break;
             case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;
+            case 'getMarketUniverse': result = await API.asset.market.marketUniverse(params.force); break;
             case 'getPeerStats': result = await API.asset.market.peerStats(params.symbols); break;
             case 'getPeerValuation': result = await API.asset.market.peers(params.symbol); break;
             case 'getMarketReference': result = await API.asset.market.reference(params.symbol); break;

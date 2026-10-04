@@ -51,6 +51,18 @@ async function emailManagers(supabase: any): Promise<{ id: string; email: string
   return (users ?? []).filter((u: any) => u.email && u.active !== false && (u.group_key === "admin" || mgr.has(u.id)) && optIn.has(u.id)).map((u: any) => ({ id: u.id, email: u.email }));
 }
 
+// PostgREST trả tối đa 1.000 dòng mỗi lần dù .limit() lớn hơn (đã gặp: 523 mã trong ảnh chụp mất ngành ICB vì chỉ đọc được 1.000 dòng của finance_stock_meta): đọc từng trang tới khi hết
+async function fetchAll(build: () => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
 async function chunked<T>(rows: T[], n: number, fn: (part: T[]) => Promise<void>) { for (let i = 0; i < rows.length; i += n) await fn(rows.slice(i, i + n)); }
 async function inBatches<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
@@ -122,9 +134,9 @@ async function syncRatios(supabase: any, only?: string[]) {
   let symbols: string[];
   if (only && only.length) symbols = only;
   else {
-    const [{ data: tx }, { data: wl }] = await Promise.all([
-      supabase.from("finance_transactions").select("symbol").is("deleted_at", null).limit(5000),
-      supabase.from("finance_watchlist").select("symbol").limit(1000),
+    const [tx, wl] = await Promise.all([
+      fetchAll(() => supabase.from("finance_transactions").select("symbol").is("deleted_at", null).order("id")),
+      fetchAll(() => supabase.from("finance_watchlist").select("symbol").order("id")),
     ]);
     symbols = [...new Set([...(tx ?? []), ...(wl ?? [])].map((r: any) => String(r.symbol || "").toUpperCase()).filter((s) => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 80);
   }
@@ -153,7 +165,7 @@ async function syncSnapshot(supabase: any) {
     const j = await getJson(`${B}/ratios?q=ratioCode:${code}~reportDate:${isQ ? "gte:" + since : date}&size=4000`);
     (isQ ? quarter : daily)[code] = j && Array.isArray(j.data) ? j.data : [];
   });
-  const { data: metaRows } = await supabase.from("finance_stock_meta").select("symbol, icb2_code").limit(5000);
+  const metaRows = await fetchAll(() => supabase.from("finance_stock_meta").select("symbol, icb2_code").order("symbol"));
   const icb = new Map((metaRows ?? []).map((m: any) => [m.symbol, m.icb2_code]));
   const rows = buildSnapshot(daily, quarter, (sym) => (icb.get(sym) as string | null) ?? null);
   // an toàn: nguồn trả quá ít (hỏng một phần) thì không ghi đè
@@ -173,9 +185,9 @@ async function syncSnapshot(supabase: any) {
 
 async function checkHealth(supabase: any) {
   const nowSec = Math.floor(Date.now() / 1000), fromSec = nowSec - 40 * 86400, toSec = nowSec + 86400;
-  const [{ data: tx }, { data: wl }] = await Promise.all([
-    supabase.from("finance_transactions").select("symbol").is("deleted_at", null).limit(5000),
-    supabase.from("finance_watchlist").select("symbol").limit(1000),
+  const [tx, wl] = await Promise.all([
+    fetchAll(() => supabase.from("finance_transactions").select("symbol").is("deleted_at", null).order("id")),
+    fetchAll(() => supabase.from("finance_watchlist").select("symbol").order("id")),
   ]);
   const symbols = [...new Set([...(tx ?? []), ...(wl ?? [])].map((r: any) => String(r.symbol || "").toUpperCase()).filter((s) => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 80);
   if (!symbols.length) return { ok: true, checked: 0, flagged: 0 };

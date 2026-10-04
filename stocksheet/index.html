@@ -73,6 +73,7 @@
             <div class="vl-seg" role="group" aria-label="Chế độ xem">
                 <button type="button" id="seg-overview" aria-pressed="true" onclick="showView('overview')"><i class="fa-solid fa-table-list"></i> Bảng so sánh</button>
                 <button type="button" id="seg-screener" aria-pressed="false" onclick="showView('screener')"><i class="fa-solid fa-filter"></i> Bộ lọc</button>
+                <button type="button" id="seg-market" aria-pressed="false" onclick="showView('market')"><i class="fa-solid fa-earth-asia"></i> Thị trường</button>
                 <button type="button" id="seg-ideas" aria-pressed="false" onclick="showView('ideas')"><i class="fa-solid fa-lightbulb"></i> Ý tưởng</button>
                 <button type="button" id="seg-detail" aria-pressed="false" onclick="showView('detail')"><i class="fa-solid fa-magnifying-glass-chart"></i> Chi tiết mã</button>
             </div>
@@ -91,6 +92,9 @@
 
         <!-- 2) BỘ LỌC: tìm mã đáng xem theo tiêu chí, thêm hàng loạt theo rổ -->
         <section id="view-screener" style="display:none;" aria-label="Bộ lọc tìm mã"><div id="sc-root"></div></section>
+
+        <!-- 2b) THỊ TRƯỜNG: sàng lọc cả ~1.500 mã niêm yết theo định giá tương đối trong ngành -->
+        <section id="view-market" style="display:none;" aria-label="Sàng lọc toàn thị trường"><div id="mk-root"></div></section>
 
         <!-- 3) Ý TƯỞNG: quy trình nghiên cứu, phản biện, duyệt, theo dõi kết quả -->
         <section id="view-ideas" style="display:none;" aria-label="Ý tưởng đầu tư của nhóm"><div id="id-root"></div></section>
@@ -146,10 +150,12 @@
     <script src="valuation-ui.js?v=1791900000000"></script>
     <script src="../lib/valuation-models.js?v=1791900000000"></script>
     <script src="../lib/peer-valuation.js?v=1791900000000"></script>
+    <script src="../lib/market-screener.js?v=1791900000000"></script>
     <script src="valuation-advanced.js?v=1791900000000"></script>
     <script src="financials-sync.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
     <script src="screener-ui.js?v=1791900000000"></script>
+    <script src="market-screener-ui.js?v=1791900000000"></script>
     <script src="ideas-ui.js?v=1791900000000"></script>
 </body>
 </html>

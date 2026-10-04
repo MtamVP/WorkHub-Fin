@@ -26,7 +26,7 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)
 
-`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v5 · `storage-proxy` v7.
+`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v6 · `storage-proxy` v7.
 
 Secrets (đặt trong Supabase → Edge Functions → Secrets, KHÔNG ghi vào kho mã): `RESEND_API_KEY`, `ALERT_FROM_EMAIL`. Chỉ cần cho email cảnh báo.
 
@@ -117,3 +117,4 @@ Nguồn đều là điểm cuối công khai, không cam kết dịch vụ.
 - `market-data-sync` v5 (có `peers.ts`) đã triển khai; chạy thử `{"mode":"snapshot"}`: 1.523 mã, 18 ngành + `ALL`, trung vị P/E toàn thị trường 9,94x.
 - Trigger đã kiểm bằng khối `DO` có huỷ dữ liệu (9 ca): mua nhỏ cho phép; mua vượt 10% NAV bị chặn `LIMIT_BLOCKED`; bán không bị chặn; quản lý không bị chặn; chế độ "phải ghi lý do" không chặn; giới hạn riêng cho mã thay thế giới hạn chung; cộng dồn vị thế vượt `max_position_vnd` bị chặn; nhập sao kê vượt giới hạn không chặn và ghi 1 dòng kiểm tra `limit`. Sau kiểm không còn dữ liệu thử.
 - Còn lại: `check-limits` v1 trên máy chủ cũ hơn kho mã (triển khai lại khi cần). 523 mã trong ảnh chụp chưa có ngành ICB (phần lớn UPCoM nhỏ) nên không vào thống kê ngành.
+- 05/10 (sau đó): phát hiện và sửa lỗi thật: PostgREST chỉ trả tối đa 1.000 dòng mỗi lần dù `.limit(5000)`, nên 523 mã trong ảnh chụp mất ngành ICB (thống kê ngành lệch: ngân hàng chỉ 20 mã thay vì 28). Đã thêm `fetchAll` đọc theo trang trong `market-data-sync` (v6) cho meta, giao dịch, theo dõi; chạy lại snapshot: 0 mã thiếu ngành. BẪY: mọi đọc bảng có thể quá 1.000 dòng trong Edge Function phải phân trang.
