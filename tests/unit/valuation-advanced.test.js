@@ -101,3 +101,23 @@ describe('ô nhập số', () => {
     expect(h).not.toMatch(/id="va-g1"[^>]*value="15,9"/);
   });
 });
+
+describe('peerHtml: thẻ So với ngành', () => {
+  const Q = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+  const peer = { sectorName: 'Ngân hàng', sector: { n: 30, as_of: '2026-10-02', stats: { pe: { n: 30, median: 12, q: Q }, pb: { n: 30, median: 1.5, q: [0.5, 0.8, 1, 1.2, 1.4, 1.5, 1.7, 2, 2.5, 3, 4] }, roae: { n: 30, median: 0.12, q: [-0.02, 0.03, 0.06, 0.09, 0.11, 0.12, 0.14, 0.17, 0.2, 0.25, 0.35] } } },
+    market: { n: 700, stats: { pe: { n: 600, median: 10, q: Q } } },
+    rows: [{ symbol: 'AAA', metrics: { pe: 5, pb: 0.9, roae: 0.18, marketcap: 5e12 } }, { symbol: 'BBB', metrics: { pe: 12, pb: 1.5, roae: 0.12, marketcap: 4e12 } }] };
+  it('mã rẻ so với ngành: có kết luận, thanh phân vị, bảng cùng ngành và lời nhắc giới hạn', () => {
+    const h = VA.peerHtml(peer, 'AAA', { pe: 5, pb: 0.9, roae: 0.18 });
+    expect(h).toContain('So với ngành'); expect(h).toContain('Ngân hàng'); expect(h).toContain('Rẻ so với ngành');
+    expect(h).toContain('vl-peer-dot good'); expect(h).toContain('mã này'); expect(h).toContain('chưa tính khác biệt');
+    expect(h).toMatch(/So với cả thị trường \(600 mã\)/);
+  });
+  it('không có dữ liệu ngành thì không vẽ gì; đang tải thì có chỉ báo; chuỗi lạ được thoát', () => {
+    expect(VA.peerHtml(null, 'AAA', {})).toBe('');
+    expect(VA.peerHtml(peer, 'AAA', {})).toBe('');
+    expect(VA.peerHtml(null, 'AAA', {}, { loading: true })).toContain('Đang lấy thống kê ngành');
+    const evil = Object.assign({}, peer, { sectorName: '<img src=x onerror=alert(1)>' });
+    expect(VA.peerHtml(evil, 'AAA', { pe: 5, pb: 0.9, roae: 0.18 })).not.toContain('<img');
+  });
+});

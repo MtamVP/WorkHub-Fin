@@ -21,6 +21,7 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 | market-rates-daily | `30 10 * * 1-5` | market-data-sync `rates` | lợi suất TPCP |
 | market-health-daily | `45 10 * * 1-5` | market-data-sync `health` | kiểm hai nguồn giá + email cảnh báo mới |
 | market-ratios-daily | `0 11 * * 1-5` | market-data-sync `ratios` | P/E, P/B, beta, khối ngoại… |
+| market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành (CHƯA bật: cần áp dụng `finance-market-snapshot-migration.sql` và triển khai lại hàm) |
 | cleanup_system_logs | `0 3 1 * *` | SQL | dọn nhật ký hệ thống |
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)

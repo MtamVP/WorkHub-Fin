@@ -2539,6 +2539,38 @@ const API = {
                 }
                 return out;
             },
+            // Định giá tương đối so với ngành: thống kê ngành ICB + toàn thị trường (finance_sector_stats) và các mã cùng ngành (finance_market_snapshot), do Edge Function market-data-sync (mode snapshot) cập nhật hằng ngày.
+            // null nếu mã chưa có trong ảnh chụp (hoặc bảng chưa tạo). Trả { symbol, icb2_code, sectorName, sector: {n, as_of, stats}, market, rows: [{symbol, metrics}], self }.
+            peers: async (symbol) => {
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                const me = await sbClient.from('finance_market_snapshot').select('symbol, icb2_code, daily_date, metrics').eq('symbol', sym).maybeSingle();
+                if (me.error || !me.data) return null;
+                const icb = me.data.icb2_code || null;
+                const [st, rows] = await Promise.all([
+                    sbClient.from('finance_sector_stats').select('icb2_code, n, as_of, stats').in('icb2_code', icb ? [icb, 'ALL'] : ['ALL']),
+                    icb ? API.asset._fetchAll(() => sbClient.from('finance_market_snapshot').select('symbol, metrics').eq('icb2_code', icb).order('symbol')) : Promise.resolve([]),
+                ]);
+                if (st.error) return null;
+                const by = {}; (st.data || []).forEach(r => { by[r.icb2_code] = r; });
+                const sector = icb ? by[icb] : null;
+                if (!sector) return null;
+                const sectorName = (typeof SectorMap !== 'undefined' && SectorMap.icbName(icb)) || ('ICB ' + icb);
+                return { symbol: sym, icb2_code: icb, sectorName, sector, market: by.ALL || null, rows: rows || [], self: { symbol: sym, metrics: me.data.metrics || {} } };
+            },
+            // Thống kê ngành cho nhiều mã một lần (bảng Định Lượng của Toàn Nhóm): { bySymbol: {SYM: {icb2_code, metrics}}, stats: {icb2_code: {n, as_of, stats}}, asOf }. Rỗng nếu chưa có ảnh chụp thị trường.
+            peerStats: async (symbols) => {
+                const list = [...new Set((symbols || []).map(s => String(s).trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 120);
+                if (!list.length) return { bySymbol: {}, stats: {}, asOf: null };
+                const [snap, st] = await Promise.all([
+                    sbClient.from('finance_market_snapshot').select('symbol, icb2_code, metrics').in('symbol', list),
+                    sbClient.from('finance_sector_stats').select('icb2_code, n, as_of, stats'),
+                ]);
+                if (snap.error || st.error) return { bySymbol: {}, stats: {}, asOf: null };
+                const bySymbol = {}; (snap.data || []).forEach(r => { bySymbol[r.symbol] = { icb2_code: r.icb2_code, metrics: r.metrics || {} }; });
+                const stats = {}; let asOf = null; (st.data || []).forEach(r => { stats[r.icb2_code] = { n: r.n, as_of: r.as_of, stats: r.stats || {} }; if (r.as_of && (!asOf || r.as_of > asOf)) asOf = r.as_of; });
+                return { bySymbol, stats, asOf };
+            },
             healthList: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 60) * 86400000).toISOString();
                 // chưa xử lý (bất kể cũ) + đã xử lý trong khoảng gần đây
@@ -5045,6 +5077,8 @@ async function _dispatchAction(action, params = {}) {
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
             case 'getDailyAverages': result = await API.asset.getDailyAverages(params.symbols, params.from, params.to); break;
             case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;
+            case 'getPeerStats': result = await API.asset.market.peerStats(params.symbols); break;
+            case 'getPeerValuation': result = await API.asset.market.peers(params.symbol); break;
             case 'getMarketReference': result = await API.asset.market.reference(params.symbol); break;
             case 'getSettlement': result = await API.asset.market.settlement(params.email); break;
             case 'listDataHealth': result = await API.asset.market.healthList(params.days); break;

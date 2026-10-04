@@ -2,11 +2,13 @@
 //  "meta"   (pg_cron hằng tuần): thông tin mã -> finance_stock_meta (sàn, phân ngành ICB cấp 2 từ VCI, thuộc VN30 và ngày niêm yết từ VNDirect). Thay bảng ngành tự gõ chỉ có ~200 mã.
 //  "rates"  (pg_cron mỗi ngày làm việc): lợi suất trái phiếu chính phủ 1-15 năm (TradingView scanner công khai) -> finance_rates; app dùng làm lãi phi rủi ro THEO NGÀY.
 //  "ratios" (pg_cron mỗi ngày làm việc, hoặc gọi từ app kèm body.symbols <= 15 mã): chỉ số cơ bản và thị trường từ VNDirect (P/E, P/B, beta, ROE, biên lợi nhuận, đòn bẩy, tăng trưởng, 52 tuần, thanh khoản, khối ngoại) -> finance_stock_ratios.
+//  "snapshot" (pg_cron mỗi ngày làm việc): ẢNH CHỤP CẢ THỊ TRƯỜNG (~1.600 mã: P/E, P/B, vốn hoá, ROE... mỗi chỉ số một lần gọi) -> finance_market_snapshot, và thống kê theo ngành ICB (trung vị, phân vị) -> finance_sector_stats để định giá tương đối.
 //  "health" (pg_cron mỗi ngày làm việc): kiểm chất lượng dữ liệu giá của các mã đang nắm/theo dõi -- so VNDirect với VCI, nhảy giá vượt biên độ, thiếu phiên, giá cũ -> finance_data_health,
 //     và gửi email cho quản lý đã bật email cảnh báo khi có cảnh báo MỚI mức lỗi/cảnh báo (Resend, secrets RESEND_API_KEY / ALERT_FROM_EMAIL như approval-watch).
 // Mỗi lần chạy ghi finance_function_runs (app cảnh báo khi hàm quá hạn). Nguồn đều là điểm cuối công khai KHÔNG có cam kết dịch vụ: có thể đổi/chặn bất cứ lúc nào, nên có kiểm tra và ghi nhận "nguồn lỗi".
 // Gọi bởi pg_cron (Bearer = publishable key, verify_jwt giữ true). Phản hồi chỉ có SỐ LƯỢNG. {"selftest":true} chạy bài tự kiểm không đụng mạng/CSDL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildSnapshot, sectorStats, snapshotDate, SNAP_DAILY, SNAP_QUARTER } from "./peers.ts";
 import { BAND, buildHealthEmail, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
 
 const corsHeaders = {
@@ -135,6 +137,40 @@ async function syncRatios(supabase: any, only?: string[]) {
   return { ok: true, checked: symbols.length, saved: rows.length };
 }
 
+// Ảnh chụp cả thị trường: mỗi chỉ số một lần gọi cho mọi mã (nhóm ngày theo ngày báo cáo mới nhất; nhóm quý theo cửa sổ 150 ngày, lấy quý mới nhất của từng mã).
+async function syncSnapshot(supabase: any) {
+  const B = "https://api-finfo.vndirect.com.vn/v4";
+  let date: string | null = null;
+  for (const probe of ["VNM", "VCB", "HPG", "FPT"]) {
+    date = latestReportDate(await getJson(`${B}/ratios?q=code:${probe}~ratioCode:PRICE_TO_EARNINGS&sort=reportDate:desc&size=1`));
+    if (date) break;
+  }
+  if (!date) return { ok: false, error: "Không xác định được ngày chỉ số mới nhất của VNDirect." };
+  const since = new Date(Date.now() - 150 * 86400000).toISOString().slice(0, 10);
+  const daily: Record<string, any[]> = {}, quarter: Record<string, any[]> = {};
+  const jobs: [string, boolean][] = [...SNAP_DAILY.map((c) => [c, false] as [string, boolean]), ...SNAP_QUARTER.map((c) => [c, true] as [string, boolean])];
+  await inBatches(jobs, 4, async ([code, isQ]) => {
+    const j = await getJson(`${B}/ratios?q=ratioCode:${code}~reportDate:${isQ ? "gte:" + since : date}&size=4000`);
+    (isQ ? quarter : daily)[code] = j && Array.isArray(j.data) ? j.data : [];
+  });
+  const { data: metaRows } = await supabase.from("finance_stock_meta").select("symbol, icb2_code").limit(5000);
+  const icb = new Map((metaRows ?? []).map((m: any) => [m.symbol, m.icb2_code]));
+  const rows = buildSnapshot(daily, quarter, (sym) => (icb.get(sym) as string | null) ?? null);
+  // an toàn: nguồn trả quá ít (hỏng một phần) thì không ghi đè
+  const prev = await supabase.from("finance_market_snapshot").select("symbol", { count: "exact", head: true });
+  if (rows.length < 500 || (prev.count && rows.length < prev.count * 0.5)) return { ok: false, error: `Ảnh chụp chỉ có ${rows.length} mã (đang lưu ${prev.count ?? 0}): bỏ qua để không ghi đè dữ liệu tốt.` };
+  const now = new Date().toISOString();
+  await chunked(rows, 400, async (part) => {
+    const { error } = await supabase.from("finance_market_snapshot").upsert(part.map((r) => ({ ...r, updated_at: now })), { onConflict: "symbol" });
+    if (error) throw new Error(error.message);
+  });
+  await supabase.from("finance_market_snapshot").delete().lt("updated_at", new Date(Date.now() - 10 * 86400000).toISOString());   // mã đã hết niêm yết
+  const stats = sectorStats(rows, snapshotDate(rows), now);
+  const { error } = await supabase.from("finance_sector_stats").upsert(stats, { onConflict: "icb2_code" });
+  if (error) throw new Error(error.message);
+  return { ok: true, symbols: rows.length, sectors: stats.length, date };
+}
+
 async function checkHealth(supabase: any) {
   const nowSec = Math.floor(Date.now() / 1000), fromSec = nowSec - 40 * 86400, toSec = nowSec + 86400;
   const [{ data: tx }, { data: wl }] = await Promise.all([
@@ -185,7 +221,7 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, band: BAND, tenors: TENORS });
-  const mode = ["meta", "rates", "health", "ratios", "all"].includes(body?.mode) ? body.mode : "health";
+  const mode = ["meta", "rates", "health", "ratios", "snapshot", "all"].includes(body?.mode) ? body.mode : "health";
   const only: string[] = Array.isArray(body?.symbols) ? [...new Set(body.symbols.map((x: unknown) => String(x).trim().toUpperCase()))].filter((x) => /^[A-Z0-9]{1,12}$/.test(x as string)).slice(0, 15) as string[] : [];
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();
@@ -193,7 +229,7 @@ Deno.serve(async (req: Request) => {
   let ok = true;
   try {
     for (const m of mode === "all" ? ["meta", "rates", "health"] : [mode]) {
-      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : (m === "ratios" ? await syncRatios(supabase, only) : await checkHealth(supabase))); }
+      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : (m === "ratios" ? await syncRatios(supabase, only) : (m === "snapshot" ? await syncSnapshot(supabase) : await checkHealth(supabase)))); }
       catch (e) { result[m] = { ok: false, error: String((e as Error).message || e).slice(0, 200) }; }
       if (!(result[m] as any).ok) ok = false;
     }

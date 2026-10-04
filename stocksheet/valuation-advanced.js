@@ -4,6 +4,7 @@
    compute() là hàm thuần (có kiểm thử) -- html() chỉ dựng chuỗi. Phụ thuộc lib/valuation-models.js (ValuationModels). Mọi chuỗi chèn vào HTML đều qua esc(). */
 const ValuationAdvanced = (function () {
   const VMODELS = (typeof require === 'function' && typeof module !== 'undefined') ? require('../lib/valuation-models.js') : ValuationModels;
+  const PEER = (typeof require === 'function' && typeof module !== 'undefined') ? require('../lib/peer-valuation.js') : (typeof PeerValuation !== 'undefined' ? PeerValuation : null);
   const esc = (s) => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const isNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(Number(v));
   const dec = (v, d) => (isNum(v) ? Number(v).toLocaleString('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: d === undefined ? 1 : d }) : '—');
@@ -144,7 +145,35 @@ const ValuationAdvanced = (function () {
     return `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-microscope"></i> Mô hình nâng cao<span class="vl-muted">${r.financial ? 'định giá theo vốn chủ (tổ chức tài chính)' : 'dòng tiền cho cổ đông'}</span></h3>${inputs}${coe}${body}${sens}${quality}${cross}${hist}${r.notes.map((t) => `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>${esc(t)}</span></div>`).join('')}</div>`;
   }
 
-  return { compute, html, DEFAULTS, FIN_SECTORS };
+  // Thẻ "So với ngành": mã này rẻ hay đắt so với các mã cùng ngành ICB (phân vị trong thống kê ngành do market-data-sync tính hằng ngày).
+  // peer: kết quả API getPeerValuation { sectorName, sector: {n, as_of, stats}, market, rows: [{symbol, metrics}] }; metrics: chỉ số của chính mã.
+  function peerHtml(peer, symbol, metrics, st) {
+    const s = st || {};
+    if (s.loading) return '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-scale-balanced"></i> So với ngành</h3><div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang lấy thống kê ngành…</div></div>';
+    if (!PEER || !peer || !peer.sector) return '';
+    const m = Object.assign({}, (peer.self && peer.self.metrics) || {}, metrics || {}), a = PEER.assess(m, peer.sector.stats);   // chỉ số mới của mã (nếu có) đè lên ảnh chụp thị trường
+    if (!a.verdict) return '';
+    const mk = PEER.assess(m, peer.market ? peer.market.stats : null);
+    const bar = (it, label, fmt) => {
+      if (!it) return `<div class="vl-peer-row na"><span>${esc(label)}</span><span class="vl-peer-track"></span><b>chưa có</b></div>`;
+      const good = it.higherIsBetter ? it.pct >= 50 : it.pct <= 50;
+      return `<div class="vl-peer-row"><span>${esc(label)}</span><span class="vl-peer-track" title="Phân vị ${dec(it.pct, 0)} trong ${it.n} mã cùng ngành"><i class="vl-peer-mid"></i><i class="vl-peer-dot ${good ? 'good' : 'bad'}" style="left:${clamp(it.pct, 2, 98)}%"></i></span><b>${fmt(it.value)}</b><small>TB ngành ${fmt(it.median)} · phân vị ${dec(it.pct, 0)}</small></div>`;
+    };
+    const x = (v) => dec(v, 1) + 'x', p1 = (v) => pct(v * 100, 1);
+    const t = PEER.peerTable(peer.rows || [], symbol, peer.sector.stats, { limit: 6 });
+    const table = t.rows.length > 1 ? `<h4 class="vl-sub">Các mã cùng ngành, từ rẻ đến đắt <small>(P/E và P/B, ${t.total} mã vốn hoá từ 300 tỷ)</small></h4><div class="vl-table-wrap"><table class="vl-scen"><thead><tr><th>#</th><th>Mã</th><th class="num">P/E</th><th class="num">P/B</th><th class="num">ROE</th></tr></thead><tbody>
+        ${t.rows.map((r) => `<tr${r.self ? ' class="vl-strong"' : ''}><td>${r.rank}</td><td>${esc(r.symbol)}${r.self ? ' <span class="vl-m-weight">mã này</span>' : ''}</td><td class="num">${r.pe === null ? '—' : x(r.pe)}</td><td class="num">${r.pb === null ? '—' : dec(r.pb, 2) + 'x'}</td><td class="num">${r.roe === null ? '—' : p1(r.roe)}</td></tr>`).join('')}
+        </tbody></table></div>` : '';
+    const asOf = peer.sector.as_of ? ' · số liệu ngày ' + esc(String(peer.sector.as_of).slice(0, 10).split('-').reverse().join('/')) : '';
+    return `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-scale-balanced"></i> So với ngành<span class="vl-muted">${esc(peer.sectorName || 'ngành')} · ${a.n || peer.sector.n} mã${asOf}</span></h3>
+      <div class="vl-peer-verdict ${esc(a.verdict.tone)}"><b>${esc(a.verdict.label)}</b><span>${esc(a.verdict.text)}</span></div>
+      <div class="vl-peer">${bar(a.items.pe, 'P/E', x)}${bar(a.items.pb, 'P/B', (v) => dec(v, 2) + 'x')}${bar(a.items.roe, 'ROE', p1)}${bar(a.items.divYield, 'Cổ tức', p1)}</div>
+      ${mk.items.pe ? `<p class="vl-hint">So với cả thị trường (${mk.items.pe.n} mã): P/E ở phân vị ${dec(mk.items.pe.pct, 0)}${mk.items.pb ? ', P/B ở phân vị ' + dec(mk.items.pb.pct, 0) : ''}.</p>` : ''}
+      ${table}
+      <p class="vl-hint">Phân vị 0 = rẻ nhất ngành (với ROE và cổ tức, phân vị cao là tốt). So sánh trong cùng ngành ICB cấp 2 nhưng chưa tính khác biệt về tăng trưởng, đòn bẩy hay quy mô; mã vốn hoá dưới 300 tỷ không nằm trong thống kê. Dùng để đặt câu hỏi, không phải khuyến nghị.</p></div>`;
+  }
+
+  return { compute, html, peerHtml, DEFAULTS, FIN_SECTORS };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = ValuationAdvanced;

@@ -288,3 +288,21 @@
 .vl-q { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; font-size: 0.82rem; padding: 4px 0; border-bottom: 1px dashed var(--border-color); }
 .vl-q.ok i { color: var(--success-color, #3fb950); } .vl-q.bad i { color: var(--danger-color, #e5534b); } .vl-q.na { opacity: 0.6; }
 .vl-q b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Thẻ "So với ngành": thanh phân vị trong ngành (vạch giữa = trung vị) */
+.vl-peer-verdict { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin: 4px 0 12px; font-size: 0.84rem; color: var(--text-secondary); }
+.vl-peer-verdict b { color: var(--text-primary); font-size: 0.92rem; }
+.vl-peer-verdict.ok { border-color: var(--success-color, #3aa675); }
+.vl-peer-verdict.warn { border-color: var(--danger-color); }
+.vl-peer { display: grid; gap: 8px; }
+.vl-peer-row { display: grid; grid-template-columns: 54px minmax(120px, 1fr) 70px minmax(110px, auto); align-items: center; gap: 10px; font-size: 0.84rem; }
+.vl-peer-row > span:first-child { color: var(--text-muted); }
+.vl-peer-row b { font-family: var(--font-mono); text-align: right; color: var(--text-primary); }
+.vl-peer-row small { color: var(--text-muted); font-size: 0.72rem; }
+.vl-peer-row.na { opacity: 0.55; }
+.vl-peer-track { position: relative; height: 6px; border-radius: 3px; background: var(--border-color); }
+.vl-peer-mid { position: absolute; left: 50%; top: -3px; width: 1px; height: 12px; background: var(--text-muted); }
+.vl-peer-dot { position: absolute; top: -4px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--card-bg); background: var(--text-muted); }
+.vl-peer-dot.good { background: var(--success-color, #3aa675); }
+.vl-peer-dot.bad { background: var(--danger-color); }
+@media (max-width: 600px) { .vl-peer-row { grid-template-columns: 48px 1fr 64px; } .vl-peer-row small { grid-column: 1 / -1; } }

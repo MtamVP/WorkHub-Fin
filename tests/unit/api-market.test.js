@@ -212,3 +212,39 @@ describe('getDailyAverages: giá trung bình ngày', () => {
     expect(Object.keys(r.averages)).toEqual(['B20']);
   });
 });
+
+describe('định giá so với ngành: peers / peerStats', () => {
+  const Q = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+  const snap = [
+    { symbol: 'AAA', icb2_code: '8300', metrics: { pe: 5, pb: 0.9, roae: 0.18, marketcap: 5e12 } },
+    { symbol: 'BBB', icb2_code: '8300', metrics: { pe: 12, pb: 1.5, roae: 0.12, marketcap: 4e12 } },
+    { symbol: 'CCC', icb2_code: '9500', metrics: { pe: 20, pb: 3, roae: 0.2, marketcap: 3e12 } },
+  ];
+  const stats = [
+    { icb2_code: '8300', n: 30, as_of: '2026-10-02', stats: { pe: { n: 30, median: 12, q: Q } } },
+    { icb2_code: 'ALL', n: 700, as_of: '2026-10-02', stats: { pe: { n: 600, median: 10, q: Q } } },
+  ];
+  it('peers: trả thống kê ngành + toàn thị trường + mã cùng ngành và tên ngành ICB; mã chưa có trong ảnh chụp trả null', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: snap, finance_sector_stats: stats });
+    const r = await c.API.asset.market.peers('aaa');
+    expect(r.icb2_code).toBe('8300'); expect(r.sectorName).toBe('Ngân hàng');
+    expect(r.sector.stats.pe.median).toBe(12); expect(r.market.n).toBe(700);
+    expect(r.rows.map(x => x.symbol)).toEqual(['AAA', 'BBB']);
+    expect(r.self.metrics.pe).toBe(5);
+    expect(await c.API.asset.market.peers('ZZZ')).toBeNull();
+    await expect(c.API.asset.market.peers('bad symbol')).rejects.toThrow(/không hợp lệ/);
+    expect((await c.callGAS('getPeerValuation', { symbol: 'BBB' })).data.symbol).toBe('BBB');
+  });
+  it('peers: ngành chưa có thống kê (ít mã) thì null, không báo lỗi', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: snap, finance_sector_stats: stats });
+    expect(await c.API.asset.market.peers('CCC')).toBeNull();
+  });
+  it('peerStats: nhiều mã một lần, lấy ngày dữ liệu mới nhất; rỗng khi chưa có bảng/ảnh chụp', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: snap, finance_sector_stats: stats });
+    const r = await c.API.asset.market.peerStats(['aaa', 'CCC', 'ZZZ', 'x y']);
+    expect(Object.keys(r.bySymbol).sort()).toEqual(['AAA', 'CCC']);
+    expect(r.stats['8300'].n).toBe(30); expect(r.asOf).toBe('2026-10-02');
+    expect((await c.API.asset.market.peerStats([])).bySymbol).toEqual({});
+    expect((await c.callGAS('getPeerStats', { symbols: ['AAA'] })).status).toBe('success');
+  });
+});

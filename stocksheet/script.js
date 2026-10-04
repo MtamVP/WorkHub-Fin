@@ -391,15 +391,15 @@ function vaParams() {
     return p;
 }
 async function loadAdvanced(d) {
-    d.adv = { loading: true, ratios: null, rates: [], error: '' };
+    d.adv = { loading: true, ratios: null, rates: [], peer: null, error: '' };
     if (state.view === 'detail') renderDetail();
     try {
-        const [ratios, rates] = await Promise.all([call('getStockRatios', { symbols: [d.symbol] }), call('getMarketRates', { days: 40 }).catch(() => [])]);
+        const [ratios, rates, peer] = await Promise.all([call('getStockRatios', { symbols: [d.symbol] }), call('getMarketRates', { days: 40 }).catch(() => []), call('getPeerValuation', { symbol: d.symbol }).catch(() => null)]);
         if (state.detail !== d) return;
-        d.adv = { loading: false, ratios: (ratios && ratios[d.symbol]) || null, rates: rates || [], error: '' };
+        d.adv = { loading: false, ratios: (ratios && ratios[d.symbol]) || null, rates: rates || [], peer: peer || null, error: '' };
     } catch (e) {
         if (state.detail !== d) return;
-        d.adv = { loading: false, ratios: null, rates: [], error: e.message || String(e) };
+        d.adv = { loading: false, ratios: null, rates: [], peer: null, error: e.message || String(e) };
     }
     if (state.view === 'detail') renderDetail();
 }
@@ -420,7 +420,8 @@ function advancedCardHtml(d) {
     const sector = (typeof FinCalc !== 'undefined') ? FinCalc.sectorOf(d.symbol) : '';
     const r = ValuationAdvanced.compute({ symbol: d.symbol, price: d.a.price, sector, metrics: d.adv.ratios ? d.adv.ratios.metrics : {}, rates: d.adv.rates, a: d.a,
         params: Object.assign({}, vaParams(), d.adv.g1 !== undefined && d.adv.g1 !== null ? { g1: d.adv.g1 } : {}) });
-    return ValuationAdvanced.html(r, {}) + (d.adv.error ? `<div class="vl-note"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được chỉ số từ VNDirect: ${VU.esc(d.adv.error)}</span></div>` : '');
+    const peerCard = ValuationAdvanced.peerHtml(d.adv.peer, d.symbol, d.adv.ratios ? d.adv.ratios.metrics : null, {});
+    return peerCard + ValuationAdvanced.html(r, {}) + (d.adv.error ? `<div class="vl-note"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được chỉ số từ VNDirect: ${VU.esc(d.adv.error)}</span></div>` : '');
 }
 
 // ---------- vẽ chi tiết ----------
