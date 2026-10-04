@@ -155,3 +155,40 @@ describe('complianceMatrix', () => {
     expect(m.totalBreaches).toBe(4);
   });
 });
+
+describe('checkImport: lô lệnh nhập từ sao kê', () => {
+  // NAV 500tr: FPT 200tr (40%), VCB 100tr, HPG 50tr, tiền 150tr; trần một mã 45%
+  const rows = [lim({ value: 45, mode: 'reason' })];
+  const t = (o) => Object.assign({ symbol: 'FPT', type: 'buy', quantity: 1000, price: 100000, date: '2026-01-10' }, o);
+  it('mua ròng đẩy mã vượt trần -> vi phạm, tính theo giá hiện tại nếu có', () => {
+    const r = L.checkImport(rows, PF, [t({ quantity: 500 })], { FPT: 110000 });     // +55tr => 255tr / 555? NAV không đổi cash => tử 255 / (255+100+50+150=555)=45.9%
+    expect(r.violations.length).toBe(1);
+    expect(r.violations[0].subject).toBe('FPT');
+    expect(r.violations[0].after).toBeCloseTo(255 / 555 * 100, 4);
+    expect(r.needsReason).toBe(true);
+  });
+  it('mua rồi bán lại trong cùng lô thì ròng bằng 0: không đổi gì', () => {
+    const r = L.checkImport(rows, PF, [t({ quantity: 800 }), t({ type: 'sell', quantity: 800, date: '2026-02-01' })], {});
+    expect(r.violations).toEqual([]);
+    expect(r.after.nav).toBeCloseTo(r.before.nav, 6);
+  });
+  it('không đổi tiền mặt dù lô có mua/bán (nhập sao kê không điều chỉnh tiền)', () => {
+    const r = L.checkImport(rows, PF, [t({ symbol: 'VCB', quantity: 100 })], { VCB: 100000 });
+    expect(r.after.items.find(i => i.subject === 'VCB').current).toBeGreaterThan(r.before.items.find(i => i.subject === 'VCB').current);
+    const cashPct = (x) => x.nav;                     // NAV tăng đúng bằng giá trị cổ phiếu thêm vào => tiền mặt giữ nguyên
+    expect(cashPct(r.after) - cashPct(r.before)).toBeCloseTo(100 * 100000, 3);
+  });
+  it('mua mã bị cấm trong lô -> vi phạm; chỉ bán mã bị cấm thì không', () => {
+    const ban = [lim({ kind: 'blocked_symbol', symbol: 'ABC', value: null, mode: 'block' })];
+    expect(L.checkImport(ban, PF, [t({ symbol: 'ABC' })], {}).blocked).toBe(true);
+    expect(L.checkImport(ban, pf({ ABC: 10e6, FPT: 90e6 }, 100e6), [t({ symbol: 'ABC', type: 'sell', quantity: 50, price: 100000 })], { ABC: 100000 }).violations).toEqual([]);
+  });
+  it('giới hạn đã vượt từ trước mà lô không làm tệ thêm: không tính là vi phạm mới', () => {
+    const over = L.checkImport(rows, pf({ FPT: 400e6, VCB: 100e6 }, 100e6), [t({ symbol: 'VCB', quantity: 10 })], { VCB: 100000 });
+    expect(over.violations.find(v => v.subject === 'FPT')).toBeUndefined();
+  });
+  it('lô rỗng hoặc không có giới hạn: không vi phạm', () => {
+    expect(L.checkImport(rows, PF, [], {}).ok).toBe(true);
+    expect(L.checkImport([], PF, [t()], {}).ok).toBe(true);
+  });
+});

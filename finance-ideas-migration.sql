@@ -104,3 +104,34 @@ begin
   end loop;
 end;
 $do$;
+
+-- Chỉ quản lý danh mục / admin được duyệt hoặc bác ý tưởng và ghi các cột quyết định -- ép ở database để không lách được bằng gọi API trực tiếp
+-- (auth.uid() rỗng = service role / bảo trì: không chặn).
+create or replace function public.fn_finance_ideas_guard() returns trigger
+language plpgsql security definer set search_path to 'public' as $fn$
+declare mgr boolean;
+begin
+  if public.current_user_id() is null then return new; end if;
+  mgr := public.current_user_has_fin_role('asset_manager') or public.current_user_group() = 'admin';
+  if tg_op = 'INSERT' then
+    if not mgr and (new.status in ('approved','rejected','in_portfolio') or new.decided_by is not null or new.decided_at is not null) then
+      raise exception 'Chỉ quản lý danh mục được tạo ý tưởng ở trạng thái đã quyết định.' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  if not mgr then
+    if new.status is distinct from old.status and new.status in ('approved','rejected') then
+      raise exception 'Chỉ quản lý danh mục được duyệt hoặc bác ý tưởng.' using errcode = '42501';
+    end if;
+    if new.decided_by is distinct from old.decided_by or new.decided_at is distinct from old.decided_at or new.decision_note is distinct from old.decision_note then
+      raise exception 'Chỉ quản lý danh mục được ghi quyết định duyệt/bác.' using errcode = '42501';
+    end if;
+    if new.status = 'in_portfolio' and old.status not in ('approved','in_portfolio') then
+      raise exception 'Ý tưởng chưa được duyệt nên chưa thể chuyển vào danh mục.' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$fn$;
+drop trigger if exists trg_finance_ideas_guard on public.finance_ideas;
+create trigger trg_finance_ideas_guard before insert or update on public.finance_ideas for each row execute function public.fn_finance_ideas_guard();

@@ -280,6 +280,10 @@
                                 <div class="txn-field" style="grid-column: 1 / -1;"><div class="jn-assist"><button type="button" class="btn-tool" onclick="fillTxnPlanFromValuation()"><i class="fa-solid fa-wand-magic-sparkles"></i> Điền từ Định Giá CP</button><span class="tl-hint" id="txn-plan-note" style="margin:0"></span></div></div>
                             </div>
                         </details>
+                        <details class="tl-details txn-plan" id="txn-pretrade" style="grid-column: 1 / -1;">
+                            <summary><i class="fa-solid fa-scale-balanced" style="color:var(--gold)"></i> Kiểm tra trước lệnh &amp; tính khối lượng theo rủi ro</summary>
+                            <div id="pt-body" class="pt-body"><p class="tl-hint">Mở mục này để xem tác động của lệnh lên danh mục trước khi lưu.</p></div>
+                        </details>
                         <div class="txn-field">
                             <label>&nbsp;</label>
                             <button type="submit" class="btn-save btn-txn-save"><i class="fa-solid fa-plus"></i> Lưu lệnh</button>
@@ -714,6 +718,7 @@
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../../lib/calendar-calc.js?v=1791900000000"></script>
     <script src="../../lib/limits-calc.js?v=1791900000000"></script>
+    <script src="../../lib/sizing-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
@@ -731,6 +736,7 @@
     <script src="risk-advanced.js?v=1791900000000"></script>
     <script src="calendar.js?v=1791900000000"></script>
     <script src="limits.js?v=1791900000000"></script>
+    <script src="pretrade.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
     <script src="attribution.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>

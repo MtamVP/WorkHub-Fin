@@ -206,6 +206,7 @@ function renderImportModal() {
             <label class="tl-check"><input type="checkbox" id="imp-div" checked onchange="onImportOptionChange()"> Nhập cả cổ tức tiền mặt (nếu có)</label>
         </div>
         <div class="tl-summary" id="import-summary"><span class="tl-badge mute"><i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra…</span></div>
+        <div id="import-limits"></div>
         <div class="tl-preview" id="import-preview"></div>`;
     setImportFooter([{ label: 'Huỷ', cls: 'btn-tool', onclick: 'closeImportModal()' }, { label: 'Nhập', cls: 'btn-save', onclick: 'confirmImport()', id: 'import-confirm-btn', disabled: true }]);
     refreshImportPreview();
@@ -351,11 +352,47 @@ async function refreshImportPreview() {
     const skippedHtml = norm.skipped.slice(0, 50).map(s => `<tr><td>${s.line}</td><td><span class="tl-badge mute">Bỏ qua</span></td><td colspan="7"></td><td class="err">${escapeAssetHtml(s.reason)}</td></tr>`).join('');
     prev.innerHTML = `<table class="excel-table asset-table"><thead><tr><th>Dòng</th><th>Trạng thái</th><th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">KL</th><th class="text-right">Giá</th><th class="text-right">Phí</th><th class="text-right">Thuế</th><th>Ghi chú</th></tr></thead><tbody>${rowsHtml}${skippedHtml}</tbody></table>`
         + (norm.rows.length > 400 ? `<div class="tl-hint" style="padding:8px 12px">Hiện 400 dòng đầu / ${norm.rows.length} dòng.</div>` : '');
-    if (btn) {
-        const total = preview.fresh.length + dividends.length;
-        btn.disabled = total === 0;
-        btn.innerHTML = total ? `<i class="fa-solid fa-file-import"></i> Nhập ${preview.fresh.length} lệnh${dividends.length ? ' + ' + dividends.length + ' cổ tức' : ''}` : 'Không có gì để nhập';
+    st.limitCheck = preview.limitCheck || null;
+    await renderImportLimits();
+    if (seq !== importPreviewSeq) return;
+    updateImportButton();
+}
+
+// Nút "Nhập": cần có gì để nhập; lô làm vượt giới hạn thì cần lý do (và bị chặn hẳn với thành viên thường nếu giới hạn ở chế độ chặn)
+function importLimitState() {
+    const st = importState, c = st && st.limitCheck;
+    const gated = c ? c.violations.filter(v => v.mode !== 'warn') : [];
+    const isManager = !!(typeof LM !== 'undefined' && LM.actor && LM.actor.isManager);
+    const reason = String((document.getElementById('imp-limit-reason') || {}).value || '').trim();
+    return { gated, hardBlocked: !!(c && c.blocked && !isManager), reasonOk: reason.length >= 3, reason };
+}
+function updateImportButton() {
+    const st = importState, btn = document.getElementById('import-confirm-btn');
+    if (!st || !st.preview || !btn) return;
+    const total = st.preview.fresh.length + st.dividends.length;
+    const ls = importLimitState();
+    if (ls.gated.length && ls.hardBlocked) { btn.disabled = true; btn.innerHTML = 'Bị chặn bởi giới hạn đầu tư'; return; }
+    btn.disabled = total === 0 || (ls.gated.length > 0 && !ls.reasonOk);
+    btn.innerHTML = total ? `<i class="fa-solid fa-file-import"></i> Nhập ${st.preview.fresh.length} lệnh${st.dividends.length ? ' + ' + st.dividends.length + ' cổ tức' : ''}` : 'Không có gì để nhập';
+}
+async function renderImportLimits() {
+    const box = document.getElementById('import-limits');
+    const c = importState && importState.limitCheck;
+    if (!box) return;
+    if (!c || (!c.violations.length && !(c.near || []).length)) { box.innerHTML = ''; return; }
+    if (typeof LM !== 'undefined' && !LM.actor && typeof lmCall === 'function') { try { LM.actor = await lmCall('getLimitActor'); } catch (e) { /* coi như thành viên thường */ } }
+    const ls = importLimitState();
+    const line = (v) => `<li class="lm-vio ${v.mode || 'warn'}"><span class="tl-badge ${v.mode === 'block' ? 'bad' : (v.mode === 'reason' ? 'warn' : 'info')}">${escapeAssetHtml(LimitsCalc.MODES[v.mode] ? LimitsCalc.MODES[v.mode].label : 'Lưu ý')}</span> ${escapeAssetHtml(v.text)}</li>`;
+    const list = c.violations.map(line).concat((c.near || []).map(v => `<li class="lm-vio"><span class="tl-badge info">Gần chạm</span> ${escapeAssetHtml(v.text)}</li>`)).join('');
+    let ask = '';
+    if (ls.gated.length) {
+        ask = ls.hardBlocked
+            ? '<div class="conc-warn"><i class="fa-solid fa-ban"></i><span>Giới hạn đang ở chế độ <b>chặn</b>: bạn không thể nhập lô này. Liên hệ quản lý danh mục nếu cần ngoại lệ.</span></div>'
+            : `<div class="txn-field txn-field-wide"><label for="imp-limit-reason">${c.blocked ? 'Lý do ghi đè (quản lý, bắt buộc)' : 'Lý do ngoại lệ (bắt buộc)'}</label>
+               <textarea id="imp-limit-reason" rows="2" maxlength="500" placeholder="Vì sao nhập lô này dù vượt giới hạn? (VD: bổ sung sao kê quá khứ đã được duyệt)" oninput="updateImportButton()"></textarea>
+               <span class="tl-hint" style="margin:0">Lý do được lưu và hiện ở Toàn Nhóm &gt; Giới Hạn để quản lý xem lại.</span></div>`;
     }
+    box.innerHTML = `<div class="tl-warn" style="flex-direction:column;align-items:stretch;gap:8px"><div><i class="fa-solid fa-triangle-exclamation"></i> <b>Lô này làm danh mục vượt giới hạn đầu tư</b> <small>(ước tính theo thay đổi khối lượng ròng × giá hiện tại; tiền mặt giữ nguyên)</small></div><ul class="lm-list">${list}</ul>${ask}</div>`;
 }
 
 async function confirmImport() {
@@ -364,9 +401,10 @@ async function confirmImport() {
     const btn = document.getElementById('import-confirm-btn');
     btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhập…';
     try {
+        const ls = importLimitState();
         const resp = await callGAS('importAssetTransactions', {
             email: targetEmail, rows: st.trades,
-            opts: { dividends: st.dividends.map(d => ({ date: d.date, symbol: d.symbol, amount: d.amount })), adjustCash: false, fileName: st.fileName }
+            opts: { dividends: st.dividends.map(d => ({ date: d.date, symbol: d.symbol, amount: d.amount })), adjustCash: false, fileName: st.fileName, exception: ls.gated.length ? { reason: ls.reason } : null }
         });
         if (resp.status !== 'success') throw new Error(resp.message);
         st.result = resp.data;
@@ -386,7 +424,7 @@ function renderImportResult(body, stepsHtml) {
         <div class="tl-steps">${stepsHtml}</div>
         <div class="tl-result">
             <div><b><i class="fa-solid fa-circle-check"></i> Đã nhập ${r.imported} lệnh${r.dividendsAdded ? ' + ' + r.dividendsAdded + ' cổ tức' : ''}.</b>
-                <div class="tl-hint">${r.duplicates} dòng trùng đã bỏ qua${r.dividendsSkipped ? ', ' + r.dividendsSkipped + ' cổ tức trùng bỏ qua' : ''}. Lãi/lỗ đã chốt theo FIFO đã được tính lại.</div></div>
+                <div class="tl-hint">${r.duplicates} dòng trùng đã bỏ qua${r.dividendsSkipped ? ', ' + r.dividendsSkipped + ' cổ tức trùng bỏ qua' : ''}. Lãi/lỗ đã chốt theo FIFO đã được tính lại.${r.limitExceptions ? ' Đã ghi ' + r.limitExceptions + ' ngoại lệ giới hạn kèm lý do.' : ''}${r.limitExceptionError ? ' <b class="text-danger">Chưa ghi được ngoại lệ giới hạn: ' + escapeAssetHtml(r.limitExceptionError) + '</b>' : ''}</div></div>
             ${r.imported ? `<button type="button" class="btn-tool" onclick="undoLastImport('${escapeAssetHtml(r.batchId)}')"><i class="fa-solid fa-rotate-left"></i> Hoàn tác lần nhập này</button>` : ''}
         </div>
         ${blocked ? `<div class="tl-warn"><i class="fa-solid fa-triangle-exclamation"></i><span><b>${blocked} lệnh bán chưa nhập</b> vì vượt khối lượng đang có (thiếu lệnh mua trước đó). Hãy nhập lệnh mua/số dư đầu kỳ rồi nhập lại file — các lệnh đã nhập sẽ không bị trùng.</span></div>` : ''}`;

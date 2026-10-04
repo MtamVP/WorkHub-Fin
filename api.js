@@ -1708,7 +1708,12 @@ const API = {
                 });
                 candidates = keep;
             }
-            return { fresh: candidates, duplicates, blocked };
+            let limitCheck = null;
+            if (typeof LimitsCalc !== 'undefined' && candidates.length) {
+                try { limitCheck = await API.asset.limits.checkImport(email, candidates.map(e => ({ symbol: e.symbol, type: e.type, quantity: e.quantity, price: e.price, date: e.date }))); }
+                catch (e) { limitCheck = null; }   // không kiểm được: để importTransactions kiểm lại (lúc đó lỗi mới chặn)
+            }
+            return { fresh: candidates, duplicates, blocked, limitCheck };
         },
 
         // Nhập thật. dividends: [{date, symbol, amount}] (cổ tức tiền từ sao kê) -- ghi vào Dòng Tiền, KHÔNG đổi số dư tiền mặt trừ khi adjustCash.
@@ -1718,6 +1723,22 @@ const API = {
             if (!userId) throw new Error("User không tồn tại");
             const preview = await API.asset.previewImport(email, rows);
             const toInsert = preview.fresh;
+            // Giới hạn đầu tư: lô nhập làm vượt giới hạn phải kèm lý do (hoặc bị chặn; chỉ quản lý ghi đè) -- cùng luật với addTransaction, không lách được bằng nhập hàng loạt.
+            let gatedViolations = [], overrideUsed = false;
+            const importReason = String((o.exception && o.exception.reason) || '').trim();
+            if (!o.skipLimitCheck && typeof LimitsCalc !== 'undefined' && toInsert.length) {
+                const chk = preview.limitCheck || await API.asset.limits.checkImport(email, toInsert.map(e => ({ symbol: e.symbol, type: e.type, quantity: e.quantity, price: e.price, date: e.date })));
+                gatedViolations = chk.violations.filter(v => v.mode !== 'warn');
+                if (gatedViolations.length) {
+                    const actor = await API.asset.limits._actor(email);
+                    if (chk.blocked) {
+                        if (!(actor.isManager && importReason.length >= 3)) throw new Error('LIMIT_BLOCKED: ' + chk.violations.filter(v => v.mode === 'block').map(v => v.text).join('; '));
+                        overrideUsed = true;
+                    } else if (importReason.length < 3) {
+                        throw new Error('LIMIT_REASON_REQUIRED: ' + gatedViolations.map(v => v.text).join('; '));
+                    }
+                }
+            }
             const batchId = 'IMP_' + Date.now().toString(36);
             let inserted = 0;
             if (toInsert.length) {
@@ -1767,7 +1788,21 @@ const API = {
             // 1 lần duy nhất cho cả lô (không tính lại sau từng lệnh như addTransaction)
             await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
-            return { batchId, imported: inserted, duplicates: preview.duplicates.length, blocked: preview.blocked, dividendsAdded, dividendsSkipped };
+            // Ghi nhận ngoại lệ của cả lô (lỗi ở đây KHÔNG làm hỏng lô đã nhập; báo lại trong kết quả)
+            let limitExceptions = 0, limitExceptionError = null;
+            if (gatedViolations.length && inserted) {
+                try {
+                    const lastDate = toInsert.reduce((m, e) => (e.date > m ? e.date : m), '');
+                    const { error: exErr } = await sbClient.from('finance_limit_exceptions').insert(gatedViolations.map(v => ({
+                        user_id: userId, limit_id: v.limitId || null, kind: v.kind, symbol: ['max_symbol_pct', 'max_position_vnd', 'blocked_symbol'].includes(v.kind) ? v.subject : null,
+                        txn_id: null, trade_date: lastDate || null, mode: v.mode, reason: importReason, override: overrideUsed && v.mode === 'block',
+                        metrics: { subject: v.subject, before: v.before, after: v.after, threshold: v.threshold, text: v.text, importBatch: batchId, source: 'statement-import' }
+                    })));
+                    if (exErr) throw exErr;
+                    limitExceptions = gatedViolations.length;
+                } catch (e) { limitExceptionError = e.message || String(e); }
+            }
+            return { batchId, imported: inserted, duplicates: preview.duplicates.length, blocked: preview.blocked, dividendsAdded, dividendsSkipped, limitExceptions, limitExceptionError };
         },
 
         undoImportBatch: async (email, batchId) => {
@@ -2318,6 +2353,21 @@ const API = {
                 ]);
                 const pf = { holdings: holdings.map(h => ({ symbol: h.symbol, value: h.marketValue })), cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0 };
                 const c = LimitsCalc.checkTrade(limits, pf, trade);
+                return { ok: c.ok, violations: c.violations, near: c.near, blocked: c.blocked, needsReason: c.needsReason, maxMode: c.maxMode, nav: c.before.nav };
+            },
+            // Kiểm tra cả LÔ lệnh nhập từ sao kê (lệnh quá khứ) theo thay đổi khối lượng ròng từng mã x giá hiện tại; tiền mặt giữ nguyên. rows: [{ symbol, type, quantity, price, date }]
+            checkImport: async (email, rows) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const limits = LimitsCalc.applicable(await API.asset.limits.list(), userId, 'member');
+                if (!limits.length || !(rows || []).length) return { ok: true, violations: [], near: [], blocked: false, needsReason: false, maxMode: null, none: !limits.length };
+                const [holdings, cd] = await Promise.all([
+                    API.asset.getHoldingsView(email),
+                    sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
+                ]);
+                const pf = { holdings: holdings.map(h => ({ symbol: h.symbol, value: h.marketValue })), cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0 };
+                const prices = {}; holdings.forEach(h => { if (h.marketPrice > 0) prices[h.symbol] = h.marketPrice; });
+                const c = LimitsCalc.checkImport(limits, pf, rows, prices);
                 return { ok: c.ok, violations: c.violations, near: c.near, blocked: c.blocked, needsReason: c.needsReason, maxMode: c.maxMode, nav: c.before.nav };
             },
             exceptions: async (days) => {

@@ -263,3 +263,23 @@ td.jn-reason::before { content: none; }
 .rk-presets { display: inline-flex; gap: 6px; }
 .rk-custom-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .rk-custom-chips .tl-link { padding: 0 2px; font-size: 0.95rem; }
+
+/* ---- Kiểm tra trước lệnh (pretrade.js) ---- */
+.pt-body { display: flex; flex-direction: column; gap: 12px; }
+.pt-controls { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.pt-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.pt-controls .tl-input { width: 110px; }
+.pt-meta { font-size: 0.78rem; color: var(--text-muted); line-height: 1.6; }
+.pt-meta b { color: var(--text-secondary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pt-sugg { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 11px 14px; border: 1px solid var(--gold); border-radius: var(--radius-sm); background: var(--gold-dim); }
+.pt-sugg.none { border-color: var(--border-strong); background: var(--bg-color-2); }
+.pt-sugg .k { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.pt-sugg b { font-family: var(--font-mono); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.pt-sugg .s { font-size: 0.76rem; color: var(--text-secondary); }
+.pt-caps { display: flex; gap: 6px; flex-wrap: wrap; }
+.pt-kpis { margin-bottom: 0; }
+.pt-flags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pt-flag { display: flex; gap: 8px; align-items: baseline; font-size: 0.84rem; line-height: 1.5; padding: 7px 11px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); }
+.pt-flag.bad { border-color: var(--danger-color); background: var(--danger-bg); } .pt-flag.bad i { color: var(--danger-color); }
+.pt-flag.warn { border-color: var(--warning-color); background: var(--warning-bg); } .pt-flag.warn i { color: var(--warning-color); }
+.pt-flag.ok i { color: var(--success-color); } .pt-flag.info i { color: var(--text-muted); }

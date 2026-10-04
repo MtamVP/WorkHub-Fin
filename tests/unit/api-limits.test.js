@@ -139,6 +139,58 @@ describe('addTransaction với giới hạn', () => {
   });
 });
 
+describe('importTransactions với giới hạn (nhập sao kê hàng loạt)', () => {
+  // Nền: 1000 FPT x 100.000 = 100tr + 300tr tiền = NAV 400tr => FPT 25%. Trần 30%: nhập thêm 500 FPT (50tr) => 150tr/450tr = 33% => vượt.
+  const row = (symbol, type, quantity, price, date = '2026-02-01', extra = {}) => Object.assign({ line: 1, date, symbol, type, quantity, price, fee: 0, tax: 0, ref: null, issues: [] }, extra);
+  const rows = () => [row('FPT', 'buy', 500, 100000, '2026-02-01', { ref: 'IMP-1' })];
+
+  it('previewImport trả limitCheck cho lô làm vượt giới hạn', async () => {
+    const c = boot({ finance_limits: [LIM({ value: 30 })] });
+    const p = await c.API.asset.previewImport(MEMBER.email, rows());
+    expect(p.limitCheck.violations).toHaveLength(1);
+    expect(p.limitCheck.needsReason).toBe(true);
+    expect(p.fresh).toHaveLength(1);
+  });
+  it('vượt giới hạn mà không có lý do -> từ chối, không ghi gì', async () => {
+    const c = boot({ finance_limits: [LIM({ value: 30 })] });
+    await expect(c.API.asset.importTransactions(MEMBER.email, rows(), {})).rejects.toThrow(/LIMIT_REASON_REQUIRED/);
+    expect(c.fake.table('finance_transactions')).toHaveLength(1);
+  });
+  it('có lý do -> nhập được và ghi ngoại lệ gắn mã lô', async () => {
+    const c = boot({ finance_limits: [LIM({ value: 30 })] });
+    const r = await c.API.asset.importTransactions(MEMBER.email, rows(), { exception: { reason: 'Bổ sung sao kê cũ đã được duyệt' } });
+    expect(r.imported).toBe(1);
+    expect(r.limitExceptions).toBe(1);
+    const ex = c.fake.table('finance_limit_exceptions');
+    expect(ex).toHaveLength(1);
+    expect(ex[0]).toMatchObject({ user_id: 'u-1', kind: 'max_symbol_pct', symbol: 'FPT', txn_id: null, reason: 'Bổ sung sao kê cũ đã được duyệt', override: false });
+    expect(ex[0].metrics).toMatchObject({ source: 'statement-import', importBatch: r.batchId });
+  });
+  it('chế độ chặn: thành viên thường bị từ chối kể cả có lý do; quản lý ghi đè được và có dấu vết', async () => {
+    const seed = () => ({ finance_limits: [LIM({ value: 30, mode: 'block' })], finance_assets: [{ user_id: 'u-1', cash: 300e6, debt: 0, nav: 0 }] });
+    const me = boot(seed());
+    await expect(me.API.asset.importTransactions(MEMBER.email, rows(), { exception: { reason: 'cho phép đi' } })).rejects.toThrow(/LIMIT_BLOCKED/);
+    expect(me.fake.table('finance_transactions')).toHaveLength(1);
+    const boss = boot(seed(), BOSS.email);
+    const r = await boss.API.asset.importTransactions(MEMBER.email, rows(), { exception: { reason: 'Quản lý đồng ý vì sao kê quá khứ' } });
+    expect(r.imported).toBe(1);
+    expect(boss.fake.table('finance_limit_exceptions')[0].override).toBe(true);
+  });
+  it('chế độ cảnh báo, hoặc lô không làm vượt: nhập bình thường, không cần lý do', async () => {
+    const warn = boot({ finance_limits: [LIM({ value: 30, mode: 'warn' })] });
+    expect((await warn.API.asset.importTransactions(MEMBER.email, rows(), {})).imported).toBe(1);
+    expect(warn.fake.table('finance_limit_exceptions')).toHaveLength(0);
+    const ok = boot({ finance_limits: [LIM({ value: 60 })] });
+    expect((await ok.API.asset.importTransactions(MEMBER.email, rows(), {})).imported).toBe(1);
+  });
+  it('không có giới hạn nào: nhập như cũ', async () => {
+    const c = boot();
+    const p = await c.API.asset.previewImport(MEMBER.email, rows());
+    expect(p.limitCheck).toMatchObject({ ok: true, none: true });
+    expect((await c.API.asset.importTransactions(MEMBER.email, rows(), {})).imported).toBe(1);
+  });
+});
+
 describe('callGAS: lệnh giới hạn', () => {
   it('đi đúng nhánh; lệnh ghi thuộc danh sách thay đổi dữ liệu', async () => {
     const { callGAS } = boot({ finance_limits: [LIM()] }, BOSS.email);
