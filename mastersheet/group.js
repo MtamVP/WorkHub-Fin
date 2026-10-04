@@ -131,7 +131,8 @@ function grPortfolioHtml() {
     }
     if (GR.risk && GR.risk.symbols) {
         const lim = grLimits();
-        html += `<div class="ce-group-title" style="margin-top:22px">Rủi ro của danh mục chung</div>` + rkBuildHtml(GR.risk, { inputs: GR.market, limits: lim, windowDays: 365, chartId: 'grp-dd-chart' });
+        if (typeof rkxState === 'function') { const x = rkxState('grp'); x.rerender = grRender; x.market = GR.market; x.holdings = GR.group.symbols.map(s => ({ symbol: s.symbol, quantity: s.quantity, value: s.value })); }
+        html += `<div class="ce-group-title" style="margin-top:22px">Rủi ro của danh mục chung</div>` + rkBuildHtml(GR.risk, { inputs: GR.market, limits: lim, windowDays: 365, chartId: 'grp-dd-chart', scope: 'grp' });
     }
     return html;
 }

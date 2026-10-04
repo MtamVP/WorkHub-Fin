@@ -3,7 +3,7 @@
 // Triển khai: Supabase MCP deploy_edge_function (verify_jwt = true). CHỈ cho người dùng đã đăng nhập (kiểm tra JWT người dùng), để hàm không thành
 // "proxy mở" tới VNDirect. Body: { symbols: ["SSI","VNINDEX"], from: "YYYY-MM-DD", to: "YYYY-MM-DD" } -> { ok, series: { SSI: [[ngày, giá VND]...] }, missing: [...] }.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { INDEX_CODES, parseDchart, parseFinfo, validateRequest, type Series } from "./parse.ts";
+import { INDEX_CODES, parseDchart, parseDchartVolumes, parseFinfo, validateRequest, type Series } from "./parse.ts";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
 const corsHeaders = {
@@ -27,21 +27,19 @@ async function getJson(url: string): Promise<any | null> {
   }
 }
 
-async function historyFor(symbol: string, from: string, to: string): Promise<Series> {
+async function historyFor(symbol: string, from: string, to: string): Promise<{ series: Series; volumes: Series }> {
   // mở rộng 1 ngày mỗi đầu để chắc chắn gồm cả phiên biên (dchart tính theo giờ UTC)
   const fromSec = Math.floor(Date.parse(from + "T00:00:00Z") / 1000) - 86400;
   const toSec = Math.floor(Date.parse(to + "T00:00:00Z") / 1000) + 2 * 86400;
-  const primary = parseDchart(
-    await getJson(`https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${fromSec}&to=${toSec}`),
-    symbol,
-  );
+  const raw = await getJson(`https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${fromSec}&to=${toSec}`);
+  const primary = parseDchart(raw, symbol);
   const inRange = (s: Series) => s.filter(([d]) => d >= from && d <= to);
-  if (primary.length) return inRange(primary);
-  if (INDEX_CODES.has(symbol)) return [];
+  if (primary.length) return { series: inRange(primary), volumes: inRange(parseDchartVolumes(raw, symbol)) };
+  if (INDEX_CODES.has(symbol)) return { series: [], volumes: [] };
   const fallback = parseFinfo(
     await getJson(`https://api-finfo.vndirect.com.vn/v4/stock_prices?q=code:${symbol}~date:gte:${from}~date:lte:${to}&sort=date&size=2000`),
   );
-  return inRange(fallback);
+  return { series: inRange(fallback), volumes: [] };
 }
 
 Deno.serve(async (req: Request) => {
@@ -59,11 +57,14 @@ Deno.serve(async (req: Request) => {
   if (v.error) return json({ ok: false, error: v.error }, 400);
 
   const series: Record<string, Series> = {};
+  const volumes: Record<string, Series> = {};
   const missing: string[] = [];
   for (let i = 0; i < v.symbols.length; i += 5) {
     const batch = v.symbols.slice(i, i + 5);
     const results = await Promise.all(batch.map((s) => historyFor(s, v.from, v.to)));
-    batch.forEach((s, j) => { if (results[j].length) series[s] = results[j]; else missing.push(s); });
+    batch.forEach((s, j) => {
+      if (results[j].series.length) { series[s] = results[j].series; if (v.volumes && results[j].volumes.length) volumes[s] = results[j].volumes; } else missing.push(s);
+    });
   }
-  return json({ ok: true, series, missing });
+  return json(v.volumes ? { ok: true, series, volumes, missing } : { ok: true, series, missing });
 });

@@ -14,8 +14,8 @@ export function vnDate(unixSec: number): string {
 }
 
 // Kiểm tra đầu vào; trả về chuỗi lỗi (tiếng Việt) hoặc null nếu hợp lệ.
-export function validateRequest(body: any): { error: string | null; symbols: string[]; from: string; to: string } {
-  const fail = (error: string) => ({ error, symbols: [], from: "", to: "" });
+export function validateRequest(body: any): { error: string | null; symbols: string[]; from: string; to: string; volumes: boolean } {
+  const fail = (error: string) => ({ error, symbols: [], from: "", to: "", volumes: false });
   if (!body || !Array.isArray(body.symbols) || !body.symbols.length) return fail("Thiếu danh sách mã.");
   const symbols = [...new Set(body.symbols.map((s: unknown) => String(s).trim().toUpperCase()))] as string[];
   if (symbols.length > MAX_SYMBOLS) return fail(`Tối đa ${MAX_SYMBOLS} mã mỗi lần.`);
@@ -26,7 +26,19 @@ export function validateRequest(body: any): { error: string | null; symbols: str
   const span = (Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000;
   if (!(span >= 0)) return fail("Khoảng ngày không hợp lệ.");
   if (span > MAX_RANGE_DAYS) return fail(`Khoảng ngày tối đa ${MAX_RANGE_DAYS} ngày.`);
-  return { error: null, symbols, from, to };
+  return { error: null, symbols, from, to, volumes: body.volumes === true };
+}
+
+// Khối lượng giao dịch ngày (cổ phiếu) từ cùng phản hồi dchart { t:[unix], v:[khối lượng] } -> chuỗi [ngày, khối lượng]. Chỉ số không có khối lượng có nghĩa nên bỏ qua.
+export function parseDchartVolumes(json: any, symbol: string): Series {
+  if (INDEX_CODES.has(symbol) || !json || json.s !== "ok" || !Array.isArray(json.t) || !Array.isArray(json.v)) return [];
+  const byDate = new Map<string, number>();
+  for (let i = 0; i < json.t.length; i++) {
+    const v = json.v[i], t = json.t[i];
+    if (typeof v !== "number" || !(v >= 0) || typeof t !== "number") continue;
+    byDate.set(vnDate(t), v);
+  }
+  return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 }
 
 // Phản hồi VNDirect dchart { s:'ok', t:[unix...], c:[giá...] } -> chuỗi [ngày, giá VND] (nhân 1000 với cổ phiếu, giữ nguyên với chỉ số).

@@ -245,3 +245,98 @@ describe('analyze: thống kê trên lịch sử giá', () => {
     expect(a.portfolio.obs).toBeGreaterThan(100);
   });
 });
+
+describe('liquidity: bán hết mất bao lâu', () => {
+  const vol = (n, v) => Array.from({ length: n }, (_, i) => ['2026-08-' + String(i + 1).padStart(2, '0'), v]);
+  const H = [{ symbol: 'FPT', quantity: 1000000, value: 100e9 }, { symbol: 'ILL', quantity: 500000, value: 5e9 }, { symbol: 'NEW', quantity: 100, value: 1e6 }];
+  const V = { FPT: vol(60, 2000000), ILL: vol(60, 10000), NEW: vol(3, 100) };
+  it('ngày bán hết = số cổ phiếu / (tỷ lệ × khối lượng bình quân); xếp từ khó bán nhất; thiếu dữ liệu được báo', () => {
+    const r = RiskCalc.liquidity(H, V, { rate: 0.2 });
+    expect(r.rows.map(x => x.symbol)).toEqual(['ILL', 'FPT']);
+    const fpt = r.rows.find(x => x.symbol === 'FPT'), ill = r.rows.find(x => x.symbol === 'ILL');
+    expect(fpt.days).toBeCloseTo(1000000 / (0.2 * 2000000), 9);            // 2,5 phiên
+    expect(ill.days).toBeCloseTo(500000 / (0.2 * 10000), 9);               // 250 phiên
+    expect(fpt.level).toBe('ok'); expect(ill.level).toBe('high');
+    expect(fpt.shareOfAdvPct).toBeCloseTo(50, 9);
+    expect(r.missing).toEqual(['NEW']);
+    expect(r.worst.symbol).toBe('ILL'); expect(r.daysToExitAll).toBeCloseTo(250, 9);
+    expect(r.coveragePct).toBeLessThan(100);
+  });
+  it('tỷ lệ giá trị bán xong sau d phiên (bán đồng thời); đơn điệu tăng', () => {
+    const r = RiskCalc.liquidity(H, V, { rate: 0.2 });
+    const pct = Object.fromEntries(r.cover.map(c => [c.days, c.pct]));
+    // sau 1 phiên: FPT bán 400k/1M = 40% = 40 tỷ; ILL bán 2k/500k = 0,4% = 0,02 tỷ  -> (40 + 0,02) / 105
+    expect(pct[1]).toBeCloseTo((40e9 + 0.02e9) / 105e9 * 100, 6);
+    expect(pct[3]).toBeGreaterThan(pct[2]); expect(pct[2]).toBeGreaterThan(pct[1]);
+    expect(pct[3]).toBeCloseTo((100e9 + 0.06e9) / 105e9 * 100, 6);          // FPT bán hết sau 2,5 phiên
+  });
+  it('tỷ lệ tham gia thấp hơn làm ngày bán dài hơn; bỏ phiên khối lượng 0; danh sách rỗng', () => {
+    const slow = RiskCalc.liquidity(H, V, { rate: 0.1 });
+    expect(slow.rows.find(x => x.symbol === 'FPT').days).toBeCloseTo(5, 9);
+    const withZero = RiskCalc.liquidity([H[0]], { FPT: vol(30, 2000000).concat(vol(10, 0)) }, { rate: 0.2 });
+    expect(withZero.rows[0].adv).toBe(2000000);
+    expect(RiskCalc.liquidity([], {}).rows).toEqual([]);
+  });
+});
+
+describe('historicalScenarios: chuỗi phiên tệ nhất của VN-Index lặp lại', () => {
+  const dates = tradingDates(120, '2026-10-02');
+  const mk = (f) => { let p = 100; return dates.map((d, i) => { if (i) p *= 1 + f(i); return [d, p]; }); };
+  // chỉ số: bình thường +0,1%/ngày, riêng ngày 60 giảm 6%, các ngày 80-84 giảm 2%/ngày
+  const idx = mk(i => i === 60 ? -0.06 : (i >= 80 && i <= 84 ? -0.02 : 0.001));
+  const A = mk(i => i === 60 ? -0.09 : (i >= 80 && i <= 84 ? -0.03 : 0.001));      // nhạy gấp 1,5 lần
+  const B = mk(i => i === 60 ? -0.03 : 0.001);                                       // phòng thủ
+  it('tìm đúng cửa sổ tệ nhất theo chỉ số và dùng lợi suất THẬT của từng mã trong cửa sổ đó', () => {
+    const r = RiskCalc.historicalScenarios({ holdings: [{ symbol: 'AAA', value: 60e6 }, { symbol: 'BBB', value: 40e6 }], nav: 100e6, histories: { VNINDEX: idx, AAA: A, BBB: B } }, { windowDays: 400 });
+    const day = r.find(x => x.windowDays === 1);
+    expect(day.to).toBe(dates[60]);
+    expect(day.benchPct).toBeCloseTo(-6, 6);
+    expect(day.bySymbol.find(x => x.symbol === 'AAA').pct).toBeCloseTo(-9, 6);
+    expect(day.portfolioPct).toBeCloseTo(0.6 * -9 + 0.4 * -3, 6);
+    expect(day.vnd).toBeCloseTo(100e6 * day.portfolioPct / 100, 3);
+    const week = r.find(x => x.windowDays === 5);
+    expect(week.bySymbol[0].symbol).toBe('AAA');                                   // thua nhiều nhất xếp đầu
+    expect(week.portfolioPct).toBeLessThan(0);
+  });
+  it('có tiền mặt thì mẫu số là NAV nên tổn thất % nhỏ hơn; mã thiếu giá lúc đó coi như đi cùng chỉ số và được đánh dấu', () => {
+    const r = RiskCalc.historicalScenarios({ holdings: [{ symbol: 'AAA', value: 50e6 }, { symbol: 'NEW', value: 50e6 }], nav: 200e6, histories: { VNINDEX: idx, AAA: A, NEW: A.slice(-5) } }, { windowDays: 400 });
+    const day = r.find(x => x.windowDays === 1);
+    expect(day.estimatedCount).toBe(1);
+    expect(day.bySymbol.find(x => x.symbol === 'NEW')).toMatchObject({ estimated: true });
+    expect(day.bySymbol.find(x => x.symbol === 'NEW').pct).toBeCloseTo(-6, 6);
+    expect(day.portfolioPct).toBeCloseTo((50e6 * -0.09 + 50e6 * -0.06) / 200e6 * 100, 6);
+  });
+  it('chuỗi chỉ tăng hoặc thiếu dữ liệu -> không có kịch bản', () => {
+    const up = mk(() => 0.001);
+    expect(RiskCalc.historicalScenarios({ holdings: [{ symbol: 'AAA', value: 1e6 }], nav: 1e6, histories: { VNINDEX: up, AAA: up } })).toEqual([]);
+    expect(RiskCalc.historicalScenarios({ holdings: [], nav: 1, histories: {} })).toEqual([]);
+  });
+});
+
+describe('customStress: kịch bản tự đặt', () => {
+  const r = { nav: 500e6, symbols: [
+    { symbol: 'VCB', sector: 'Ngân hàng', value: 100e6, betaAdj: 1.0 }, { symbol: 'TCB', sector: 'Ngân hàng', value: 100e6, betaAdj: 1.2 },
+    { symbol: 'FPT', sector: 'Công nghệ', value: 200e6, betaAdj: 0.8 }, { symbol: 'XXX', sector: 'Chưa phân ngành', value: 50e6 },
+  ] };
+  it('cú sốc chung dùng beta điều chỉnh; mã chưa có beta dùng 1 và được đánh dấu', () => {
+    const s = RiskCalc.customStress(r, { index: -10 });
+    const by = Object.fromEntries(s.rows.map(x => [x.symbol, x]));
+    expect(by.TCB.pct).toBeCloseTo(-12, 9); expect(by.FPT.pct).toBeCloseTo(-8, 9);
+    expect(by.XXX).toMatchObject({ pct: -10, defaultBeta: true, source: 'beta' });
+    expect(s.totalVnd).toBeCloseTo(-10e6 - 12e6 - 16e6 - 5e6, 3);
+    expect(s.portfolioPct).toBeCloseTo(-43 / 500 * 100, 9);
+    expect(s.navAfter).toBeCloseTo(500e6 - 43e6, 3);
+  });
+  it('ưu tiên: cú sốc theo mã > theo ngành > beta × chung', () => {
+    const s = RiskCalc.customStress(r, { index: -10, sectors: { 'Ngân hàng': -20 }, symbols: { TCB: -35 } });
+    const by = Object.fromEntries(s.rows.map(x => [x.symbol, x]));
+    expect(by.VCB).toMatchObject({ pct: -20, source: 'sector' });
+    expect(by.TCB).toMatchObject({ pct: -35, source: 'symbol' });
+    expect(by.FPT.source).toBe('beta');
+    expect(s.worst.symbol).toBe('TCB');                                            // −35tr: lớn nhất tính theo VND
+  });
+  it('bỏ qua giá trị rỗng/không phải số; NAV âm sau cú sốc được cảnh báo', () => {
+    expect(RiskCalc.customStress(r, { index: '', sectors: { 'Ngân hàng': '' }, symbols: { FPT: 'abc' } }).totalVnd).toBe(0);
+    expect(RiskCalc.customStress({ nav: 10e6, cash: 0, symbols: [{ symbol: 'A', sector: 'x', value: 100e6, betaAdj: 1 }] }, { index: -50 }).negativeNav).toBe(true);
+  });
+});

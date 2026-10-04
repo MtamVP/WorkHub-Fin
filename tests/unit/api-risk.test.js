@@ -134,3 +134,26 @@ describe('API.asset.getAttributionInputs', () => {
     expect((await none.API.asset.getAttributionInputs(EMAIL)).txns).toEqual([]);
   });
 });
+
+describe('API.asset.getVolumeHistory', () => {
+  it('gọi stock-history với volumes:true theo lô, chuẩn hoá mã, trả khối lượng từng mã', async () => {
+    const calls = [];
+    const fns = { 'stock-history': async (b) => { calls.push(b); return { data: { ok: true, series: {}, volumes: Object.fromEntries(b.symbols.map(s => [s, [[day(-1), 1000]]])) }, error: null }; } };
+    const { API } = boot({}, { functions: fns });
+    const r = await API.asset.getVolumeHistory(['fpt', 'FPT', 'hpg', 'A;B'], 90);
+    expect(Object.keys(r).sort()).toEqual(['FPT', 'HPG']);
+    expect(calls[0]).toMatchObject({ symbols: ['FPT', 'HPG'], volumes: true });
+    expect(calls[0].from < calls[0].to).toBe(true);
+    const many = Array.from({ length: 45 }, (_, i) => 'S' + i);
+    await API.asset.getVolumeHistory(many);
+    expect(calls.length).toBe(1 + 3);                              // 45 mã -> 3 lô 20
+  });
+  it('rỗng không gọi nguồn; lỗi được ném ra với lý do', async () => {
+    const calls = [];
+    const ok = boot({}, { functions: { 'stock-history': async () => { calls.push(1); return { data: { ok: true, volumes: {} }, error: null }; } } });
+    expect(await ok.API.asset.getVolumeHistory([])).toEqual({});
+    expect(calls).toHaveLength(0);
+    const bad = boot({}, { functions: { 'stock-history': async () => ({ data: null, error: { message: 'nguồn lỗi' } }) } });
+    await expect(bad.API.asset.getVolumeHistory(['FPT'])).rejects.toThrow(/nguồn lỗi/);
+  });
+});

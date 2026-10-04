@@ -2720,6 +2720,27 @@ const API = {
             return { members, txns, actions, cashFlows, prices, assets, navHistory, fetchedAt: new Date().toISOString() };
         },
 
+        // Khối lượng giao dịch ngày của các mã (Edge Function stock-history với volumes:true) để tính thanh khoản. Trả { SYM: [[ngày, khối lượng]] }; mã thiếu dữ liệu vắng mặt.
+        getVolumeHistory: async (symbols, days) => {
+            const list = [...new Set((symbols || []).map(s => String(s).toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 60);
+            if (!list.length) return {};
+            const d = Math.min(Math.max(Number(days) || 90, 30), 365);
+            const to = new Date().toISOString().slice(0, 10);
+            const from = new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+            const out = {};
+            for (let i = 0; i < list.length; i += 20) {
+                const { data, error } = await sbClient.functions.invoke('stock-history', { body: { symbols: list.slice(i, i + 20), from, to, volumes: true } });
+                if (error) {
+                    let detail = error.message;
+                    try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                    throw new Error(detail);
+                }
+                if (!data || !data.ok) throw new Error((data && data.error) || 'Không lấy được khối lượng giao dịch');
+                Object.assign(out, data.volumes || {});
+            }
+            return out;
+        },
+
         // Gom dữ liệu thô cho tab Rủi Ro (tính toán ở lib/risk-calc.js): danh mục hiện tại, tiền/nợ, giá lịch sử các mã đang giữ + VN-Index,
         // sự kiện doanh nghiệp để điều chỉnh giá (lỗi ở các phần phụ KHÔNG làm hỏng cả báo cáo), lịch sử NAV đã chụp.
         getRiskInputs: async (email, windowDays) => {
@@ -4440,6 +4461,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getGroupData': result = await API.asset.getGroupData(); break;
             case 'getMarketInputs': result = await API.asset.getMarketInputs(params.symbols, params.windowDays); break;
             case 'getCalendarInputs': result = await API.asset.getCalendarInputs(params.email); break;
+            case 'getVolumeHistory': result = await API.asset.getVolumeHistory(params.symbols, params.days); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;

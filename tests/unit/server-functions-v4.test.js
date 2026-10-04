@@ -98,3 +98,24 @@ describe('evaluateWatchAlerts + email "muốn mua"', () => {
     expect(mail.html).toMatch(/Chạm giá muốn mua/);
   });
 });
+
+import { parseDchartVolumes } from '../../supabase/functions/stock-history/parse.ts';
+describe('stock-history: khối lượng giao dịch', () => {
+  const T = (iso) => Math.floor(Date.parse(iso + 'T03:00:00Z') / 1000);
+  const j = { s: 'ok', t: [T('2026-09-29'), T('2026-09-30'), T('2026-10-01')], c: [65.3, 64.7, 63.7], v: [4350900, 0, 5148700] };
+  it('lấy khối lượng theo ngày (giữ cả phiên 0), sắp xếp tăng dần', () => {
+    expect(parseDchartVolumes(j, 'FPT')).toEqual([['2026-09-29', 4350900], ['2026-09-30', 0], ['2026-10-01', 5148700]]);
+  });
+  it('chỉ số, phản hồi lỗi hoặc thiếu mảng v -> rỗng; giá trị không hợp lệ bị bỏ', () => {
+    expect(parseDchartVolumes(j, 'VNINDEX')).toEqual([]);
+    expect(parseDchartVolumes({ s: 'no_data' }, 'FPT')).toEqual([]);
+    expect(parseDchartVolumes({ s: 'ok', t: [1], c: [1] }, 'FPT')).toEqual([]);
+    expect(parseDchartVolumes({ s: 'ok', t: [T('2026-09-29'), T('2026-09-30')], v: [-5, 'x'] }, 'FPT')).toEqual([]);
+  });
+  it('validateRequest nhận cờ volumes (mặc định tắt)', () => {
+    const body = { symbols: ['FPT'], from: '2026-08-01', to: '2026-09-30' };
+    expect(validateRequest(body).volumes).toBe(false);
+    expect(validateRequest({ ...body, volumes: true }).volumes).toBe(true);
+    expect(validateRequest({ ...body, volumes: 'yes' }).volumes).toBe(false);
+  });
+});

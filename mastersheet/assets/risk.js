@@ -191,6 +191,7 @@ function rkBuildHtml(r, ctx) {
             <div class="tl-card rk-chart-card"><div style="position:relative;height:260px"><canvas id="${ctx.chartId}"></canvas></div></div>${rkActual(r)}`;
         html += `<div class="ce-group-title">Các mã có đi cùng nhau không</div>${rkCorrelation(r)}`;
         html += `<div class="ce-group-title">Nếu thị trường giảm</div>${rkStress(r)}`;
+        if (ctx.scope && typeof rkAdvancedHtml === 'function') html += rkAdvancedHtml(ctx.scope, r);   // thanh khoản, kịch bản lịch sử, kịch bản tự đặt
     } else if (r.reason === 'no-history') {
         html += '<div class="tl-empty" style="padding:16px"><i class="fa-solid fa-chart-line"></i>Chưa đủ giá lịch sử (cần tối thiểu ~40 phiên) để tính biến động, VaR, tương quan và kịch bản.</div>' + rkActual(r);
     }
@@ -218,7 +219,8 @@ function renderRisk() {
         body.innerHTML = '<div class="tl-empty"><i class="fa-solid fa-shield-halved"></i>Chưa có mã nào đang giữ — thêm lệnh mua ở tab Sổ Lệnh để phân tích rủi ro.</div>';
         return;
     }
-    const ctx = { inputs: RK.inputs, limits: RK.limits, windowDays: RK.windowDays, chartId: 'rk-dd-chart' };
+    const ctx = { inputs: RK.inputs, limits: RK.limits, windowDays: RK.windowDays, chartId: 'rk-dd-chart', scope: 'rk' };
+    if (typeof rkxState === 'function') { const x = rkxState('rk'); x.rerender = renderRisk; x.market = RK.inputs; x.holdings = (RK.inputs.holdings || []).map(h => ({ symbol: h.symbol, quantity: h.quantity, value: h.marketValue })); }
     body.innerHTML = rkBuildHtml(r, ctx);
     if (r.ok) RK.chart = rkDrawChart(r, ctx.chartId);
 }
