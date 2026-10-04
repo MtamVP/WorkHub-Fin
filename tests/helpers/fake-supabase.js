@@ -9,6 +9,7 @@ const UNIQUES = {
   finance_holdings_price: [['user_id', 'symbol']],
   finance_allocation_targets: [['user_id', 'symbol']],
   finance_event_dismissals: [['user_id', 'event_id']],
+  finance_idea_votes: [['idea_id', 'user_id']],
   finance_assets: [['user_id']],
   finance_nav_history: [['user_id', 'snapshot_date']],
   finance_benchmark_prices: [['index_code', 'price_date']],
@@ -19,6 +20,9 @@ const DEFAULTS = {
   finance_corporate_actions: () => ({ id: uuid(), created_at: new Date().toISOString(), deleted_at: null, note: null }),
   finance_watchlist: () => ({ id: uuid(), created_at: new Date().toISOString(), buy_below: null, target_price: null, note: null, added_price: null }),
   finance_decisions: () => ({ id: uuid(), created_at: new Date().toISOString(), deleted_at: null, tags: [], txn_id: null, price_at_decision: null, quantity: null, reason: null, expected_price: null, stop_price: null, horizon_months: null, confidence: null, valuation: null, review_date: null, review_rating: null, review_note: null, lesson: null }),
+  finance_ideas: () => ({ id: uuid(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status_changed_at: new Date().toISOString(), tags: [], status: 'idea', direction: 'long', thesis: null, catalysts: null, risks: null, entry_price: null, index_at_entry: null, buy_below: null, target_price: null, stop_price: null, horizon_months: null, conviction: null, valuation: null, submitted_at: null, decided_at: null, decided_by: null, decision_note: null, closed_at: null, close_price: null, index_at_close: null, close_reason: null, close_note: null }),
+  finance_idea_comments: () => ({ id: uuid(), created_at: new Date().toISOString(), kind: 'comment' }),
+  finance_idea_votes: () => ({ created_at: new Date().toISOString(), updated_at: new Date().toISOString(), reason: null }),
   finance_holdings_price: () => ({ locked: false, target_price: null, stop_loss: null, price_date: null, price_source: null, updated_at: new Date().toISOString() }),
 };
 

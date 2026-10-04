@@ -243,3 +243,34 @@
 .vl-autosync label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
 .vl-autosync input { width: 15px; height: 15px; accent-color: var(--gold); }
 .vl-autosync span { flex: 1 1 280px; min-width: 0; }
+
+/* ---- Ý tưởng đầu tư (ideas-ui.js) ---- */
+.id-table td { vertical-align: top; }
+.id-title { margin-top: 3px; font-size: 0.82rem; font-weight: 600; color: var(--text-primary); max-width: 340px; white-space: normal; line-height: 1.4; }
+.id-sub { font-size: 0.7rem; color: var(--text-muted); }
+.id-modal .modal-card { max-width: 1040px; }
+.id-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; }
+.id-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.id-card { padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); }
+.id-h { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px; display: flex; gap: 8px; align-items: baseline; }
+.id-h small { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.id-text { margin: 0; font-size: 0.86rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+.id-kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 0.8rem; border-bottom: 1px dashed var(--border-color); }
+.id-kv:last-child { border-bottom: 0; } .id-kv span { color: var(--text-secondary); } .id-kv b { font-family: var(--font-mono); font-weight: 600; text-align: right; }
+.id-flag { margin-top: 6px; padding: 5px 9px; border-radius: var(--radius-sm); font-size: 0.74rem; font-weight: 600; }
+.id-flag.ok { background: var(--success-bg); color: var(--success-color); } .id-flag.bad { background: var(--danger-bg); color: var(--danger-color); } .id-flag.warn { background: var(--warning-bg); color: var(--warning-color); }
+.id-thread { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.id-cm { padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--card-bg); }
+.id-cm.challenge { border-left: 3px solid var(--warning-color); } .id-cm.answer { border-left: 3px solid var(--success-color); }
+.id-cm-h { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; font-size: 0.78rem; } .id-cm-h small { color: var(--text-muted); }
+.id-del { margin-left: auto; font-size: 0.74rem; color: var(--text-muted); } .id-del:hover { color: var(--danger-color); }
+.id-cform, .id-actform { display: flex; flex-direction: column; gap: 8px; }
+.id-cform textarea, .id-actform textarea, .id-voteform input, .id-form input, .id-form textarea, .id-form select, .id-cform select, .id-actform select { padding: 8px 10px; font: inherit; font-size: 0.84rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); width: 100%; box-sizing: border-box; min-width: 0; }
+.id-cform textarea:focus, .id-actform textarea:focus, .id-form input:focus, .id-form textarea:focus, .id-voteform input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+.id-vote { padding: 4px 0; font-size: 0.8rem; } .id-vote.for b { color: var(--success-color); } .id-vote.against b { color: var(--danger-color); }
+.id-voteform { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; } .id-vbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.id-meter { height: 7px; border-radius: 4px; background: var(--card-bg); overflow: hidden; } .id-meter i { display: block; height: 100%; border-radius: 4px; background: var(--warning-color); transition: width .2s; } .id-meter i.ok { background: var(--success-color); }
+.id-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.id-form label { display: flex; flex-direction: column; gap: 5px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); } .id-form label.wide { grid-column: 1 / -1; }
+.id-assist { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+@media (max-width: 860px) { .id-grid { grid-template-columns: 1fr; } }

@@ -76,10 +76,13 @@ function showView(view) {
     document.getElementById('view-overview').style.display = view === 'overview' ? '' : 'none';
     document.getElementById('view-detail').style.display = view === 'detail' ? '' : 'none';
     document.getElementById('view-screener').style.display = view === 'screener' ? '' : 'none';
+    document.getElementById('view-ideas').style.display = view === 'ideas' ? '' : 'none';
+    document.getElementById('seg-ideas').setAttribute('aria-pressed', String(view === 'ideas'));
     document.getElementById('seg-overview').setAttribute('aria-pressed', String(view === 'overview'));
     document.getElementById('seg-detail').setAttribute('aria-pressed', String(view === 'detail'));
     document.getElementById('seg-screener').setAttribute('aria-pressed', String(view === 'screener'));
     if (view === 'screener') renderScreener();
+    if (view === 'ideas' && typeof loadIdeas === 'function') loadIdeas();
     if (view === 'overview') {
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     } else if (state.detail) {

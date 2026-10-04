@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="/finance-shared.css?v=2.8">
     <link rel="stylesheet" href="/stocksheet/style.css?v=1789060000000">
     <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791900000000">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -72,6 +73,7 @@
             <div class="vl-seg" role="group" aria-label="Chế độ xem">
                 <button type="button" id="seg-overview" aria-pressed="true" onclick="showView('overview')"><i class="fa-solid fa-table-list"></i> Bảng so sánh</button>
                 <button type="button" id="seg-screener" aria-pressed="false" onclick="showView('screener')"><i class="fa-solid fa-filter"></i> Bộ lọc</button>
+                <button type="button" id="seg-ideas" aria-pressed="false" onclick="showView('ideas')"><i class="fa-solid fa-lightbulb"></i> Ý tưởng</button>
                 <button type="button" id="seg-detail" aria-pressed="false" onclick="showView('detail')"><i class="fa-solid fa-magnifying-glass-chart"></i> Chi tiết mã</button>
             </div>
             <a class="btn-refresh" href="/stocksheet/autosheet/"><i class="fa-solid fa-plus"></i> Thêm / sửa định giá</a>
@@ -90,7 +92,10 @@
         <!-- 2) BỘ LỌC: tìm mã đáng xem theo tiêu chí, thêm hàng loạt theo rổ -->
         <section id="view-screener" style="display:none;" aria-label="Bộ lọc tìm mã"><div id="sc-root"></div></section>
 
-        <!-- 3) CHI TIẾT MỘT MÃ -->
+        <!-- 3) Ý TƯỞNG: quy trình nghiên cứu, phản biện, duyệt, theo dõi kết quả -->
+        <section id="view-ideas" style="display:none;" aria-label="Ý tưởng đầu tư của nhóm"><div id="id-root"></div></section>
+
+        <!-- 4) CHI TIẾT MỘT MÃ -->
         <section id="view-detail" style="display:none;" aria-label="Chi tiết định giá một mã">
             <div class="control-panel">
                 <label for="stock-select"><i class="fa-solid fa-magnifying-glass"></i> Chọn mã cổ phiếu:</label>
@@ -115,13 +120,30 @@
 
     </div>
 
+    <div class="modal-overlay tl-modal id-modal" id="id-modal">
+        <div class="modal-card">
+            <div class="modal-header"><h3 id="id-modal-title"></h3><button type="button" class="icon-btn" onclick="closeIdeaModal()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body" id="id-modal-body"></div>
+        </div>
+    </div>
+    <div class="modal-overlay tl-modal id-modal" id="idf-modal">
+        <div class="modal-card">
+            <div class="modal-header"><h3 id="idf-modal-title"></h3><button type="button" class="icon-btn" onclick="closeIdeaFormModal()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body" id="idf-modal-body"></div>
+            <div class="modal-footer" id="idf-modal-footer"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=1791900000000"></script>
     <script src="../lib/valuation-calc.js?v=1791900000000"></script>
     <script src="../lib/screener.js?v=1791900000000"></script>
+    <script src="../lib/decision-journal.js?v=1791900000000"></script>
+    <script src="../lib/ideas.js?v=1791900000000"></script>
     <script src="valuation-ui.js?v=1791900000000"></script>
     <script src="financials-sync.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
     <script src="screener-ui.js?v=1791900000000"></script>
+    <script src="ideas-ui.js?v=1791900000000"></script>
 </body>
 </html>

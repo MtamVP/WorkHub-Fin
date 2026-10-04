@@ -1505,6 +1505,7 @@ const API = {
             if (error) throw error;
         }
     },
+    _fetchAllRows: async (build) => API.asset._fetchAll(build),
     asset: {
         // --- Sổ lệnh (transaction ledger) — nguồn sự thật duy nhất cho khối lượng/giá vốn ---
         listTransactions: async (email) => {
@@ -3384,6 +3385,142 @@ const API = {
             return `${sym}: đã ${done.join(' và ')}`;
         }
     },
+    // --- Quy trình nghiên cứu và ý tưởng đầu tư (lib/ideas.js): ý tưởng -> nghiên cứu -> chờ phản biện -> duyệt/bác -> vào danh mục -> đóng.
+    //     Quy tắc chuyển trạng thái được kiểm ở đây (RLS chỉ giới hạn ai được ghi dòng nào). ---
+    ideas: {
+        // Giá hiện tại các mã + điểm VN-Index gần nhất, để ghi nhận giá vào/ra và tính kết quả so với chỉ số.
+        marks: async (email, symbols) => {
+            const list = [...new Set((symbols || []).map(s => String(s).toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
+            let prices = {}, index = null;
+            if (list.length) { try { prices = await API.stock.getLivePrices(list, email); } catch (e) { /* thiếu giá: để trống */ } }
+            try {
+                const to = new Date().toISOString().slice(0, 10);
+                const from = new Date(Date.now() - 12 * 86400000).toISOString().slice(0, 10);
+                const s = (await API.asset.getPriceHistory(['VNINDEX'], from, to)).VNINDEX || [];
+                index = s.length ? Number(s[s.length - 1][1]) : null;
+            } catch (e) { /* thiếu chỉ số: kết quả tính không có alpha */ }
+            return { prices, index };
+        },
+        list: async () => {
+            const { data: ideas, error } = await sbClient.from('finance_ideas').select('*').order('updated_at', { ascending: false });
+            if (error) throw error;
+            const [votes, comments, users] = await Promise.all([
+                API._fetchAllRows(() => sbClient.from('finance_idea_votes').select('idea_id, user_id, vote')),
+                API._fetchAllRows(() => sbClient.from('finance_idea_comments').select('id, idea_id, user_id, kind, created_at')),
+                sbClient.from('users').select('id, email, nickname').in('group_key', ['finance', 'admin'])
+            ]);
+            const members = {};
+            ((users && users.data) || []).forEach(u => { members[u.id] = u.nickname || String(u.email || '').split('@')[0]; });
+            return { ideas: ideas || [], votes, comments, members };
+        },
+        get: async (id) => {
+            const { data: idea, error } = await sbClient.from('finance_ideas').select('*').eq('id', id).maybeSingle();
+            if (error) throw error;
+            if (!idea) throw new Error("Không tìm thấy ý tưởng");
+            const [{ data: comments }, { data: votes }] = await Promise.all([
+                sbClient.from('finance_idea_comments').select('*').eq('idea_id', id).order('created_at', { ascending: true }),
+                sbClient.from('finance_idea_votes').select('*').eq('idea_id', id)
+            ]);
+            return { idea, comments: comments || [], votes: votes || [] };
+        },
+        // Tạo mới hoặc sửa. Người tạo = người đang đăng nhập. Giá ghi nhận mặc định là giá hiện tại và điểm VN-Index lúc tạo (để so kết quả sau này).
+        save: async (email, input) => {
+            const v = IdeaFlow.validate(input || {});
+            if (!v.ok) throw new Error(v.error);
+            const actor = await API.asset.limits._actor(email);
+            if (!actor.actorId) throw new Error("User không tồn tại");
+            const i = v.idea;
+            const row = {
+                symbol: i.symbol, title: i.title.trim(), direction: i.direction, thesis: i.thesis || null, catalysts: i.catalysts || null, risks: i.risks || null,
+                buy_below: i.buyBelow, target_price: i.target, stop_price: i.stop, horizon_months: i.horizonMonths, conviction: i.conviction,
+                valuation: i.valuation || null, tags: i.tags, updated_at: new Date().toISOString()
+            };
+            if (input && input.id) {
+                const { data: cur } = await sbClient.from('finance_ideas').select('*').eq('id', input.id).maybeSingle();
+                if (!cur) throw new Error("Không tìm thấy ý tưởng");
+                if (cur.user_id !== actor.actorId) throw new Error("Chỉ tác giả được sửa ý tưởng");
+                if (!['idea', 'research', 'rejected'].includes(cur.status)) throw new Error("Ý tưởng đang chờ phản biện hoặc đã duyệt: hãy đưa về “Đang nghiên cứu” trước khi sửa");
+                const { error } = await sbClient.from('finance_ideas').update(row).eq('id', input.id);
+                if (error) throw error;
+                return "Đã cập nhật ý tưởng!";
+            }
+            const marks = await API.ideas.marks(email, [i.symbol]);
+            const live = marks.prices[i.symbol] ? Number(marks.prices[i.symbol].price) : 0;
+            const entry = i.entry > 0 ? i.entry : (live > 0 ? live : null);
+            // Kiểm lại mục tiêu/cắt lỗ theo giá ghi nhận vừa lấy được
+            if (entry && i.direction === 'long') {
+                if (i.target !== null && i.target <= entry) throw new Error("Ý tưởng mua: giá mục tiêu phải cao hơn giá hiện tại (" + Math.round(entry).toLocaleString('en-US') + ")");
+                if (i.stop !== null && i.stop >= entry) throw new Error("Ý tưởng mua: ngưỡng cắt lỗ phải thấp hơn giá hiện tại (" + Math.round(entry).toLocaleString('en-US') + ")");
+            }
+            const { data: created, error } = await sbClient.from('finance_ideas').insert(Object.assign(row, { user_id: actor.actorId, entry_price: entry, index_at_entry: marks.index })).select('id').single();
+            if (error) throw error;
+            return { message: "Đã ghi nhận ý tưởng!", id: created.id };
+        },
+        setStatus: async (email, id, to, data) => {
+            const { data: cur, error } = await sbClient.from('finance_ideas').select('*').eq('id', id).maybeSingle();
+            if (error) throw error;
+            if (!cur) throw new Error("Không tìm thấy ý tưởng");
+            const actor = await API.asset.limits._actor(email);
+            const d = Object.assign({}, data || {});
+            if (to === 'closed' && !(Number(d.closePrice) > 0)) {
+                const marks = await API.ideas.marks(email, [cur.symbol]);
+                const p = marks.prices[cur.symbol] ? Number(marks.prices[cur.symbol].price) : 0;
+                if (p > 0) d.closePrice = p;
+                if (marks.index > 0) d.indexClose = marks.index;
+            }
+            const t = IdeaFlow.transition(cur, to, { userId: actor.actorId, isManager: actor.isManager }, d);
+            if (!t.ok) throw new Error(t.error);
+            const { error: upErr } = await sbClient.from('finance_ideas').update(Object.assign({}, t.patch, { updated_at: new Date().toISOString() })).eq('id', id);
+            if (upErr) throw upErr;
+            return "Đã chuyển sang “" + IdeaFlow.STATUSES[to].label + "”!";
+        },
+        addComment: async (email, id, kind, text) => {
+            const actor = await API.asset.limits._actor(email);
+            const body = String(text || '').trim();
+            if (!body) throw new Error("Nhập nội dung");
+            if (body.length > 2000) throw new Error("Nội dung tối đa 2.000 ký tự");
+            if (!IdeaFlow.COMMENT_KINDS[kind]) throw new Error("Loại bình luận không hợp lệ");
+            const { data: idea } = await sbClient.from('finance_ideas').select('user_id, status').eq('id', id).maybeSingle();
+            if (!idea) throw new Error("Không tìm thấy ý tưởng");
+            if (idea.status === 'closed') throw new Error("Ý tưởng đã đóng");
+            if (kind === 'answer' && idea.user_id !== actor.actorId) throw new Error("Chỉ tác giả được trả lời phản biện");
+            if (kind === 'challenge' && idea.user_id === actor.actorId) throw new Error("Không tự phản biện ý tưởng của mình — hãy dùng “Bình luận” hoặc “Trả lời”");
+            const { error } = await sbClient.from('finance_idea_comments').insert({ idea_id: id, user_id: actor.actorId, kind, text: body });
+            if (error) throw error;
+            return kind === 'challenge' ? "Đã gửi phản biện!" : "Đã gửi!";
+        },
+        deleteComment: async (email, commentId) => {
+            const actor = await API.asset.limits._actor(email);
+            const { data: c } = await sbClient.from('finance_idea_comments').select('user_id').eq('id', commentId).maybeSingle();
+            if (!c) return "Đã xoá!";
+            if (c.user_id !== actor.actorId && !actor.isManager) throw new Error("Chỉ xoá được bình luận của chính mình");
+            const { error } = await sbClient.from('finance_idea_comments').delete().eq('id', commentId);
+            if (error) throw error;
+            return "Đã xoá!";
+        },
+        vote: async (email, id, vote, reason) => {
+            if (!IdeaFlow.VOTES[vote]) throw new Error("Phiếu không hợp lệ");
+            const actor = await API.asset.limits._actor(email);
+            const { data: idea } = await sbClient.from('finance_ideas').select('user_id, status').eq('id', id).maybeSingle();
+            if (!idea) throw new Error("Không tìm thấy ý tưởng");
+            if (idea.user_id === actor.actorId) throw new Error("Tác giả không bỏ phiếu cho ý tưởng của mình");
+            if (idea.status !== 'review') throw new Error("Chỉ bỏ phiếu khi ý tưởng đang chờ phản biện");
+            if (vote === 'against' && String(reason || '').trim().length < 3) throw new Error("Phản đối phải nêu lý do");
+            const { error } = await sbClient.from('finance_idea_votes').upsert({ idea_id: id, user_id: actor.actorId, vote, reason: String(reason || '').trim() || null, updated_at: new Date().toISOString() }, { onConflict: 'idea_id,user_id' });
+            if (error) throw error;
+            return "Đã ghi phiếu!";
+        },
+        remove: async (email, id) => {
+            const actor = await API.asset.limits._actor(email);
+            const { data: cur } = await sbClient.from('finance_ideas').select('user_id, status').eq('id', id).maybeSingle();
+            if (!cur) return "Đã xoá!";
+            const own = cur.user_id === actor.actorId && ['idea', 'research'].includes(cur.status);
+            if (!own && !actor.isManager) throw new Error("Chỉ tác giả được xoá ý tưởng khi còn ở bước Ý tưởng/Đang nghiên cứu; sau đó hãy đóng thay vì xoá");
+            const { error } = await sbClient.from('finance_ideas').delete().eq('id', id);
+            if (error) throw error;
+            return "Đã xoá ý tưởng!";
+        }
+    },
     settings: {
         getSetting: async (key) => {
             if (!sbClient) return null;
@@ -3645,7 +3782,7 @@ const API = {
         _PK: { // upsert onConflict column(s) per table -- most default to 'id'
             app_settings: 'key', finance_stocks: 'symbol', user_status: 'uid',
             lounge_players: 'email', task_assignees: 'task_id,user_email',
-            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol', finance_event_dismissals: 'user_id,event_id'
+            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol', finance_event_dismissals: 'user_id,event_id', finance_idea_votes: 'idea_id,user_id'
         },
         listLocal: async () => {
             if (!window.__TAURI__ || !window.__TAURI__.fs) return [];
@@ -3684,7 +3821,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4144,7 +4281,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
-    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
@@ -4307,6 +4444,15 @@ async function _dispatchAction(action, params = {}) {
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
             case 'listLimitExceptions': result = await API.asset.limits.exceptions(params.days); break;
             case 'getLimitActor': result = await API.asset.limits._actor(params.email); break;
+            case 'listIdeas': result = await API.ideas.list(); break;
+            case 'getIdea': result = await API.ideas.get(params.id); break;
+            case 'saveIdea': result = await API.ideas.save(params.email, params.idea); break;
+            case 'setIdeaStatus': result = await API.ideas.setStatus(params.email, params.id, params.to, params.data); break;
+            case 'addIdeaComment': result = await API.ideas.addComment(params.email, params.id, params.kind, params.text); break;
+            case 'deleteIdeaComment': result = await API.ideas.deleteComment(params.email, params.commentId); break;
+            case 'voteIdea': result = await API.ideas.vote(params.email, params.id, params.vote, params.reason); break;
+            case 'removeIdea': result = await API.ideas.remove(params.email, params.id); break;
+            case 'getIdeaMarks': result = await API.ideas.marks(params.email, params.symbols); break;
             case 'loadCorporateEvents': result = await API.asset.events.load(params.email); break;
             case 'applyCorporateEvents': result = await API.asset.events.apply(params.email, params.events, params.ids, params.opts); break;
             case 'dismissCorporateEvent': result = await API.asset.events.dismiss(params.email, params.event); break;
