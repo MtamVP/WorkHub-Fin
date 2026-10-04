@@ -49,9 +49,51 @@ async function gsLoad(force) {
             return { id: p.id, name: p.name, att, res: bsAnalyze(att) };
         });
         GS.period = period;
+        GS.linked = gsLinkMonthly({ txns, navAll, base, period });
         GS.state = 'ok'; GS.loadedKey = key;
     } catch (e) { GS.state = 'error'; GS.error = e.message || String(e); }
     grRender();
+}
+
+// Chia kỳ thành các tháng lịch liên tiếp (mốc chốt = cuối tháng), phân tích Brinson từng tháng rồi NỐI theo Carino: tổng điểm % từng tháng không cộng dồn được vì lợi suất nối lãi kép.
+function gsMonthRanges(from, to) {
+    const out = []; let cur = from;
+    for (let i = 0; i < 40 && cur < to; i++) {
+        const d = new Date(Date.parse(cur + 'T00:00:00Z') + 86400000);          // tháng của ngày ĐẦU kỳ (cur là mốc chốt ngày trước đó)
+        const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+        const next = end >= to ? to : end;
+        if (next > cur) out.push({ from: cur, to: next });
+        cur = next;
+    }
+    return out;
+}
+function gsLinkMonthly(ctx) {
+    try {
+        const ranges = gsMonthRanges(ctx.period.from, ctx.period.to);
+        if (ranges.length < 2) return null;
+        const results = ranges.map(r => {
+            try { return bsAnalyze(AttributionCalc.analyze(Object.assign({ txns: ctx.txns, cashFlows: GR.data.cashFlows, navHistory: ctx.navAll }, ctx.base, { from: r.from, to: r.to }))); }
+            catch (e) { return { ok: false }; }
+        });
+        const L = BrinsonCalc.link(results);
+        return L.ok && L.periods >= 2 ? L : null;
+    } catch (e) { return null; }
+}
+function gsLinkedHtml() {
+    const L = GS.linked;
+    if (!L) return '';
+    const sg = (v, d) => (v > 0 ? '+' : '') + rkNum(v, d === undefined ? 2 : d);
+    const cls = (v) => v > 0.005 ? 'tl-up' : (v < -0.005 ? 'tl-down' : '');
+    return `<div class="ce-group-title">Nối ${L.periods} tháng liên tiếp <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(phương pháp Carino)</small></div>
+        <div class="tl-kpis">${[rkKpi('Danh mục (lãi kép)', rkPct(L.portfolioPct, 2, true), `${L.periods} tháng`), rkKpi('Chuẩn (lãi kép)', rkPct(L.benchmarkPct, 2, true), ''), rkKpi('Hơn / kém chuẩn', rkPct(L.activePct, 2, true), 'điểm % cả kỳ', cls(L.activePct)),
+            rkKpi('Phân bổ ngành', sg(L.allocation), 'điểm %', cls(L.allocation)), rkKpi('Chọn mã', sg(L.selection), 'điểm %', cls(L.selection)), rkKpi('Tương tác', sg(L.interaction), 'điểm %', cls(L.interaction))].join('')}</div>
+        <div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Ngành</th><th class="text-right">Phân bổ</th><th class="text-right">Chọn mã</th><th class="text-right">Tương tác</th><th class="text-right">Tổng</th></tr></thead><tbody>
+        ${L.rows.map(r => `<tr><td><b>${gsEsc(r.sector)}</b></td><td class="text-right ${cls(r.allocation)}">${sg(r.allocation)}</td><td class="text-right ${cls(r.selection)}">${sg(r.selection)}</td><td class="text-right ${cls(r.interaction)}">${sg(r.interaction)}</td><td class="text-right ${cls(r.total)}"><b>${sg(r.total)}</b></td></tr>`).join('')}
+        </tbody></table></div>
+        <details class="tl-details"><summary>Từng tháng</summary><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Tháng</th><th class="text-right">Danh mục</th><th class="text-right">Chuẩn</th><th class="text-right">Hơn / kém</th></tr></thead><tbody>
+        ${L.months.map(m => `<tr><td>${glDate(m.from + 'T00:00:00')} → ${glDate(m.to + 'T00:00:00')}</td><td class="text-right ${cls(m.portfolioPct)}">${rkPct(m.portfolioPct, 2, true)}</td><td class="text-right">${rkPct(m.benchmarkPct, 2, true)}</td><td class="text-right ${cls(m.activePct)}">${sg(m.activePct)}</td></tr>`).join('')}
+        </tbody></table></div></details>
+        <p class="tl-hint">Brinson từng tháng không cộng dồn được vì lợi suất nối theo lãi kép (tổng điểm % từng tháng khác chênh lệch cả kỳ). Carino nhân hiệu ứng mỗi tháng với một hệ số để tổng các hiệu ứng đã nối bằng đúng chênh lệch lãi kép cả kỳ. Dùng tỷ trọng chuẩn hiện tại cho mọi tháng.</p>`;
 }
 
 function gsChangeRange(v) { GS.range = v; gsLoad(true); }
@@ -123,7 +165,7 @@ function gsAnalysisHtml() {
     if (GS.histError) html += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy đủ giá lịch sử: ${gsEsc(GS.histError)}</span></div>`;
     if (BS.indicesError) html += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được chỉ số ngành: ${gsEsc(BS.indicesError)}. Phần chọn mã chưa tách được.</span></div>`;
     html += bsResultHtml(GS.group.res, 'gs-chart');
-    return html + gsMembersHtml();
+    return html + gsLinkedHtml() + gsMembersHtml();
 }
 
 function grStrategyHtml() {

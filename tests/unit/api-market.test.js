@@ -144,3 +144,19 @@ describe('giá tham chiếu và T+2', () => {
     expect(r.sessions).toContain('2026-10-05');
   });
 });
+
+describe('getPerfInputs: cổ tức và lợi suất trái phiếu', () => {
+  it('trả thêm cổ tức tiền mặt và lợi suất 1 năm để PerfCalc tách lợi suất giá và dùng lãi phi rủi ro theo ngày; thiếu bảng thì vẫn chạy', async () => {
+    const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const nav = [{ user_id: 'u-1', snapshot_date: day(40), nav: 100e6, net_contributed: 100e6 }, { user_id: 'u-1', snapshot_date: day(1), nav: 110e6, net_contributed: 100e6 }];
+    const c = boot(MEMBER, {
+      finance_nav_history: nav,
+      finance_cash_flows: [{ id: 'f1', user_id: 'u-1', flow_type: 'dividend', amount: 2e6, flow_date: day(10), symbol: 'FPT', deleted_at: null }, { id: 'f2', user_id: 'u-1', flow_type: 'deposit', amount: 5e6, flow_date: day(20), deleted_at: null }],
+      finance_rates: [{ rate_date: day(5), tenor: '1Y', yield_pct: 3.7 }],
+    }, {}, { 'stock-history': async (b) => ({ data: { ok: true, series: { VNINDEX: [[day(41), 1000], [day(1), 1010]] } }, error: null }) });
+    const r = await c.API.asset.getPerfInputs(MEMBER.email, 'VNINDEX');
+    expect(r.dividends).toEqual([{ date: day(10), amount: 2e6 }]);
+    expect(r.rates.map(x => x.yield_pct)).toEqual([3.7]);
+    expect(r.navHistory).toHaveLength(2);
+  });
+});

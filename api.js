@@ -3113,7 +3113,10 @@ const API = {
                 try { const s = await API.asset.getPriceHistory([key], from, to); bench = s[key] || null; if (!bench) benchError = 'Nguồn chưa có dữ liệu ' + key; }
                 catch (e) { benchError = e.message || String(e); }
             }
-            return { navHistory, bench, benchKey: key, benchError };
+            // Cổ tức tiền mặt (để tách lợi suất giá khỏi lợi suất tổng) và lợi suất trái phiếu (lãi phi rủi ro theo ngày): lỗi thì bỏ qua, phần tính vẫn chạy với mức cài tay
+            const [flows, rates] = await Promise.all([API.asset.cashFlow.list(email).catch(() => []), API.asset.market.rates(1100).catch(() => [])]);
+            const dividends = (flows || []).filter(f => f.flow_type === 'dividend').map(f => ({ date: String(f.flow_date).slice(0, 10), amount: Number(f.amount) || 0 }));
+            return { navHistory, bench, benchKey: key, benchError, dividends, rates };
         },
 
         // Dữ liệu thô cho phân tích nguồn gốc lợi nhuận (tính toán ở lib/attribution-calc.js): sổ lệnh, hành động DN, dòng tiền, NAV đã chụp,

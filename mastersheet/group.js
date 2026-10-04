@@ -53,10 +53,17 @@ async function loadGroup(force) {
             firstNav ? grCall('getBenchSeries', { benchKey: 'VNINDEX', from: String(firstNav).slice(0, 10) }).then(s => ({ series: s, error: null })).catch(e => ({ series: null, error: e.message })) : Promise.resolve({ series: null, error: null }),
         ]);
         GR.market = market; GR.bench = bench.series; GR.benchError = bench.error;
+        GR.rates = await grCall('getMarketRates', { days: 1100 }).catch(() => []);   // lãi phi rủi ro theo ngày (lỗi thì dùng mức cài tay)
         GR.state = 'ok';
         grCompute();
     } catch (e) { GR.state = 'error'; GR.error = e.message || String(e); }
     grRender();
+}
+
+// Lãi phi rủi ro theo ngày (TPCP 1 năm) và cổ tức tiền mặt của một thành viên (userId) hoặc cả nhóm (null), cho PerfCalc
+function grRfSeries() { return PerfCalc.rfFromRates(GR.rates || [], '1Y'); }
+function grDividends(userId) {
+    return ((GR.data && GR.data.cashFlows) || []).filter(f => f.flow_type === 'dividend' && (!userId || f.user_id === userId)).map(f => ({ date: String(f.flow_date).slice(0, 10), amount: Number(f.amount) || 0 }));
 }
 
 // Tính lại các phân tích phụ thuộc cửa sổ/lãi phi rủi ro (không cần tải lại dữ liệu)
@@ -71,9 +78,9 @@ function grCompute() {
     GR.perf = {};
     GR.portfolios.forEach(p => {
         const rows = GR.data.navHistory.filter(r => r.user_id === p.id);
-        GR.perf[p.id] = PerfCalc.analyze({ navHistory: rows, bench: GR.bench, rf: GR.rf, range });
+        GR.perf[p.id] = PerfCalc.analyze({ navHistory: rows, bench: GR.bench, rf: GR.rf, rfSeries: grRfSeries(), dividends: grDividends(p.id), range });
     });
-    GR.groupPerf = PerfCalc.analyze({ navHistory: GroupCalc.groupNavHistory(GR.data.navHistory), bench: GR.bench, rf: GR.rf, range });
+    GR.groupPerf = PerfCalc.analyze({ navHistory: GroupCalc.groupNavHistory(GR.data.navHistory), bench: GR.bench, rf: GR.rf, rfSeries: grRfSeries(), dividends: grDividends(null), range });
 }
 
 // Ngưỡng tập trung của nhóm (mở rộng ở phần Giới Hạn): mặc định 25% / 40%

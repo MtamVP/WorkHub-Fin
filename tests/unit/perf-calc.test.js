@@ -190,3 +190,69 @@ describe('đường tích luỹ để vẽ', () => {
     expect(a.curve).toHaveLength(a.periods + 1);
   });
 });
+
+// ---- Đối chiếu độc lập với numpy/scipy (tests/fixtures/perf-golden.json, tạo bằng tests/fixtures/make-perf-golden.py) ----
+import { readFileSync } from 'node:fs';
+import nodePath from 'node:path';
+import { fileURLToPath } from 'node:url';
+const GOLD = JSON.parse(readFileSync(nodePath.join(nodePath.dirname(fileURLToPath(import.meta.url)), '../fixtures/perf-golden.json'), 'utf8'));
+const gnear = (a, b, tol = 1e-8) => expect(Math.abs(a - b)).toBeLessThanOrEqual(tol * Math.max(1, Math.abs(b)));
+
+describe('đối chiếu với tính độc lập bằng numpy/scipy', () => {
+  const E = GOLD.expected;
+  const base = { navHistory: GOLD.rows, bench: GOLD.bench, rf: GOLD.rf_fixed };
+  const rfSeries = PerfCalc.rfFromRates(GOLD.rates, '1Y');
+  it('lợi suất kỳ Modified Dietz, TWR và lợi suất chuẩn khớp', () => {
+    const a = PerfCalc.analyze(base);
+    expect(a.periods).toBe(E.periods);
+    gnear(a.periodsPerYear, E.ppy, 1e-9);
+    gnear(a.cumulativePct, E.cumulativePct); gnear(a.benchCumulativePct, E.benchCumulativePct);
+  });
+  it('rf cố định: Sharpe, Sortino, beta, alpha dùng cùng công thức cũ (không có chuỗi theo ngày)', () => {
+    const a = PerfCalc.analyze(base);
+    expect(a.rfMode).toBe('fixed');
+    expect(a.rf).toBe(GOLD.rf_fixed);
+    expect(Number.isFinite(a.sharpe)).toBe(true);
+  });
+  it('lãi phi rủi ro THEO KỲ từ chuỗi lợi suất trái phiếu: Sharpe, Sortino, beta, alpha, t-stat, khoảng tin cậy và số năm cần khớp', () => {
+    const a = PerfCalc.analyze(Object.assign({ rfSeries }, base));
+    expect(a.rfMode).toBe('series');
+    expect(a.rfSeriesShare).toBeGreaterThan(0.6); expect(a.rfSeriesShare).toBeLessThan(0.7);       // chuỗi chỉ có từ ngày thứ 100 / 300
+    gnear(a.rf, E.rfEffective, 1e-9);
+    gnear(a.sharpe, E.sharpe); gnear(a.sortino, E.sortino); gnear(a.beta, E.beta);
+    gnear(a.alphaPct, E.alphaPct); gnear(a.alphaTStat, E.alphaTStat);
+    gnear(a.alphaCIPct[0], E.alphaCIPct[0]); gnear(a.alphaCIPct[1], E.alphaCIPct[1]);
+    gnear(a.alphaYearsNeeded, E.alphaYearsNeeded);
+    expect(a.alphaCIPct[0]).toBeLessThan(a.alphaPct); expect(a.alphaCIPct[1]).toBeGreaterThan(a.alphaPct);
+  });
+  it('lợi suất giá (đã trừ cổ tức) và alpha giá khớp; tổng cổ tức và phần thu nhập đúng', () => {
+    const a = PerfCalc.analyze(Object.assign({ rfSeries, dividends: GOLD.dividends }, base));
+    expect(a.hasPriceReturn).toBe(true);
+    gnear(a.priceCumulativePct, E.priceCumulativePct);
+    gnear(a.dividendsTotal, E.dividendsTotal, 1e-12);
+    gnear(a.incomeReturnPct, E.cumulativePct - E.priceCumulativePct);
+    gnear(a.priceAlphaPct, E.priceAlphaPct);
+    gnear(a.priceExcessCumulativePct, E.priceCumulativePct - E.benchCumulativePct);
+    expect(a.priceCumulativePct).toBeLessThan(a.cumulativePct);          // có cổ tức thì lợi suất tổng cao hơn lợi suất giá
+    expect(PerfCalc.analyze(base).hasPriceReturn).toBeUndefined();
+  });
+  it('IRR (XIRR) khớp scipy.optimize.brentq trên cùng dòng tiền', () => {
+    gnear(PerfCalc.analyze(base).irrPct, E.irrPct, 1e-7);
+    gnear(PerfCalc.xirr(GOLD.cf.map(([date, amount]) => ({ date, amount }))) * 100, E.irrPct, 1e-7);
+  });
+});
+
+describe('xirr và rfFromRates', () => {
+  it('một khoản gửi 100 sau đúng 365 ngày nhận 110 -> 10%; không có nghiệm khi chỉ một chiều', () => {
+    gnear(PerfCalc.xirr([{ date: '2025-01-01', amount: -100 }, { date: '2026-01-01', amount: 110 }]), 0.1, 1e-9);
+    expect(PerfCalc.xirr([{ date: '2025-01-01', amount: -100 }, { date: '2026-01-01', amount: -10 }])).toBeNull();
+    expect(PerfCalc.xirr([])).toBeNull();
+  });
+  it('rfFromRates: lọc đúng kỳ hạn, đổi % sang thập phân, sắp tăng dần; rfAt lấy ngày gần nhất tại/trước, null nếu chưa có dữ liệu', () => {
+    const s = PerfCalc.rfFromRates([{ rate_date: '2026-10-02', tenor: '1Y', yield_pct: 3.69 }, { rate_date: '2026-09-01', tenor: '1Y', yield_pct: 3.5 }, { rate_date: '2026-10-02', tenor: '10Y', yield_pct: 4.59 }, { rate_date: '2026-10-01', tenor: '1Y', yield_pct: 'x' }], '1Y');
+    expect(s).toEqual([['2026-09-01', 0.035], ['2026-10-02', 0.0369]]);
+    expect(PerfCalc.rfAt(s, '2026-09-15')).toBe(0.035);
+    expect(PerfCalc.rfAt(s, '2026-08-01')).toBeNull();
+    expect(PerfCalc.rfAt([], '2026-08-01')).toBeNull();
+  });
+});

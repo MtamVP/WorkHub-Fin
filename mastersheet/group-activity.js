@@ -86,9 +86,9 @@ function gaBuildReport() {
     const p = gaPeriod(GA.period);
     const navAll = GroupCalc.groupNavHistory(GR.data.navHistory);
     const range = { from: p.from, to: p.to };
-    const groupPerf = PerfCalc.analyze({ navHistory: navAll, bench: GR.bench, rf: GR.rf, range });
+    const groupPerf = PerfCalc.analyze({ navHistory: navAll, bench: GR.bench, rf: GR.rf, rfSeries: grRfSeries(), dividends: grDividends(null), range });
     const perfBy = {};
-    GR.portfolios.forEach(pf => { perfBy[pf.id] = PerfCalc.analyze({ navHistory: GR.data.navHistory.filter(r => r.user_id === pf.id), bench: GR.bench, rf: GR.rf, range }); });
+    GR.portfolios.forEach(pf => { perfBy[pf.id] = PerfCalc.analyze({ navHistory: GR.data.navHistory.filter(r => r.user_id === pf.id), bench: GR.bench, rf: GR.rf, rfSeries: grRfSeries(), dividends: grDividends(pf.id), range }); });
     const trades = GroupCalc.blotter({ members: GR.data.members, txns: GR.data.txns }, { from: p.start, to: p.to, exceptions: GL.exceptions });
     const exceptions = (GL.exceptions || []).filter(e => { const d = String(e.created_at || '').slice(0, 10); return d >= p.start && d <= p.to; });
     const comp = LimitsCalc.complianceMatrix(GL.rows || [], GR.portfolios, GR.group);

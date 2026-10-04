@@ -129,3 +129,47 @@ describe('thiếu dữ liệu', () => {
     expect(x.rows.find((q) => q.sector === 'Chưa phân ngành').index).toBe('VNINDEX');
   });
 });
+
+describe('link: nối nhiều kỳ theo Carino', () => {
+  const per = (from, to, rp, rb, rows) => ({ ok: true, from, to, portfolioPct: rp, benchmarkPct: rb, activePct: rp - rb,
+    rows: rows.map(([sector, a, s, i]) => ({ sector, allocation: a, selection: s, interaction: i, total: a + s + i })),
+    allocation: rows.reduce((x, r) => x + r[1], 0), selection: rows.reduce((x, r) => x + r[2], 0), interaction: rows.reduce((x, r) => x + r[3], 0) });
+  // hai tháng: lợi suất danh mục +6% rồi -4%; chuẩn +4% rồi -3%; hiệu ứng từng tháng cộng đúng bằng chênh lệch tháng đó
+  const m1 = per('2026-01-01', '2026-01-31', 6, 4, [['Ngân hàng', 1.2, 0.5, 0.1], ['Công nghệ', -0.3, 0.6, -0.1]]);   // tổng 2.0
+  const m2 = per('2026-02-01', '2026-02-28', -4, -3, [['Ngân hàng', -0.5, -0.4, 0.0], ['Công nghệ', 0.2, -0.3, 0.0]]);  // tổng -1.0
+  it('tổng các hiệu ứng đã nối bằng đúng chênh lệch lãi kép cả kỳ (khác tổng đơn giản các tháng)', () => {
+    const L = B.link([m1, m2]);
+    const Rp = 1.06 * 0.96 - 1, Rb = 1.04 * 0.97 - 1;
+    expect(L.ok).toBe(true);
+    expect(L.portfolioPct).toBeCloseTo(Rp * 100, 9);
+    expect(L.benchmarkPct).toBeCloseTo(Rb * 100, 9);
+    expect(L.activePct).toBeCloseTo((Rp - Rb) * 100, 9);
+    expect(L.allocation + L.selection + L.interaction).toBeCloseTo(L.activePct, 9);
+    expect(Math.abs(L.gap)).toBeLessThan(1e-9);
+    expect(Math.abs(L.activePct - (2.0 + -1.0))).toBeGreaterThan(0.001);          // tổng đơn giản (1,0) KHÔNG bằng chênh lệch lãi kép
+    expect(L.rows.reduce((s, r) => s + r.total, 0)).toBeCloseTo(L.activePct, 9);
+  });
+  it('một kỳ: hệ số bằng 1, kết quả giữ nguyên', () => {
+    const L = B.link([m1]);
+    expect(L.factors[0]).toBeCloseTo(1, 12);
+    expect(L.allocation).toBeCloseTo(m1.allocation, 12);
+    expect(L.activePct).toBeCloseTo(2, 9);
+  });
+  it('kỳ có lợi suất bằng chuẩn (chênh 0) dùng giới hạn 1/(1+R), không chia cho 0; kỳ lỗi bị bỏ qua; rỗng thì báo', () => {
+    const flat = per('2026-03-01', '2026-03-31', 3, 3, [['Ngân hàng', 0, 0, 0]]);
+    const L = B.link([m1, flat]);
+    expect(Number.isFinite(L.factors[1])).toBe(true);
+    expect(L.allocation + L.selection + L.interaction).toBeCloseTo(L.activePct, 9);
+    expect(B.link([m1, { ok: false }]).periods).toBe(1);
+    expect(B.link([]).ok).toBe(false);
+  });
+  it('hiệu ứng từng ngành cộng đúng theo hệ số; ngành chỉ có ở một kỳ vẫn được giữ', () => {
+    const m3 = per('2026-03-01', '2026-03-31', 2, 1, [['Ngân hàng', 0.4, 0.4, 0.2], ['Tiền mặt', 0, 0, 0]]);
+    const L = B.link([m1, m2, m3]);
+    expect(L.rows.map(r => r.sector).sort()).toEqual(['Công nghệ', 'Ngân hàng', 'Tiền mặt']);
+    const bank = L.rows.find(r => r.sector === 'Ngân hàng');
+    const f = L.factors;
+    expect(bank.allocation).toBeCloseTo(1.2 * f[0] - 0.5 * f[1] + 0.4 * f[2], 9);
+    expect(L.months).toHaveLength(3);
+  });
+});

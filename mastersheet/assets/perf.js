@@ -50,6 +50,7 @@ async function loadPerfPro(force) {
 
 function ppReload() { PP.bench = document.getElementById('pp-bench').value; PP.state = 'idle'; ppSave(); loadPerfPro(true); }
 function ppChangeRange() { PP.range = document.getElementById('pp-range').value; ppSave(); ppRender(); }
+function ppUseCurrentRf(v) { if (v >= 0 && v <= 0.3) { PP.rf = Number(v); const el = document.getElementById('pp-rf'); if (el) el.value = (PP.rf * 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); ppSave(); ppRender(); } }
 function ppRf() {
     const v = Number(document.getElementById('pp-rf').value);
     if (!(v >= 0 && v <= 30)) { showToast('Lãi phi rủi ro từ 0 đến 30%/năm.', 'error'); return; }
@@ -69,7 +70,8 @@ function ppRender() {
     if (PP.state === 'error') { body.innerHTML = `<div class="tl-empty text-danger"><i class="fa-solid fa-triangle-exclamation"></i>Không tải được: ${ppEsc(PP.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="loadPerfPro(true)">Thử lại</button></div>`; return; }
     const inp = PP.inputs;
     const range = PerfCalc.rangeFor(PP.range, new Date().toISOString().slice(0, 10));
-    const a = PerfCalc.analyze({ navHistory: inp.navHistory, bench: inp.bench, rf: PP.rf, range });
+    const rfSeries = PerfCalc.rfFromRates(inp.rates, '1Y');
+    const a = PerfCalc.analyze({ navHistory: inp.navHistory, bench: inp.bench, rf: PP.rf, rfSeries, dividends: inp.dividends, range });
     PP.result = a;
     const benchName = PP.bench === 'VN30' ? 'VN30' : 'VN-Index';
     if (!a.ok && a.reason === 'few-points') {
@@ -86,7 +88,9 @@ function ppRender() {
     if (a.hasBench) {
         k.push(ppKpi(`Chuẩn (${benchName})`, ppPct(a.benchCumulativePct, 2, true), a.benchAnnualizedPct !== null ? `${ppPct(a.benchAnnualizedPct, 1, true)}/năm` : '', ppUpDown(a.benchCumulativePct)));
         k.push(ppKpi('Vượt / thua chuẩn', ppPct(a.excessCumulativePct, 2, true), 'điểm % cùng kỳ', ppUpDown(a.excessCumulativePct)));
+        if (a.hasPriceReturn && a.priceExcessCumulativePct !== undefined) k.push(ppKpi('Vượt chuẩn (lợi suất giá)', ppPct(a.priceExcessCumulativePct, 2, true), `đã loại ${ppNum(a.incomeReturnPct, 1)} điểm % cổ tức`, ppUpDown(a.priceExcessCumulativePct), 'VN-Index là chỉ số giá (không có cổ tức). Đây là so sánh công bằng: lợi suất danh mục sau khi trừ cổ tức tiền mặt nhận được so với chỉ số.'));
     }
+    if (a.irrPct !== undefined && a.irrPct !== null) k.push(ppKpi('IRR (có trọng số dòng tiền)', ppPct(a.irrPct, 1, true), 'quy năm; khác TWR vì tính cả thời điểm nạp/rút', ppUpDown(a.irrPct), 'XIRR: phản ánh thời điểm bạn bỏ thêm / rút vốn. TWR loại bỏ yếu tố này nên đo kỹ năng chọn mã; IRR đo kết quả thực của riêng bạn.'));
     if (a.enough) {
         if (a.hasBench) {
             k.push(ppKpi('Alpha', ppPct(a.alphaPct, 1, true), a.alphaTStat !== undefined && a.alphaTStat !== null ? `t = ${ppNum(a.alphaTStat, 1)} ${Math.abs(a.alphaTStat) >= 2 ? '(đáng tin)' : '(chưa đủ bằng chứng)'}` : '', ppUpDown(a.alphaPct), 'Lợi suất vượt trội/năm sau khi loại phần do thị trường chung (beta × chuẩn). t-stat ≥ 2 mới nên coi là kỹ năng thật'));
@@ -97,12 +101,16 @@ function ppRender() {
             k.push(ppKpi('Down capture', ppPct(a.downCapturePct, 0), `${a.downPeriods} ${a.captureBasis === 'month' ? 'tháng' : 'kỳ'} chuẩn giảm`, '', 'Tỷ lệ mức giảm của chuẩn mà danh mục phải chịu. Thấp hơn up capture là tốt'));
             k.push(ppKpi('Tháng thắng chuẩn', `${a.monthsBeat}/${a.monthsCompared}`, a.winRateMonthsPct !== null ? ppPct(a.winRateMonthsPct, 0) : '', a.winRateMonthsPct >= 50 ? 'tl-up' : ''));
         }
-        k.push(ppKpi('Sharpe', ppNum(a.sharpe, 2), `lãi phi rủi ro ${ppNum(PP.rf * 100)}%`, '', 'Lợi suất vượt lãi phi rủi ro trên mỗi đơn vị biến động'));
+        k.push(ppKpi('Sharpe', ppNum(a.sharpe, 2), a.rfMode === 'series' ? `lãi phi rủi ro theo ngày, TB ${ppNum(a.rf * 100, 2)}%` : `lãi phi rủi ro ${ppNum(PP.rf * 100)}%`, '', 'Lợi suất vượt lãi phi rủi ro trên mỗi đơn vị biến động'));
         k.push(ppKpi('Sortino', ppNum(a.sortino, 2), 'chỉ phạt biến động giảm', ''));
         k.push(ppKpi('Biến động / năm', ppPct(a.volatilityPct, 1), a.benchVolatilityPct ? `Chuẩn ${ppPct(a.benchVolatilityPct, 1)}` : ''));
         k.push(ppKpi('Sụt giảm tối đa', ppPct(a.maxDD, 1), a.maxDDPeak ? `${ppDate(a.maxDDPeak)} → ${ppDate(a.maxDDTrough)}` : '', 'tl-down', 'Mức giảm sâu nhất từ đỉnh xuống đáy của chuỗi TWR'));
         k.push(ppKpi('Calmar', ppNum(a.calmar, 2), 'lợi suất năm / sụt giảm tối đa', '', 'Cần chuỗi ≥ 1 năm'));
     }
+    // Lãi phi rủi ro: có chuỗi TPCP theo ngày thì dùng; chưa đủ lịch sử thì gợi ý đổi mức cài tay sang lãi suất TPCP hiện tại
+    const curY1 = rfSeries.length ? rfSeries[rfSeries.length - 1] : null;
+    if (a.enough && curY1 && a.rfMode !== 'series') html += `<p class="tl-hint" style="margin:8px 0 0">Lãi phi rủi ro đang là mức cài tay <b>${ppNum(PP.rf * 100, 1)}%</b>. Lợi suất trái phiếu chính phủ 1 năm hiện tại là <b>${ppNum(curY1[1] * 100, 2)}%</b> (ghi nhận theo ngày từ ${ppDate(rfSeries[0][0])}, chưa phủ hết kỳ phân tích). <button type="button" class="tl-link" onclick="ppUseCurrentRf(${(curY1[1]).toFixed(5)})">Dùng ${ppNum(curY1[1] * 100, 2)}% làm mức cố định</button></p>`;
+    else if (a.rfMode === 'series') html += `<p class="tl-hint" style="margin:8px 0 0">Lãi phi rủi ro lấy theo ngày từ lợi suất trái phiếu chính phủ 1 năm (phủ ${ppNum(a.rfSeriesShare * 100, 0)}% số kỳ; kỳ chưa có dữ liệu dùng mức cài tay ${ppNum(PP.rf * 100, 1)}%).</p>`;
     html += `<div class="tl-kpis">${k.join('')}</div>`;
     if (a.hasBench && a.curve) {
         html += `<div class="ce-group-title">Tăng trưởng gốc 100 so với chuẩn</div><div class="tl-card rk-chart-card"><div style="position:relative;height:250px"><canvas id="pp-curve"></canvas></div></div>`;
