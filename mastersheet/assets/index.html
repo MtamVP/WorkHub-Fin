@@ -306,6 +306,7 @@
                 </p>
                 <div class="export-bar export-bar-inline">
                     <button type="button" class="btn-tool" onclick="openImportModal()" title="Nhập hàng loạt từ file sao kê của công ty chứng khoán (Excel/CSV)"><i class="fa-solid fa-file-import"></i> Nhập từ sao kê</button>
+                    <button type="button" class="btn-tool" onclick="openReconcileModal()" title="So sổ lệnh với sao kê số dư / sao kê lệnh của công ty chứng khoán để tìm chỗ lệch"><i class="fa-solid fa-scale-balanced"></i> Đối soát sao kê</button>
                     <button type="button" class="btn-tool" onclick="exportLedgerCsv()" title="Tải toàn bộ lệnh giao dịch dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
                     <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
                 </div>
@@ -699,6 +700,17 @@
         </div>
     </div>
 
+    <div class="modal-overlay tl-modal" id="rc-modal">
+        <div class="modal-card" style="max-width:980px">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-scale-balanced" style="color: var(--gold);"></i> Đối Soát Với Sao Kê</h3>
+                <button type="button" class="icon-btn" onclick="closeReconcileModal()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="rc-body"></div>
+            <div class="modal-footer" id="rc-footer"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay tl-modal jn-modal" id="lim-modal">
         <div class="modal-card">
             <div class="modal-header">
@@ -733,6 +745,7 @@
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
+    <script src="../../lib/reconcile.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
     <script src="../../lib/decision-journal.js?v=1791900000000"></script>
@@ -749,6 +762,7 @@
     <script src="risk-advanced.js?v=1791900000000"></script>
     <script src="calendar.js?v=1791900000000"></script>
     <script src="mirror.js?v=1791900000000"></script>
+    <script src="reconcile.js?v=1791900000000"></script>
     <script src="limits.js?v=1791900000000"></script>
     <script src="pretrade.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>

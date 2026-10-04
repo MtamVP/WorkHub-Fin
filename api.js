@@ -2385,6 +2385,53 @@ const API = {
             }
         },
 
+        // --- Đối soát sổ lệnh với sao kê công ty chứng khoán (lib/reconcile.js). Phép so khớp chạy trên máy; ở đây chỉ lấy dữ liệu đầu vào và ghi nhật ký. ---
+        reconcile: {
+            getInputs: async (email) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const [txns, actions, cd] = await Promise.all([
+                    API.asset.listTransactions(email), API.asset.corporateAction.list(email),
+                    sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
+                ]);
+                return { txns, actions, cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0, today: new Date().toISOString().slice(0, 10) };
+            },
+            // rec: { kind: 'positions'|'trades', asOf, source, total, matched, mismatched, valueAtStake, cashStatement, cashApp, cashOk, summary, note }
+            save: async (email, rec) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const r = rec || {};
+                if (!['positions', 'trades'].includes(r.kind)) throw new Error("Loại đối soát không hợp lệ");
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.asOf || ''))) throw new Error("Ngày sao kê không hợp lệ");
+                const actor = await API.asset.limits._actor(email);
+                const int = (v) => Math.max(0, Math.round(Number(v) || 0));
+                const optNum = (v) => (v === null || v === undefined || v === '' || !isFinite(Number(v))) ? null : Number(v);
+                const { error } = await sbClient.from('finance_reconciliations').insert({
+                    user_id: userId, kind: r.kind, as_of: r.asOf, source: r.source ? String(r.source).slice(0, 200) : null,
+                    total: int(r.total), matched: int(r.matched), mismatched: int(r.mismatched), value_at_stake: Math.max(0, Number(r.valueAtStake) || 0),
+                    cash_statement: optNum(r.cashStatement), cash_app: optNum(r.cashApp), cash_ok: r.cashOk === null || r.cashOk === undefined ? null : !!r.cashOk,
+                    summary: r.summary || null, note: r.note ? String(r.note).slice(0, 500) : null, created_by: actor.actorId
+                });
+                if (error) throw error;
+                return "Đã lưu kết quả đối soát";
+            },
+            // Lịch sử đối soát của một người (mới nhất trước)
+            list: async (email, limit) => {
+                const userId = await getUserId(email);
+                if (!userId) return [];
+                const { data, error } = await sbClient.from('finance_reconciliations').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(Math.min(Number(limit) || 30, 200));
+                if (error) throw error;
+                return data || [];
+            },
+            // Mọi lần đối soát gần đây của cả nhóm (RLS cho nhóm finance/admin đọc) -- để quản lý xem ai đã đối soát tới ngày nào
+            listAll: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 365) * 86400000).toISOString();
+                const { data, error } = await sbClient.from('finance_reconciliations').select('id, user_id, kind, as_of, source, total, matched, mismatched, value_at_stake, cash_ok, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(1000);
+                if (error) throw error;
+                return data || [];
+            }
+        },
+
         // --- Giá đóng cửa VN-Index/VN30: dữ liệu tham chiếu dùng chung, nhập tay bởi asset_manager ---
         benchmark: {
             list: async (indexCode, days) => {
@@ -3955,7 +4002,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4416,7 +4463,7 @@ const MUTATING_ACTIONS = new Set([
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
+    'saveReconciliation', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
@@ -4579,6 +4626,10 @@ async function _dispatchAction(action, params = {}) {
             case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
             case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
+            case 'getReconcileInputs': result = await API.asset.reconcile.getInputs(params.email); break;
+            case 'saveReconciliation': result = await API.asset.reconcile.save(params.email, params.record); break;
+            case 'listReconciliations': result = await API.asset.reconcile.list(params.email, params.limit); break;
+            case 'listAllReconciliations': result = await API.asset.reconcile.listAll(params.days); break;
             case 'listComplianceLog': result = await API.asset.limits.complianceLog(params.days); break;
             case 'listLimitExceptions': result = await API.asset.limits.exceptions(params.days); break;
             case 'getLimitActor': result = await API.asset.limits._actor(params.email); break;

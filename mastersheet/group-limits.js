@@ -3,7 +3,7 @@
    mà thành viên đã ghi khi vượt giới hạn. Phép tính ở /lib/limits-calc.js (có kiểm thử); việc chặn/ghi lý do thực hiện ở api.js khi ghi lệnh.
    Dùng global của group.js (GR, grCall, grRender) và assets/risk.js (rkEsc, rkNum, rkPct, rkVnd, rkKpi, rkBar). */
 
-const GL = { rows: [], exceptions: [], log: [], actor: null, loaded: false, error: '' };
+const GL = { rows: [], exceptions: [], log: [], recon: [], actor: null, loaded: false, error: '' };
 
 const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 
@@ -11,11 +11,11 @@ const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 async function glLoad() {
     GL.loaded = false; GL.error = '';
     try {
-        const [rows, ex, actor, log] = await Promise.all([
+        const [rows, ex, actor, log, recon] = await Promise.all([
             grCall('listLimits'), grCall('listLimitExceptions', { days: 365 }).catch(() => []), grCall('getLimitActor', { email: (GR.data && GR.data.members[0] && GR.data.members[0].email) || '' }).catch(() => ({ isManager: false })),
-            grCall('listComplianceLog', { days: 120 }).catch(() => []),
+            grCall('listComplianceLog', { days: 120 }).catch(() => []), grCall('listAllReconciliations', { days: 400 }).catch(() => []),
         ]);
-        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.log = log; GL.loaded = true;
+        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.log = log; GL.recon = recon; GL.loaded = true;
     } catch (e) { GL.error = e.message || String(e); }
 }
 
@@ -62,6 +62,7 @@ function grLimitsHtml() {
         </tbody></table></div>`;
 
     html += glHistoryHtml();
+    html += glReconcileHtml();
 
     // Giới hạn chung
     html += `<div class="ce-group-title">Giới hạn chung của nhóm ${manager ? '' : '<small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(chỉ quản lý danh mục / admin được sửa)</small>'}</div>`;
@@ -129,6 +130,26 @@ function glHistoryHtml() {
         </tbody></table></div>` : '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-circle-check" style="color:var(--success-color);opacity:1"></i>Không có vi phạm nào trong nhật ký.</div>';
     html += '<p class="tl-hint">Số ngày = số phiên liên tiếp có nhật ký mà giới hạn vẫn bị vượt. Khác với ngoại lệ (do một lệnh gây ra), đây là vi phạm do giá biến động hoặc do lệnh đã được duyệt trước đó mà chưa được điều chỉnh về mức.</p>';
     return html;
+}
+
+// Đối soát với sao kê công ty chứng khoán: mỗi thành viên đã đối soát tới ngày nào, kết quả ra sao, có quá hạn không (quá 35 ngày). Dữ liệu từ nhật ký đối soát (lib/reconcile.js).
+function glReconcileHtml() {
+    const title = '<div class="ce-group-title">Đối soát với công ty chứng khoán <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(người dùng đối soát ở Danh Mục &gt; Sổ Lệnh &gt; Đối soát sao kê)</small></div>';
+    if (typeof Reconcile === 'undefined') return '';
+    const today = new Date().toISOString().slice(0, 10);
+    const latest = {};
+    GL.recon.forEach(r => { const k = r.user_id + '|' + r.kind; if (!latest[k] || String(r.created_at) > String(latest[k].created_at)) latest[k] = r; });
+    const rows = GR.portfolios.map(p => {
+        const pos = latest[p.id + '|positions'] || null, trd = latest[p.id + '|trades'] || null;
+        const last = [pos, trd].filter(Boolean).sort((a, b) => (a.as_of < b.as_of ? 1 : -1))[0] || null;
+        return { p, pos, trd, st: Reconcile.staleness(last ? last.as_of : null, today), last };
+    });
+    const cell = (r) => !r ? '<span class="text-muted">—</span>' : `${rkEsc(glDate(r.as_of))}<br><small>${r.matched}/${r.total} khớp${r.mismatched ? ` · <b class="tl-down">${r.mismatched} lệch</b>` : ''}${r.cash_ok === false ? ' · <b class="tl-down">tiền lệch</b>' : ''}</small>`;
+    const bad = rows.filter(r => r.st.level !== 'ok').length;
+    return title + `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Thành viên</th><th>Số dư mã (gần nhất)</th><th>Lệnh (gần nhất)</th><th>Lần đối soát cuối</th><th>Tình trạng</th></tr></thead><tbody>
+        ${rows.map(r => `<tr><td><b>${rkEsc(r.p.name)}</b></td><td>${cell(r.pos)}</td><td>${cell(r.trd)}</td><td>${r.last ? rkEsc(r.st.text) : '—'}</td>
+            <td>${r.st.level === 'never' ? '<span class="tl-badge mute">Chưa đối soát</span>' : (r.st.level === 'stale' ? '<span class="tl-badge warn">Đã lâu (>' + Reconcile.STALE_DAYS + ' ngày)</span>' : ((r.pos && r.pos.mismatched) || (r.trd && r.trd.mismatched) ? '<span class="tl-badge bad">Còn lệch</span>' : '<span class="tl-badge ok"><i class="fa-solid fa-check"></i> Khớp</span>'))}</td></tr>`).join('')}
+        </tbody></table></div><p class="tl-hint">${bad ? `<b>${bad}</b> thành viên chưa đối soát hoặc đã quá ${Reconcile.STALE_DAYS} ngày. ` : ''}Đối soát định kỳ (mỗi tháng) với sao kê của công ty chứng khoán là bước kiểm soát cơ bản: nếu sổ lệnh lệch thì mọi con số lãi/lỗ, rủi ro và giới hạn ở đây đều sai theo.</p>`;
 }
 
 function grLimitsAfterRender() { glKindChanged(); }

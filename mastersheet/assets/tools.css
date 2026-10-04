@@ -329,3 +329,13 @@ td.jn-reason::before { content: none; }
 .id-cap.up { color: var(--success-color); border-color: var(--success-color); } .id-cap.down { color: var(--danger-color); border-color: var(--danger-color); } .id-cap.weak { color: var(--text-muted); opacity: 0.75; }
 .id-cap small { color: var(--text-muted); }
 .id-sub { margin: 16px 0 8px; font-size: 0.82rem; color: var(--text-secondary); }
+
+/* ---- Đối soát sao kê (reconcile.js) ---- */
+tr.rc-bad td { background: color-mix(in srgb, var(--danger-bg) 55%, transparent); }
+.rc-cause { min-width: 260px; max-width: 460px; white-space: normal; }
+.rc-hint { font-size: 0.8rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 4px; }
+.rc-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.rc-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); }
+.rc-form label, .rc-cash label { display: flex; flex-direction: column; gap: 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
+.rc-cash { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 14px 0 6px; }
+.rc-skip { margin: 0; padding-left: 18px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; }
