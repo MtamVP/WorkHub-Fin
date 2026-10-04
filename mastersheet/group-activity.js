@@ -71,6 +71,16 @@ function gaActivityHtml() {
 }
 
 // ---------- Báo cáo ----------
+// Các mục cho hội đồng đầu tư (lib/committee-pack.js): quản trị/duyệt lệnh, kịch bản căng thẳng, hành trình ý tưởng, chất lượng khớp lệnh. Mục nào chưa tải được thì bỏ qua (không làm hỏng báo cáo).
+function gaCommittee(p) {
+    const c = {}, safe = (f) => { try { return f(); } catch (e) { return null; } };
+    if (typeof GQ !== 'undefined' && GQ.state === 'ok') c.governance = safe(() => CommitteePack.governance({ AC: ApprovalCalc, requests: GQ.rows || [], audit: GQ.audit || [], restricted: (typeof GL !== 'undefined' && GL.restricted) || [], policy: GQ.policy, from: p.start, to: p.to, today: gaToday(), nameOf: (id) => glMemberName(id) }));
+    c.stress = safe(() => CommitteePack.stress({ risk: GR.risk, RiskCalc, StressCalc, LC: LimitsCalc, limits: typeof rkxLimitsFor === 'function' ? rkxLimitsFor('grp') : [], maintenancePct: typeof rkxState === 'function' ? rkxState('grp').maintenance : undefined }));
+    if (typeof GJ !== 'undefined' && GJ.state === 'ok' && GJ.out) c.journey = safe(() => CommitteePack.journey(GJ.out.summary));
+    if (typeof GX !== 'undefined' && GX.state === 'ok' && GX.out) c.execution = safe(() => CommitteePack.execution(GX.out.summary, GX.months));
+    return c;
+}
+
 // Dựng báo cáo cho kỳ đang chọn. Hiệu quả tính lại trên đúng kỳ này (không dùng khoảng của tab Thành Viên).
 function gaBuildReport() {
     const p = gaPeriod(GA.period);
@@ -83,6 +93,7 @@ function gaBuildReport() {
     const exceptions = (GL.exceptions || []).filter(e => { const d = String(e.created_at || '').slice(0, 10); return d >= p.start && d <= p.to; });
     const comp = LimitsCalc.complianceMatrix(GL.rows || [], GR.portfolios, GR.group);
     return GroupReport.build({
+        committee: gaCommittee(p),
         asOf: gaToday(), period: { from: p.start, to: p.to, label: p.label }, benchLabel: 'VN-Index',
         group: GR.group, portfolios: GR.portfolios, groupPerf, memberRows: GroupCalc.memberTable(GR.portfolios, perfBy, GR.group),
         risk: GR.risk, compliance: comp, exceptions, flow: GroupCalc.flow(trades, GR.portfolios), trades,
@@ -94,7 +105,8 @@ function gaReportHtml() {
     let body;
     try { body = GroupReport.toHtml(gaBuildReport()); }
     catch (e) { body = `<div class="tl-empty text-danger">Không dựng được báo cáo: ${rkEsc(e.message || String(e))}</div>`; }
-    return `<div class="ga-filters no-print">
+    const loading = (typeof GQ !== 'undefined' && GQ.state === 'loading') || (typeof GJ !== 'undefined' && GJ.state === 'loading') || (typeof GX !== 'undefined' && GX.state === 'loading');
+    return `${loading ? '<p class="tl-hint no-print"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thêm số liệu cho hội đồng đầu tư (duyệt lệnh, hành trình ý tưởng, khớp lệnh)…</p>' : ''}<div class="ga-filters no-print">
         <label>Kỳ báo cáo<select class="tl-select" onchange="gaSet('period', this.value)">${periods.map(([v, t]) => `<option value="${v}" ${GA.period === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <button type="button" class="btn-save" onclick="gaDownloadXlsx()"><i class="fa-solid fa-file-excel"></i> Tải Excel (.xlsx)</button>
         <button type="button" class="btn-tool" onclick="window.print()"><i class="fa-solid fa-print"></i> In / lưu PDF</button>

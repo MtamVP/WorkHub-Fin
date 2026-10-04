@@ -121,3 +121,59 @@ describe('periodFor', () => {
     expect((Date.parse(y.to) - Date.parse(y.start)) / 86400000).toBe(364);
   });
 });
+
+// ---- Các mục dành cho hội đồng đầu tư (CommitteePack) ----
+import CommitteePack from '../../lib/committee-pack.js';
+import ApprovalCalc from '../../lib/approval-calc.js';
+import RiskCalc from '../../lib/risk-calc.js';
+import StressCalc from '../../lib/stress-calc.js';
+
+describe('mục hội đồng đầu tư', () => {
+  const D = (d, h = 3) => d + 'T0' + h + ':00:00Z';
+  const governance = CommitteePack.governance({
+    AC: ApprovalCalc, from: '2026-09-01', to: '2026-09-30', today: '2026-09-30', nameOf: () => '<i>Bình</i>',
+    policy: { active: true, thresholdPct: 10, thresholdVnd: 50e6, validDays: 3, selfApprovers: ['u9'] },
+    requests: [{ id: 'a', user_id: 'u1', created_by: 'u1', status: 'executed', created_at: D('2026-09-10'), decided_at: D('2026-09-10', 5), decided_by: 'm1' }, { id: 'b', user_id: 'u1', created_by: 'u1', status: 'pending', created_at: D('2026-09-20') }],
+    audit: [{ kind: 'split', status: 'open', detected_at: D('2026-09-15') }],
+    restricted: [{ symbol: 'FPT', user_id: 'u2', reason: 'Thông tin <b>nội bộ</b>', active: true, created_at: D('2026-09-01') }],
+  });
+  const stress = CommitteePack.stress({ risk: { nav: 700e6, cash: 100e6, debt: 0, symbols: [{ symbol: 'VCB', sector: 'Ngân hàng', value: 400e6, betaAdj: 1 }, { symbol: 'FPT', sector: 'Công nghệ', value: 200e6, betaAdj: 1.5 }] }, RiskCalc, StressCalc, LC: LimitsCalc });
+  const journey = CommitteePack.journey({ funnel: { total: 6, decided: 5, approved: 4, executed: 3, rejected: 1, closed: 0 }, timing: { toDecide: 2, toExecute: 4 }, byPath: { executed: { n: 3, avgAlpha: 2.5, alphaN: 3 } }, insights: [{ tone: 'warn', text: 'Có <script>x</script>' }], minN: 4 });
+  const execution = CommitteePack.execution({ n: 8, value: 4e8, cost: 6e5, costPct: 0.15, vsCloseBuy: { n: 5, pct: 0.7 }, vsCloseSell: { n: 3, pct: 0.1 }, vsRef: { n: 0, pct: null }, delay: { days: null }, forwardBuy: { n: 5, pct: -1.2 }, forwardSell: { n: 3, pct: 0.4 }, insights: [] }, 6);
+  const r = GroupReport.build(input({ committee: { governance, stress, journey, execution } }));
+  const html = GroupReport.toHtml(r);
+
+  it('không có committee: báo cáo như cũ, không có mục mới', () => {
+    const plain = GroupReport.build(input());
+    expect(plain.committee).toBeNull();
+    const h = GroupReport.toHtml(plain);
+    expect(h).not.toContain('Quản trị và kiểm soát');
+    expect(GroupReport.toSheets(plain).map(s => s.name)).toEqual(['01_Tong_quan', '02_Danh_muc_chung', '03_Thanh_vien', '04_Tuan_thu', '05_Ngoai_le', '06_So_lenh']);
+  });
+  it('tóm tắt có câu về duyệt lệnh, đề xuất chờ, kiểm tra độc lập, hạn chế và kịch bản căng thẳng', () => {
+    const t = r.notes.join(' | ');
+    expect(t).toMatch(/Duyệt lệnh lớn đang bật \(từ 10% NAV hoặc 50\.000\.000 đ\): 2 đề xuất trong kỳ/);
+    expect(t).toMatch(/1 đề xuất lệnh đang chờ duyệt/);
+    expect(t).toMatch(/1 lệnh ở mục Kiểm tra độc lập chưa được xem xét/);
+    expect(t).toMatch(/1 mã đang trong danh sách hạn chế/);
+    expect(t).toMatch(/Kịch bản "VN-Index -20%": NAV nhóm giảm khoảng 20%/);
+  });
+  it('HTML có đủ 4 mục và escape nội dung do người dùng nhập', () => {
+    ['Quản trị và kiểm soát', 'Kịch bản căng thẳng', 'Hành trình ý tưởng đầu tư', 'Chất lượng khớp lệnh (6 tháng gần nhất)'].forEach(t => expect(html).toContain(t));
+    expect(html).not.toContain('<script>x</script>');
+    expect(html).not.toContain('<b>nội bộ</b>');
+    expect(html).not.toContain('<i>Bình</i>');
+    expect(html).toContain('&lt;b&gt;nội bộ&lt;/b&gt;');
+    expect(html).toContain('VN-Index -10%');
+    expect(html).toContain('Kịch bản ngược');
+  });
+  it('Excel có thêm 4 sheet; tên sheet duy nhất và sách tạo được', () => {
+    const sheets = GroupReport.toSheets(r);
+    expect(sheets.map(s => s.name).slice(6)).toEqual(['07_Quan_tri', '08_Can_thang', '09_Hanh_trinh_y_tuong', '10_Khop_lenh']);
+    expect(new Set(sheets.map(s => s.name)).size).toBe(sheets.length);
+    expect(XlsxWriter.build(sheets).length).toBeGreaterThan(1000);
+    const gov = sheets[6].rows.map(x => x[0]);
+    expect(gov).toContain('Đề xuất trong kỳ');
+    expect(sheets[7].rows[1][0]).toBe('VN-Index -10%');
+  });
+});

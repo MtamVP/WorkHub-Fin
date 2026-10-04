@@ -87,6 +87,11 @@ function switchGroupTab(tab) {
     if (tab === 'approvals' && typeof gqLoad === 'function') gqLoad(true);
     if (tab === 'journey' && typeof gjLoad === 'function') gjLoad();
     if (tab === 'execution' && typeof gxLoad === 'function') gxLoad();
+    if (tab === 'report') {          // báo cáo hội đồng đầu tư gom thêm duyệt lệnh, hành trình ý tưởng, khớp lệnh: tải nền, báo cáo tự vẽ lại khi xong
+        if (typeof gqLoad === 'function') gqLoad();
+        if (typeof gjLoad === 'function') gjLoad();
+        if (typeof gxLoad === 'function') gxLoad();
+    }
     document.querySelectorAll('#grp-tabs .view-toggle-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-gtab') === tab));
     grRender();
 }
