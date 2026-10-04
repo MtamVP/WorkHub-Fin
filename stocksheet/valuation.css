@@ -209,3 +209,29 @@
 .vl-sync-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vl-syncbar .vl-note { margin-top: 8px; }
 #ov-syncresult { margin-bottom: 14px; }
+
+/* ---- Bộ lọc tìm mã (screener-ui.js) ---- */
+.sc-universe { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.sc-universe select { min-width: 240px; padding: 8px 12px; font: inherit; font-size: 0.85rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary); }
+.sc-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.sc-group { margin: 0; padding: 10px 12px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.sc-group legend { padding: 0 6px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.sc-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; color: var(--text-secondary); }
+.sc-field small { color: var(--text-muted); }
+.sc-field input, .sc-field select { padding: 7px 10px; font: inherit; font-size: 0.84rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); width: 100%; min-width: 0; box-sizing: border-box; }
+.sc-field select { font-family: var(--font-body); }
+.sc-field input:focus, .sc-field select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+.sc-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sc-check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+.sc-check input { width: 16px; height: 16px; accent-color: var(--gold); }
+.sc-active { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.sc-table { min-width: 1020px; }
+.sc-table .sc-th { display: block; padding: 11px 12px; }
+.sc-score { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 46px; }
+.sc-score b { font-family: var(--font-mono); font-size: 0.86rem; }
+.sc-score i { display: block; height: 4px; border-radius: 3px; background: var(--finance-accent); align-self: flex-start; }
+.sc-fail { margin-top: 3px; font-size: 0.68rem; font-weight: 500; color: var(--warning-color); max-width: 240px; white-space: normal; line-height: 1.4; }
+.sc-near > summary { list-style: none; }
+.sc-near > summary::-webkit-details-marker { display: none; }
+@media (max-width: 640px) { .sc-universe select { min-width: 0; width: 100%; } .sc-universe .btn-save { width: 100%; } }

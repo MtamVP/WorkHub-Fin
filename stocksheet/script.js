@@ -74,8 +74,11 @@ function showView(view) {
     state.view = view;
     document.getElementById('view-overview').style.display = view === 'overview' ? '' : 'none';
     document.getElementById('view-detail').style.display = view === 'detail' ? '' : 'none';
+    document.getElementById('view-screener').style.display = view === 'screener' ? '' : 'none';
     document.getElementById('seg-overview').setAttribute('aria-pressed', String(view === 'overview'));
     document.getElementById('seg-detail').setAttribute('aria-pressed', String(view === 'detail'));
+    document.getElementById('seg-screener').setAttribute('aria-pressed', String(view === 'screener'));
+    if (view === 'screener') renderScreener();
     if (view === 'overview') {
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     } else if (state.detail) {
@@ -110,6 +113,7 @@ async function loadOverview() {
         state.overviewLoaded = true;
         fillSymbolSelect();
         renderOverview();
+        if (state.view === 'screener' && typeof renderScreener === 'function') renderScreener();
     } catch (e) {
         console.error(e);
         wrap.innerHTML = `<div class="vl-empty">Không tải được dữ liệu: ${VU.esc(e.message)}</div>`;
