@@ -128,7 +128,7 @@ function gsAnalysisHtml() {
 
 function grStrategyHtml() {
     if (!GL.loaded) return '<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang tải…</div>';
-    return gsPolicyHtml() + gsAnalysisHtml();
+    return gsPolicyHtml() + (typeof grbHtml === 'function' ? grbHtml() : '') + gsAnalysisHtml();
 }
 function grStrategyAfterRender() {
     BS.charts.forEach(c => { try { c.destroy(); } catch (e) { /* đã huỷ */ } }); BS.charts = [];
