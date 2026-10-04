@@ -2518,6 +2518,27 @@ const API = {
                 if (error) throw error;
                 return data || [];
             },
+            // Chỉ số cơ bản và thị trường (P/E, P/B, beta, ROE, biên lợi nhuận, đòn bẩy, tăng trưởng, 52 tuần, thanh khoản, khối ngoại) của các mã: đọc cache finance_stock_ratios;
+            // mã thiếu hoặc cũ quá 20 giờ thì nhờ Edge Function market-data-sync (mode ratios) lấy từ VNDirect rồi đọc lại. Trả { SYMBOL: { metrics, dailyDate, quarterDate, updatedAt } }.
+            ratios: async (symbols) => {
+                const list = [...new Set((symbols || []).map(s => String(s).trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 15);
+                if (!list.length) return {};
+                const read = async () => {
+                    const { data, error } = await sbClient.from('finance_stock_ratios').select('symbol, daily_date, quarter_date, metrics, updated_at').in('symbol', list);
+                    if (error) throw error;
+                    const out = {}; (data || []).forEach(r => { out[r.symbol] = { metrics: r.metrics || {}, dailyDate: r.daily_date, quarterDate: r.quarter_date, updatedAt: r.updated_at }; });
+                    return out;
+                };
+                let out = await read();
+                const stale = list.filter(s => !out[s] || Date.now() - Date.parse(out[s].updatedAt) > 20 * 3600 * 1000);
+                if (stale.length) {
+                    try {
+                        const { error } = await sbClient.functions.invoke('market-data-sync', { body: { mode: 'ratios', symbols: stale } });
+                        if (!error) out = await read();
+                    } catch (e) { /* không lấy mới được: dùng bản cache cũ nếu có */ }
+                }
+                return out;
+            },
             healthList: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 60) * 86400000).toISOString();
                 // chưa xử lý (bất kể cũ) + đã xử lý trong khoảng gần đây
@@ -5006,6 +5027,7 @@ async function _dispatchAction(action, params = {}) {
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
+            case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;
             case 'getMarketReference': result = await API.asset.market.reference(params.symbol); break;
             case 'getSettlement': result = await API.asset.market.settlement(params.email); break;
             case 'listDataHealth': result = await API.asset.market.healthList(params.days); break;

@@ -160,3 +160,30 @@ describe('getPerfInputs: cổ tức và lợi suất trái phiếu', () => {
     expect(r.navHistory).toHaveLength(2);
   });
 });
+
+describe('ratios: chỉ số cơ bản từ cache và làm mới theo yêu cầu', () => {
+  const row = (symbol, hoursAgo, metrics = { pe: 11.7 }) => ({ symbol, daily_date: '2026-10-02', quarter_date: '2026-06-30', metrics, updated_at: new Date(Date.now() - hoursAgo * 3600000).toISOString() });
+  it('cache còn mới: trả ngay, KHÔNG gọi Edge Function', async () => {
+    let calls = 0;
+    const c = boot(MEMBER, { finance_stock_ratios: [row('FPT', 2), row('VCB', 5)] }, {}, { 'market-data-sync': async () => { calls++; return { data: { ok: true }, error: null }; } });
+    const r = await c.API.asset.market.ratios(['fpt', 'VCB']);
+    expect(calls).toBe(0);
+    expect(r.FPT.metrics.pe).toBe(11.7); expect(r.FPT.dailyDate).toBe('2026-10-02');
+    expect(Object.keys(r).sort()).toEqual(['FPT', 'VCB']);
+  });
+  it('mã thiếu hoặc cũ quá 20 giờ: gọi Edge Function đúng các mã đó rồi đọc lại', async () => {
+    let body = null, c = null;
+    const fns = { 'market-data-sync': async (b) => { body = b; c.fake.table('finance_stock_ratios').push({ symbol: 'HPG', daily_date: '2026-10-02', quarter_date: '2026-06-30', metrics: { pe: 9 }, updated_at: new Date().toISOString() }); const old = c.fake.table('finance_stock_ratios').find(x => x.symbol === 'VCB'); old.updated_at = new Date().toISOString(); old.metrics = { pe: 12 }; return { data: { ok: true }, error: null }; } };
+    c = boot(MEMBER, { finance_stock_ratios: [row('FPT', 2), row('VCB', 30)] }, {}, fns);
+    const r = await c.API.asset.market.ratios(['FPT', 'VCB', 'HPG']);
+    expect(body).toEqual({ mode: 'ratios', symbols: ['VCB', 'HPG'] });
+    expect(r.HPG.metrics.pe).toBe(9); expect(r.VCB.metrics.pe).toBe(12); expect(r.FPT.metrics.pe).toBe(11.7);
+  });
+  it('Edge Function lỗi: dùng bản cache cũ nếu có; mã không hợp lệ bị bỏ; không có mã thì trả rỗng; qua callGAS', async () => {
+    const c = boot(MEMBER, { finance_stock_ratios: [row('VCB', 30, { pe: 12 })] }, {}, { 'market-data-sync': async () => ({ data: null, error: { message: 'down' } }) });
+    const r = await c.API.asset.market.ratios(['VCB', 'bad symbol']);
+    expect(r.VCB.metrics.pe).toBe(12);
+    expect(await c.API.asset.market.ratios([])).toEqual({});
+    expect((await c.callGAS('getStockRatios', { symbols: ['VCB'] })).data.VCB.metrics.pe).toBe(12);
+  });
+});

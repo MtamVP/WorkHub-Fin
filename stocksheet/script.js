@@ -355,6 +355,7 @@ async function loadStockDetail(opts) {
         spinner.style.display = 'none';
         renderDetail();
         loadPriceHistory(state.detail); // chạy nền: có giá lịch sử thì vẽ lại thêm dải P/E
+        loadAdvanced(state.detail);     // chạy nền: chỉ số cơ bản VNDirect + lãi suất trái phiếu cho thẻ Mô hình nâng cao
     } catch (e) {
         spinner.style.display = 'none';
         displayDiv.style.display = 'block';
@@ -380,6 +381,46 @@ async function loadPriceHistory(d) {
         console.warn('Không lấy được giá lịch sử:', e.message);
         if (state.detail === d) { d.historyError = e.message; if (state.view === 'detail') renderDetail(); }
     }
+}
+
+// ---------- Mô hình nâng cao (stocksheet/valuation-advanced.js) ----------
+const VA_KEY = 'wh.fin.va.v1';
+function vaParams() {
+    const p = { erp: 0.08, gT: 0.05 };
+    try { const s = JSON.parse(localStorage.getItem(VA_KEY) || 'null'); if (s) { if (s.erp >= 0.03 && s.erp <= 0.15) p.erp = Number(s.erp); if (s.gT >= 0 && s.gT <= 0.08) p.gT = Number(s.gT); } } catch (e) { /* mặc định */ }
+    return p;
+}
+async function loadAdvanced(d) {
+    d.adv = { loading: true, ratios: null, rates: [], error: '' };
+    if (state.view === 'detail') renderDetail();
+    try {
+        const [ratios, rates] = await Promise.all([call('getStockRatios', { symbols: [d.symbol] }), call('getMarketRates', { days: 40 }).catch(() => [])]);
+        if (state.detail !== d) return;
+        d.adv = { loading: false, ratios: (ratios && ratios[d.symbol]) || null, rates: rates || [], error: '' };
+    } catch (e) {
+        if (state.detail !== d) return;
+        d.adv = { loading: false, ratios: null, rates: [], error: e.message || String(e) };
+    }
+    if (state.view === 'detail') renderDetail();
+}
+// Người dùng đổi phần bù rủi ro / tăng trưởng: lưu lại và vẽ lại thẻ (không gọi mạng)
+function vaChange() {
+    const d = state.detail; if (!d || !d.adv) return;
+    const num = (id) => { const el = document.getElementById(id); return el && el.value !== '' ? Number(el.value) : null; };
+    const erp = num('va-erp'), gt = num('va-gt'), g1 = num('va-g1');
+    const prev = vaParams();
+    const next = { erp: erp !== null && erp >= 3 && erp <= 15 ? erp / 100 : prev.erp, gT: gt !== null && gt >= 0 && gt <= 8 ? gt / 100 : prev.gT };
+    try { localStorage.setItem(VA_KEY, JSON.stringify(next)); } catch (e) { /* không lưu được: vẫn dùng cho lần vẽ này */ }
+    d.adv.g1 = g1 !== null && g1 >= -10 && g1 <= 40 ? g1 / 100 : null;
+    renderDetail();
+}
+function advancedCardHtml(d) {
+    if (typeof ValuationAdvanced === 'undefined' || !d.adv) return '';
+    if (d.adv.loading) return ValuationAdvanced.html(null, { loading: true });
+    const sector = (typeof FinCalc !== 'undefined') ? FinCalc.sectorOf(d.symbol) : '';
+    const r = ValuationAdvanced.compute({ symbol: d.symbol, price: d.a.price, sector, metrics: d.adv.ratios ? d.adv.ratios.metrics : {}, rates: d.adv.rates, a: d.a,
+        params: Object.assign({}, vaParams(), d.adv.g1 !== undefined && d.adv.g1 !== null ? { g1: d.adv.g1 } : {}) });
+    return ValuationAdvanced.html(r, {}) + (d.adv.error ? `<div class="vl-note"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được chỉ số từ VNDirect: ${VU.esc(d.adv.error)}</span></div>` : '');
 }
 
 // ---------- vẽ chi tiết ----------
@@ -509,7 +550,7 @@ function renderDetail() {
     </div>`;
 
     display.style.display = 'block';
-    display.innerHTML = hero + football + scen + groups + charts + thesis + apply +
+    display.innerHTML = hero + football + scen + advancedCardHtml(d) + groups + charts + thesis + apply +
         '<p class="vl-hint">Kết quả là công cụ tham khảo dựa trên số liệu và giả định bạn nhập; không phải khuyến nghị đầu tư.</p>';
 
     drawCharts(d, hasBand);

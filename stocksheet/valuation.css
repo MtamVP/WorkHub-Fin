@@ -274,3 +274,17 @@
 .id-form label { display: flex; flex-direction: column; gap: 5px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); } .id-form label.wide { grid-column: 1 / -1; }
 .id-assist { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
 @media (max-width: 860px) { .id-grid { grid-template-columns: 1fr; } }
+
+
+/* ---- Mô hình nâng cao (valuation-advanced.js) ---- */
+.vl-adv-inputs { display: flex; flex-wrap: wrap; gap: 14px 22px; margin: 6px 0 12px; }
+.vl-adv-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--text-secondary); }
+.vl-adv-inputs .input-val { width: 110px; }
+.vl-adv-inputs small { color: var(--text-muted); font-size: 0.72rem; }
+.vl-metric-row { padding: 8px 0 12px; font-size: 0.88rem; line-height: 1.6; color: var(--text-secondary); }
+.vl-sub { margin: 18px 0 8px; font-size: 0.9rem; color: var(--text-primary); }
+.vl-sub small { font-weight: 400; color: var(--text-muted); }
+.vl-quality { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
+.vl-q { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; font-size: 0.82rem; padding: 4px 0; border-bottom: 1px dashed var(--border-color); }
+.vl-q.ok i { color: var(--success-color, #3fb950); } .vl-q.bad i { color: var(--danger-color, #e5534b); } .vl-q.na { opacity: 0.6; }
+.vl-q b { font-weight: 600; font-variant-numeric: tabular-nums; }

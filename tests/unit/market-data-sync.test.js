@@ -134,3 +134,34 @@ describe('metaGaps', () => {
     expect(metaGaps(['FPT'], () => true, '2026-10-04')).toEqual([]);
   });
 });
+
+import { curateRatios, latestReportDate, DAILY_MAP, QUARTER_MAP } from '../../supabase/functions/market-data-sync/logic.ts';
+
+describe('chỉ số cơ bản từ VNDirect ratios', () => {
+  // giá trị lấy từ phản hồi thật của FPT ngày 02/10/2026 và quý 30/06/2026
+  const daily = [{ ratioCode: 'PRICE_TO_EARNINGS', value: 11.711 }, { ratioCode: 'PRICE_TO_BOOK', value: 2.9385 }, { ratioCode: 'BETA', value: 0.73586 }, { ratioCode: 'BVPS_CR', value: 21133 }, { ratioCode: 'PRICE_HIGHEST_CR_52W', value: 95144 }, { ratioCode: 'NMVALUE_AVG_CR_20D', value: 3.9869e11 }, { ratioCode: 'UNKNOWN_CODE', value: 1 }, { ratioCode: 'DAILY_JDK_RS_CR', value: 96.73 }];
+  const quarterly = [{ ratioCode: 'ROAE_TR_AVG5Q', value: 0.2409 }, { ratioCode: 'EPS_TR', value: 5870 }, { ratioCode: 'EPS_TR_GRYOY', value: 0.009273 }, { ratioCode: 'DEBT_TO_EQUITY_AQ', value: 0.45 }, { ratioCode: 'CURRENT_RATIO_AQ', value: 1.5621 }, { ratioCode: 'INTEREST_COVERAGE_TR', value: 11.96 }, { ratioCode: 'BETA', value: 9 }, { ratioCode: 'NET_MARGIN_TR', value: 'x' }];
+  it('chọn đúng tập chỉ số, đổi tên ngắn, bỏ mã lạ và giá trị không phải số; nhóm ngày không lẫn vào nhóm quý', () => {
+    const m = curateRatios(daily, quarterly, []);
+    expect(m).toMatchObject({ pe: 11.711, pb: 2.9385, beta: 0.73586, bvps: 21133, high52: 95144, advValue20: 3.9869e11, jdkRs: 96.73, roae: 0.2409, epsTtm: 5870, epsGrowthYoY: 0.009273, debtToEquity: 0.45, currentRatio: 1.5621, interestCoverage: 11.96 });
+    expect(m.netMargin).toBeUndefined();            // 'x' không phải số
+    expect(Object.keys(m)).not.toContain('UNKNOWN_CODE');
+    expect(m.beta).toBe(0.73586);                    // BETA của nhóm quý không ghi đè (không nằm trong QUARTER_MAP)
+  });
+  it('dòng tiền khối ngoại: tổng ròng 5 phiên gần nhất, ngày mới nhất, room còn lại %', () => {
+    const f = [{ tradingDate: '2026-10-02', netVal: -2.97e9, totalRoom: 8.4e8, currentRoom: 3.519e8 }, { tradingDate: '2026-10-01', netVal: 3.56e10 }, { tradingDate: '2026-09-30', netVal: 1e9 }, { tradingDate: '2026-09-29', netVal: 0 }, { tradingDate: '2026-09-28', netVal: 1e9 }, { tradingDate: '2026-09-25', netVal: 5e11 }];
+    const m = curateRatios([], [], f);
+    expect(m.foreignNet5d).toBeCloseTo(-2.97e9 + 3.56e10 + 1e9 + 0 + 1e9, 0);
+    expect(m.foreignNetDate).toBe('2026-10-02');
+    expect(m.foreignRoomLeftPct).toBeCloseTo(3.519e8 / 8.4e8 * 100, 9);
+    expect(curateRatios([], [], [{ tradingDate: '2026-10-02', netVal: 1, totalRoom: 0, currentRoom: 5 }]).foreignRoomLeftPct).toBeNull();
+    expect(curateRatios(null, null, null)).toEqual({});
+  });
+  it('ngày báo cáo mới nhất; phản hồi lỗi -> null; bản đồ không trùng tên trường giữa hai nhóm (trừ freefloat)', () => {
+    expect(latestReportDate({ data: [{ reportDate: '2026-06-30', value: 1 }] })).toBe('2026-06-30');
+    expect(latestReportDate({ data: [] })).toBeNull();
+    expect(latestReportDate(null)).toBeNull();
+    const dup = Object.values(DAILY_MAP).filter(v => Object.values(QUARTER_MAP).includes(v));
+    expect(dup).toEqual(['freefloat']);
+  });
+});

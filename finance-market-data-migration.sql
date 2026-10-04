@@ -109,3 +109,23 @@ select cron.schedule('market-health-daily', '45 10 * * 1-5', $job$
     headers := jsonb_build_object('Authorization', 'Bearer sb_publishable_sl9uOpcIzfzN9NZ5D_ZdsQ_FQZchyUR', 'Content-Type', 'application/json'),
     body := '{"mode":"health"}'::jsonb, timeout_milliseconds := 150000);
 $job$);
+
+-- ---- Chỉ số cơ bản và thị trường (VNDirect ratios): cache theo mã, cập nhật mỗi ngày làm việc cho mã đang nắm/theo dõi và theo yêu cầu từ app ----
+create table if not exists finance_stock_ratios (
+  symbol text primary key,
+  daily_date date,                    -- ngày báo cáo của nhóm chỉ số ngày (P/E, P/B, beta, 52 tuần...)
+  quarter_date date,                  -- ngày báo cáo (cuối quý) của nhóm chỉ số quý (ROE, biên lợi nhuận, tăng trưởng...)
+  metrics jsonb not null default '{}'::jsonb,
+  source text,
+  updated_at timestamptz not null default now()
+);
+alter table finance_stock_ratios enable row level security;
+drop policy if exists "Finance team can view stock ratios" on finance_stock_ratios;
+create policy "Finance team can view stock ratios" on finance_stock_ratios for select using (current_user_group() = any (array['finance','admin']));
+
+select cron.unschedule('market-ratios-daily') where exists (select 1 from cron.job where jobname = 'market-ratios-daily');
+select cron.schedule('market-ratios-daily', '0 11 * * 1-5', $job$
+  select net.http_post(url := 'https://gqsbsqaxzpzcloaopzvv.supabase.co/functions/v1/market-data-sync',
+    headers := jsonb_build_object('Authorization', 'Bearer sb_publishable_sl9uOpcIzfzN9NZ5D_ZdsQ_FQZchyUR', 'Content-Type', 'application/json'),
+    body := '{"mode":"ratios"}'::jsonb, timeout_milliseconds := 150000);
+$job$);

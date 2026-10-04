@@ -152,3 +152,49 @@ export function metaGaps(heldSymbols: string[], hasSector: (s: string) => boolea
   if (!missing.length) return [];
   return [{ kind: "meta_gap", symbol: null, severity: "info", ref_date: today, detail: { symbols: missing.slice(0, 40), count: missing.length, note: "Các mã này chưa có phân ngành: phân bổ ngành, Brinson và giới hạn ngành sẽ xếp vào 'Chưa phân ngành'." }, dedupe_key: `meta_gap|${today}|${missing.slice(0, 40).join(",")}` }];
 }
+
+// ---------- chỉ số cơ bản và thị trường từ VNDirect ratios ----------
+// VNDirect /v4/ratios trả hàng trăm chỉ số mỗi mã mỗi ngày báo cáo: nhóm "ngày" (P/E, P/B, beta, 52 tuần, thanh khoản...) và nhóm "quý" (ROE, biên lợi nhuận, đòn bẩy, tăng trưởng...).
+// Chỉ lấy tập có chọn lọc dưới đây (tên trường ngắn, giá trị giữ nguyên đơn vị gốc: tỷ lệ là số thập phân 0,24 = 24%, tiền là đồng).
+export const DAILY_MAP: Record<string, string> = {
+  PRICE_TO_EARNINGS: "pe", PRICE_TO_BOOK: "pb", PRICE_TO_SALES: "ps", BETA: "beta", BVPS_CR: "bvps", MARKETCAP: "marketcap", DIVIDEND_YIELD: "divYield",
+  PRICE_HIGHEST_CR_52W: "high52", PRICE_LOWEST_CR_52W: "low52", NMVALUE_AVG_CR_20D: "advValue20", NMVOLUME_AVG_CR_20D: "advVol20",
+  PRICE_TO_EARNINGS_AVG_CR_1Y: "pe1y", PRICE_TO_EARNINGS_AVG_CR_3Y: "pe3y", PRICE_TO_EARNINGS_AVG_CR_5Y: "pe5y",
+  PRICE_TO_BOOK_AVG_CR_1Y: "pb1y", PRICE_TO_BOOK_AVG_CR_3Y: "pb3y", PRICE_TO_BOOK_AVG_CR_5Y: "pb5y",
+  PRICE_CHG_PCT_CR_1M: "chg1m", PRICE_CHG_PCT_CR_3M: "chg3m", PRICE_CHG_PCT_CR_6M: "chg6m", PRICE_CHG_PCT_CR_1Y: "chg1y",
+  DAILY_JDK_RS_CR: "jdkRs", DAILY_JDK_RS_MOMENTUM_CR: "jdkMom", FREEFLOAT: "freefloat",
+};
+export const QUARTER_MAP: Record<string, string> = {
+  ROAE_TR_AVG5Q: "roae", ROAA_TR_AVG5Q: "roaa", ROIC_TR_AVG5Q: "roic", GROSS_MARGIN_TR: "grossMargin", NET_MARGIN_TR: "netMargin", OPERATING_EBIT_MARGIN_TR: "ebitMargin", DELTA_MARGIN_TR: "deltaMargin",
+  CFO_TO_SALES_TR: "cfoToSales", INTEREST_COVERAGE_TR: "interestCoverage", DEBT_TO_EQUITY_AQ: "debtToEquity", CURRENT_RATIO_AQ: "currentRatio", EQUITY_TO_ASSET_AQ: "equityToAsset",
+  EPS_TR: "epsTtm", EPS_TR_GRYOY: "epsGrowthYoY", NET_SALES_TR_GRYOY: "salesGrowthYoY", PRETAX_PROFIT_TR_GRYOY: "pretaxGrowthYoY", DIVIDEND_PAYOUT_TR: "payoutTtm",
+  NET_PROFIT_TR: "netProfitTtm", NET_SALES_TR: "salesTtm", TOTAL_SHARES: "shares", POSITIVE_CFO_NUM_CR_2YR: "positiveCfo2y",
+  NET_INTEREST_MARGIN_TR_AVG5Q: "nim", PROVISION_BAD_LOANS_AQ: "badDebtCoverage", FREEFLOAT: "freefloat",
+};
+function pick(rows: any[], map: Record<string, string>, into: Record<string, number>) {
+  for (const r of rows ?? []) {
+    const k = map[String(r && r.ratioCode)];
+    const v = Number(r && r.value);
+    if (k && isFinite(v) && !(k in into)) into[k] = v;
+  }
+}
+// daily/quarterly: hàng ratios của ngày/quý mới nhất; foreigns: các phiên gần nhất (mới trước) của /v4/foreigns.
+export function curateRatios(daily: any[], quarterly: any[], foreigns: any[]): Record<string, number | string | null> {
+  const m: Record<string, number> = {};
+  pick(daily, DAILY_MAP, m); pick(quarterly, QUARTER_MAP, m);
+  const out: Record<string, number | string | null> = { ...m };
+  const f = (foreigns ?? []).filter((x) => x && isFinite(Number(x.netVal)));
+  if (f.length) {
+    out.foreignNet5d = f.slice(0, 5).reduce((s, x) => s + Number(x.netVal), 0);
+    out.foreignNetDate = String(f[0].tradingDate || "").slice(0, 10) || null;
+    const total = Number(f[0].totalRoom), left = Number(f[0].currentRoom);
+    out.foreignRoomLeftPct = total > 0 && isFinite(left) && left >= 0 && left <= total ? left / total * 100 : null;
+  }
+  return out;
+}
+// Ngày báo cáo mới nhất từ phản hồi `ratios?...&sort=reportDate:desc&size=1`
+export function latestReportDate(json: any): string | null {
+  const r = json && Array.isArray(json.data) ? json.data[0] : null;
+  const d = r ? String(r.reportDate || "").slice(0, 10) : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+}

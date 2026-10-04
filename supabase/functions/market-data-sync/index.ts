@@ -1,11 +1,12 @@
 // Edge Function: market-data-sync -- dữ liệu thị trường MIỄN PHÍ và kiểm chất lượng dữ liệu, chạy cả khi không ai mở app. Ba chế độ (body {"mode": ...}; "all" chạy cả ba):
 //  "meta"   (pg_cron hằng tuần): thông tin mã -> finance_stock_meta (sàn, phân ngành ICB cấp 2 từ VCI, thuộc VN30 và ngày niêm yết từ VNDirect). Thay bảng ngành tự gõ chỉ có ~200 mã.
 //  "rates"  (pg_cron mỗi ngày làm việc): lợi suất trái phiếu chính phủ 1-15 năm (TradingView scanner công khai) -> finance_rates; app dùng làm lãi phi rủi ro THEO NGÀY.
+//  "ratios" (pg_cron mỗi ngày làm việc, hoặc gọi từ app kèm body.symbols <= 15 mã): chỉ số cơ bản và thị trường từ VNDirect (P/E, P/B, beta, ROE, biên lợi nhuận, đòn bẩy, tăng trưởng, 52 tuần, thanh khoản, khối ngoại) -> finance_stock_ratios.
 //  "health" (pg_cron mỗi ngày làm việc): kiểm chất lượng dữ liệu giá của các mã đang nắm/theo dõi -- so VNDirect với VCI, nhảy giá vượt biên độ, thiếu phiên, giá cũ -> finance_data_health.
 // Mỗi lần chạy ghi finance_function_runs (app cảnh báo khi hàm quá hạn). Nguồn đều là điểm cuối công khai KHÔNG có cam kết dịch vụ: có thể đổi/chặn bất cứ lúc nào, nên có kiểm tra và ghi nhận "nguồn lỗi".
 // Gọi bởi pg_cron (Bearer = publishable key, verify_jwt giữ true). Phản hồi chỉ có SỐ LƯỢNG. {"selftest":true} chạy bài tự kiểm không đụng mạng/CSDL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { BAND, comparePrices, detectGaps, detectJumps, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
+import { BAND, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +77,42 @@ async function barsFromVci(symbol: string, toSec: number): Promise<Bar[] | null>
   return j ? parseVciBars(j, symbol) : null;
 }
 
+// Chỉ số cơ bản của một mã từ VNDirect /v4/ratios (nhóm ngày + nhóm quý) và /v4/foreigns. null nếu không có dữ liệu.
+async function ratiosFor(sym: string): Promise<{ symbol: string; daily_date: string | null; quarter_date: string | null; metrics: Record<string, unknown> } | null> {
+  const B = "https://api-finfo.vndirect.com.vn/v4";
+  const [dj, qj] = await Promise.all([
+    getJson(`${B}/ratios?q=code:${sym}~ratioCode:PRICE_TO_EARNINGS&sort=reportDate:desc&size=1`),
+    getJson(`${B}/ratios?q=code:${sym}~ratioCode:ROAE_TR_AVG5Q&sort=reportDate:desc&size=1`),
+  ]);
+  const dd = latestReportDate(dj), qd = latestReportDate(qj);
+  const [d, q, f] = await Promise.all([
+    dd ? getJson(`${B}/ratios?q=code:${sym}~reportDate:${dd}&size=300`) : Promise.resolve(null),
+    qd ? getJson(`${B}/ratios?q=code:${sym}~reportDate:${qd}&size=400`) : Promise.resolve(null),
+    getJson(`${B}/foreigns?q=code:${sym}&sort=tradingDate:desc&size=5`),
+  ]);
+  const metrics = curateRatios(d?.data ?? [], q?.data ?? [], f?.data ?? []);
+  return Object.keys(metrics).length ? { symbol: sym, daily_date: dd, quarter_date: qd, metrics } : null;
+}
+
+async function syncRatios(supabase: any, only?: string[]) {
+  let symbols: string[];
+  if (only && only.length) symbols = only;
+  else {
+    const [{ data: tx }, { data: wl }] = await Promise.all([
+      supabase.from("finance_transactions").select("symbol").is("deleted_at", null).limit(5000),
+      supabase.from("finance_watchlist").select("symbol").limit(1000),
+    ]);
+    symbols = [...new Set([...(tx ?? []), ...(wl ?? [])].map((r: any) => String(r.symbol || "").toUpperCase()).filter((s) => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 80);
+  }
+  if (!symbols.length) return { ok: true, checked: 0, saved: 0 };
+  const got = await inBatches(symbols, 4, (s) => ratiosFor(s));
+  const rows = got.filter((x) => x).map((x: any) => ({ symbol: x.symbol, daily_date: x.daily_date, quarter_date: x.quarter_date, metrics: x.metrics, source: "vndirect", updated_at: new Date().toISOString() }));
+  if (!rows.length) return { ok: false, error: "VNDirect không trả chỉ số cho mã nào.", checked: symbols.length };
+  const { error } = await supabase.from("finance_stock_ratios").upsert(rows, { onConflict: "symbol" });
+  if (error) throw new Error(error.message);
+  return { ok: true, checked: symbols.length, saved: rows.length };
+}
+
 async function checkHealth(supabase: any) {
   const nowSec = Math.floor(Date.now() / 1000), fromSec = nowSec - 40 * 86400, toSec = nowSec + 86400;
   const [{ data: tx }, { data: wl }] = await Promise.all([
@@ -118,14 +155,15 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, band: BAND, tenors: TENORS });
-  const mode = ["meta", "rates", "health", "all"].includes(body?.mode) ? body.mode : "health";
+  const mode = ["meta", "rates", "health", "ratios", "all"].includes(body?.mode) ? body.mode : "health";
+  const only: string[] = Array.isArray(body?.symbols) ? [...new Set(body.symbols.map((x: unknown) => String(x).trim().toUpperCase()))].filter((x) => /^[A-Z0-9]{1,12}$/.test(x as string)).slice(0, 15) as string[] : [];
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();
   const result: Record<string, unknown> = {};
   let ok = true;
   try {
     for (const m of mode === "all" ? ["meta", "rates", "health"] : [mode]) {
-      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : await checkHealth(supabase)); }
+      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : (m === "ratios" ? await syncRatios(supabase, only) : await checkHealth(supabase))); }
       catch (e) { result[m] = { ok: false, error: String((e as Error).message || e).slice(0, 200) }; }
       if (!(result[m] as any).ok) ok = false;
     }
