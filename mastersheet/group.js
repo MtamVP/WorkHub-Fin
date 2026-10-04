@@ -82,6 +82,7 @@ function grLimits() {
 
 function switchGroupTab(tab) {
     GR.tab = tab;
+    if (tab === 'strategy' && typeof gsLoad === 'function') gsLoad();
     document.querySelectorAll('#grp-tabs .view-toggle-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-gtab') === tab));
     grRender();
 }
@@ -195,6 +196,9 @@ function grRender() {
     if (GR.tab === 'members') {
         body.innerHTML = grMembersHtml();
         grDrawMembersChart();
+    } else if (GR.tab === 'strategy' && typeof grStrategyHtml === 'function') {
+        body.innerHTML = grStrategyHtml();
+        if (typeof grStrategyAfterRender === 'function') grStrategyAfterRender();
     } else if (GR.tab === 'activity' && typeof gaActivityHtml === 'function') {
         body.innerHTML = gaActivityHtml();
     } else if (GR.tab === 'report' && typeof gaReportHtml === 'function') {

@@ -2385,6 +2385,68 @@ const API = {
             }
         },
 
+        // --- Danh mục chuẩn chiến lược của nhóm (tỷ trọng mục tiêu theo ngành; phần còn lại là tiền mặt) dùng cho phân tích Brinson (lib/brinson-calc.js).
+        //     Mọi thành viên finance/admin đọc được; chỉ quản lý danh mục / admin sửa (RLS + kiểm tra ở đây). ---
+        policy: {
+            list: async () => {
+                const { data, error } = await sbClient.from('finance_policy_weights').select('sector, target_pct, updated_at, updated_by');
+                if (error) throw error;
+                const weights = {};
+                (data || []).forEach(r => { weights[r.sector] = Number(r.target_pct) || 0; });
+                const updatedAt = (data || []).reduce((m, r) => (r.updated_at && r.updated_at > m ? r.updated_at : m), '');
+                return { weights, updatedAt: updatedAt || null };
+            },
+            // Thay toàn bộ bộ tỷ trọng bằng weights = { ngành: % }
+            save: async (email, weights) => {
+                if (typeof BrinsonCalc === 'undefined') throw new Error("Thiếu thư viện Brinson (lib/brinson-calc.js)");
+                const v = BrinsonCalc.validatePolicy(weights || {});
+                if (!v.ok) throw new Error(v.error);
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin mới đặt được danh mục chuẩn chiến lược của nhóm");
+                const keep = Object.keys(v.weights);
+                const { data: existing, error: listErr } = await sbClient.from('finance_policy_weights').select('sector');
+                if (listErr) throw listErr;
+                const toDelete = (existing || []).map(r => r.sector).filter(sec => !keep.includes(sec));
+                if (toDelete.length) {
+                    const { error: delErr } = await sbClient.from('finance_policy_weights').delete().in('sector', toDelete);
+                    if (delErr) throw delErr;
+                }
+                if (keep.length) {
+                    const { error } = await sbClient.from('finance_policy_weights').upsert(
+                        keep.map(sector => ({ sector, target_pct: v.weights[sector], updated_by: actor.actorId, updated_at: new Date().toISOString() })), { onConflict: 'sector' });
+                    if (error) throw error;
+                }
+                return "Đã lưu danh mục chuẩn chiến lược (tiền mặt chuẩn " + (Math.round(v.cashPct * 10) / 10) + "%)";
+            },
+        },
+
+        // Lịch sử giá đóng cửa nhiều mã (+ VN-Index) từ `from` tới nay, chia lô 20 mã. Trả { histories, error } -- lỗi một phần vẫn trả phần đã lấy được.
+        getPriceHistories: async (symbols, from) => {
+            const list = [...new Set((symbols || []).map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{1,12}$/.test(x)))].slice(0, 80);
+            const to = new Date().toISOString().slice(0, 10);
+            const floor = new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10);
+            let start = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '')) ? String(from) : floor;
+            if (start < floor) start = floor;
+            const histories = {};
+            let error = null;
+            for (let i = 0; i < list.length || i === 0; i += 20) {
+                try { Object.assign(histories, await API.asset.getPriceHistory(list.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), start, to)); }
+                catch (e) { error = e.message || String(e); }
+                if (i + 20 >= list.length) break;
+            }
+            return { histories, error, from: start, to };
+        },
+
+        // Chuỗi điểm của các chỉ số ngành HOSE + VN-Index từ trước ngày `from` ~10 ngày tới nay (cho Brinson). Chỉ số lỗi/thiếu sẽ vắng mặt trong kết quả.
+        getSectorIndices: async (from) => {
+            if (typeof BrinsonCalc === 'undefined') throw new Error("Thiếu thư viện Brinson (lib/brinson-calc.js)");
+            const to = new Date().toISOString().slice(0, 10);
+            const floor = new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10);
+            let start = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '')) ? new Date(new Date(from + 'T00:00:00Z').getTime() - 10 * 86400000).toISOString().slice(0, 10) : floor;
+            if (start < floor) start = floor;
+            return await API.asset.getPriceHistory(BrinsonCalc.SECTOR_INDEX_CODES.concat(['VNINDEX']), start, to);
+        },
+
         // --- Đối soát sổ lệnh với sao kê công ty chứng khoán (lib/reconcile.js). Phép so khớp chạy trên máy; ở đây chỉ lấy dữ liệu đầu vào và ghi nhật ký. ---
         reconcile: {
             getInputs: async (email) => {
@@ -3963,7 +4025,7 @@ const API = {
         _PK: { // upsert onConflict column(s) per table -- most default to 'id'
             app_settings: 'key', finance_stocks: 'symbol', user_status: 'uid',
             lounge_players: 'email', task_assignees: 'task_id,user_email',
-            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol', finance_event_dismissals: 'user_id,event_id', finance_idea_votes: 'idea_id,user_id'
+            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol', finance_event_dismissals: 'user_id,event_id', finance_idea_votes: 'idea_id,user_id', finance_policy_weights: 'sector'
         },
         listLocal: async () => {
             if (!window.__TAURI__ || !window.__TAURI__.fs) return [];
@@ -4002,7 +4064,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4463,7 +4525,7 @@ const MUTATING_ACTIONS = new Set([
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'saveReconciliation', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
+    'savePolicy', 'saveReconciliation', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
@@ -4626,6 +4688,10 @@ async function _dispatchAction(action, params = {}) {
             case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
             case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
+            case 'listPolicy': result = await API.asset.policy.list(); break;
+            case 'savePolicy': result = await API.asset.policy.save(params.email, params.weights); break;
+            case 'getPriceHistories': result = await API.asset.getPriceHistories(params.symbols, params.from); break;
+            case 'getSectorIndices': result = await API.asset.getSectorIndices(params.from); break;
             case 'getReconcileInputs': result = await API.asset.reconcile.getInputs(params.email); break;
             case 'saveReconciliation': result = await API.asset.reconcile.save(params.email, params.record); break;
             case 'listReconciliations': result = await API.asset.reconcile.list(params.email, params.limit); break;

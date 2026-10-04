@@ -546,6 +546,15 @@
                 <div id="at-body"></div>
             </div>
 
+            <div class="tl-card" id="bs-card" style="margin-top:18px">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-scale-unbalanced-flip"></i> Phân Bổ Ngành Và Chọn Mã</h3>
+                    <div class="tl-card-tools"><button type="button" class="btn-tool" onclick="bsRefresh()"><i class="fa-solid fa-rotate"></i> Tính lại</button></div>
+                </div>
+                <p class="tl-hint" style="margin:-6px 0 12px">So với danh mục chuẩn chiến lược của nhóm (tỷ trọng mục tiêu theo ngành do quản lý đặt): bạn hơn hay kém chuẩn bao nhiêu điểm, bao nhiêu nhờ phân bổ đúng ngành và bao nhiêu nhờ chọn mã trong ngành giỏi hơn chỉ số ngành (phương pháp Brinson-Fachler). Kỳ theo ô chọn của thẻ Nguồn Gốc Lợi Nhuận ở trên.</p>
+                <div id="bs-body"><div class="tl-empty" style="padding:14px">Chờ tính nguồn gốc lợi nhuận…</div></div>
+            </div>
+
             <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
                 <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi 5 phút trong phiên — chỉ dùng khi cần sửa)</span></h3>
                 <form id="benchmark-form" class="grant-form-grid">
@@ -744,6 +753,7 @@
     <script src="../../lib/sizing-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
+    <script src="../../lib/brinson-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
     <script src="../../lib/reconcile.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
@@ -767,6 +777,7 @@
     <script src="pretrade.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
     <script src="attribution.js?v=1791900000000"></script>
+    <script src="brinson.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

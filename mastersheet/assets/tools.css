@@ -339,3 +339,9 @@ tr.rc-bad td { background: color-mix(in srgb, var(--danger-bg) 55%, transparent)
 .rc-form label, .rc-cash label { display: flex; flex-direction: column; gap: 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); }
 .rc-cash { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 14px 0 6px; }
 .rc-skip { margin: 0; padding-left: 18px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; }
+
+/* ---- Chiến lược nhóm / Brinson (group-strategy.js, assets/brinson.js) ---- */
+.gs-sum { margin: 10px 0 0; font-size: 0.84rem; color: var(--text-secondary); }
+.gs-sum b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.gs-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0 6px; }
+tr.tl-total-row td { border-top: 2px solid var(--border-strong); }

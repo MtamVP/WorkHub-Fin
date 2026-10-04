@@ -78,6 +78,7 @@ function atRender() {
     const period = AttributionCalc.periodFor(AT.range, new Date().toISOString().slice(0, 10), inp.firstTxnDate);
     const r = AttributionCalc.analyze({ txns: inp.txns, actions: inp.actions, cashFlows: inp.cashFlows, histories: inp.histories, navHistory: inp.navHistory, from: period.from, to: period.to });
     AT.result = r;
+    if (typeof bsRefresh === 'function') bsRefresh();
     const t = r.totals;
     let html = '';
     if (inp.historyError) html += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được giá lịch sử: ${atEsc(inp.historyError)}. Chưa tính được lãi/lỗ theo giá.</span></div>`;

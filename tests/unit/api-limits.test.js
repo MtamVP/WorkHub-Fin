@@ -8,7 +8,7 @@ import { createFakeSupabase } from '../helpers/fake-supabase.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(here, '../../', rel), 'utf8');
-const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/limits-calc.js', 'lib/corporate-events.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
+const LIBS = ['lib/finance-calc.js', 'lib/portfolio-calc.js', 'lib/limits-calc.js', 'lib/brinson-calc.js', 'lib/corporate-events.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
 
 const MEMBER = { id: 'u-1', email: 'an@x.vn', nickname: 'An', group_key: 'finance', active: true };
 const BOSS = { id: 'u-2', email: 'sep@x.vn', nickname: 'Sếp', group_key: 'finance', active: true };
@@ -217,5 +217,34 @@ describe('API.asset.limits.complianceLog', () => {
     const r = await c.callGAS('listComplianceLog', { days: 30 });
     expect(r.status).toBe('success');
     expect(r.data).toHaveLength(1);
+  });
+});
+
+describe('API.asset.policy: danh mục chuẩn chiến lược', () => {
+  it('quản lý lưu được; list trả đúng; lưu lại sẽ thay thế toàn bộ (ngành bỏ đi bị xoá)', async () => {
+    const boss = boot({}, BOSS.email);
+    expect(await boss.API.asset.policy.save(BOSS.email, { 'Ngân hàng': 30, 'Công nghệ': 20, 'Bất động sản': 10 })).toMatch(/tiền mặt chuẩn 40%/);
+    let l = await boss.API.asset.policy.list();
+    expect(l.weights).toEqual({ 'Ngân hàng': 30, 'Công nghệ': 20, 'Bất động sản': 10 });
+    expect(l.updatedAt).toBeTruthy();
+    await boss.API.asset.policy.save(BOSS.email, { 'Ngân hàng': 35, 'Công nghệ': 0 });
+    l = await boss.API.asset.policy.list();
+    expect(l.weights).toEqual({ 'Ngân hàng': 35 });
+    expect(boss.fake.table('finance_policy_weights')).toHaveLength(1);
+    expect(boss.fake.table('finance_policy_weights')[0].updated_by).toBe('u-2');
+  });
+  it('thành viên thường không được sửa; tổng vượt 100% hoặc ngành lạ bị từ chối', async () => {
+    const me = boot({}, MEMBER.email);
+    await expect(me.API.asset.policy.save(MEMBER.email, { 'Ngân hàng': 30 })).rejects.toThrow(/quản lý/);
+    const boss = boot({}, BOSS.email);
+    await expect(boss.API.asset.policy.save(BOSS.email, { 'Ngân hàng': 70, 'Công nghệ': 40 })).rejects.toThrow(/vượt 100%/);
+    await expect(boss.API.asset.policy.save(BOSS.email, { 'Ngành tự chế': 10 })).rejects.toThrow(/không hợp lệ/);
+    expect(boss.fake.table('finance_policy_weights')).toHaveLength(0);
+  });
+  it('thành viên đọc được chuẩn của nhóm; qua callGAS', async () => {
+    const boss = boot({}, BOSS.email);
+    expect((await boss.callGAS('savePolicy', { email: BOSS.email, weights: { 'Bán lẻ': 15 } })).status).toBe('success');
+    const r = await boss.callGAS('listPolicy', {});
+    expect(r.data.weights).toEqual({ 'Bán lẻ': 15 });
   });
 });
