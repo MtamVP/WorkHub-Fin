@@ -213,3 +213,4 @@ td.jn-reason::before { content: none; }
 .rk-table td { vertical-align: middle; }
 @media (max-width: 640px) { .rk-sector-row { grid-template-columns: 1fr auto; } .rk-sector-row .rk-bar { grid-column: 1 / -1; order: 3; } }
 #tab-risk .spreadsheet-wrapper { overflow-x: auto; }
+.rk-warn.good { border-color: var(--success-color); background: var(--success-bg); } .rk-warn.good i { color: var(--success-color); }

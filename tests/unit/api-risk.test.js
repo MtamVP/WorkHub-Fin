@@ -83,3 +83,30 @@ describe('API.asset.getRiskInputs', () => {
     expect(r.data.windowDays).toBe(180);
   });
 });
+
+describe('API.asset.getPerfInputs', () => {
+  const nav = (d, v) => ({ user_id: USER, snapshot_date: day(d), nav: v, net_contributed: 100e6, cash: 0, debt: 0, market_value: v });
+  it('trả lịch sử NAV + giá chuẩn (VN-Index mặc định), chuẩn lạ quay về VN-Index, VN30 được nhận', async () => {
+    const calls = [];
+    const fns = { 'stock-history': async (b) => { calls.push(b); return { data: { ok: true, series: Object.fromEntries(b.symbols.map(s => [s, series(30, 100)])) }, error: null }; } };
+    const { API } = boot({ finance_nav_history: [nav(-10, 100e6), nav(-5, 101e6), nav(-1, 103e6)] }, { functions: fns });
+    const r = await API.asset.getPerfInputs(EMAIL);
+    expect(r.navHistory).toHaveLength(3);
+    expect(r.benchKey).toBe('VNINDEX');
+    expect(r.bench).toHaveLength(30);
+    expect(calls[0].symbols).toEqual(['VNINDEX']);
+    expect(calls[0].from < day(-10)).toBe(true);        // phủ từ trước ngày chụp NAV đầu tiên
+    expect((await API.asset.getPerfInputs(EMAIL, 'VN30')).benchKey).toBe('VN30');
+    expect((await API.asset.getPerfInputs(EMAIL, 'HACK')).benchKey).toBe('VNINDEX');
+  });
+  it('chưa đủ NAV thì không gọi nguồn; lỗi giá chuẩn được báo riêng', async () => {
+    const calls = [];
+    const none = boot({}, { functions: { 'stock-history': async () => { calls.push(1); return { data: { ok: true, series: {} }, error: null }; } } });
+    expect((await none.API.asset.getPerfInputs(EMAIL)).bench).toBeNull();
+    expect(calls).toHaveLength(0);
+    const bad = boot({ finance_nav_history: [nav(-3, 1), nav(-1, 2)] }, { functions: { 'stock-history': async () => ({ data: null, error: { message: 'giá hỏng' } }) } });
+    const r = await bad.API.asset.getPerfInputs(EMAIL);
+    expect(r.benchError).toMatch(/giá hỏng/);
+    expect(r.navHistory).toHaveLength(2);
+  });
+});

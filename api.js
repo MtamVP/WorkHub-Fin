@@ -2478,6 +2478,22 @@ const API = {
             };
         },
 
+        // Dữ liệu thô cho phân tích hiệu quả so với chuẩn (tính toán ở lib/perf-calc.js): lịch sử NAV + giá chuẩn (VN-Index hoặc VN30)
+        // phủ từ trước ngày chụp NAV đầu tiên. Lỗi lấy giá chuẩn không làm hỏng phần còn lại (benchError).
+        getPerfInputs: async (email, benchKey) => {
+            const key = ['VNINDEX', 'VN30'].includes(benchKey) ? benchKey : 'VNINDEX';
+            const navHistory = await API.asset.getNavHistory(email);
+            let bench = null, benchError = null;
+            if (navHistory.length >= 2) {
+                const first = String(navHistory[0].snapshot_date).slice(0, 10);
+                const from = new Date(new Date(first + 'T00:00:00Z').getTime() - 20 * 86400000).toISOString().slice(0, 10);
+                const to = new Date().toISOString().slice(0, 10);
+                try { const s = await API.asset.getPriceHistory([key], from, to); bench = s[key] || null; if (!bench) benchError = 'Nguồn chưa có dữ liệu ' + key; }
+                catch (e) { benchError = e.message || String(e); }
+            }
+            return { navHistory, bench, benchKey: key, benchError };
+        },
+
         // Gom dữ liệu thô cho tab Rủi Ro (tính toán ở lib/risk-calc.js): danh mục hiện tại, tiền/nợ, giá lịch sử các mã đang giữ + VN-Index,
         // sự kiện doanh nghiệp để điều chỉnh giá (lỗi ở các phần phụ KHÔNG làm hỏng cả báo cáo), lịch sử NAV đã chụp.
         getRiskInputs: async (email, windowDays) => {
@@ -4066,6 +4082,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getPriceFetchStatus': result = await API.asset.getPriceFetchStatus(); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
+            case 'getPerfInputs': result = await API.asset.getPerfInputs(params.email, params.benchKey); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;

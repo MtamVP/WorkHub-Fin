@@ -514,6 +514,19 @@
                 <p class="guide-text symperf-note">* Tổng lãi/lỗ đã trừ phí giao dịch và gồm cổ tức tiền ghi ở tab "Dòng Tiền" (cổ tức không gắn mã không được tính vào bảng này).</p>
             </div>
 
+            <div class="tl-card" id="perf-pro" style="margin-top:18px">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-scale-balanced"></i> Hiệu Quả So Với Chuẩn</h3>
+                    <div class="tl-card-tools">
+                        <select id="pp-bench" class="tl-select" aria-label="Chuẩn so sánh" onchange="ppReload()"><option value="VNINDEX">VN-Index</option><option value="VN30">VN30</option></select>
+                        <select id="pp-range" class="tl-select" aria-label="Khoảng thời gian" onchange="ppChangeRange()"><option value="3m">3 tháng</option><option value="6m">6 tháng</option><option value="ytd">Từ đầu năm</option><option value="1y">12 tháng</option><option value="all" selected>Từ đầu</option></select>
+                        <label class="tl-check" title="Dùng để tính Sharpe, Sortino, alpha. Lãi tiền gửi kỳ hạn dài là một lựa chọn hợp lý.">Lãi phi rủi ro <input type="number" class="tl-input num" id="pp-rf" style="width:64px" step="0.1" min="0" max="30" value="4.5" onchange="ppRf()"> %/năm</label>
+                    </div>
+                </div>
+                <p class="tl-hint" style="margin:-6px 0 12px">Mức chuyên môn mà một quỹ dùng để đánh giá hiệu quả: alpha và beta, sai lệch so với chuẩn, hệ số thông tin, Sharpe/Sortino, mức hưởng tăng/chịu giảm so với chuẩn, tỷ lệ tháng thắng chuẩn.</p>
+                <div id="pp-body"></div>
+            </div>
+
             <div id="benchmark-admin-panel" class="spreadsheet-wrapper roles-admin-panel" style="display:none;">
                 <h3 class="stock-section-title"><i class="fa-solid fa-chart-simple"></i> Chỉnh Tay Giá Đóng Cửa VN-Index <span class="sub-note">(tự động cập nhật mỗi 5 phút trong phiên — chỉ dùng khi cần sửa)</span></h3>
                 <form id="benchmark-form" class="grant-form-grid">
@@ -660,6 +673,7 @@
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
     <script src="../../lib/corporate-events.js?v=1791900000000"></script>
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
+    <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
@@ -672,6 +686,7 @@
     <script src="journal.js?v=1791900000000"></script>
     <script src="events.js?v=1791900000000"></script>
     <script src="risk.js?v=1791900000000"></script>
+    <script src="perf.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

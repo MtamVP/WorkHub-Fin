@@ -176,6 +176,7 @@ function switchAssetTab(tab) {
     if (tab === 'ledger' && !TAB_LOADED.ledger) { loadLedger(); TAB_LOADED.ledger = true; }
     if (tab === 'journal') { loadJournal(); TAB_LOADED.journal = true; }   // lệnh mới / quyết định mới: mỗi lần mở đều tải lại
     if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
+    if (tab === 'performance' && typeof loadPerfPro === 'function') loadPerfPro();
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
     if (tab === 'risk') loadRisk();   // dữ liệu giữ trong phiên; nút "Tính lại" để lấy mới
