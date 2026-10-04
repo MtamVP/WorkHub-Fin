@@ -119,3 +119,20 @@ describe('stock-history: khối lượng giao dịch', () => {
     expect(validateRequest({ ...body, volumes: 'yes' }).volumes).toBe(false);
   });
 });
+
+import { parseFinfoAverages } from '../../supabase/functions/stock-history/parse.ts';
+describe('stock-history: giá trung bình ngày (VWAP)', () => {
+  // dữ liệu thật của VNDirect stock_prices cho FPT (01-02/10/2026): average tính bằng nghìn đồng
+  const json = { data: [{ code: 'FPT', date: '2026-10-02', average: 62.602, close: 62.1 }, { code: 'FPT', date: '2026-10-01', average: 62.844, close: 62.7 }, { code: 'FPT', date: '2026-09-30', average: 0 }, { code: 'FPT', date: null, average: 60 }, { code: 'FPT', date: '2026-09-29', average: 'x' }] };
+  it('đổi nghìn đồng sang đồng, sắp tăng dần, bỏ dòng không có giá trung bình hoặc thiếu ngày', () => {
+    expect(parseFinfoAverages(json)).toEqual([['2026-10-01', 62844], ['2026-10-02', 62602]]);
+    expect(parseFinfoAverages({ data: [] })).toEqual([]);
+    expect(parseFinfoAverages(null)).toEqual([]);
+  });
+  it('validateRequest nhận cờ averages (mặc định tắt)', () => {
+    const body = { symbols: ['FPT'], from: '2026-09-01', to: '2026-10-01' };
+    expect(validateRequest(body).averages).toBe(false);
+    expect(validateRequest({ ...body, averages: true }).averages).toBe(true);
+    expect(validateRequest({}).averages).toBe(false);
+  });
+});

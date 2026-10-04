@@ -15,8 +15,8 @@ export function vnDate(unixSec: number): string {
 }
 
 // Kiểm tra đầu vào; trả về chuỗi lỗi (tiếng Việt) hoặc null nếu hợp lệ.
-export function validateRequest(body: any): { error: string | null; symbols: string[]; from: string; to: string; volumes: boolean } {
-  const fail = (error: string) => ({ error, symbols: [], from: "", to: "", volumes: false });
+export function validateRequest(body: any): { error: string | null; symbols: string[]; from: string; to: string; volumes: boolean; averages: boolean } {
+  const fail = (error: string) => ({ error, symbols: [], from: "", to: "", volumes: false, averages: false });
   if (!body || !Array.isArray(body.symbols) || !body.symbols.length) return fail("Thiếu danh sách mã.");
   const symbols = [...new Set(body.symbols.map((s: unknown) => String(s).trim().toUpperCase()))] as string[];
   if (symbols.length > MAX_SYMBOLS) return fail(`Tối đa ${MAX_SYMBOLS} mã mỗi lần.`);
@@ -27,7 +27,7 @@ export function validateRequest(body: any): { error: string | null; symbols: str
   const span = (Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000;
   if (!(span >= 0)) return fail("Khoảng ngày không hợp lệ.");
   if (span > MAX_RANGE_DAYS) return fail(`Khoảng ngày tối đa ${MAX_RANGE_DAYS} ngày.`);
-  return { error: null, symbols, from, to, volumes: body.volumes === true };
+  return { error: null, symbols, from, to, volumes: body.volumes === true, averages: body.averages === true };
 }
 
 // Khối lượng giao dịch ngày (cổ phiếu) từ cùng phản hồi dchart { t:[unix], v:[khối lượng] } -> chuỗi [ngày, khối lượng]. Chỉ số không có khối lượng có nghĩa nên bỏ qua.
@@ -63,6 +63,19 @@ export function parseFinfo(json: any): Series {
     const close = Number(r && r.close);
     if (!(close > 0) || !r.date) continue;
     byDate.set(String(r.date).slice(0, 10), Math.round(close * 1000));
+  }
+  return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
+// Giá TRUNG BÌNH NGÀY (VWAP của các lệnh khớp trong ngày) từ VNDirect finfo v4 stock_prices { data:[{date, average}] }; đơn vị nghìn đồng -> đồng. Dùng làm chuẩn đo chất lượng khớp lệnh (TCA):
+// khớp so với giá trung bình ngày tốt hơn so với giá đóng cửa vì đo đúng mặt bằng giá mà cả thị trường đã giao dịch trong ngày.
+export function parseFinfoAverages(json: any): Series {
+  const rows = json && Array.isArray(json.data) ? json.data : [];
+  const byDate = new Map<string, number>();
+  for (const r of rows) {
+    const avg = Number(r && r.average);
+    if (!(avg > 0) || !r.date) continue;
+    byDate.set(String(r.date).slice(0, 10), Math.round(avg * 1000));
   }
   return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 }

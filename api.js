@@ -2756,6 +2756,22 @@ const API = {
             }
         },
 
+        // Giá trung bình ngày (VWAP) của nhiều mã từ `from` tới `to`, chia lô 20 mã: { SYMBOL: [[ngày, giá VND]] }. Edge Function stock-history chưa hỗ trợ cờ averages (bản cũ) thì trả rỗng, không lỗi.
+        getDailyAverages: async (symbols, from, to) => {
+            const list = [...new Set((symbols || []).map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{1,12}$/.test(x)))].slice(0, 80);
+            const end = /^\d{4}-\d{2}-\d{2}$/.test(String(to || '')) ? String(to) : new Date().toISOString().slice(0, 10);
+            const start = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '')) ? String(from) : new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10);
+            const out = {}; let error = null;
+            for (let i = 0; i < list.length; i += 20) {
+                try {
+                    const { data, error: err } = await sbClient.functions.invoke('stock-history', { body: { symbols: list.slice(i, i + 20), from: start, to: end, averages: true } });
+                    if (err) throw err;
+                    Object.assign(out, (data && data.averages) || {});
+                } catch (e) { error = e.message || String(e); }
+            }
+            return { averages: out, error, from: start, to: end };
+        },
+
         // Lịch sử giá đóng cửa nhiều mã (+ VN-Index) từ `from` tới nay, chia lô 20 mã. Trả { histories, error } -- lỗi một phần vẫn trả phần đã lấy được.
         getPriceHistories: async (symbols, from) => {
             const list = [...new Set((symbols || []).map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{1,12}$/.test(x)))].slice(0, 80);
@@ -5027,6 +5043,7 @@ async function _dispatchAction(action, params = {}) {
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
+            case 'getDailyAverages': result = await API.asset.getDailyAverages(params.symbols, params.from, params.to); break;
             case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;
             case 'getMarketReference': result = await API.asset.market.reference(params.symbol); break;
             case 'getSettlement': result = await API.asset.market.settlement(params.email); break;

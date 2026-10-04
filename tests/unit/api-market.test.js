@@ -187,3 +187,28 @@ describe('ratios: chỉ số cơ bản từ cache và làm mới theo yêu cầu
     expect((await c.callGAS('getStockRatios', { symbols: ['VCB'] })).data.VCB.metrics.pe).toBe(12);
   });
 });
+
+describe('getDailyAverages: giá trung bình ngày', () => {
+  it('gọi stock-history với cờ averages, chia lô 20 mã, gộp kết quả; bản hàm cũ không có averages thì trả rỗng', async () => {
+    const calls = [];
+    const fns = { 'stock-history': async (b) => { calls.push(b); return { data: { ok: true, series: {}, averages: Object.fromEntries(b.symbols.map(s => [s, [['2026-10-01', 100500]]])) }, error: null }; } };
+    const syms = Array.from({ length: 25 }, (_, i) => 'A' + String(i).padStart(2, '0'));
+    const c = boot(MEMBER, {}, {}, fns);
+    const r = await c.API.asset.getDailyAverages(syms, '2026-09-01', '2026-10-03');
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ from: '2026-09-01', to: '2026-10-03', averages: true });
+    expect(calls[0].symbols).toHaveLength(20); expect(calls[1].symbols).toHaveLength(5);
+    expect(Object.keys(r.averages)).toHaveLength(25);
+    const old = boot(MEMBER, {}, {}, { 'stock-history': async () => ({ data: { ok: true, series: {} }, error: null }) });
+    expect((await old.API.asset.getDailyAverages(['FPT'], '2026-09-01', '2026-10-03')).averages).toEqual({});
+    expect((await c.callGAS('getDailyAverages', { symbols: ['FPT'], from: '2026-09-01' })).status).toBe('success');
+  });
+  it('lỗi một lô không làm mất các lô khác; mã sai bị bỏ', async () => {
+    let n = 0;
+    const fns = { 'stock-history': async (b) => { n++; if (n === 1) return { data: null, error: { message: 'down' } }; return { data: { ok: true, averages: { [b.symbols[0]]: [['2026-10-01', 1]] } }, error: null }; } };
+    const syms = Array.from({ length: 25 }, (_, i) => 'B' + String(i).padStart(2, '0')).concat(['bad symbol']);
+    const r = await boot(MEMBER, {}, {}, fns).API.asset.getDailyAverages(syms, '2026-09-01', '2026-10-03');
+    expect(r.error).toBe('down');
+    expect(Object.keys(r.averages)).toEqual(['B20']);
+  });
+});

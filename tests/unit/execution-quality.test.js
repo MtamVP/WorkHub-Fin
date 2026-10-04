@@ -80,3 +80,36 @@ describe('nhận xét chỉ khi đủ mẫu', () => {
     expect(EQ.build({ txns, requests: [], series }).summary.insights.some(i => /thời điểm mua/.test(i.text))).toBe(true);
   });
 });
+
+describe('so với giá trung bình ngày (VWAP)', () => {
+  // VWAP ngày 01/10: 100.500; 02/10: 98.600
+  const averages = { FPT: [['2026-10-01', 100500], ['2026-10-02', 98600]] };
+  it('khớp trên VWAP là bất lợi cho lệnh mua và bán đều theo dấu quy ước; chỉ lấy đúng ngày giao dịch (không lấy ngày trước đó)', () => {
+    const o = EQ.build({ txns: [tx('a', { price: 101505 }), tx('b', { type: 'sell', price: 99495 }), tx('c', { trade_date: '2026-10-03' })], requests: [], series, averages });
+    expect(o.rows[0].vsVwapPct).toBeCloseTo(1, 9);                    // mua 101.505 vs 100.500 = +1% bất lợi
+    expect(o.rows[1].vsVwapPct).toBeCloseTo(1, 9);                    // bán 99.495 thấp hơn 100.500 = +1% bất lợi
+    expect(o.rows[2].vsVwapPct).toBeNull();                           // 03/10 không có VWAP (không dùng ngày trước)
+    expect(EQ.valueOn(averages, 'FPT', '2026-10-02')).toBe(98600);
+    expect(EQ.valueOn(averages, 'FPT', '2026-10-03')).toBeNull();
+    expect(EQ.valueOn({}, 'FPT', '2026-10-02')).toBeNull();
+  });
+  it('trung bình có trọng số theo giá trị và tách mua / bán', () => {
+    const o = EQ.build({ txns: [tx('a', { price: 101505, quantity: 3000 }), tx('b', { price: 99495, quantity: 1000 }), tx('s', { type: 'sell', price: 101505 })], requests: [], series, averages });
+    expect(o.summary.vsVwapBuy.n).toBe(2);
+    expect(o.summary.vsVwapBuy.pct).toBeCloseTo((1 * 304515000 + -1 * 99495000) / (304515000 + 99495000), 9);
+    expect(o.summary.vsVwapSell.n).toBe(1);
+    expect(o.summary.vsVwapSell.pct).toBeCloseTo(-1, 9);              // bán cao hơn VWAP 1% là có lợi (âm)
+  });
+  it('nhận xét VWAP khi đủ 5 lệnh cùng phía: mua đắt hơn VWAP cảnh báo, mua rẻ hơn khen; thiếu mẫu thì im lặng', () => {
+    const many = (price) => [1, 2, 3, 4, 5].map(i => tx('m' + i, { price }));
+    expect(EQ.build({ txns: many(101505), requests: [], series, averages }).summary.insights.some(i => /VWAP/.test(i.text) && i.tone === 'warn')).toBe(true);
+    expect(EQ.build({ txns: many(99495), requests: [], series, averages }).summary.insights.some(i => /thấp hơn VWAP/.test(i.text) && i.tone === 'good')).toBe(true);
+    expect(EQ.build({ txns: many(101505).slice(0, 3), requests: [], series, averages }).summary.insights.some(i => /VWAP/.test(i.text))).toBe(false);
+  });
+  it('không có averages: các chỉ số VWAP rỗng, các chỉ số cũ không đổi', () => {
+    const o = EQ.build({ txns: [tx('a', { price: 101000 })], requests: [], series });
+    expect(o.rows[0].vsVwapPct).toBeNull();
+    expect(o.summary.vsVwap.n).toBe(0);
+    expect(o.rows[0].vsClosePct).toBeCloseTo(1, 9);
+  });
+});

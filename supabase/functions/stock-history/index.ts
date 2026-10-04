@@ -2,8 +2,9 @@
 // danh sách theo dõi. Nguồn: VNDirect dchart-api (chính), VNDirect finfo v4 (dự phòng, chỉ cổ phiếu) -- cùng nguồn với fetch-stock-prices.
 // Triển khai: Supabase MCP deploy_edge_function (verify_jwt = true). CHỈ cho người dùng đã đăng nhập (kiểm tra JWT người dùng), để hàm không thành
 // "proxy mở" tới VNDirect. Body: { symbols: ["SSI","VNINDEX"], from: "YYYY-MM-DD", to: "YYYY-MM-DD" } -> { ok, series: { SSI: [[ngày, giá VND]...] }, missing: [...] }.
+// Thêm `volumes: true` -> trả thêm volumes (khối lượng ngày); `averages: true` -> trả thêm averages (giá TRUNG BÌNH ngày, VWAP, từ finfo stock_prices) để đo chất lượng khớp lệnh.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { INDEX_CODES, parseDchart, parseDchartVolumes, parseFinfo, validateRequest, type Series } from "./parse.ts";
+import { INDEX_CODES, parseDchart, parseDchartVolumes, parseFinfo, parseFinfoAverages, validateRequest, type Series } from "./parse.ts";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
 const corsHeaders = {
@@ -42,6 +43,12 @@ async function historyFor(symbol: string, from: string, to: string): Promise<{ s
   return { series: inRange(fallback), volumes: [] };
 }
 
+// Giá trung bình ngày của một cổ phiếu (chỉ số không có): VNDirect finfo v4 stock_prices. Trả [] nếu lỗi.
+async function averagesFor(symbol: string, from: string, to: string): Promise<Series> {
+  if (INDEX_CODES.has(symbol)) return [];
+  return parseFinfoAverages(await getJson(`https://api-finfo.vndirect.com.vn/v4/stock_prices?q=code:${symbol}~date:gte:${from}~date:lte:${to}&sort=date&size=2000`));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -58,13 +65,18 @@ Deno.serve(async (req: Request) => {
 
   const series: Record<string, Series> = {};
   const volumes: Record<string, Series> = {};
+  const averages: Record<string, Series> = {};
   const missing: string[] = [];
   for (let i = 0; i < v.symbols.length; i += 5) {
     const batch = v.symbols.slice(i, i + 5);
     const results = await Promise.all(batch.map((s) => historyFor(s, v.from, v.to)));
+    const avgs = v.averages ? await Promise.all(batch.map((s) => averagesFor(s, v.from, v.to))) : [];
     batch.forEach((s, j) => {
-      if (results[j].series.length) { series[s] = results[j].series; if (v.volumes && results[j].volumes.length) volumes[s] = results[j].volumes; } else missing.push(s);
+      if (results[j].series.length) { series[s] = results[j].series; if (v.volumes && results[j].volumes.length) volumes[s] = results[j].volumes; if (v.averages && avgs[j].length) averages[s] = avgs[j]; } else missing.push(s);
     });
   }
-  return json(v.volumes ? { ok: true, series, volumes, missing } : { ok: true, series, missing });
+  const extra: Record<string, unknown> = {};
+  if (v.volumes) extra.volumes = volumes;
+  if (v.averages) extra.averages = averages;
+  return json({ ok: true, series, ...extra, missing });
 });
