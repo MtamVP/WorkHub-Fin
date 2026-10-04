@@ -553,7 +553,7 @@
             <div class="tl-card" id="bs-card" style="margin-top:18px">
                 <div class="tl-card-head">
                     <h3><i class="fa-solid fa-scale-unbalanced-flip"></i> Phân Bổ Ngành Và Chọn Mã</h3>
-                    <div class="tl-card-tools"><button type="button" class="btn-tool" onclick="bsRefresh()"><i class="fa-solid fa-rotate"></i> Tính lại</button></div>
+                    <div class="tl-card-tools"><button type="button" class="btn-tool" onclick="openRebalance()" title="Đề xuất lệnh mua/bán cụ thể để đưa danh mục về chuẩn chiến lược của nhóm"><i class="fa-solid fa-arrows-rotate"></i> Đề xuất cân bằng về chuẩn</button><button type="button" class="btn-tool" onclick="bsRefresh()"><i class="fa-solid fa-rotate"></i> Tính lại</button></div>
                 </div>
                 <p class="tl-hint" style="margin:-6px 0 12px">So với danh mục chuẩn chiến lược của nhóm (tỷ trọng mục tiêu theo ngành do quản lý đặt): bạn hơn hay kém chuẩn bao nhiêu điểm, bao nhiêu nhờ phân bổ đúng ngành và bao nhiêu nhờ chọn mã trong ngành giỏi hơn chỉ số ngành (phương pháp Brinson-Fachler). Kỳ theo ô chọn của thẻ Nguồn Gốc Lợi Nhuận ở trên.</p>
                 <div id="bs-body"><div class="tl-empty" style="padding:14px">Chờ tính nguồn gốc lợi nhuận…</div></div>
@@ -724,6 +724,17 @@
         </div>
     </div>
 
+    <div class="modal-overlay tl-modal" id="rb-modal">
+        <div class="modal-card" style="max-width:1040px">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-arrows-rotate" style="color: var(--gold);"></i> Cân Bằng Về Danh Mục Chuẩn Chiến Lược</h3>
+                <button type="button" class="icon-btn" onclick="closeRebalance()" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="rb-body"></div>
+            <div class="modal-footer" id="rb-footer"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay tl-modal jn-modal" id="lim-modal">
         <div class="modal-card">
             <div class="modal-header">
@@ -756,6 +767,7 @@
     <script src="../../lib/limits-calc.js?v=1791900000000"></script>
     <script src="../../lib/approval-calc.js?v=1791900000000"></script>
     <script src="../../lib/sizing-calc.js?v=1791900000000"></script>
+    <script src="../../lib/rebalance-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../../lib/brinson-calc.js?v=1791900000000"></script>
@@ -784,6 +796,7 @@
     <script src="perf.js?v=1791900000000"></script>
     <script src="attribution.js?v=1791900000000"></script>
     <script src="brinson.js?v=1791900000000"></script>
+    <script src="rebalance.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

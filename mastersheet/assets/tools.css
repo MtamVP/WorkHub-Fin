@@ -355,3 +355,8 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .ap-box b { font-variant-numeric: tabular-nums; }
 
 .gq-exempt { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 6px 0 4px; }
+
+/* ---- Cân bằng về chuẩn (assets/rebalance.js) ---- */
+.rb-controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin: 0 0 12px; }
+.rb-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); }
+.rb-controls label.tl-check { flex-direction: row; align-items: center; }
