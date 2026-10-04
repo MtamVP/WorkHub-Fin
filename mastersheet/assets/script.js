@@ -180,7 +180,7 @@ function switchAssetTab(tab) {
     if (tab === 'performance' && typeof loadAttribution === 'function') loadAttribution();
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
-    if (tab === 'risk') loadRisk();   // dữ liệu giữ trong phiên; nút "Tính lại" để lấy mới
+    if (tab === 'risk') { loadRisk(); if (typeof loadLimitsPanel === 'function') loadLimitsPanel(true); }   // dữ liệu giữ trong phiên; nút "Tính lại" để lấy mới
     if (tab === 'reports' && !TAB_LOADED.reports) { initReportsTab(); TAB_LOADED.reports = true; }
 }
 
@@ -628,6 +628,13 @@ async function handleTxnSubmit(e) {
     const plan = typeof readTxnPlan === 'function' ? readTxnPlan() : null;
     if (plan) txn.decision = plan;
 
+    // Giới hạn đầu tư: vượt thì hỏi lý do ngoại lệ hoặc chặn (máy chủ kiểm lại khi ghi)
+    if (typeof limitsGate === 'function') {
+        const gate = await limitsGate(txn);
+        if (gate === false) return;
+        if (gate && gate.reason) txn.exception = { reason: gate.reason };
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
 
@@ -645,10 +652,10 @@ async function handleTxnSubmit(e) {
             await loadKpis();
             if (TAB_LOADED.performance) loadPerformanceChart();
         } else {
-            showToast('Lỗi: ' + response.message, 'error');
+            showToast('Lỗi: ' + String(response.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: '), 'error');
         }
     } catch (err) {
-        showToast('Lỗi: ' + err.message, 'error');
+        showToast('Lỗi: ' + String(err.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: '), 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHtml;

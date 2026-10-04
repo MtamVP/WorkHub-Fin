@@ -1611,6 +1611,22 @@ const API = {
             }
 
             const tradeDate = txn.tradeDate || new Date().toISOString().slice(0, 10);
+            // Giới hạn đầu tư: lệnh vượt giới hạn phải kèm lý do, hoặc bị chặn (chỉ quản lý ghi đè). Bỏ qua khi không có giới hạn nào đang bật.
+            let gatedViolations = [], overrideUsed = false;
+            if (!txn.skipLimitCheck && typeof LimitsCalc !== 'undefined') {
+                const chk = await API.asset.limits.checkTrade(email, { type: txn.type === 'sell' ? 'sell' : 'buy', symbol, quantity, price, fee: Number(txn.fee) || 0, tax: txn.type === 'sell' ? (Number(txn.tax) || 0) : 0 });
+                gatedViolations = chk.violations.filter(v => v.mode !== 'warn');
+                if (gatedViolations.length) {
+                    const reason = String((txn.exception && txn.exception.reason) || '').trim();
+                    const actor = await API.asset.limits._actor(email);
+                    if (chk.blocked) {
+                        if (!(actor.isManager && reason.length >= 3)) throw new Error('LIMIT_BLOCKED: ' + chk.violations.filter(v => v.mode === 'block').map(v => v.text).join('; '));
+                        overrideUsed = true;
+                    } else if (reason.length < 3) {
+                        throw new Error('LIMIT_REASON_REQUIRED: ' + gatedViolations.map(v => v.text).join('; '));
+                    }
+                }
+            }
             const { data: inserted, error } = await sbClient.from('finance_transactions').insert({
                 user_id: userId, symbol, type: txn.type === 'sell' ? 'sell' : 'buy', quantity, price,
                 fee: Number(txn.fee) || 0,
@@ -1623,6 +1639,20 @@ const API = {
             // làm thay đổi thứ tự tiêu thụ lô FIFO của những lệnh bán đó.
             await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
+            // Ghi nhận ngoại lệ giới hạn (lý do bắt buộc đã kiểm ở trên): lỗi ở đây KHÔNG làm hỏng lệnh đã lưu
+            if (gatedViolations.length && inserted) {
+                try {
+                    const reason = String(txn.exception.reason).trim();
+                    const { error: exErr } = await sbClient.from('finance_limit_exceptions').insert(gatedViolations.map(v => ({
+                        user_id: userId, limit_id: v.limitId || null, kind: v.kind, symbol: ['max_symbol_pct', 'max_position_vnd', 'blocked_symbol'].includes(v.kind) ? v.subject : symbol,
+                        txn_id: inserted.id, trade_date: tradeDate, mode: v.mode, reason, override: overrideUsed && v.mode === 'block',
+                        metrics: { subject: v.subject, before: v.before, after: v.after, threshold: v.threshold, text: v.text }
+                    })));
+                    if (exErr) throw exErr;
+                } catch (e) {
+                    return "Đã lưu lệnh giao dịch, nhưng chưa ghi được ngoại lệ giới hạn: " + e.message;
+                }
+            }
             // Kế hoạch & lý do đi kèm lệnh (nhật ký quyết định): lỗi ở đây KHÔNG làm hỏng lệnh đã lưu
             if (txn.decision && inserted) {
                 try {
@@ -2216,6 +2246,84 @@ const API = {
                 const { error } = await sbClient.from('finance_event_dismissals').delete().eq('user_id', userId).eq('event_id', String(eventId));
                 if (error) throw error;
                 return "Đã hiện lại sự kiện!";
+            }
+        },
+
+        // --- Giới hạn đầu tư của nhóm (lib/limits-calc.js): chung cho mọi thành viên (quản lý đặt), cá nhân tự đặt, và cho danh mục gộp.
+        //     Lệnh vượt giới hạn phải kèm lý do (chế độ 'reason') hoặc bị chặn (chế độ 'block', chỉ quản lý ghi đè kèm lý do); mọi ngoại lệ được lưu lại. ---
+        limits: {
+            list: async () => {
+                const { data, error } = await sbClient.from('finance_limits').select('*').order('created_at', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            },
+            save: async (email, input) => {
+                if (typeof LimitsCalc === 'undefined') throw new Error("Thiếu thư viện giới hạn (lib/limits-calc.js)");
+                const v = LimitsCalc.validate(input || {});
+                if (!v.ok) throw new Error(v.error);
+                const l = v.limit;
+                const actor = await API.asset.limits._actor(email);
+                if (l.scope !== 'user' && !actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin mới đặt được giới hạn chung của nhóm");
+                const ownerId = l.scope === 'user' ? ((input && input.userId) || actor.targetId) : null;
+                if (l.scope === 'user' && ownerId !== actor.actorId && !actor.isManager) throw new Error("Chỉ đặt được giới hạn cá nhân cho chính mình");
+                const row = { scope: l.scope, user_id: ownerId, kind: l.kind, symbol: l.symbol, sector: l.sector, value: l.value, mode: l.mode, note: l.note || null, active: l.active, updated_at: new Date().toISOString() };
+                if (input && input.id) {
+                    const { error } = await sbClient.from('finance_limits').update(row).eq('id', input.id);
+                    if (error) throw error;
+                    return "Đã cập nhật giới hạn!";
+                }
+                const { error } = await sbClient.from('finance_limits').insert(Object.assign({}, row, { created_by: actor.actorId }));
+                if (error) throw error;
+                return "Đã thêm giới hạn!";
+            },
+            remove: async (id) => {
+                const { error } = await sbClient.from('finance_limits').delete().eq('id', id);
+                if (error) throw error;
+                return "Đã xoá giới hạn!";
+            },
+            setActive: async (id, active) => {
+                const { error } = await sbClient.from('finance_limits').update({ active: !!active, updated_at: new Date().toISOString() }).eq('id', id);
+                if (error) throw error;
+                return active ? "Đã bật giới hạn!" : "Đã tắt giới hạn!";
+            },
+            // Người đang thao tác (đăng nhập thật) khác với `email` (chủ danh mục) khi quản lý nhập hộ lệnh.
+            _actor: async (email) => {
+                const targetId = await getUserId(email);
+                let actorId = targetId, actorEmail = email;
+                try {
+                    const { data } = await sbClient.auth.getUser();
+                    if (data && data.user && data.user.email) { actorEmail = data.user.email; actorId = (await getUserId(actorEmail)) || targetId; }
+                } catch (e) { /* không đọc được phiên: coi như chính chủ */ }
+                let isManager = false;
+                if (actorId) {
+                    const [{ data: roles }, { data: u }] = await Promise.all([
+                        sbClient.from('fin_roles').select('role').eq('user_id', actorId),
+                        sbClient.from('users').select('group_key').eq('id', actorId).maybeSingle()
+                    ]);
+                    isManager = (roles || []).some(r => r.role === 'asset_manager') || !!(u && u.group_key === 'admin');
+                }
+                return { targetId, actorId, actorEmail, isManager };
+            },
+            // Kiểm tra 1 lệnh TRƯỚC khi ghi. trade: { type, symbol, quantity, price, fee, tax }. Không có giới hạn nào đang bật thì trả nhanh, không tải danh mục.
+            checkTrade: async (email, trade) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const rows = await API.asset.limits.list();
+                const limits = LimitsCalc.applicable(rows, userId, 'member');
+                if (!limits.length) return { ok: true, violations: [], near: [], blocked: false, needsReason: false, maxMode: null, none: true };
+                const [holdings, cd] = await Promise.all([
+                    API.asset.getHoldingsView(email),
+                    sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
+                ]);
+                const pf = { holdings: holdings.map(h => ({ symbol: h.symbol, value: h.marketValue })), cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0 };
+                const c = LimitsCalc.checkTrade(limits, pf, trade);
+                return { ok: c.ok, violations: c.violations, near: c.near, blocked: c.blocked, needsReason: c.needsReason, maxMode: c.maxMode, nav: c.before.nav };
+            },
+            exceptions: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 180) * 86400000).toISOString();
+                const { data, error } = await sbClient.from('finance_limit_exceptions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(500);
+                if (error) throw error;
+                return data || [];
             }
         },
 
@@ -3576,7 +3684,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4036,7 +4144,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
-    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
@@ -4192,6 +4300,13 @@ async function _dispatchAction(action, params = {}) {
             case 'saveStockValuationBatch': result = await API.stock.saveValuationRecords(params.records, params.email); break;
             case 'saveStockQuarterBatch': result = await API.stock.saveQuarters(params.rows, params.email); break;
             case 'getStockPortfolioSymbols': result = await API.stock.getPortfolioSymbols(params.email); break;
+            case 'listLimits': result = await API.asset.limits.list(); break;
+            case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
+            case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
+            case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
+            case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
+            case 'listLimitExceptions': result = await API.asset.limits.exceptions(params.days); break;
+            case 'getLimitActor': result = await API.asset.limits._actor(params.email); break;
             case 'loadCorporateEvents': result = await API.asset.events.load(params.email); break;
             case 'applyCorporateEvents': result = await API.asset.events.apply(params.email, params.events, params.ids, params.opts); break;
             case 'dismissCorporateEvent': result = await API.asset.events.dismiss(params.email, params.event); break;

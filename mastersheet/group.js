@@ -43,6 +43,7 @@ async function loadGroup(force) {
         GR.data = data;
         GR.portfolios = GroupCalc.memberPortfolios(data);
         GR.group = GroupCalc.consolidate(GR.portfolios);
+        if (typeof glLoad === 'function') await glLoad();   // giới hạn + ngoại lệ (lỗi không làm hỏng các tab khác)
         const symbols = GR.group.symbols.map(s => s.symbol).slice(0, 40);
         const firstNav = data.navHistory.reduce((m, r) => (!m || r.snapshot_date < m ? r.snapshot_date : m), null);
         const [market, bench] = await Promise.all([

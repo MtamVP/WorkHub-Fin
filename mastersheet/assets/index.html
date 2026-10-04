@@ -561,6 +561,11 @@
         <!-- Tab: Báo Cáo -->
         <!-- Tab: Rủi Ro -->
         <section id="tab-risk" class="asset-tab-panel" style="display:none;">
+            <div class="tl-card" id="lm-card" style="margin-bottom:18px">
+                <div class="tl-card-head"><h3><i class="fa-solid fa-gauge-high"></i> Giới Hạn Đầu Tư Áp Dụng Cho Bạn</h3></div>
+                <p class="tl-hint" style="margin:-6px 0 12px">Mức bạn đang dùng so với giới hạn chung của nhóm và giới hạn bạn tự đặt. Lệnh làm vượt giới hạn phải kèm lý do (hoặc bị chặn, tuỳ chế độ) và được lưu để quản lý xem lại.</p>
+                <div id="lm-panel"></div>
+            </div>
             <div class="tl-card">
                 <div class="tl-card-head">
                     <h3><i class="fa-solid fa-shield-halved"></i> Rủi Ro Danh Mục</h3>
@@ -668,6 +673,17 @@
         </div>
     </div>
 
+    <div class="modal-overlay tl-modal jn-modal" id="lim-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="lim-modal-title"></h3>
+                <button type="button" class="icon-btn" onclick="limitsGateDone(false)" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="lim-modal-body"></div>
+            <div class="modal-footer" id="lim-modal-footer"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay tl-modal jn-modal" id="jn-modal">
         <div class="modal-card">
             <div class="modal-header">
@@ -685,6 +701,7 @@
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
     <script src="../../lib/corporate-events.js?v=1791900000000"></script>
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
+    <script src="../../lib/limits-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
@@ -699,6 +716,7 @@
     <script src="journal.js?v=1791900000000"></script>
     <script src="events.js?v=1791900000000"></script>
     <script src="risk.js?v=1791900000000"></script>
+    <script src="limits.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
     <script src="attribution.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
