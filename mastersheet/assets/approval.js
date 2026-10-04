@@ -4,7 +4,7 @@
    Quy tắc ở /lib/approval-calc.js (có kiểm thử); việc ép thật nằm ở api.js (addTransaction). Quản lý duyệt ở Toàn Nhóm > Duyệt Lệnh.
    Dùng global của script.js / limits.js: callGAS, targetEmail, showToast, escapeAssetHtml, pickTxnType. Dùng lại khung #lim-modal. */
 
-const AP = { rows: [], policy: null, state: 'idle', pending: null };
+const AP = { rows: [], policy: null, state: 'idle', pending: null, ideas: null };
 
 const apEsc = (s) => escapeAssetHtml(s === null || s === undefined ? '' : String(s));
 const apNum = (v, d) => Number(v).toLocaleString('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: d === undefined ? 0 : d });
@@ -40,12 +40,27 @@ function apShowRequest(trade, chk) {
         <div class="ap-box">Lệnh <b>${trade.type === 'sell' ? 'bán' : 'mua'} ${apEsc(trade.symbol)}</b> ${apNum(trade.quantity)} cổ × ${apNum(trade.price)} = <b>${apVnd(chk.value)}</b> vượt ngưỡng duyệt của nhóm: ${apEsc(why)}.
             Lệnh <b>chưa được ghi</b>. Gửi đề xuất cho quản lý; khi được duyệt (hiệu lực ${chk.policy.validDays} ngày) bạn quay lại ghi đúng lệnh này.</div>
         ${dup ? `<div class="conc-warn"><i class="fa-solid fa-circle-info"></i><span>Bạn đã có một đề xuất ${trade.type === 'sell' ? 'bán' : 'mua'} ${apEsc(trade.symbol)} đang chờ duyệt (${apVnd(dup.value)}). Gửi thêm sẽ tạo đề xuất thứ hai.</span></div>` : ''}
+        <div class="txn-field txn-field-wide" id="ap-idea-wrap" style="display:none"><label for="ap-idea">Ý tưởng đầu tư liên quan (tuỳ chọn — để theo dõi hành trình từ ý tưởng tới lệnh)</label><select id="ap-idea" class="tl-select"><option value="">Không gắn ý tưởng</option></select></div>
         <div class="txn-field txn-field-wide"><label for="ap-reason">Lý do đề xuất (bắt buộc, ít nhất 10 ký tự)</label>
             <textarea id="ap-reason" rows="4" maxlength="1000" placeholder="Luận điểm đầu tư, vì sao cỡ lệnh này, điểm cắt lỗ / giá mục tiêu…" oninput="document.getElementById('ap-send').disabled = this.value.trim().length < 10">${apEsc(planReason)}</textarea>
             <span class="tl-hint" style="margin:0">Quản lý đọc lý do này để duyệt hoặc từ chối. Người duyệt phải là người khác bạn.</span></div>`;
     document.getElementById('lim-modal-footer').innerHTML = '<button type="button" class="btn-tool" onclick="apClose()">Đóng</button>'
         + `<button type="button" class="btn-save" id="ap-send" ${planReason.trim().length >= 10 ? '' : 'disabled'} onclick="apSend()"><i class="fa-solid fa-paper-plane"></i> Gửi đề xuất</button>`;
     document.getElementById('lim-modal').classList.add('open');
+    apLoadIdeas(trade);
+}
+
+// Ý tưởng đang mở của đúng mã (đã duyệt / vào danh mục / chờ phản biện); chỉ có đúng một thì chọn sẵn
+async function apLoadIdeas(trade) {
+    try {
+        if (!AP.ideas) AP.ideas = (await apCall('listIdeas')).ideas || [];
+        const list = AP.ideas.filter(i => String(i.symbol).toUpperCase() === trade.symbol && ['approved', 'in_portfolio', 'review'].includes(i.status) && i.direction !== 'avoid');
+        const sel = document.getElementById('ap-idea'), wrap = document.getElementById('ap-idea-wrap');
+        if (!sel || !wrap || !list.length || !AP.pending) return;
+        sel.innerHTML = '<option value="">Không gắn ý tưởng</option>' + list.map(i => `<option value="${apEsc(i.id)}">${apEsc(i.title)}</option>`).join('');
+        if (list.length === 1) sel.value = list[0].id;
+        wrap.style.display = '';
+    } catch (e) { /* không lấy được ý tưởng: bỏ qua phần tuỳ chọn này */ }
 }
 
 function apClose() { document.getElementById('lim-modal').classList.remove('open'); AP.pending = null; }
@@ -57,7 +72,8 @@ async function apSend() {
     const reason = String((document.getElementById('ap-reason') || {}).value || '').trim();
     if (btn) btn.disabled = true;
     try {
-        const msg = await apCall('createOrderRequest', { request: { symbol: p.trade.symbol, side: p.trade.type, quantity: p.trade.quantity, price: p.trade.price, reason } });
+        const ideaSel = document.getElementById('ap-idea');
+        const msg = await apCall('createOrderRequest', { request: { symbol: p.trade.symbol, side: p.trade.type, quantity: p.trade.quantity, price: p.trade.price, reason, ideaId: ideaSel && ideaSel.value ? ideaSel.value : undefined } });
         apClose();
         showToast(msg, 'success');
         apLoadMine();

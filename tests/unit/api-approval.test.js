@@ -110,6 +110,15 @@ describe('orders: đề xuất, duyệt, huỷ', () => {
     expect(row.order_pct).toBeCloseTo(12.5, 6);
     expect((await c.API.asset.orders.list(MEMBER.email))).toHaveLength(1);
   });
+  it('đề xuất gắn ý tưởng (ideaId hợp lệ mới được lưu)', async () => {
+    const c = boot();
+    const id = '11111111-2222-4333-8444-555555555555';
+    await c.API.asset.orders.create(MEMBER.email, { symbol: 'HPG', side: 'buy', quantity: 500, price: 100000, reason: 'Theo ý tưởng đã duyệt của nhóm', ideaId: id });
+    await c.API.asset.orders.create(MEMBER.email, { symbol: 'HPG', side: 'buy', quantity: 500, price: 100000, reason: 'Không gắn ý tưởng nào hết', ideaId: 'not-a-uuid' });
+    const rows = c.fake.table('finance_order_requests');
+    expect(rows[0].idea_id).toBe(id);
+    expect(rows[1].idea_id).toBeUndefined();
+  });
   it('quản lý duyệt: có hạn dùng theo quy định; từ chối cần lý do', async () => {
     const c = boot(MANAGER, { finance_order_requests: [{ id: 'r1', user_id: 'u-1', symbol: 'HPG', side: 'buy', quantity: 500, price_ref: 100000, value: 50e6, status: 'pending', created_at: new Date().toISOString() }] });
     await expect(c.API.asset.orders.decide(MANAGER.email, 'r1', 'rejected', '')).rejects.toThrow(/lý do/);

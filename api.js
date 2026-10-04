@@ -2522,7 +2522,8 @@ const API = {
                 const nav = await API.asset.orders._nav(email, userId);
                 const b = ApprovalCalc.buildRequest(input || {}, { nav });
                 if (!b.ok) throw new Error(b.error);
-                const { error } = await sbClient.from('finance_order_requests').insert(Object.assign({ user_id: userId }, b.row));
+                const ideaId = input && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(input.ideaId || '')) ? String(input.ideaId) : null;   // ý tưởng đầu tư sinh ra đề xuất này (tuỳ chọn)
+                const { error } = await sbClient.from('finance_order_requests').insert(Object.assign({ user_id: userId }, b.row, ideaId ? { idea_id: ideaId } : {}));
                 if (error) throw error;
                 return "Đã gửi đề xuất lệnh, chờ quản lý duyệt";
             },

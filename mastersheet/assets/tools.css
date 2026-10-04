@@ -360,3 +360,10 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .rb-controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin: 0 0 12px; }
 .rb-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); }
 .rb-controls label.tl-check { flex-direction: row; align-items: center; }
+
+/* ---- Hành trình ý tưởng (group-journey.js) ---- */
+.gj-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; margin-top: 6px; font-size: 0.78rem; color: var(--text-muted); }
+.gj-step { display: inline-flex; flex-direction: column; padding: 2px 8px; border-radius: var(--radius-pill); border: 1px dashed var(--border-color); white-space: nowrap; }
+.gj-step.done { color: var(--text-primary); border-style: solid; background: var(--bg-color-2); }
+.gj-step small { font-size: 0.68rem; color: var(--text-muted); }
+.gj-arrow { font-style: normal; color: var(--text-muted); padding: 0 2px; }
