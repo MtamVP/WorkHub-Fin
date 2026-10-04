@@ -166,3 +166,20 @@ td.jn-reason::before { content: none; }
 .jn-modal .jn-form input[readonly] { opacity: 0.75; cursor: not-allowed; }
 .jn-modal .txn-field > label { font-size: 0.66rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .jn-modal .modal-body > .txn-field { margin-top: 2px; }
+
+/* ---- Sự kiện doanh nghiệp tự gợi ý (events.js) ---- */
+.ce-banner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; padding: 11px 14px; border: 1px solid var(--gold); border-radius: var(--radius-sm); background: var(--gold-dim); color: var(--text-primary); font-size: 0.84rem; line-height: 1.5; }
+.ce-banner > i { color: var(--gold); font-size: 1.05rem; }
+.ce-banner > span { flex: 1 1 320px; min-width: 0; }
+.ce-group-title { display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+.ce-group-title:first-child { margin-top: 0; }
+.ce-table td { vertical-align: top; }
+#ce-card .spreadsheet-wrapper { overflow-x: auto; }
+.ce-detail { min-width: 240px; }
+.ce-sub { margin-top: 2px; font-size: 0.74rem; color: var(--text-muted); line-height: 1.5; }
+.ce-actions { white-space: nowrap; }
+.ce-actions .tl-link { margin-left: 6px; }
+.btn-tool.ce-apply { color: var(--on-gold, #1A1407); background: var(--gold); border-color: var(--gold); font-weight: 700; }
+.btn-tool.ce-apply:hover { filter: brightness(1.06); }
+.btn-tool.ce-apply:disabled { opacity: 0.55; cursor: wait; }
+@media (max-width: 640px) { .ce-detail { min-width: 180px; } .ce-actions { white-space: normal; } }

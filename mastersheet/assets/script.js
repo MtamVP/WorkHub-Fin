@@ -191,6 +191,7 @@ function switchLedgerSubTab(sub) {
     });
     if (sub === 'cashflow' && !LEDGER_SUB_LOADED.cashflow) { loadCashFlows(); LEDGER_SUB_LOADED.cashflow = true; }
     if (sub === 'corporate' && !LEDGER_SUB_LOADED.corporate) { loadCorporateActions(); LEDGER_SUB_LOADED.corporate = true; }
+    if (sub === 'corporate' && typeof renderCorpEvents === 'function') { if (CE.state === 'idle') loadCorpEvents(); else renderCorpEvents(); }
 }
 
 // --- TIỀN MẶT / DƯ NỢ ---

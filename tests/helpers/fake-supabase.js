@@ -8,6 +8,7 @@ const UNIQUES = {
   finance_watchlist: [['user_id', 'symbol']],
   finance_holdings_price: [['user_id', 'symbol']],
   finance_allocation_targets: [['user_id', 'symbol']],
+  finance_event_dismissals: [['user_id', 'event_id']],
   finance_assets: [['user_id']],
   finance_nav_history: [['user_id', 'snapshot_date']],
   finance_benchmark_prices: [['index_code', 'price_date']],

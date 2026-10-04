@@ -12,6 +12,7 @@ function onHoldingsLoaded(holdings) {
     renderSectorBlock(lastHoldings);
     renderPriceStatus();
     renderAlertEmailBar();
+    if (typeof initCorpEvents === 'function') initCorpEvents();   // sự kiện doanh nghiệp: lấy ngầm 1 lần mỗi phiên để hiện thông báo
 }
 
 function renderPriceAge(h) {

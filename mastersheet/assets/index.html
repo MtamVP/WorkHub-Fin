@@ -121,7 +121,7 @@
         <div class="task-view-toggle asset-tab-toggle">
             <button class="view-toggle-btn active" data-tab="holdings" onclick="switchAssetTab('holdings')"><i class="fa-solid fa-layer-group"></i> Danh Mục</button>
             <button class="view-toggle-btn" data-tab="watchlist" onclick="switchAssetTab('watchlist')"><i class="fa-solid fa-eye"></i> Theo Dõi</button>
-            <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh</button>
+            <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh <span class="jn-badge" id="ce-badge" style="display:none;" title="Sự kiện doanh nghiệp chưa ghi"></span></button>
             <button class="view-toggle-btn" data-tab="journal" onclick="switchAssetTab('journal')"><i class="fa-solid fa-book-open"></i> Nhật Ký <span class="jn-badge" id="jn-badge" style="display:none;"></span></button>
             <button class="view-toggle-btn" data-tab="performance" onclick="switchAssetTab('performance')"><i class="fa-solid fa-chart-area"></i> Hiệu Suất</button>
             <button class="view-toggle-btn" data-tab="reports" onclick="switchAssetTab('reports')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
@@ -137,6 +137,7 @@
                 </div>
             </div>
             <div id="alert-email-bar" class="alert-email-bar"></div>
+            <div id="ce-banner" class="ce-banner" style="display:none;"></div>
             <div class="holdings-layout">
                 <div class="spreadsheet-wrapper">
                     <table class="excel-table asset-table" id="holdings-table">
@@ -367,6 +368,19 @@
             </div>
 
             <div id="ledger-sub-corporate" class="ledger-sub-panel" style="display:none;">
+                <div class="tl-card" id="ce-card">
+                    <div class="tl-card-head">
+                        <h3><i class="fa-solid fa-gift"></i> Sự kiện doanh nghiệp của các mã bạn nắm</h3>
+                        <div class="tl-card-tools">
+                            <span class="tl-hint" id="ce-meta" style="margin:0"></span>
+                            <label class="tl-check" title="Nguồn công bố cổ tức GỘP. Thuế TNCN 5% đã bị công ty khấu trừ trước khi chuyển cho bạn, nên số thực nhận = 95%."><input type="checkbox" id="ce-aftertax" checked onchange="ceSetAfterTax(this)"> Ghi cổ tức sau thuế 5%</label>
+                            <button type="button" class="btn-tool" onclick="loadCorpEvents()"><i class="fa-solid fa-rotate"></i> Kiểm tra lại</button>
+                            <button type="button" class="btn-tool ce-apply" id="ce-apply-all" style="display:none" onclick="applyAllCorpEvents()"><i class="fa-solid fa-check-double"></i> <span>Ghi tất cả</span></button>
+                        </div>
+                    </div>
+                    <p class="tl-hint" style="margin:-6px 0 12px">Cổ tức tiền, cổ phiếu thưởng, cổ tức bằng cổ phiếu và quyền mua phát hành thêm, tính theo <b>số cổ phiếu bạn giữ trước ngày giao dịch không hưởng quyền</b>. App chỉ gợi ý — mỗi khoản chỉ được ghi khi bạn bấm “Ghi”. Dữ liệu từ nguồn thị trường công khai, hãy đối chiếu với thông báo của công ty chứng khoán.</p>
+                    <div id="ce-body"></div>
+                </div>
                 <form id="corpaction-form" class="txn-form">
                     <h3 class="txn-form-title"><i class="fa-solid fa-building-columns"></i> Ghi Nhận Hành Động Doanh Nghiệp</h3>
                     <div class="txn-form-grid">
@@ -618,6 +632,7 @@
     <script src="../../api.js?v=1791900000000"></script>
     <script src="../../lib/finance-calc.js?v=2"></script>
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
+    <script src="../../lib/corporate-events.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
@@ -628,6 +643,7 @@
     <script src="ledger-tools.js?v=1791900000000"></script>
     <script src="watchlist.js?v=1791900000000"></script>
     <script src="journal.js?v=1791900000000"></script>
+    <script src="events.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

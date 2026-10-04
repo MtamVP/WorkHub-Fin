@@ -2144,6 +2144,81 @@ const API = {
             }
         },
 
+        // --- Sự kiện doanh nghiệp tự gợi ý (cổ tức tiền, cổ phiếu thưởng/cổ tức CP, quyền mua): nguồn VNDirect qua Edge Function stock-events,
+        //     đối chiếu với sổ lệnh bằng lib/corporate-events.js. App KHÔNG tự ghi: người dùng bấm xác nhận từng sự kiện. ---
+        events: {
+            _fetchEvents: async (symbols, since) => {
+                const events = [], errors = {};
+                for (let i = 0; i < symbols.length; i += 30) {
+                    const { data, error } = await sbClient.functions.invoke('stock-events', { body: { symbols: symbols.slice(i, i + 30), since } });
+                    if (error) {
+                        let detail = error.message;
+                        try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                        throw new Error(detail);
+                    }
+                    if (!data || !data.ok) throw new Error((data && data.error) || 'Không lấy được sự kiện doanh nghiệp');
+                    events.push(...(data.events || []));
+                    Object.assign(errors, data.errors || {});
+                }
+                return { events, errors };
+            },
+            _context: async (email) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const [txns, actions, cashFlows, dis] = await Promise.all([
+                    API.asset.listTransactions(email),
+                    API.asset.corporateAction.list(email),
+                    API.asset.cashFlow.list(email),
+                    sbClient.from('finance_event_dismissals').select('event_id').eq('user_id', userId)
+                ]);
+                if (dis.error) throw dis.error;
+                return { userId, txns, actions, cashFlows, dismissed: new Set((dis.data || []).map(r => r.event_id)) };
+            },
+            // Tải sự kiện mới + đối chiếu. Trả { items, summary, errors, fetchedAt, events } (events = bản thô để truyền lại cho apply).
+            load: async (email) => {
+                if (typeof CorporateEvents === 'undefined') throw new Error("Thiếu thư viện sự kiện doanh nghiệp (lib/corporate-events.js)");
+                const ctx = await API.asset.events._context(email);
+                const scope = CorporateEvents.queryScope(ctx.txns);
+                if (!scope.symbols.length) return { items: [], summary: CorporateEvents.suggest([], ctx).summary, errors: {}, events: [], fetchedAt: new Date().toISOString(), empty: true };
+                const { events, errors } = await API.asset.events._fetchEvents(scope.symbols, scope.since);
+                const res = CorporateEvents.suggest(events, Object.assign({ today: new Date().toISOString().slice(0, 10) }, ctx));
+                return { items: res.items, summary: res.summary, errors, events, fetchedAt: new Date().toISOString() };
+            },
+            // Ghi các sự kiện được chọn. events = bản thô từ load(); ids = id sự kiện muốn ghi; opts.afterTax (mặc định true: cổ tức ghi sau thuế 5%).
+            // Luôn tính lại trên sổ lệnh MỚI NHẤT và chỉ ghi sự kiện còn ở trạng thái 'pending' (chống ghi trùng khi bấm 2 lần / 2 thiết bị).
+            apply: async (email, events, ids, opts) => {
+                const ctx = await API.asset.events._context(email);
+                const res = CorporateEvents.suggest(events || [], Object.assign({ today: new Date().toISOString().slice(0, 10) }, ctx));
+                const want = new Set(ids || []);
+                const todo = res.items.filter(p => p.status === 'pending' && want.has(p.event.id) && p.kind !== 'rights')
+                    .sort((a, b) => (a.event.exDate < b.event.exDate ? -1 : (a.event.exDate > b.event.exDate ? 1 : 0)));
+                let cash = 0, stock = 0;
+                const skipped = (ids || []).length - todo.length;
+                for (const p of todo) {
+                    const rec = CorporateEvents.toRecord(p, opts);
+                    if (!rec) continue;
+                    if (rec.type === 'cashFlow') { await API.asset.cashFlow.add(email, rec.flow); cash++; }
+                    else { await API.asset.corporateAction.add(email, rec.action); stock++; }
+                }
+                return { cash, stock, skipped, message: `Đã ghi ${cash} khoản cổ tức tiền và ${stock} sự kiện cổ phiếu${skipped ? ` (bỏ qua ${skipped} sự kiện đã ghi hoặc chưa tới hạn)` : ''}.` };
+            },
+            dismiss: async (email, event) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const { error } = await sbClient.from('finance_event_dismissals').upsert({
+                    user_id: userId, event_id: String(event.id), symbol: event.symbol, kind: event.kind, note: event.note || null
+                }, { onConflict: 'user_id,event_id' });
+                if (error) throw error;
+                return "Đã ẩn sự kiện này!";
+            },
+            restore: async (email, eventId) => {
+                const userId = await getUserId(email);
+                const { error } = await sbClient.from('finance_event_dismissals').delete().eq('user_id', userId).eq('event_id', String(eventId));
+                if (error) throw error;
+                return "Đã hiện lại sự kiện!";
+            }
+        },
+
         // --- Giá đóng cửa VN-Index/VN30: dữ liệu tham chiếu dùng chung, nhập tay bởi asset_manager ---
         benchmark: {
             list: async (indexCode, days) => {
@@ -3311,7 +3386,7 @@ const API = {
         _PK: { // upsert onConflict column(s) per table -- most default to 'id'
             app_settings: 'key', finance_stocks: 'symbol', user_status: 'uid',
             lounge_players: 'email', task_assignees: 'task_id,user_email',
-            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol'
+            finance_holdings_price: 'user_id,symbol', finance_allocation_targets: 'user_id,symbol', finance_event_dismissals: 'user_id,event_id'
         },
         listLocal: async () => {
             if (!window.__TAURI__ || !window.__TAURI__.fs) return [];
@@ -3350,7 +3425,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -3810,7 +3885,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
-    'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
@@ -3958,6 +4033,10 @@ async function _dispatchAction(action, params = {}) {
             case 'saveStockValuationBatch': result = await API.stock.saveValuationRecords(params.records, params.email); break;
             case 'saveStockQuarterBatch': result = await API.stock.saveQuarters(params.rows, params.email); break;
             case 'getStockPortfolioSymbols': result = await API.stock.getPortfolioSymbols(params.email); break;
+            case 'loadCorporateEvents': result = await API.asset.events.load(params.email); break;
+            case 'applyCorporateEvents': result = await API.asset.events.apply(params.email, params.events, params.ids, params.opts); break;
+            case 'dismissCorporateEvent': result = await API.asset.events.dismiss(params.email, params.event); break;
+            case 'restoreCorporateEvent': result = await API.asset.events.restore(params.email, params.eventId); break;
             case 'listDecisions': result = await API.asset.journal.list(params.email); break;
             case 'saveDecision': result = await API.asset.journal.save(params.email, params.decision); break;
             case 'saveDecisionReview': result = await API.asset.journal.saveReview(params.email, params.id, params.review); break;
