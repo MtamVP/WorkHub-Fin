@@ -45,6 +45,7 @@ async function loadGroup(force) {
         GR.group = GroupCalc.consolidate(GR.portfolios);
         if (typeof glLoad === 'function') await glLoad();   // giới hạn + ngoại lệ (lỗi không làm hỏng các tab khác)
         if (typeof gqLoad === 'function') gqLoad(true);      // đề xuất lệnh chờ duyệt (chỉ để hiện số trên thẻ; không chặn tải nhóm)
+        if (typeof gdBadge === 'function') gdBadge();         // số cảnh báo chất lượng dữ liệu đang mở (chỉ để hiện số trên nút tab)
         const symbols = GR.group.symbols.map(s => s.symbol).slice(0, 40);
         const firstNav = data.navHistory.reduce((m, r) => (!m || r.snapshot_date < m ? r.snapshot_date : m), null);
         const [market, bench] = await Promise.all([
@@ -87,6 +88,7 @@ function switchGroupTab(tab) {
     if (tab === 'approvals' && typeof gqLoad === 'function') gqLoad(true);
     if (tab === 'journey' && typeof gjLoad === 'function') gjLoad();
     if (tab === 'execution' && typeof gxLoad === 'function') gxLoad();
+    if (tab === 'data' && typeof gdLoad === 'function') gdLoad(true);
     if (tab === 'report') {          // báo cáo hội đồng đầu tư gom thêm duyệt lệnh, hành trình ý tưởng, khớp lệnh: tải nền, báo cáo tự vẽ lại khi xong
         if (typeof gqLoad === 'function') gqLoad();
         if (typeof gjLoad === 'function') gjLoad();
@@ -208,6 +210,8 @@ function grRender() {
     } else if (GR.tab === 'strategy' && typeof grStrategyHtml === 'function') {
         body.innerHTML = grStrategyHtml();
         if (typeof grStrategyAfterRender === 'function') grStrategyAfterRender();
+    } else if (GR.tab === 'data' && typeof grDataHtml === 'function') {
+        body.innerHTML = grDataHtml();
     } else if (GR.tab === 'execution' && typeof grExecutionHtml === 'function') {
         body.innerHTML = grExecutionHtml();
     } else if (GR.tab === 'journey' && typeof grJourneyHtml === 'function') {

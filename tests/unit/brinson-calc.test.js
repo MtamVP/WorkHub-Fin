@@ -19,8 +19,10 @@ describe('sectorReturns / indexFor', () => {
     expect(B.SECTOR_INDEX_CODES.sort()).toEqual(['VNCOND', 'VNCONS', 'VNENE', 'VNFIN', 'VNHEAL', 'VNIND', 'VNIT', 'VNMAT', 'VNREAL', 'VNUTI']);
   });
   it('mọi ngành nội bộ đều có chỉ số', () => {
-    expect(B.allSectors()).toHaveLength(16);
-    B.allSectors().forEach((s) => expect(B.SECTOR_INDEX[s]).toBeTruthy());
+    expect(B.allSectors()).toHaveLength(22);
+    B.allSectors().forEach((s) => expect(B.indexFor(s)).toBeTruthy());
+    expect(B.indexFor('Viễn thông')).toBe('VNINDEX');                    // chưa có chỉ số ngành riêng
+    expect(B.indexFor('Công nghiệp & dịch vụ')).toBe('VNIND');
   });
   it('lợi suất giá của chỉ số giữa hai mốc, dùng điểm gần nhất tại hoặc trước mốc', () => {
     const histories = { VNFIN: [['2026-01-01', 1000], ['2026-03-31', 1050], ['2026-06-30', 1080]], VNIT: [['2026-01-02', 2000]] };

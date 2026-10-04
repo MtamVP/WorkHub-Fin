@@ -1943,6 +1943,7 @@ const API = {
         },
 
         getHoldingsView: async (email) => {
+            await API.asset.market.ensureMeta();
             const userId = await getUserId(email);
             const holdings = await API.asset.computeHoldings(userId);
             const { data: prices } = await sbClient.from('finance_holdings_price')
@@ -2443,6 +2444,70 @@ const API = {
                 }
                 return "Đã lưu danh mục chuẩn chiến lược (tiền mặt chuẩn " + (Math.round(v.cashPct * 10) / 10) + "%)";
             },
+        },
+
+        // --- Dữ liệu thị trường miễn phí + giám sát vận hành (finance-market-data-migration.sql; Edge Function market-data-sync):
+        //     phân ngành ICB cho toàn bộ mã niêm yết, lợi suất trái phiếu chính phủ theo ngày (lãi phi rủi ro), cảnh báo chất lượng dữ liệu giá, nhật ký chạy của các hàm định kỳ. ---
+        market: {
+            _p: null, _at: 0,
+            // Nạp phân ngành ICB một lần mỗi phiên (cache localStorage 24 giờ) rồi đăng ký vào FinCalc; lỗi nào cũng chỉ bỏ qua (bảng tự gõ vẫn dùng được).
+            ensureMeta: async (force) => {
+                const M = API.asset.market;
+                if (typeof SectorMap === 'undefined' || typeof FinCalc === 'undefined') return 0;
+                if (!force && M._p && Date.now() - M._at < 300000) return M._p;
+                M._at = Date.now();
+                M._p = (async () => {
+                    const KEY = 'wh_sector_meta_v1', TTL = 24 * 3600 * 1000;
+                    let cached = null;
+                    try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* không có cache */ }
+                    if (!force && cached && cached.map && Date.now() - cached.ts < TTL) return FinCalc.registerSectors(cached.map);
+                    try {
+                        const rows = await API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('symbol, icb2_code').order('symbol'));
+                        const map = SectorMap.buildMap(rows || []);
+                        if (Object.keys(map).length) {
+                            try { localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), map })); } catch (e) { /* cache đầy: bỏ qua */ }
+                            return FinCalc.registerSectors(map);
+                        }
+                    } catch (e) { /* không đọc được: dùng cache cũ nếu có */ }
+                    return cached && cached.map ? FinCalc.registerSectors(cached.map) : 0;
+                })();
+                return M._p;
+            },
+            listMeta: async () => API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('*').order('symbol')),
+            // Lợi suất trái phiếu chính phủ các kỳ hạn trong `days` ngày gần nhất (cũ -> mới)
+            rates: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 400) * 86400000).toISOString().slice(0, 10);
+                const { data, error } = await sbClient.from('finance_rates').select('rate_date, tenor, yield_pct, source').gte('rate_date', since).order('rate_date', { ascending: true }).limit(5000);
+                if (error) throw error;
+                return data || [];
+            },
+            healthList: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 60) * 86400000).toISOString();
+                // chưa xử lý (bất kể cũ) + đã xử lý trong khoảng gần đây
+                const [open, done] = await Promise.all([
+                    sbClient.from('finance_data_health').select('*').eq('resolved', false).order('detected_at', { ascending: false }).limit(300),
+                    sbClient.from('finance_data_health').select('*').eq('resolved', true).gte('detected_at', since).order('detected_at', { ascending: false }).limit(300)
+                ]);
+                if (open.error) throw open.error;
+                if (done.error) throw done.error;
+                return (open.data || []).concat(done.data || []).sort((x, y) => (x.detected_at < y.detected_at ? 1 : -1));
+            },
+            healthResolve: async (email, id, note) => {
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin được đánh dấu đã xử lý cảnh báo dữ liệu");
+                const text = String(note || '').trim();
+                if (text.length < 3) throw new Error("Ghi chú xử lý cần ít nhất 3 ký tự");
+                const { data, error } = await sbClient.from('finance_data_health').update({ resolved: true, resolve_note: text.slice(0, 500) }).eq('id', id).eq('resolved', false).select('id');
+                if (error) throw error;
+                if (!data || !data.length) throw new Error("Cảnh báo đã được xử lý");
+                return "Đã đánh dấu đã xử lý";
+            },
+            runs: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 14) * 86400000).toISOString();
+                const { data, error } = await sbClient.from('finance_function_runs').select('id, fn, mode, run_at, ok, duration_ms, detail').gte('run_at', since).order('run_at', { ascending: false }).limit(400);
+                if (error) throw error;
+                return data || [];
+            }
         },
 
         // --- Danh sách hạn chế mã (finance-restricted-migration.sql): quản lý / admin cấm cả MUA lẫn BÁN một mã cho mọi thành viên hoặc một người (thông tin chưa công bố, xung đột lợi ích...).
@@ -3107,6 +3172,7 @@ const API = {
         // Dữ liệu thô của CẢ NHÓM (thành viên finance/admin đang hoạt động): sổ lệnh, hành động DN, dòng tiền, giá, tiền/nợ, lịch sử NAV.
         // Chính sách RLS cho phép nhóm finance/admin đọc dữ liệu của nhau. Phép gộp ở lib/group-calc.js.
         getGroupData: async () => {
+            await API.asset.market.ensureMeta();
             const { data: users, error } = await sbClient.from('users').select('id, email, nickname, group_key, active').in('group_key', ['finance', 'admin']);
             if (error) throw error;
             const members = (users || []).filter(u => u.active !== false).map(u => ({ id: u.id, email: u.email, nickname: u.nickname || null }));
@@ -4737,7 +4803,7 @@ const MUTATING_ACTIONS = new Set([
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
-    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addRestricted', 'setRestrictedActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
+    'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addRestricted', 'setRestrictedActive', 'resolveDataHealth', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'reviewApprovalAudit', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
@@ -4899,6 +4965,11 @@ async function _dispatchAction(action, params = {}) {
             case 'listLimits': result = await API.asset.limits.list(); break;
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
+            case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
+            case 'listDataHealth': result = await API.asset.market.healthList(params.days); break;
+            case 'resolveDataHealth': result = await API.asset.market.healthResolve(params.email, params.id, params.note); break;
+            case 'listFunctionRuns': result = await API.asset.market.runs(params.days); break;
+            case 'ensureMarketMeta': result = await API.asset.market.ensureMeta(params.force); break;
             case 'addRestricted': result = await API.asset.restricted.add(params.email, params.restricted); break;
             case 'setRestrictedActive': result = await API.asset.restricted.setActive(params.email, params.id, params.active); break;
             case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
