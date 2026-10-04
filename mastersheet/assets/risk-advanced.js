@@ -193,8 +193,67 @@ function rkxCustomHtml(scope, r) {
     return rkxCustomCoreHtml(scope, r) + rkxConsequencesHtml(scope, r) + rkxMembersHtml(scope, r) + rkxReverseHtml(scope, r);
 }
 
+// ---------- 5) Mô hình rủi ro nâng cao (lib/risk-models.js, đã đối chiếu numpy/scipy) ----------
+function rkxModelsHtml(scope, r) {
+    if (typeof RiskModels === 'undefined' || !r.model) return '';
+    if (!r._models) { try { r._models = RiskModels.summary(r.model, { level: 0.95 }); } catch (e) { r._models = { ok: false, reason: 'error', error: String(e && e.message || e) }; } }
+    const m = r._models;
+    const head = '<div class="ce-group-title">Mô hình rủi ro nâng cao</div>';
+    if (!m.ok) return head + `<p class="tl-hint">Chưa đủ lịch sử giá để chạy (cần tối thiểu 60 phiên có giá).</p>`;
+    const kpi = [];
+    kpi.push(rkKpi('Biến động hiện tại (EWMA)', rkPct(m.vol.ewmaAnn, 1), `so với mẫu cả năm ${rkPct(m.vol.sampleAnn, 1)}`, m.vol.ratio > 1.25 ? 'tl-down' : (m.vol.ratio < 0.8 ? 'tl-up' : '')));
+    kpi.push(rkKpi('VaR 95%/ngày: lịch sử', rkPct(m.hist.varPct, 2), m.hist.cvarPct === null ? '' : `CVaR ${rkPct(m.hist.cvarPct, 2)}`));
+    kpi.push(rkKpi('VaR 95%/ngày: có lọc biến động', m.fhs ? rkPct(m.fhs.varPct, 2) : '—', m.fhs && m.fhs.cvarPct !== null ? `CVaR ${rkPct(m.fhs.cvarPct, 2)} · theo biến động hiện tại` : ''));
+    kpi.push(rkKpi('VaR 95%/ngày: giả định chuẩn', rkPct(m.param.varPct, 2), 'thường thấp hơn nếu đuôi dày'));
+    let html = head + `<div class="tl-kpis">${kpi.join('')}</div>`;
+    const notes = [];
+    if (m.vol.ratio !== null) notes.push(m.vol.ratio > 1.25 ? `Biến động HIỆN TẠI cao hơn mức trung bình cả năm ${rkNum((m.vol.ratio - 1) * 100, 0)}% (EWMA phản ứng nhanh với những phiên gần đây): VaR lịch sử một năm có thể đang đánh giá thấp rủi ro lúc này.` : (m.vol.ratio < 0.8 ? `Biến động hiện tại thấp hơn trung bình năm ${rkNum((1 - m.vol.ratio) * 100, 0)}%: thị trường đang yên, nhưng VaR chỉ phản ánh điều đó chứ không bảo đảm yên tiếp.` : 'Biến động hiện tại gần mức trung bình cả năm.'));
+    if (m.fhs && m.hist.varPct !== null && m.fhs.varPct > m.hist.varPct * 1.2) notes.push('VaR có lọc biến động cao hơn VaR lịch sử trên 20%: nên lấy mức cao hơn làm ước lượng thận trọng.');
+    if (notes.length) html += `<div class="rk-warns">${notes.map(t => `<div class="rk-warn low"><i class="fa-solid fa-circle-info"></i><span>${rkEsc(t)}</span></div>`).join('')}</div>`;
+
+    // Kiểm định ngược
+    const b = m.backtest;
+    if (b && b.ok) {
+        const V = { ok: ['ok', 'Mô hình VaR phù hợp: số lần vượt và cách phân bố đều trong mức chấp nhận.'], underestimates: ['bad', 'VaR lịch sử ĐÁNH GIÁ THẤP rủi ro: số lần lỗ vượt VaR nhiều hơn kỳ vọng có ý nghĩa thống kê.'], overestimates: ['warn', 'VaR lịch sử đánh giá CAO rủi ro: ít lần vượt hơn kỳ vọng có ý nghĩa thống kê (thận trọng quá mức).'], clustered: ['warn', 'Số lần vượt đúng kỳ vọng nhưng DỒN CỤC theo thời gian: VaR chậm thích ứng khi thị trường đổi chế độ.'] }[b.verdict];
+        html += `<div class="ce-group-title">Kiểm định ngược VaR <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(cửa sổ ${b.window} phiên, ${b.n} phiên kiểm${b.n < 250 ? ' — ít phiên kiểm nên kết luận yếu hơn' : ''})</small></div>
+            <div class="tl-kpis">${[rkKpi('Số lần lỗ vượt VaR', `${b.exceptions} / ${rkNum(b.expected, 1)} kỳ vọng`, rkPct(b.rate * 100, 1) + ' số phiên'), rkKpi('Kupiec (đúng tỷ lệ?)', 'p = ' + rkNum(b.kupiec.p, 3), b.kupiec.p < 0.05 ? 'bị bác bỏ ở mức 5%' : 'chấp nhận', b.kupiec.p < 0.05 ? 'tl-down' : 'tl-up'), rkKpi('Christoffersen (có dồn cục?)', 'p = ' + rkNum(b.independence.p, 3), b.independence.p < 0.05 ? 'có dồn cục' : 'độc lập', b.independence.p < 0.05 ? 'tl-down' : 'tl-up')].join('')}</div>
+            <div class="conc-warn"><i class="fa-solid fa-${V[0] === 'ok' ? 'circle-check' : 'triangle-exclamation'}"></i><span>${rkEsc(V[1])}</span></div>
+            <p class="tl-hint">Kiểm định cho biết mô hình VaR có đáng tin hay không bằng chính lịch sử của danh mục hiện tại (giả định tỷ trọng không đổi). Kupiec kiểm số lần vượt có đúng ${rkPct((1 - b.level) * 100, 0)} không; Christoffersen kiểm các lần vượt có xảy ra liên tiếp không. p dưới 0,05 nghĩa là không nên tin con số VaR.</p>`;
+    } else if (b && b.reason === 'short') html += `<p class="tl-hint">Kiểm định ngược VaR cần ít nhất ${b.need} phiên (đang có ${b.have}); chưa chạy được.</p>`;
+
+    // Beta Dimson
+    if (m.beta && m.beta.length) {
+        const byS = {}; (r.symbols || []).forEach(x => { byS[x.symbol] = x; });
+        const rows = m.beta.filter(x => x.dimson !== null).sort((a, c) => ((byS[c.symbol] || {}).value || 0) - ((byS[a.symbol] || {}).value || 0));
+        html += `<div class="ce-group-title">Beta từng mã: hồi quy thường và Dimson</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Mã</th><th class="text-right">Beta hồi quy</th><th class="text-right">Beta Dimson</th><th class="text-right">Chênh</th><th class="text-right">Số phiên</th></tr></thead><tbody>
+            ${rows.map(x => { const d = x.dimson - x.simple; return `<tr><td><b>${rkEsc(x.symbol)}</b></td><td class="text-right">${rkNum(x.simple, 2)}</td><td class="text-right">${rkNum(x.dimson, 2)}</td><td class="text-right ${Math.abs(d) >= 0.2 ? 'tl-down' : ''}">${d > 0 ? '+' : ''}${rkNum(d, 2)}</td><td class="text-right">${x.obs}</td></tr>`; }).join('')}
+            </tbody></table></div><p class="tl-hint">Dimson thêm lợi suất chỉ số hôm qua và ngày mai vào hồi quy: mã kém thanh khoản phản ứng chậm một phiên so với chỉ số nên beta hồi quy thường bị thấp. Chênh từ 0,2 trở lên (đỏ) nghĩa là rủi ro thị trường của mã này đang bị đánh giá thấp nếu chỉ nhìn beta thường.</p>`;
+    }
+
+    // Co hiệp phương sai + tương quan căng thẳng
+    if (m.shrink) {
+        const sh = m.shrink, top = sh.symbols.map((s, i) => ({ s, a: sh.sampleShare[i], b: sh.shrunkShare[i] })).sort((x, y) => y.b - x.b).slice(0, 6);
+        html += `<div class="ce-group-title">Đóng góp rủi ro với hiệp phương sai co (Ledoit-Wolf) và khi tương quan tăng vọt</div><div class="tl-kpis">${[
+            rkKpi('Cường độ co', rkPct(sh.delta * 100, 1), 'càng cao càng nhiều nhiễu ước lượng'),
+            rkKpi('Biến động danh mục', rkPct(sh.shrunkAnn, 1), `mẫu thường ${rkPct(sh.sampleAnn, 1)}`),
+            m.stressCorr ? rkKpi('Khi tương quan tăng vọt', rkPct(m.stressCorr.annPct, 1), `×${rkNum(m.stressCorr.multiplier, 2)} (tương quan co ${rkNum(m.stressCorr.k * 100, 0)}% về 1)`, 'tl-down') : '',
+        ].join('')}</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Mã</th><th class="text-right">Đóng góp rủi ro (mẫu)</th><th class="text-right">Đóng góp rủi ro (co)</th></tr></thead><tbody>
+            ${top.map(x => `<tr><td><b>${rkEsc(x.s)}</b></td><td class="text-right">${rkPct(x.a, 1)}</td><td class="text-right">${rkPct(x.b, 1)}</td></tr>`).join('')}</tbody></table></div>
+            <p class="tl-hint">Hiệp phương sai ước lượng từ ít phiên so với số mã thì nhiễu; co về ma trận đường chéo giúp đóng góp rủi ro ổn định hơn. Mức "tương quan tăng vọt" cho biết biến động danh mục lớn thế nào khi mọi mã cùng giảm (đa dạng hoá biến mất đúng lúc cần nhất).</p>`;
+    }
+
+    // Kẹt sàn
+    if (typeof VnMarket !== 'undefined' && r.symbols && r.symbols.length) {
+        const rows = r.symbols.filter(x => x.value > 0).map(x => { const l = typeof FinCalc !== 'undefined' && FinCalc.listingOf ? FinCalc.listingOf(x.symbol) : { exchange: 'HOSE' }; return { symbol: x.symbol, value: x.value, exchange: l.exchange }; });
+        const total = (n) => rows.reduce((s, x) => s + x.value * VnMarket.lockedLossPct(x.exchange, n) / 100, 0);
+        html += `<div class="ce-group-title">Kịch bản kẹt sàn</div><div class="tl-kpis">${[1, 2, 3, 5].map(n => rkKpi(`Kẹt sàn ${n} phiên`, rkVnd(total(n)), r.nav > 0 ? '−' + rkPct(total(n) / r.nav * 100, 1) + ' NAV' : '', 'tl-down')).join('')}</div>
+            <p class="tl-hint">Khi một cổ phiếu giảm sàn liên tiếp, lệnh bán không khớp được: không thể cắt lỗ trong lúc giá giảm theo biên độ (HOSE −7%, HNX −10%, UPCoM −15% mỗi phiên; sàn lấy theo thông tin niêm yết, chưa rõ thì tính HOSE). Bảng cho thiệt hại nếu TOÀN BỘ cổ phiếu cùng kẹt sàn — tình huống cực đoan của một ngày hoảng loạn; VaR thông thường không bắt được rủi ro này.</p>`;
+    }
+    return html;
+}
+
 // Gộp 3 phần, đặt cuối khối rủi ro. scope: 'rk' | 'grp'.
 function rkAdvancedHtml(scope, r) {
     if (!r || !r.ok) return '';
-    return rkxHistoricalHtml(scope, r) + rkxLiquidityHtml(scope, r) + rkxCustomHtml(scope, r);
+    return rkxHistoricalHtml(scope, r) + rkxModelsHtml(scope, r) + rkxLiquidityHtml(scope, r) + rkxCustomHtml(scope, r);
 }
