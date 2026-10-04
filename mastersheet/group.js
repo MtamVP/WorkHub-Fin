@@ -86,6 +86,7 @@ function switchGroupTab(tab) {
     if (tab === 'strategy' && typeof gsLoad === 'function') gsLoad();
     if (tab === 'approvals' && typeof gqLoad === 'function') gqLoad(true);
     if (tab === 'journey' && typeof gjLoad === 'function') gjLoad();
+    if (tab === 'execution' && typeof gxLoad === 'function') gxLoad();
     document.querySelectorAll('#grp-tabs .view-toggle-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-gtab') === tab));
     grRender();
 }
@@ -202,6 +203,8 @@ function grRender() {
     } else if (GR.tab === 'strategy' && typeof grStrategyHtml === 'function') {
         body.innerHTML = grStrategyHtml();
         if (typeof grStrategyAfterRender === 'function') grStrategyAfterRender();
+    } else if (GR.tab === 'execution' && typeof grExecutionHtml === 'function') {
+        body.innerHTML = grExecutionHtml();
     } else if (GR.tab === 'journey' && typeof grJourneyHtml === 'function') {
         body.innerHTML = grJourneyHtml();
     } else if (GR.tab === 'approvals' && typeof grApprovalHtml === 'function') {
