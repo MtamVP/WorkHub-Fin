@@ -96,6 +96,7 @@ function switchGroupTab(tab) {
     if (tab === 'journey' && typeof gjLoad === 'function') gjLoad();
     if (tab === 'execution' && typeof gxLoad === 'function') gxLoad();
     if (tab === 'data' && typeof gdLoad === 'function') gdLoad(true);
+    if (tab === 'quant' && typeof gqtLoad === 'function') gqtLoad();
     if (tab === 'report') {          // báo cáo hội đồng đầu tư gom thêm duyệt lệnh, hành trình ý tưởng, khớp lệnh: tải nền, báo cáo tự vẽ lại khi xong
         if (typeof gqLoad === 'function') gqLoad();
         if (typeof gjLoad === 'function') gjLoad();
@@ -217,6 +218,8 @@ function grRender() {
     } else if (GR.tab === 'strategy' && typeof grStrategyHtml === 'function') {
         body.innerHTML = grStrategyHtml();
         if (typeof grStrategyAfterRender === 'function') grStrategyAfterRender();
+    } else if (GR.tab === 'quant' && typeof grQuantHtml === 'function') {
+        body.innerHTML = grQuantHtml();
     } else if (GR.tab === 'data' && typeof grDataHtml === 'function') {
         body.innerHTML = grDataHtml();
     } else if (GR.tab === 'execution' && typeof grExecutionHtml === 'function') {
