@@ -141,3 +141,4 @@ return { sectorOf, sectorAllocation, concentrationWarnings, priceAgeLabel, price
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = FinCalc;
+globalThis.FinCalc = FinCalc;

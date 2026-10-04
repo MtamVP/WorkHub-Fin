@@ -296,3 +296,9 @@ td.jn-reason::before { content: none; }
 .gr-rep-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 0.88rem; line-height: 1.55; }
 .gr-rep-table { overflow-x: auto; }
 .gr-report .tl-kpis { margin-bottom: 0; }
+
+/* ---- Lịch sử tuân thủ (group-limits.js) ---- */
+.gl-strip { display: flex; gap: 3px; flex-wrap: wrap; margin: 0 0 12px; }
+.gl-day { width: 14px; height: 22px; border-radius: 3px; background: var(--border-color); }
+.gl-day.ok { background: var(--success-bg); border: 1px solid var(--success-color); opacity: 0.7; }
+.gl-day.bad { background: var(--danger-color); }

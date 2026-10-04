@@ -2370,6 +2370,13 @@ const API = {
                 const c = LimitsCalc.checkImport(limits, pf, rows, prices);
                 return { ok: c.ok, violations: c.violations, near: c.near, blocked: c.blocked, needsReason: c.needsReason, maxMode: c.maxMode, nav: c.before.nav };
             },
+            // Nhật ký tuân thủ theo ngày do Edge Function check-limits ghi (xem finance-compliance-log-migration.sql); mới nhất cuối.
+            complianceLog: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 120) * 86400000).toISOString().slice(0, 10);
+                const { data, error } = await sbClient.from('finance_compliance_log').select('log_date, user_id, nav, limit_count, breaches, warns').gte('log_date', since).order('log_date', { ascending: true }).limit(5000);
+                if (error) throw error;
+                return data || [];
+            },
             exceptions: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 180) * 86400000).toISOString();
                 const { data, error } = await sbClient.from('finance_limit_exceptions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(500);
@@ -4547,6 +4554,7 @@ async function _dispatchAction(action, params = {}) {
             case 'removeLimit': result = await API.asset.limits.remove(params.id); break;
             case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
+            case 'listComplianceLog': result = await API.asset.limits.complianceLog(params.days); break;
             case 'listLimitExceptions': result = await API.asset.limits.exceptions(params.days); break;
             case 'getLimitActor': result = await API.asset.limits._actor(params.email); break;
             case 'listIdeas': result = await API.ideas.list(); break;

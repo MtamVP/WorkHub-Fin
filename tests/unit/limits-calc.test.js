@@ -192,3 +192,40 @@ describe('checkImport: lô lệnh nhập từ sao kê', () => {
     expect(L.checkImport([], PF, [t()], {}).ok).toBe(true);
   });
 });
+
+describe('breachEpisodes: đợt vi phạm từ nhật ký theo ngày', () => {
+  const day = (d, user_id, breaches) => ({ log_date: d, user_id, breaches });
+  const b = (kind, subject, current, extra = {}) => Object.assign({ kind, subject, current, threshold: 25, mode: 'reason' }, extra);
+  it('chuỗi ngày liên tiếp được gộp thành một đợt, ghi đỉnh và giá trị mới nhất', () => {
+    const e = L.breachEpisodes([day('2026-10-01', 'u1', [b('max_symbol_pct', 'FPT', 27)]), day('2026-10-02', 'u1', [b('max_symbol_pct', 'FPT', 31)]), day('2026-10-03', 'u1', [b('max_symbol_pct', 'FPT', 29)])]);
+    expect(e).toHaveLength(1);
+    expect(e[0]).toMatchObject({ userId: 'u1', subject: 'FPT', firstDate: '2026-10-01', lastDate: '2026-10-03', days: 3, calendarDays: 3, ongoing: true, peak: 31, current: 29 });
+  });
+  it('hết vi phạm rồi lại vượt: hai đợt riêng, đợt cũ đã kết thúc', () => {
+    const e = L.breachEpisodes([day('2026-10-01', 'u1', [b('max_symbol_pct', 'FPT', 27)]), day('2026-10-02', 'u1', []), day('2026-10-03', 'u1', [b('max_symbol_pct', 'FPT', 26)])]);
+    expect(e).toHaveLength(2);
+    expect(e[0]).toMatchObject({ ongoing: true, firstDate: '2026-10-03', days: 1 });
+    expect(e[1]).toMatchObject({ ongoing: false, firstDate: '2026-10-01', days: 1 });
+  });
+  it('mỗi thành viên và mỗi (loại, đối tượng) tách riêng; cả nhóm (user_id rỗng) cũng được theo dõi', () => {
+    const e = L.breachEpisodes([
+      day('2026-10-01', 'u1', [b('max_symbol_pct', 'FPT', 27), b('max_sector_pct', 'Ngân hàng', 45)]), day('2026-10-01', 'u2', [b('max_symbol_pct', 'FPT', 28)]), day('2026-10-01', null, [b('max_symbol_pct', 'FPT', 30)]),
+      day('2026-10-02', 'u1', [b('max_symbol_pct', 'FPT', 27)]), day('2026-10-02', 'u2', []), day('2026-10-02', null, [b('max_symbol_pct', 'FPT', 31)]),
+    ]);
+    expect(e).toHaveLength(4);
+    expect(e.find(x => x.userId === 'u1' && x.subject === 'Ngân hàng').ongoing).toBe(false);
+    expect(e.find(x => x.userId === 'u2').ongoing).toBe(false);
+    expect(e.find(x => x.userId === null)).toMatchObject({ days: 2, ongoing: true });
+  });
+  it('thứ tự: đang diễn ra trước, rồi lâu nhất; dữ liệu vào lộn xộn vẫn đúng', () => {
+    const e = L.breachEpisodes([day('2026-10-03', 'u1', [b('max_symbol_pct', 'FPT', 27)]), day('2026-10-01', 'u1', [b('max_symbol_pct', 'FPT', 27), b('min_cash_pct', 'Tiền mặt', 3)]), day('2026-10-02', 'u1', [b('max_symbol_pct', 'FPT', 27)])]);
+    expect(e.map(x => x.subject)).toEqual(['FPT', 'Tiền mặt']);
+    expect(e[0].days).toBe(3);
+    expect(L.breachEpisodes([])).toEqual([]);
+    expect(L.breachEpisodes(null)).toEqual([]);
+  });
+  it('cuối tuần không có nhật ký: vẫn là một đợt liên tục, calendarDays > days', () => {
+    const e = L.breachEpisodes([day('2026-10-02', 'u1', [b('max_symbol_pct', 'FPT', 27)]), day('2026-10-05', 'u1', [b('max_symbol_pct', 'FPT', 27)])]);
+    expect(e[0]).toMatchObject({ days: 2, calendarDays: 4 });
+  });
+});

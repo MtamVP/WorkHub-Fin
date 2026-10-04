@@ -3,7 +3,7 @@
    mà thành viên đã ghi khi vượt giới hạn. Phép tính ở /lib/limits-calc.js (có kiểm thử); việc chặn/ghi lý do thực hiện ở api.js khi ghi lệnh.
    Dùng global của group.js (GR, grCall, grRender) và assets/risk.js (rkEsc, rkNum, rkPct, rkVnd, rkKpi, rkBar). */
 
-const GL = { rows: [], exceptions: [], actor: null, loaded: false, error: '' };
+const GL = { rows: [], exceptions: [], log: [], actor: null, loaded: false, error: '' };
 
 const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 
@@ -11,10 +11,11 @@ const glModeCls = { warn: 'info', reason: 'warn', block: 'bad' };
 async function glLoad() {
     GL.loaded = false; GL.error = '';
     try {
-        const [rows, ex, actor] = await Promise.all([
+        const [rows, ex, actor, log] = await Promise.all([
             grCall('listLimits'), grCall('listLimitExceptions', { days: 365 }).catch(() => []), grCall('getLimitActor', { email: (GR.data && GR.data.members[0] && GR.data.members[0].email) || '' }).catch(() => ({ isManager: false })),
+            grCall('listComplianceLog', { days: 120 }).catch(() => []),
         ]);
-        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.loaded = true;
+        GL.rows = rows; GL.exceptions = ex; GL.actor = actor; GL.log = log; GL.loaded = true;
     } catch (e) { GL.error = e.message || String(e); }
 }
 
@@ -60,6 +61,8 @@ function grLimitsHtml() {
                 : '<span class="tl-badge ok"><i class="fa-solid fa-check"></i> Trong mức</span>')}</td></tr>`).join('')}
         </tbody></table></div>`;
 
+    html += glHistoryHtml();
+
     // Giới hạn chung
     html += `<div class="ce-group-title">Giới hạn chung của nhóm ${manager ? '' : '<small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(chỉ quản lý danh mục / admin được sửa)</small>'}</div>`;
     html += groupRows.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Giới hạn</th><th>Đối tượng</th><th class="text-right">Ngưỡng</th><th>Chế độ</th><th>Áp dụng cho</th><th>Bật</th>${manager ? '<th></th>' : ''}</tr></thead><tbody>
@@ -88,7 +91,43 @@ function grLimitsHtml() {
             <td>${mt.before !== undefined ? `${rkNum(mt.before, 1)} → <b class="tl-down">${rkNum(mt.after, 1)}</b>` : '—'}</td>
             <td class="gr-reason">${rkEsc(e.reason)}</td><td>${e.override ? '<span class="tl-badge bad">Ghi đè chặn</span>' : `<span class="tl-badge ${glModeCls[e.mode] || 'mute'}">${rkEsc((LimitsCalc.MODES[e.mode] || {}).label || '')}</span>`}</td></tr>`; }).join('')}
         </tbody></table></div>` : '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-circle-check" style="color:var(--success-color);opacity:1"></i>Chưa có ngoại lệ nào.</div>';
-    html += '<p class="tl-hint">Giới hạn được kiểm khi thành viên ghi lệnh trên máy họ và kiểm lại ở máy chủ nên không lách được bằng giao diện. Lệnh nhập hàng loạt từ sao kê không đi qua bước kiểm này — quản lý nên đối chiếu bảng “Tuân thủ hiện tại”.</p>';
+    html += '<p class="tl-hint">Giới hạn được kiểm khi thành viên ghi lệnh trên máy họ và kiểm lại ở máy chủ nên không lách được bằng giao diện. Lệnh nhập hàng loạt từ sao kê cũng được kiểm theo thay đổi khối lượng ròng của cả lô.</p>';
+    return html;
+}
+
+// Lịch sử tuân thủ: các đợt vi phạm (bao nhiêu ngày liên tiếp) từ nhật ký Edge Function check-limits ghi mỗi chiều ngày giao dịch -- chạy cả khi không ai mở app,
+// nên bắt được vi phạm do GIÁ BIẾN ĐỘNG (không ai giao dịch). Đợt vi phạm tính ở LimitsCalc.breachEpisodes (có kiểm thử).
+function glSubjectText(e) {
+    if (e.kind === 'blocked_symbol') return `${e.subject} (đang giữ mã bị cấm)`;
+    if (e.kind === 'max_position_vnd') return `${rkVnd(e.peak)} → ${rkVnd(e.current)} / ${rkVnd(e.threshold)}`;
+    const u = e.kind === 'max_leverage' ? '×' : '%';
+    return `${rkNum(e.peak, 1)}${u} → ${rkNum(e.current, 1)}${u} / ${rkNum(e.threshold, e.kind === 'max_leverage' ? 2 : 1)}${u}`;
+}
+
+function glHistoryHtml() {
+    const title = '<div class="ce-group-title">Lịch sử tuân thủ <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(nhật ký tự động mỗi chiều ngày giao dịch)</small></div>';
+    if (!GL.log.length) return title + '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-clock-rotate-left"></i>Chưa có nhật ký. Hệ thống tự chấm tuân thủ lúc 15:40 các ngày giao dịch khi nhóm có giới hạn đang bật; nhật ký đầu tiên sẽ hiện từ phiên kế tiếp.</div>';
+    const eps = LimitsCalc.breachEpisodes(GL.log);
+    const ongoing = eps.filter(e => e.ongoing);
+    const days = Array.from(new Set(GL.log.map(r => String(r.log_date).slice(0, 10)))).sort();
+    const longest = ongoing.reduce((m, e) => Math.max(m, e.days), 0);
+    const nameOf = (id) => id ? glMemberName(id) : 'Cả nhóm (gộp)';
+    const strip = days.slice(-30).map(d => {
+        const n = GL.log.filter(r => String(r.log_date).slice(0, 10) === d).reduce((s, r) => s + (r.breaches || []).length, 0);
+        return `<span class="gl-day ${n ? 'bad' : 'ok'}" title="${glDate(d)}: ${n ? n + ' giới hạn đang vượt' : 'không vi phạm'}"></span>`;
+    }).join('');
+    let html = title + `<div class="tl-kpis">${[
+        rkKpi('Đang vượt kéo dài', String(ongoing.length), ongoing.length ? `lâu nhất ${longest} ngày giao dịch` : 'không có đợt nào đang diễn ra', ongoing.length ? 'tl-down' : 'tl-up'),
+        rkKpi('Đợt vi phạm 120 ngày', String(eps.length), `${eps.length - ongoing.length} đã kết thúc`),
+        rkKpi('Ngày có nhật ký', String(days.length), `gần nhất ${glDate(days[days.length - 1])}`),
+    ].join('')}</div><div class="gl-strip" aria-label="30 ngày gần nhất: đỏ = có vi phạm">${strip}</div>`;
+    html += eps.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Thành viên</th><th>Giới hạn</th><th>Đối tượng</th><th>Từ ngày</th><th class="text-right">Số ngày</th><th>Đỉnh → hiện tại / ngưỡng</th><th>Chế độ</th><th>Trạng thái</th></tr></thead><tbody>
+        ${eps.slice(0, 40).map(e => `<tr><td><b>${rkEsc(nameOf(e.userId))}</b></td><td>${rkEsc((LimitsCalc.KINDS[e.kind] || {}).label || e.kind)}</td><td>${rkEsc(e.subject)}</td><td>${glDate(e.firstDate)}</td>
+            <td class="text-right ${e.ongoing && e.days >= 5 ? 'tl-down' : ''}">${e.days}</td><td>${glSubjectText(e)}</td>
+            <td><span class="tl-badge ${glModeCls[e.mode] || 'mute'}">${rkEsc((LimitsCalc.MODES[e.mode] || {}).label || '')}</span></td>
+            <td>${e.ongoing ? '<span class="tl-badge bad">Đang vượt</span>' : `<span class="tl-badge mute">Đã hết ${glDate(e.lastDate)}</span>`}</td></tr>`).join('')}
+        </tbody></table></div>` : '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-circle-check" style="color:var(--success-color);opacity:1"></i>Không có vi phạm nào trong nhật ký.</div>';
+    html += '<p class="tl-hint">Số ngày = số phiên liên tiếp có nhật ký mà giới hạn vẫn bị vượt. Khác với ngoại lệ (do một lệnh gây ra), đây là vi phạm do giá biến động hoặc do lệnh đã được duyệt trước đó mà chưa được điều chỉnh về mức.</p>';
     return html;
 }
 

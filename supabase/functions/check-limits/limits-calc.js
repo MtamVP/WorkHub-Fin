@@ -262,3 +262,4 @@ const LimitsCalc = (function () {
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LimitsCalc;
+globalThis.LimitsCalc = LimitsCalc;

@@ -202,3 +202,20 @@ describe('callGAS: lệnh giới hạn', () => {
     ['saveLimit', 'removeLimit', 'setLimitActive'].forEach(a => expect(src).toContain(`'${a}'`));
   });
 });
+
+describe('API.asset.limits.complianceLog', () => {
+  const row = (log_date, user_id) => ({ id: 'c-' + log_date + (user_id || 'g'), log_date, user_id, nav: 1e8, limit_count: 1, breaches: [], warns: [] });
+  const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  it('trả nhật ký trong khoảng ngày, cũ trước mới sau; bỏ nhật ký quá cũ', async () => {
+    const c = boot({ finance_compliance_log: [row(d(2), 'u-1'), row(d(200), 'u-1'), row(d(5), null), row(d(1), 'u-1')] });
+    const r = await c.API.asset.limits.complianceLog(120);
+    expect(r.map(x => x.log_date)).toEqual([d(5), d(2), d(1)]);
+    expect((await c.API.asset.limits.complianceLog(300)).length).toBe(4);
+  });
+  it('qua callGAS listComplianceLog', async () => {
+    const c = boot({ finance_compliance_log: [row(d(1), 'u-1')] });
+    const r = await c.callGAS('listComplianceLog', { days: 30 });
+    expect(r.status).toBe('success');
+    expect(r.data).toHaveLength(1);
+  });
+});
