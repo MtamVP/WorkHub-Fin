@@ -39,16 +39,27 @@ const FinancialsSync = (function () {
   }
 
   // Đồng bộ nhiều mã: gom tối đa 5 mã mỗi lần gọi nguồn, ghi từng mã; mã lỗi không làm hỏng các mã còn lại.
+  // opts.useCache: dùng số liệu máy chủ đã làm mới sẵn (bảng đệm), chỉ gọi nguồn cho mã chưa có trong đệm.
   // onProgress(done, total, symbol). Trả [{ symbol, ok, summary | error }].
-  async function syncMany(symbols, onProgress) {
+  async function syncMany(symbols, onProgress, opts) {
+    const o = opts || {};
     const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(Boolean))];
     const results = [];
     let done = 0;
     for (let i = 0; i < list.length; i += 5) {
       const chunk = list.slice(i, i + 5);
       let fetched = { results: {}, errors: {} };
-      try { fetched = await call('fetchStockFinancials', { symbols: chunk }); }
-      catch (e) { chunk.forEach(s => { fetched.errors[s] = e.message; }); }
+      if (o.useCache) {
+        try { Object.assign(fetched.results, await call('getFinancialsCache', { symbols: chunk })); } catch (e) { /* không đọc được đệm: gọi nguồn như thường */ }
+      }
+      const need = chunk.filter(s => !fetched.results[s]);
+      if (need.length) {
+        try {
+          const f = await call('fetchStockFinancials', { symbols: need });
+          Object.assign(fetched.results, f.results);
+          Object.assign(fetched.errors, f.errors);
+        } catch (e) { need.forEach(s => { fetched.errors[s] = e.message; }); }
+      }
       for (const sym of chunk) {
         try {
           if (!fetched.results[sym]) throw new Error(fetched.errors[sym] || 'Không lấy được số liệu');

@@ -2985,6 +2985,37 @@ const API = {
             return { results: data.results || {}, errors: data.errors || {}, fetchedAt: data.fetchedAt || null };
         },
 
+        // Số liệu đã được máy chủ làm mới hằng ngày (Edge Function refresh-financials -> bảng đệm finance_financials_cache).
+        // getFinancialsUpdates: mã nào có số liệu MỚI hơn lần đồng bộ gần nhất của hồ sơ định giá (chỉ xét mã đã từng đồng bộ tự động, vì mã nhập tay
+        // người dùng tự quản lý). Trả { updates: [{ symbol, annualYear, quarterKey, changedAt, lastSyncAt }], status: {ranAt,...}|null }.
+        getFinancialsUpdates: async () => {
+            const [{ data: cache, error }, { data: vals, error: vErr }, st] = await Promise.all([
+                sbClient.from('finance_financials_cache').select('symbol, annual_year, quarter_key, changed_at, fetched_at'),
+                sbClient.from('finance_stock_valuations').select('symbol, year, data'),
+                sbClient.from('app_settings').select('value').eq('key', 'financials_refresh_status').maybeSingle()
+            ]);
+            if (error) throw error;
+            if (vErr) throw vErr;
+            const lastSync = {};
+            (vals || []).forEach(v => { const t = v.data && v.data.financialsAt; if (t && (!lastSync[v.symbol] || t > lastSync[v.symbol])) lastSync[v.symbol] = t; });
+            const updates = (cache || []).filter(c => lastSync[c.symbol] && c.changed_at && Date.parse(c.changed_at) > Date.parse(lastSync[c.symbol]))
+                .map(c => ({ symbol: c.symbol, annualYear: c.annual_year, quarterKey: c.quarter_key, changedAt: c.changed_at, lastSyncAt: lastSync[c.symbol] }))
+                .sort((a, b) => (a.symbol < b.symbol ? -1 : 1));
+            let status = null;
+            try { status = st && st.data && st.data.value ? JSON.parse(st.data.value) : null; } catch (e) { /* trạng thái hỏng: bỏ qua */ }
+            return { updates, status };
+        },
+        // Lấy số liệu đã đệm của các mã (cùng định dạng fetchFinancials.results) để áp dụng mà không phải gọi nguồn thị trường.
+        getFinancialsCache: async (symbols) => {
+            const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
+            if (!list.length) return {};
+            const { data, error } = await sbClient.from('finance_financials_cache').select('symbol, payload').in('symbol', list);
+            if (error) throw error;
+            const out = {};
+            (data || []).forEach(r => { if (r.payload) out[r.symbol] = r.payload; });
+            return out;
+        },
+
         // Lưu hàng loạt hồ sơ định giá (đã dựng bằng ValuationCalc.syncRecords/buildRecord): records = [{ symbol, year, record }].
         saveValuationRecords: async (records, email) => {
             const rows = (records || []).map(r => ({
@@ -4056,6 +4087,8 @@ async function _dispatchAction(action, params = {}) {
             case 'getStockList': result = await API.stock.getStockList(); break;
             case 'getStockYears': result = await API.stock.getStockYears(params.symbol); break;
             case 'getStockDetail': result = await API.stock.getStockDetail(params.symbol, params.year); break;
+            case 'getFinancialsUpdates': result = await API.stock.getFinancialsUpdates(); break;
+            case 'getFinancialsCache': result = await API.stock.getFinancialsCache(params.symbols); break;
             case 'getStockHistory': result = await API.stock.getStockHistory(params.symbol); break;
             case 'saveStockValuation': result = await API.stock.saveStockValuation(params, params.email); break;
             case 'deleteStockValuation': result = await API.stock.deleteValuation(params.symbol, params.year); break;

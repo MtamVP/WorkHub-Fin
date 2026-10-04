@@ -16,6 +16,7 @@ const state = {
     sort: { key: 'upside', dir: -1 },
     detail: null,           // { symbol, year, rows, quarters, live, series, a, hist }
     portfolio: { held: [], watched: [] }, // mã đang nắm / theo dõi (kể cả chưa định giá)
+    fin: { updates: [], status: null },   // máy chủ tự làm mới số liệu mỗi ngày: mã nào có báo cáo mới + trạng thái lần chạy
     charts: []
 };
 
@@ -103,17 +104,20 @@ function analyzeItem(item) {
     };
 }
 
-async function loadOverview() {
+async function loadOverview(opts) {
     const wrap = document.getElementById('ov-table-wrap');
     wrap.innerHTML = '<div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải bảng định giá…</div>';
     try {
         const raw = await call('getStockOverview');
         state.items = raw.map(analyzeItem);
         try { state.portfolio = await call('getStockPortfolioSymbols'); } catch (e) { state.portfolio = { held: [], watched: [] }; }
+        try { state.fin = await call('getFinancialsUpdates'); } catch (e) { state.fin = { updates: [], status: null }; }
         state.overviewLoaded = true;
         fillSymbolSelect();
         renderOverview();
         if (state.view === 'screener' && typeof renderScreener === 'function') renderScreener();
+        // Bật "tự cập nhật": có số liệu mới thì áp dụng ngay, mỗi lần mở trang đúng 1 lượt (không lặp khi vừa đồng bộ xong)
+        if (!(opts && opts.skipAutoSync) && !state.autoSyncTried && autoSyncOn() && (state.fin.updates || []).length) { state.autoSyncTried = true; applyFinUpdates(true); }
     } catch (e) {
         console.error(e);
         wrap.innerHTML = `<div class="vl-empty">Không tải được dữ liệu: ${VU.esc(e.message)}</div>`;
@@ -666,6 +670,11 @@ function renderSyncBar() {
         : (state.items.length ? 'Chưa đồng bộ số liệu tự động lần nào — các mã đang dùng số liệu nhập tay.' : 'Thêm mã để lấy số liệu tài chính tự động.');
     const have = new Set(state.items.map(i => i.symbol));
     const missing = [...new Set([...(state.portfolio.held || []), ...(state.portfolio.watched || [])])].filter(s => !have.has(s));
+    const ups = (state.fin.updates || []).filter(u => have.has(u.symbol));
+    const auto = autoSyncOn();
+    const qLabel = (u) => u.quarterKey ? `Q${u.quarterKey.slice(5)}/${u.quarterKey.slice(0, 4)}` : (u.annualYear ? `năm ${u.annualYear}` : '');
+    const st = state.fin.status;
+    const autoRan = st && st.ranAt ? `Máy chủ tự kiểm tra báo cáo mới mỗi ngày — lần gần nhất ${VU.esc(fmtDateTime(st.ranAt))}.` : 'Máy chủ tự kiểm tra báo cáo mới mỗi ngày (chưa có lần chạy nào được ghi nhận).';
     el.innerHTML = `<div class="vl-syncrow">
             <span class="vl-sync-status"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i> ${status}</span>
             <span class="vl-sync-actions">
@@ -674,6 +683,8 @@ function renderSyncBar() {
                 <button type="button" class="btn-save" id="btn-sync-all" onclick="syncAll()"${state.items.length ? '' : ' disabled'}><i class="fa-solid fa-rotate"></i> Đồng bộ số liệu</button>
             </span>
         </div>
+        ${ups.length ? `<div class="vl-note vl-note-new"><i class="fa-solid fa-bell"></i><span>Có số liệu mới từ nguồn thị trường: <b>${ups.map(u => `${VU.esc(u.symbol)}${qLabel(u) ? ' (' + VU.esc(qLabel(u)) + ')' : ''}`).join(', ')}</b>. <button type="button" class="vl-link" onclick="applyFinUpdates()">Cập nhật ${ups.length} mã</button></span></div>` : ''}
+        <div class="vl-autosync"><label><input type="checkbox" id="autosync-box" ${auto ? 'checked' : ''} onchange="setAutoSync(this.checked)"> Tự cập nhật khi mở trang</label><span>${autoRan} Cập nhật chỉ ghi đè số liệu tài chính, giữ nguyên P/E, P/B mục tiêu và luận điểm của bạn.</span></div>
         ${missing.length ? `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>Trong danh mục của bạn có ${missing.length} mã chưa định giá: <b>${missing.map(VU.esc).join(', ')}</b>. <button type="button" class="vl-link" onclick="addMissing()">Thêm tất cả tự động</button></span></div>` : ''}`;
     const input = document.getElementById('qa-symbol');
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') quickAdd(); });
@@ -693,7 +704,28 @@ function renderSyncResult(results) {
         ${bad.length ? '<p class="vl-hint">Mã lỗi thường do sai mã, mã chưa niêm yết hoặc nguồn tạm thời không phản hồi — thử lại sau.</p>' : ''}`;
 }
 
-async function runSync(symbols) {
+const AUTOSYNC_KEY = 'wh.fin.autosync';
+function autoSyncOn() { try { return localStorage.getItem(AUTOSYNC_KEY) === '1'; } catch (e) { return false; } }
+function setAutoSync(on) {
+    try { localStorage.setItem(AUTOSYNC_KEY, on ? '1' : '0'); } catch (e) { /* bỏ qua */ }
+    showToast(on ? 'Đã bật: số liệu mới sẽ tự được cập nhật mỗi lần mở trang.' : 'Đã tắt tự cập nhật.', 'success');
+    if (on) applyFinUpdates(true);
+}
+
+// Áp dụng số liệu máy chủ đã làm mới sẵn cho các mã có báo cáo mới (không cần gọi nguồn từ máy bạn)
+async function applyFinUpdates(silent) {
+    const have = new Set(state.items.map(i => i.symbol));
+    const symbols = (state.fin.updates || []).map(u => u.symbol).filter(s => have.has(s));
+    if (!symbols.length) { if (!silent) showToast('Không có số liệu mới cần cập nhật.', 'success'); return; }
+    const results = await runSync(symbols, { useCache: true, silent: !!silent });
+    if (silent) {
+        const ok = results.filter(r => r.ok).length;
+        showToast(`Đã tự cập nhật số liệu mới của ${ok}/${results.length} mã.`, ok ? 'success' : 'error');
+    }
+}
+
+async function runSync(symbols, opts) {
+    const o = opts || {};
     const btn = document.getElementById('btn-sync-all');
     const quick = document.getElementById('btn-quick-add');
     if (btn) btn.disabled = true;
@@ -701,9 +733,9 @@ async function runSync(symbols) {
     try {
         const results = await FinancialsSync.syncMany(symbols, function (done, total, sym) {
             if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${done}/${total} · ${VU.esc(sym)}`;
-        });
-        await loadOverview();
-        renderSyncResult(results);
+        }, { useCache: !!o.useCache });
+        await loadOverview({ skipAutoSync: true });
+        if (!o.silent) renderSyncResult(results);
         return results;
     } finally {
         const b = document.getElementById('btn-sync-all'), q = document.getElementById('btn-quick-add');

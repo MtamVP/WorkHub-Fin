@@ -235,3 +235,11 @@
 .sc-near > summary { list-style: none; }
 .sc-near > summary::-webkit-details-marker { display: none; }
 @media (max-width: 640px) { .sc-universe select { min-width: 0; width: 100%; } .sc-universe .btn-save { width: 100%; } }
+
+/* ---- Số liệu mới từ máy chủ + tự cập nhật ---- */
+.vl-note-new { border-color: var(--gold); background: var(--gold-dim); }
+.vl-note-new > i { color: var(--gold); }
+.vl-autosync { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 0.74rem; color: var(--text-muted); line-height: 1.5; }
+.vl-autosync label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.vl-autosync input { width: 15px; height: 15px; accent-color: var(--gold); }
+.vl-autosync span { flex: 1 1 280px; min-width: 0; }
