@@ -2,11 +2,12 @@
 //  "meta"   (pg_cron hằng tuần): thông tin mã -> finance_stock_meta (sàn, phân ngành ICB cấp 2 từ VCI, thuộc VN30 và ngày niêm yết từ VNDirect). Thay bảng ngành tự gõ chỉ có ~200 mã.
 //  "rates"  (pg_cron mỗi ngày làm việc): lợi suất trái phiếu chính phủ 1-15 năm (TradingView scanner công khai) -> finance_rates; app dùng làm lãi phi rủi ro THEO NGÀY.
 //  "ratios" (pg_cron mỗi ngày làm việc, hoặc gọi từ app kèm body.symbols <= 15 mã): chỉ số cơ bản và thị trường từ VNDirect (P/E, P/B, beta, ROE, biên lợi nhuận, đòn bẩy, tăng trưởng, 52 tuần, thanh khoản, khối ngoại) -> finance_stock_ratios.
-//  "health" (pg_cron mỗi ngày làm việc): kiểm chất lượng dữ liệu giá của các mã đang nắm/theo dõi -- so VNDirect với VCI, nhảy giá vượt biên độ, thiếu phiên, giá cũ -> finance_data_health.
+//  "health" (pg_cron mỗi ngày làm việc): kiểm chất lượng dữ liệu giá của các mã đang nắm/theo dõi -- so VNDirect với VCI, nhảy giá vượt biên độ, thiếu phiên, giá cũ -> finance_data_health,
+//     và gửi email cho quản lý đã bật email cảnh báo khi có cảnh báo MỚI mức lỗi/cảnh báo (Resend, secrets RESEND_API_KEY / ALERT_FROM_EMAIL như approval-watch).
 // Mỗi lần chạy ghi finance_function_runs (app cảnh báo khi hàm quá hạn). Nguồn đều là điểm cuối công khai KHÔNG có cam kết dịch vụ: có thể đổi/chặn bất cứ lúc nào, nên có kiểm tra và ghi nhận "nguồn lỗi".
 // Gọi bởi pg_cron (Bearer = publishable key, verify_jwt giữ true). Phản hồi chỉ có SỐ LƯỢNG. {"selftest":true} chạy bài tự kiểm không đụng mạng/CSDL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { BAND, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
+import { BAND, buildHealthEmail, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,27 @@ async function getJson(url: string, headers: Record<string, string> = UA, init?:
     const text = await res.text();
     return text ? JSON.parse(text) : null;
   } catch (_e) { return null; }
+}
+
+async function sendEmail(apiKey: string, from: string, to: string, subject: string, html: string, text: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [to], subject, html, text }), signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) console.error("market-data-sync: Resend HTTP", res.status);
+    return res.ok;
+  } catch (e) { console.error("market-data-sync: gửi email lỗi:", String((e as Error).message || e)); return false; }
+}
+// Quản lý (asset_manager hoặc nhóm admin) đang hoạt động và đã bật email cảnh báo -- cùng quy tắc với approval-watch
+async function emailManagers(supabase: any): Promise<{ id: string; email: string }[]> {
+  const [{ data: users }, { data: roles }, { data: prefs }] = await Promise.all([
+    supabase.from("users").select("id, email, group_key, active").in("group_key", ["finance", "admin"]),
+    supabase.from("fin_roles").select("user_id").eq("role", "asset_manager"),
+    supabase.from("finance_alert_prefs").select("user_id").eq("email_enabled", true),
+  ]);
+  const mgr = new Set((roles ?? []).map((r: any) => r.user_id)), optIn = new Set((prefs ?? []).map((p: any) => p.user_id));
+  return (users ?? []).filter((u: any) => u.email && u.active !== false && (u.group_key === "admin" || mgr.has(u.id)) && optIn.has(u.id)).map((u: any) => ({ id: u.id, email: u.email }));
 }
 
 async function chunked<T>(rows: T[], n: number, fn: (part: T[]) => Promise<void>) { for (let i = 0; i < rows.length; i += n) await fn(rows.slice(i, i + n)); }
@@ -141,13 +163,21 @@ async function checkHealth(supabase: any) {
   if (primaryDown >= Math.max(3, symbols.length * 0.5)) flags.push({ kind: "source_down", symbol: null, severity: "error", ref_date: today, detail: { source: "vndirect dchart", failed: primaryDown, of: symbols.length }, dedupe_key: `source_down|vndirect|${today}` });
   if (secondaryDown >= Math.max(3, symbols.length * 0.5)) flags.push({ kind: "source_down", symbol: null, severity: "warn", ref_date: today, detail: { source: "vci", failed: secondaryDown, of: symbols.length, note: "Không có nguồn thứ hai để đối chiếu giá hôm nay." }, dedupe_key: `source_down|vci|${today}` });
   flags.push(...metaGaps(symbols, (s) => !!(meta.get(s) as any)?.icb2_code, today));
-  let inserted = 0;
+  let inserted = 0, emailed = 0;
   if (flags.length) {
-    const { data, error } = await supabase.from("finance_data_health").upsert(flags, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
+    const { data, error } = await supabase.from("finance_data_health").upsert(flags, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id, kind, symbol, severity, ref_date, detail");
     if (error) throw new Error(error.message);
     inserted = (data ?? []).length;
+    // Báo quản lý khi có cảnh báo MỚI mức lỗi/cảnh báo (mức thông tin không báo email); mỗi cảnh báo chỉ báo một lần vì chỉ dòng vừa chèn mới được trả về
+    const alertRows = (data ?? []).filter((r: any) => r.severity === "error" || r.severity === "warn");
+    const apiKey = Deno.env.get("RESEND_API_KEY");
+    if (alertRows.length && apiKey) {
+      const from = Deno.env.get("ALERT_FROM_EMAIL") || "WorkHub <onboarding@resend.dev>";
+      const mail = buildHealthEmail(alertRows);
+      for (const rcp of await emailManagers(supabase)) { if (await sendEmail(apiKey, from, rcp.email, mail.subject, mail.html, mail.text)) emailed++; }
+    }
   }
-  return { ok: true, checked: symbols.length, flagged: flags.length, newlyRecorded: inserted, primaryDown, secondaryDown };
+  return { ok: true, checked: symbols.length, flagged: flags.length, newlyRecorded: inserted, emailed, primaryDown, secondaryDown };
 }
 
 Deno.serve(async (req: Request) => {

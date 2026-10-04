@@ -198,3 +198,31 @@ export function latestReportDate(json: any): string | null {
   const d = r ? String(r.reportDate || "").slice(0, 10) : "";
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
 }
+
+// ---------- email báo quản lý khi có cảnh báo dữ liệu MỚI mức lỗi/cảnh báo ----------
+const KIND_LABEL: Record<string, string> = {
+  price_mismatch: "Hai nguồn giá lệch nhau", price_jump: "Giá nhảy vượt biên độ sàn", stale_price: "Giá cũ / mã dừng giao dịch", missing_session: "Thiếu phiên giá",
+  source_down: "Nguồn dữ liệu lỗi", price_level: "Khác cách điều chỉnh giá", meta_gap: "Mã chưa có phân ngành",
+};
+const escH = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+export function describeHealth(r: { kind: string; symbol: string | null; ref_date: string | null; detail: any }): string {
+  const d = r.detail || {};
+  const sym = r.symbol ? r.symbol + ": " : "";
+  const when = r.ref_date ? " (" + r.ref_date + ")" : "";
+  if (r.kind === "price_mismatch") return `${sym}VNDirect ${Math.round(Number(d.vndirect))} so với VCI ${Math.round(Number(d.vci))}, lệch ${d.diffPct}%${when}`;
+  if (r.kind === "price_jump") return `${sym}giá ${Math.round(Number(d.prev))} → ${Math.round(Number(d.close))} (${d.retPct}%, biên độ ±${d.bandPct}%)${when}`;
+  if (r.kind === "stale_price") return `${sym}giá cuối ${d.lastBar}, chậm ${d.sessionsBehind} phiên${when}`;
+  if (r.kind === "missing_session") return `${sym}thiếu ${(d.missing ?? []).join(", ")}`;
+  if (r.kind === "source_down") return `${d.source}: ${d.failed}/${d.of} mã không lấy được`;
+  return `${sym}${KIND_LABEL[r.kind] ?? r.kind}${when}`;
+}
+export function buildHealthEmail(rows: { severity: string; kind: string; symbol: string | null; ref_date: string | null; detail: any }[]): { subject: string; html: string; text: string } {
+  const errors = rows.filter((r) => r.severity === "error").length;
+  const subject = errors ? `WorkHub: ${errors} lỗi dữ liệu mới cần xử lý (${rows.length} cảnh báo)` : `WorkHub: ${rows.length} cảnh báo chất lượng dữ liệu mới`;
+  const line = (r: typeof rows[0]) => `[${r.severity === "error" ? "LỖI" : "Cảnh báo"}] ${KIND_LABEL[r.kind] ?? r.kind} — ${describeHealth(r)}`;
+  const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;color:#1c1c1e"><h2 style="margin:0 0 12px">Cảnh báo chất lượng dữ liệu</h2><p style="margin:0 0 10px">Kiểm tra dữ liệu hằng ngày phát hiện:</p>`
+    + rows.slice(0, 30).map((r) => `<div style="border:1px solid #e3e3e6;border-radius:8px;padding:8px 12px;margin:0 0 8px"><b style="color:${r.severity === "error" ? "#c0392b" : "#b9770e"}">${r.severity === "error" ? "LỖI" : "Cảnh báo"}</b> · ${escH(KIND_LABEL[r.kind] ?? r.kind)}<div style="color:#4a4a4f;margin-top:2px">${escH(describeHealth(r))}</div></div>`).join("")
+    + `${rows.length > 30 ? `<p>… và ${rows.length - 30} cảnh báo khác.</p>` : ""}<p style="color:#6b6b70;font-size:12px;margin-top:14px">Email này gửi vì bạn bật “email cảnh báo” trong WorkHub Fin và có quyền quản lý danh mục. Mở WorkHub Fin → Toàn Nhóm → Dữ Liệu để xem và đánh dấu đã xử lý.</p></div>`;
+  const text = rows.slice(0, 30).map(line).join("\n") + (rows.length > 30 ? `\n… và ${rows.length - 30} cảnh báo khác.` : "") + "\n\nMở WorkHub Fin → Toàn Nhóm → Dữ Liệu để xem và đánh dấu đã xử lý.";
+  return { subject, html, text };
+}

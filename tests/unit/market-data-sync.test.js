@@ -165,3 +165,30 @@ describe('chỉ số cơ bản từ VNDirect ratios', () => {
     expect(dup).toEqual(['freefloat']);
   });
 });
+
+import { buildHealthEmail, describeHealth } from '../../supabase/functions/market-data-sync/logic.ts';
+describe('email cảnh báo dữ liệu', () => {
+  const rows = [
+    { severity: 'error', kind: 'price_jump', symbol: 'HPG', ref_date: '2026-10-01', detail: { prev: 27000, close: 24000, retPct: -11.11, bandPct: 7 } },
+    { severity: 'warn', kind: 'price_mismatch', symbol: 'FPT', ref_date: '2026-10-02', detail: { vndirect: 102000, vci: 101000, diffPct: 0.99 } },
+    { severity: 'error', kind: 'source_down', symbol: null, ref_date: '2026-10-05', detail: { source: 'vndirect dchart', failed: 4, of: 4 } },
+    { severity: 'warn', kind: 'stale_price', symbol: 'SSI', ref_date: '2026-10-02', detail: { lastBar: '2026-09-28', sessionsBehind: 3 } },
+  ];
+  it('tiêu đề đếm lỗi và cảnh báo; nội dung mô tả từng loại bằng số liệu', () => {
+    const m = buildHealthEmail(rows);
+    expect(m.subject).toBe('WorkHub: 2 lỗi dữ liệu mới cần xử lý (4 cảnh báo)');
+    expect(m.text).toContain('[LỖI] Giá nhảy vượt biên độ sàn — HPG: giá 27000 → 24000 (-11.11%, biên độ ±7%) (2026-10-01)');
+    expect(m.text).toContain('VNDirect 102000 so với VCI 101000, lệch 0.99%');
+    expect(m.text).toContain('vndirect dchart: 4/4 mã không lấy được');
+    expect(m.text).toContain('chậm 3 phiên');
+    expect(buildHealthEmail(rows.filter(r => r.severity === 'warn')).subject).toBe('WorkHub: 2 cảnh báo chất lượng dữ liệu mới');
+  });
+  it('escape HTML trong nội dung và giới hạn 30 dòng', () => {
+    const m = buildHealthEmail([{ severity: 'warn', kind: 'meta_gap', symbol: '<b>X</b>', ref_date: null, detail: {} }]);
+    expect(m.html).not.toContain('<b>X</b>');
+    expect(m.html).toContain('&lt;b&gt;X&lt;/b&gt;');
+    const many = Array.from({ length: 35 }, (_, i) => ({ severity: 'warn', kind: 'stale_price', symbol: 'S' + i, ref_date: null, detail: { lastBar: 'x', sessionsBehind: 2 } }));
+    expect(buildHealthEmail(many).text).toContain('và 5 cảnh báo khác');
+    expect(describeHealth({ kind: 'lạ', symbol: null, ref_date: null, detail: null })).toBe('lạ');
+  });
+});

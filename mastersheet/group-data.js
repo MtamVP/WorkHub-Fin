@@ -71,6 +71,20 @@ function gdFreshness() {
     return out;
 }
 
+// Sổ đăng ký mô hình (lib/model-registry.js): mô hình nào, tham số, nguồn, đã kiểm chứng thế nào, giới hạn đã biết
+function gdRegistryHtml() {
+    if (typeof ModelRegistry === 'undefined') return '';
+    const groups = ModelRegistry.byArea();
+    return `<div class="ce-group-title">Sổ đăng ký mô hình <small style="font-weight:400">(phiên bản ${rkEsc(ModelRegistry.VERSION)})</small></div>
+        <div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mô hình</th><th>Phương pháp và tham số</th><th>Nguồn dữ liệu</th><th>Kiểm chứng</th><th>Giới hạn đã biết</th></tr></thead><tbody>
+        ${Object.keys(groups).map(a => groups[a].map(m => `<tr><td><b>${rkEsc(m.name)}</b><span class="symbol-sub">${rkEsc(m.area)}</span></td>
+            <td class="gr-reason">${rkEsc(m.method)}<span class="symbol-sub">${rkEsc(m.params)}</span></td><td class="gr-reason">${rkEsc(m.data)}</td>
+            <td class="gr-reason"><span class="tl-badge ${m.validation.golden ? 'ok' : 'info'}">${m.validation.golden ? 'Đối chiếu số chuẩn' : 'Kiểm thử đơn vị'}</span><span class="symbol-sub">${rkEsc(m.validation.note)}</span></td>
+            <td class="gr-reason">${rkEsc(m.limits)}</td></tr>`).join('')).join('')}
+        </tbody></table></div>
+        <p class="tl-hint">Số chuẩn do Python (numpy/scipy) sinh ra và được kiểm thử tự động mỗi lần đẩy mã. Sổ này cũng là danh sách để rà soát định kỳ: khi quy định thị trường hoặc nguồn dữ liệu đổi, các mô hình ở đây là nơi phải kiểm tra lại.</p>`;
+}
+
 function grDataHtml() {
     if (GD.state === 'loading' || GD.state === 'idle') return '<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang kiểm tra sức khoẻ dữ liệu…</div>';
     if (GD.state === 'error') return `<div class="tl-empty text-danger"><i class="fa-solid fa-triangle-exclamation"></i>Không tải được: ${rkEsc(GD.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="gdLoad(true)">Thử lại</button></div>`;
@@ -116,6 +130,8 @@ function grDataHtml() {
     // Đường cong lợi suất
     if (curve.length) html += `<div class="ce-group-title">Đường cong lợi suất trái phiếu chính phủ</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr>${curve.map(c => `<th class="text-right">${c.tenor}</th>`).join('')}</tr></thead><tbody><tr>${curve.map(c => `<td class="text-right">${rkNum(c.yield_pct, 2)}%</td>`).join('')}</tr></tbody></table></div>
         <p class="tl-hint">Lãi phi rủi ro dùng cho Sharpe, alpha và chi phí vốn lấy từ lợi suất kỳ hạn 1 năm theo từng ngày. Lịch sử bắt đầu từ ngày hệ thống chạy lần đầu (${glDate(GD.rates.reduce((m, r) => (m && m < r.rate_date ? m : r.rate_date), '') + 'T00:00:00')}); các ngày trước đó dùng mức cài đặt tay.</p>`;
+
+    html += gdRegistryHtml();
 
     html += `<div class="ce-group-title">Nguồn dữ liệu đang dùng</div><ul class="gr-rep-notes">
         <li><b>Giá đóng cửa, chỉ số, khối lượng:</b> VNDirect (dchart) — nguồn chính; kiểm chéo với VCI mỗi ngày làm việc.</li>
