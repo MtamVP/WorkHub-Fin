@@ -353,3 +353,5 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .ap-box { margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--warning-color); border-radius: var(--radius-md, 8px); background: var(--warning-bg); font-size: 0.86rem; }
 .ap-box.ok { border-color: var(--success-color); background: var(--success-bg); }
 .ap-box b { font-variant-numeric: tabular-nums; }
+
+.gq-exempt { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 6px 0 4px; }

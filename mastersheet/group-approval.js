@@ -8,7 +8,10 @@ const GQ = { state: 'idle', error: '', policy: null, rows: [], draft: null, savi
 
 function gqToday() { return new Date().toISOString().slice(0, 10); }
 function gqManager() { return !!(typeof GL !== 'undefined' && GL.actor && GL.actor.isManager); }
-function gqActor() { const a = (typeof GL !== 'undefined' && GL.actor) || {}; return { isManager: !!a.isManager, isAdmin: !!a.isAdmin, actorId: a.actorId }; }
+function gqActor() {
+    const a = (typeof GL !== 'undefined' && GL.actor) || {};
+    return { isManager: !!a.isManager, isAdmin: !!a.isAdmin, actorId: a.actorId, canSelfApprove: !!(GQ.policy && (GQ.policy.selfApprovers || []).includes(a.actorId)) };
+}
 function gqName(id) {
     const m = GR.data && GR.data.members ? GR.data.members.find(x => x.id === id) : null;
     return m ? (m.nickname || String(m.email || '').split('@')[0]) : 'Thành viên';
@@ -58,6 +61,23 @@ async function gqSavePolicy() {
     } catch (e) { GQ.saving = false; showToast('Lỗi: ' + e.message, 'error'); }
 }
 
+async function gqSaveSelfApprovers() {
+    const ids = [...document.querySelectorAll('.gq-selfapp:checked')].map(c => c.value);
+    try { showToast(await grCall('setSelfApprovers', { ids, email: (GL.actor && GL.actor.actorEmail) || '' }), 'success'); await gqLoad(true); } catch (e) { showToast('Lỗi: ' + e.message, 'error'); }
+}
+
+// Chỉ admin thấy: chọn ai được miễn nguyên tắc hai người (tự duyệt lệnh của mình, vẫn phải ghi lý do)
+function gqExemptHtml() {
+    const sel = (GQ.policy && GQ.policy.selfApprovers) || [];
+    const names = sel.map(gqName);
+    let html = `<div class="ce-group-title" style="margin-top:22px">Ngoại lệ nguyên tắc hai người</div>
+        <p class="tl-hint" style="margin:0 0 8px">Admin luôn được tự duyệt. ${sel.length ? 'Ngoài admin, đang được miễn: <b>' + names.map(rkEsc).join(', ') + '</b>.' : 'Hiện không ai khác được miễn.'} Người được miễn vẫn phải ghi lý do (≥ 10 ký tự) khi tự duyệt, và lịch sử gắn nhãn “tự duyệt”.</p>`;
+    if (!gqActor().isAdmin) return html;
+    const managers = (GR.data.members || []);
+    return html + `<div class="gq-exempt">${managers.map(m => `<label class="tl-check"><input type="checkbox" class="gq-selfapp" value="${rkEsc(m.id)}" ${sel.includes(m.id) ? 'checked' : ''}> ${rkEsc(m.nickname || String(m.email || '').split('@')[0])}</label>`).join('')}</div>
+        <div class="gs-actions"><button type="button" class="btn-save" onclick="gqSaveSelfApprovers()"><i class="fa-solid fa-floppy-disk"></i> Lưu danh sách miễn</button></div>`;
+}
+
 function gqPolicyHtml() {
     const manager = gqManager(), p = GQ.policy || { active: false };
     const summary = p.active
@@ -88,7 +108,7 @@ async function gqDecide(id, decision) {
     const req = GQ.rows.find(r => r.id === id);
     const can = ApprovalCalc.canDecide(gqActor(), req, decision, note);
     if (!can.allowed) { showToast(can.reason, 'error'); return; }
-    if (can.selfApproval && !confirm('Bạn đang tự duyệt lệnh của chính mình (ngoại lệ dành cho admin). Lý do sẽ được lưu cùng quyết định. Tiếp tục?')) return;
+    if (can.selfApproval && !confirm('Bạn đang tự duyệt lệnh của chính mình (ngoại lệ được cấp cho bạn). Lý do sẽ được lưu cùng quyết định. Tiếp tục?')) return;
     GQ.busy = id;
     try {
         const msg = await grCall('decideOrderRequest', { id, decision, note, email: (GL.actor && GL.actor.actorEmail) || '' });
@@ -110,7 +130,7 @@ function gqQueueHtml() {
         ${rows.map(r => {
             const own = r.user_id === actor.actorId || r.created_by === actor.actorId;
             const act = !actor.isManager ? (own ? `<button type="button" class="tl-link tl-danger" onclick="gqCancel('${r.id}')">Huỷ đề xuất</button>` : '<span class="tl-hint" style="margin:0">Chờ quản lý</span>')
-                : (own && !actor.isAdmin ? '<span class="tl-hint" style="margin:0">Không tự duyệt lệnh của mình — nhờ quản lý khác</span> <button type="button" class="tl-link tl-danger" onclick="gqCancel(\'' + r.id + '\')">Huỷ</button>'
+                : (own && !(actor.isAdmin || actor.canSelfApprove) ? '<span class="tl-hint" style="margin:0">Không tự duyệt lệnh của mình — nhờ quản lý khác</span> <button type="button" class="tl-link tl-danger" onclick="gqCancel(\'' + r.id + '\')">Huỷ</button>'
                     : `<div class="gq-act"><input type="text" id="gq-note-${r.id}" class="tl-input" maxlength="500" placeholder="${own ? 'Lý do tự duyệt (≥ 10 ký tự)' : 'Ghi chú (bắt buộc khi từ chối)'}">
                        <button type="button" class="btn-save" onclick="gqDecide('${r.id}', 'approved')" ${GQ.busy ? 'disabled' : ''}><i class="fa-solid fa-check"></i> Duyệt</button>
                        <button type="button" class="btn-tool" onclick="gqDecide('${r.id}', 'rejected')" ${GQ.busy ? 'disabled' : ''}><i class="fa-solid fa-xmark"></i> Từ chối</button></div>`);
@@ -142,5 +162,5 @@ function grApprovalHtml() {
         rkKpi('Đã thực hiện', String(s.executed), '120 ngày qua'),
         rkKpi('Bị từ chối', String(s.rejected), '120 ngày qua'),
         rkKpi('Hết hạn / huỷ', String(s.expired + s.cancelled), 'không dùng tới'),
-    ].join('')}</div>` + gqQueueHtml() + gqHistoryHtml() + `<div style="margin-top:22px">${gqPolicyHtml()}</div>`;
+    ].join('')}</div>` + gqQueueHtml() + gqHistoryHtml() + `<div style="margin-top:22px">${gqPolicyHtml()}</div>` + gqExemptHtml();
 }

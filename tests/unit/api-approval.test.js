@@ -126,6 +126,19 @@ describe('orders: đề xuất, duyệt, huỷ', () => {
     await adm.API.asset.orders.decide(ADMIN.email, 'r1', 'approved', 'Không còn quản lý nào khác trực');
     expect(adm.fake.table('finance_order_requests')[0].status).toBe('approved');
   });
+  it('người trong danh sách miễn (do admin đặt) tự duyệt được với lý do; admin mới đặt được danh sách', async () => {
+    const own = [{ id: 'r1', user_id: 'u-2', symbol: 'HPG', side: 'buy', quantity: 1, price_ref: 1, value: 1, status: 'pending', created_at: new Date().toISOString() }];
+    const pol = [{ id: 1, active: true, threshold_pct: 10, valid_days: 3, self_approvers: ['u-2'] }];
+    const c = boot(MANAGER, { finance_order_requests: own, finance_approval_policy: pol });
+    await expect(c.API.asset.orders.decide(MANAGER.email, 'r1', 'approved', 'ngắn')).rejects.toThrow(/lý do/);
+    await c.API.asset.orders.decide(MANAGER.email, 'r1', 'approved', 'Chủ dự án uỷ quyền tự duyệt');
+    expect(c.fake.table('finance_order_requests')[0].status).toBe('approved');
+    await expect(c.API.asset.approvalPolicy.setSelfApprovers(MANAGER.email, ['u-1'])).rejects.toThrow(/Chỉ admin/);
+    const adm = boot(ADMIN, { finance_approval_policy: pol });
+    expect(await adm.API.asset.approvalPolicy.setSelfApprovers(ADMIN.email, ['u-2', 'u-2', 'u-1'])).toMatch(/2/);
+    expect(adm.fake.table('finance_approval_policy')[0].self_approvers).toEqual(['u-2', 'u-1']);
+    expect((await adm.API.asset.approvalPolicy.get()).selfApprovers).toEqual(['u-2', 'u-1']);
+  });
   it('huỷ đề xuất đang chờ; không huỷ được đề xuất đã thực hiện', async () => {
     const c = boot(MEMBER, { finance_order_requests: [approved({ id: 'a', status: 'pending' }), approved({ id: 'b', status: 'executed' })] });
     expect(await c.API.asset.orders.cancel('a')).toMatch(/huỷ/);

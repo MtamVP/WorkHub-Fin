@@ -2443,7 +2443,16 @@ const API = {
                 if (typeof ApprovalCalc === 'undefined') throw new Error("Thiếu thư viện duyệt lệnh (lib/approval-calc.js)");
                 const { data, error } = await sbClient.from('finance_approval_policy').select('*').eq('id', 1).maybeSingle();
                 if (error) throw error;
-                return Object.assign(ApprovalCalc.normalizePolicy(data), { updatedAt: data ? data.updated_at : null });
+                return Object.assign(ApprovalCalc.normalizePolicy(data), { updatedAt: data ? data.updated_at : null, selfApprovers: data && Array.isArray(data.self_approvers) ? data.self_approvers : [] });
+            },
+            // Danh sách người được miễn nguyên tắc hai người (tự duyệt lệnh của mình, vẫn phải ghi lý do). Chỉ admin đặt được (trigger DB cũng chặn người khác).
+            setSelfApprovers: async (email, ids) => {
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isAdmin) throw new Error("Chỉ admin được đặt danh sách người miễn nguyên tắc hai người");
+                const list = [...new Set((ids || []).map(String))];
+                const { error } = await sbClient.from('finance_approval_policy').upsert({ id: 1, self_approvers: list, updated_by: actor.actorId, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+                if (error) throw error;
+                return list.length ? "Đã lưu danh sách người được tự duyệt (" + list.length + ")" : "Đã bỏ mọi ngoại lệ: không ai được tự duyệt ngoài admin";
             },
             save: async (email, policy) => {
                 if (typeof ApprovalCalc === 'undefined') throw new Error("Thiếu thư viện duyệt lệnh (lib/approval-calc.js)");
@@ -2525,10 +2534,11 @@ const API = {
                 const { data: req, error: gErr } = await sbClient.from('finance_order_requests').select('*').eq('id', id).maybeSingle();
                 if (gErr) throw gErr;
                 if (!req) throw new Error("Không tìm thấy đề xuất");
-                const can = ApprovalCalc.canDecide({ isManager: actor.isManager, isAdmin: actor.isAdmin, actorId: actor.actorId }, req, decision, note);
+                const pol = await API.asset.approvalPolicy.get();
+                const can = ApprovalCalc.canDecide({ isManager: actor.isManager, isAdmin: actor.isAdmin, canSelfApprove: pol.selfApprovers.includes(actor.actorId), actorId: actor.actorId }, req, decision, note);
                 if (!can.allowed) throw new Error(can.reason);
                 const patch = { status: decision, decision_note: String(note || '').trim().slice(0, 500) || null };
-                if (decision === 'approved') patch.valid_until = ApprovalCalc.validUntil(API.asset.orders._today(), (await API.asset.approvalPolicy.get()).validDays);
+                if (decision === 'approved') patch.valid_until = ApprovalCalc.validUntil(API.asset.orders._today(), pol.validDays);
                 const { data, error } = await sbClient.from('finance_order_requests').update(patch).eq('id', id).eq('status', 'pending').select('id');
                 if (error) throw error;
                 if (!data || !data.length) throw new Error("Đề xuất đã được xử lý bởi người khác");
@@ -4651,7 +4661,7 @@ const MUTATING_ACTIONS = new Set([
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
+    'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
@@ -4816,6 +4826,7 @@ async function _dispatchAction(action, params = {}) {
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
             case 'listPolicy': result = await API.asset.policy.list(); break;
             case 'getApprovalPolicy': result = await API.asset.approvalPolicy.get(); break;
+            case 'setSelfApprovers': result = await API.asset.approvalPolicy.setSelfApprovers(params.email, params.ids); break;
             case 'saveApprovalPolicy': result = await API.asset.approvalPolicy.save(params.email, params.policy); break;
             case 'checkTradeApproval': result = await API.asset.orders.checkTrade(params.email, params.trade); break;
             case 'createOrderRequest': result = await API.asset.orders.create(params.email, params.request); break;

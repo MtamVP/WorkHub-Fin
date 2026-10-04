@@ -107,6 +107,13 @@ describe('canDecide: nguyên tắc hai người', () => {
     expect(A.canDecide(mgr, { status: 'pending', user_id: 'u1', created_by: 'm1' }, 'approved', 'duyệt hộ chính mình').allowed).toBe(false);
     expect(A.canDecide(mgr, { status: 'pending', user_id: 'u1', created_by: 'u1' }, 'approved', '').allowed).toBe(true);
   });
+  it('người trong danh sách miễn tự duyệt được nhưng vẫn phải ghi lý do', () => {
+    const exempt = { isManager: true, isAdmin: false, canSelfApprove: true, actorId: 'm1' };
+    const own = { status: 'pending', user_id: 'm1' };
+    expect(A.canDecide(exempt, own, 'approved', 'ngắn').allowed).toBe(false);
+    expect(A.canDecide(exempt, own, 'approved', 'Chủ dự án uỷ quyền tự duyệt').selfApproval).toBe(true);
+    expect(A.canDecide(mgr, own, 'approved', 'Chủ dự án uỷ quyền tự duyệt').allowed).toBe(false);
+  });
   it('chỉ đề xuất đang chờ mới duyệt được', () => {
     expect(A.canDecide(mgr, { status: 'approved', user_id: 'u1' }, 'approved', '').allowed).toBe(false);
   });
