@@ -85,6 +85,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
       },
       order(col, o) { q.order = { col, asc: !(o && o.ascending === false) }; return api; },
       limit(n) { q.limit = n; return api; },
+      range(from, to) { q.range = [from, to]; return api; },
       maybeSingle() { q.single = 'maybe'; return api; },
       single() { q.single = 'one'; return api; },
       then(resolve, reject) { return Promise.resolve(run()).then(resolve, reject); },
@@ -127,6 +128,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
         for (let i = rows.length - 1; i >= 0; i--) if (matchRow(rows[i], q.filters)) { result.push({ ...rows[i] }); rows.splice(i, 1); }
       }
       if (q.order) result.sort((a, b) => ((a[q.order.col] > b[q.order.col]) - (a[q.order.col] < b[q.order.col])) * (q.order.asc ? 1 : -1));
+      if (q.range) result = result.slice(q.range[0], q.range[1] + 1);
       if (q.limit) result = result.slice(0, q.limit);
       if (error) return { data: null, error };
       if ((q.op === 'insert' || q.op === 'update' || q.op === 'upsert' || q.op === 'delete') && !q.returning) return { data: null, error: null };

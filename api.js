@@ -2520,6 +2520,65 @@ const API = {
             return { txns, cashFlows, navHistory, actions, histories, historyError, firstTxnDate: first, from: start, to };
         },
 
+        // Chuỗi giá chuẩn (VN-Index hoặc VN30) từ trước ngày `from` ~20 ngày tới nay, cho các phân tích hiệu quả cấp nhóm.
+        getBenchSeries: async (benchKey, from) => {
+            const key = ['VNINDEX', 'VN30'].includes(benchKey) ? benchKey : 'VNINDEX';
+            const to = new Date().toISOString().slice(0, 10);
+            const floor = new Date(Date.now() - 2590 * 86400000).toISOString().slice(0, 10);
+            const start = /^\d{4}-\d{2}-\d{2}$/.test(String(from || '')) ? new Date(new Date(from + 'T00:00:00Z').getTime() - 20 * 86400000).toISOString().slice(0, 10) : floor;
+            const s = await API.asset.getPriceHistory([key], start < floor ? floor : start, to);
+            return s[key] || [];
+        },
+
+        // Đọc hết một bảng lớn theo từng trang 1.000 dòng (giới hạn mặc định của máy chủ); build() trả query MỚI mỗi lần gọi.
+        _fetchAll: async (build) => {
+            const out = [];
+            for (let from = 0; ; from += 1000) {
+                const { data, error } = await build().range(from, from + 999);
+                if (error) throw error;
+                out.push(...(data || []));
+                if (!data || data.length < 1000) break;
+            }
+            return out;
+        },
+
+        // Giá lịch sử + sự kiện doanh nghiệp cho một nhóm mã (dùng chung cho Rủi Ro cá nhân và Rủi Ro cấp nhóm). Lỗi phần nào được báo riêng.
+        getMarketInputs: async (symbols, windowDays) => {
+            const win = Math.min(Math.max(Number(windowDays) || 365, 90), 1100);
+            const list = [...new Set((symbols || []).map(s => String(s).toUpperCase()))].slice(0, 60);
+            const to = new Date().toISOString().slice(0, 10);
+            const from = new Date(Date.now() - (win + 20) * 86400000).toISOString().slice(0, 10);
+            let histories = {}, historyError = null, events = [], eventsError = null;
+            if (list.length) {
+                try {
+                    for (let i = 0; i < list.length; i += 20) {
+                        Object.assign(histories, await API.asset.getPriceHistory(list.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), from, to));
+                    }
+                } catch (e) { historyError = e.message || String(e); }
+                try { events = (await API.asset.events._fetchEvents(list, from)).events; } catch (e) { eventsError = e.message || String(e); }
+            }
+            return { histories, historyError, events, eventsError, from, to, windowDays: win };
+        },
+
+        // Dữ liệu thô của CẢ NHÓM (thành viên finance/admin đang hoạt động): sổ lệnh, hành động DN, dòng tiền, giá, tiền/nợ, lịch sử NAV.
+        // Chính sách RLS cho phép nhóm finance/admin đọc dữ liệu của nhau. Phép gộp ở lib/group-calc.js.
+        getGroupData: async () => {
+            const { data: users, error } = await sbClient.from('users').select('id, email, nickname, group_key, active').in('group_key', ['finance', 'admin']);
+            if (error) throw error;
+            const members = (users || []).filter(u => u.active !== false).map(u => ({ id: u.id, email: u.email, nickname: u.nickname || null }));
+            const ids = members.map(m => m.id);
+            if (!ids.length) return { members: [], txns: [], actions: [], cashFlows: [], prices: [], assets: [], navHistory: [], fetchedAt: new Date().toISOString() };
+            const [txns, actions, cashFlows, prices, assets, navHistory] = await Promise.all([
+                API.asset._fetchAll(() => sbClient.from('finance_transactions').select('*').in('user_id', ids).is('deleted_at', null).order('trade_date', { ascending: true })),
+                API.asset._fetchAll(() => sbClient.from('finance_corporate_actions').select('*').in('user_id', ids).is('deleted_at', null).order('ex_date', { ascending: true })),
+                API.asset._fetchAll(() => sbClient.from('finance_cash_flows').select('*').in('user_id', ids).is('deleted_at', null).order('flow_date', { ascending: true })),
+                API.asset._fetchAll(() => sbClient.from('finance_holdings_price').select('user_id, symbol, market_price, price_date, updated_at').in('user_id', ids)),
+                API.asset._fetchAll(() => sbClient.from('finance_assets').select('user_id, cash, debt, nav').in('user_id', ids)),
+                API.asset._fetchAll(() => sbClient.from('finance_nav_history').select('user_id, snapshot_date, nav, net_contributed, cash, market_value').in('user_id', ids).order('snapshot_date', { ascending: true }))
+            ]);
+            return { members, txns, actions, cashFlows, prices, assets, navHistory, fetchedAt: new Date().toISOString() };
+        },
+
         // Gom dữ liệu thô cho tab Rủi Ro (tính toán ở lib/risk-calc.js): danh mục hiện tại, tiền/nợ, giá lịch sử các mã đang giữ + VN-Index,
         // sự kiện doanh nghiệp để điều chỉnh giá (lỗi ở các phần phụ KHÔNG làm hỏng cả báo cáo), lịch sử NAV đã chụp.
         getRiskInputs: async (email, windowDays) => {
@@ -2530,18 +2589,8 @@ const API = {
                 API.asset.getHoldingsView(email), API.asset.getNavHistory(email),
                 sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
             ]);
-            const symbols = holdings.map(h => h.symbol).slice(0, 40);
-            const to = new Date().toISOString().slice(0, 10);
-            const from = new Date(Date.now() - (win + 20) * 86400000).toISOString().slice(0, 10);
-            let histories = {}, historyError = null, events = [], eventsError = null;
-            if (symbols.length) {
-                try {
-                    for (let i = 0; i < symbols.length; i += 20) {
-                        Object.assign(histories, await API.asset.getPriceHistory(symbols.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), from, to));
-                    }
-                } catch (e) { historyError = e.message || String(e); }
-                try { events = (await API.asset.events._fetchEvents(symbols, from)).events; } catch (e) { eventsError = e.message || String(e); }
-            }
+            const mk = await API.asset.getMarketInputs(holdings.map(h => h.symbol).slice(0, 40), win);
+            const { histories, historyError, events, eventsError, from, to } = mk;
             return {
                 holdings: holdings.map(h => ({ symbol: h.symbol, quantity: h.quantity, marketValue: h.marketValue, marketPrice: h.marketPrice })),
                 cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0,
@@ -4110,6 +4159,9 @@ async function _dispatchAction(action, params = {}) {
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
             case 'getPerfInputs': result = await API.asset.getPerfInputs(params.email, params.benchKey); break;
             case 'getAttributionInputs': result = await API.asset.getAttributionInputs(params.email, params.from); break;
+            case 'getBenchSeries': result = await API.asset.getBenchSeries(params.benchKey, params.from); break;
+            case 'getGroupData': result = await API.asset.getGroupData(); break;
+            case 'getMarketInputs': result = await API.asset.getMarketInputs(params.symbols, params.windowDays); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;

@@ -167,8 +167,8 @@ function rkActual(r) {
     return `<p class="tl-hint"><b>Thực tế từ NAV bạn đã chụp</b> (${a.points} điểm, ${rkDate(a.from)} → ${rkDate(a.to)}, đã loại ngày nạp/rút vốn): sụt giảm tối đa <b class="tl-down">${rkPct(a.maxDD * 100, 1)}</b>${a.peakDate ? ` (${rkDate(a.peakDate)} → ${rkDate(a.troughDate)})` : ''}, hiện cách đỉnh <b>${rkPct(a.current * 100, 1)}</b>.</p>`;
 }
 
-function rkCoverage(r) {
-    const cv = r.coverage, i = RK.inputs;
+function rkCoverage(r, i) {
+    const cv = r.coverage;
     const notes = [];
     if (cv && cv.from) notes.push(`Giá từ <b>${rkDate(cv.from)}</b> đến <b>${rkDate(cv.to)}</b> (${cv.days} phiên)`);
     if (cv) notes.push(`${cv.used.length}/${r.symbols.length} mã đủ dữ liệu`);
@@ -177,6 +177,29 @@ function rkCoverage(r) {
     if (i && i.historyError) warn += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được giá lịch sử: ${rkEsc(i.historyError)}. Các chỉ số biến động/VaR/tương quan chưa tính được; phần tập trung vẫn hiển thị.</span></div>`;
     if (i && i.eventsError) warn += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Không lấy được sự kiện doanh nghiệp (${rkEsc(i.eventsError)}) nên giá chưa được điều chỉnh theo cổ phiếu thưởng — mã vừa chia thưởng có thể bị tính biến động cao hơn thực tế.</span></div>`;
     return `${warn}<div class="rk-meta">${notes.join(' · ')}</div>`;
+}
+
+// Dựng HTML phân tích rủi ro cho một kết quả RiskCalc.analyze. Dùng chung cho tab Rủi Ro cá nhân và Rủi Ro cấp nhóm (trang Toàn Nhóm).
+// ctx: { inputs (có historyError/eventsError), limits:{sectorLimit}, windowDays, chartId }
+function rkBuildHtml(r, ctx) {
+    let html = rkCoverage(r, ctx.inputs) + `<div class="ce-group-title" style="margin-top:4px">Điều cần chú ý</div>${rkWarnings(r)}`;
+    html += rkKpis(r);
+    html += `<div class="ce-group-title">Từng mã: vốn chiếm bao nhiêu, rủi ro chiếm bao nhiêu</div>${rkSymbolTable(r)}`;
+    html += `<div class="ce-group-title">Theo ngành <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(ngưỡng ${rkNum(ctx.limits.sectorLimit)}%)</small></div>${rkSectors(r)}`;
+    if (r.ok) {
+        html += `<div class="ce-group-title">Danh mục từng sụt giảm bao nhiêu từ đỉnh <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(nếu giữ tỷ trọng hiện tại suốt kỳ)</small></div>
+            <div class="tl-card rk-chart-card"><div style="position:relative;height:260px"><canvas id="${ctx.chartId}"></canvas></div></div>${rkActual(r)}`;
+        html += `<div class="ce-group-title">Các mã có đi cùng nhau không</div>${rkCorrelation(r)}`;
+        html += `<div class="ce-group-title">Nếu thị trường giảm</div>${rkStress(r)}`;
+    } else if (r.reason === 'no-history') {
+        html += '<div class="tl-empty" style="padding:16px"><i class="fa-solid fa-chart-line"></i>Chưa đủ giá lịch sử (cần tối thiểu ~40 phiên) để tính biến động, VaR, tương quan và kịch bản.</div>' + rkActual(r);
+    }
+    html += `<details class="tl-details"><summary>Cách tính và giới hạn</summary><div class="tl-hint">
+        Mọi chỉ số thống kê là <b>hồi tố với tỷ trọng hiện tại</b> trên giá đóng cửa ${ctx.windowDays >= 700 ? '2 năm' : (ctx.windowDays >= 365 ? '1 năm' : '6 tháng')} gần nhất, so với VN-Index; tiền mặt coi như không sinh lời, nợ vay làm đòn bẩy (chưa tính lãi vay).
+        Biến động = độ lệch chuẩn lợi suất ngày × √252. VaR 95% = phân vị 5% của lợi suất ngày. Đóng góp rủi ro = tỷ trọng × hiệp phương sai của mã với danh mục ÷ phương sai danh mục (cộng lại 100%).
+        Kịch bản dùng beta điều chỉnh (0,67 × beta + 0,33). Ước lượng từ quá khứ, <b>không phải dự báo</b>, và không phản ánh rủi ro thanh khoản, tin xấu riêng của doanh nghiệp hay giá chạm sàn liên tiếp.
+        Phân loại ngành theo bảng nội bộ cho các mã phổ biến; mã ngoài bảng xếp vào “Chưa phân ngành”.</div></details>`;
+    return html;
 }
 
 function renderRisk() {
@@ -195,32 +218,16 @@ function renderRisk() {
         body.innerHTML = '<div class="tl-empty"><i class="fa-solid fa-shield-halved"></i>Chưa có mã nào đang giữ — thêm lệnh mua ở tab Sổ Lệnh để phân tích rủi ro.</div>';
         return;
     }
-    let html = rkCoverage(r) + `<div class="ce-group-title" style="margin-top:4px">Điều cần chú ý</div>${rkWarnings(r)}`;
-    html += rkKpis(r);
-    html += `<div class="ce-group-title">Từng mã: vốn chiếm bao nhiêu, rủi ro chiếm bao nhiêu</div>${rkSymbolTable(r)}`;
-    html += `<div class="ce-group-title">Theo ngành <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(ngưỡng ${rkNum(RK.limits.sectorLimit)}%)</small></div>${rkSectors(r)}`;
-    if (r.ok) {
-        html += `<div class="ce-group-title">Danh mục từng sụt giảm bao nhiêu từ đỉnh <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(nếu giữ tỷ trọng hiện tại suốt kỳ)</small></div>
-            <div class="tl-card rk-chart-card"><div style="position:relative;height:260px"><canvas id="rk-dd-chart"></canvas></div></div>${rkActual(r)}`;
-        html += `<div class="ce-group-title">Các mã có đi cùng nhau không</div>${rkCorrelation(r)}`;
-        html += `<div class="ce-group-title">Nếu thị trường giảm</div>${rkStress(r)}`;
-    } else if (r.reason === 'no-history') {
-        html += '<div class="tl-empty" style="padding:16px"><i class="fa-solid fa-chart-line"></i>Chưa đủ giá lịch sử (cần tối thiểu ~40 phiên) để tính biến động, VaR, tương quan và kịch bản.</div>' + rkActual(r);
-    }
-    html += `<details class="tl-details"><summary>Cách tính và giới hạn</summary><div class="tl-hint">
-        Mọi chỉ số thống kê là <b>hồi tố với tỷ trọng hiện tại</b> trên giá đóng cửa ${RK.windowDays >= 700 ? '2 năm' : (RK.windowDays >= 365 ? '1 năm' : '6 tháng')} gần nhất, so với VN-Index; tiền mặt coi như không sinh lời, nợ vay làm đòn bẩy (chưa tính lãi vay).
-        Biến động = độ lệch chuẩn lợi suất ngày × √252. VaR 95% = phân vị 5% của lợi suất ngày. Đóng góp rủi ro = tỷ trọng × hiệp phương sai của mã với danh mục ÷ phương sai danh mục (cộng lại 100%).
-        Kịch bản dùng beta điều chỉnh (0,67 × beta + 0,33). Ước lượng từ quá khứ, <b>không phải dự báo</b>, và không phản ánh rủi ro thanh khoản, tin xấu riêng của doanh nghiệp hay giá chạm sàn liên tiếp.
-        Phân loại ngành theo bảng nội bộ cho các mã phổ biến; mã ngoài bảng xếp vào “Chưa phân ngành”.</div></details>`;
-    body.innerHTML = html;
-    if (r.ok) rkDrawChart(r);
+    const ctx = { inputs: RK.inputs, limits: RK.limits, windowDays: RK.windowDays, chartId: 'rk-dd-chart' };
+    body.innerHTML = rkBuildHtml(r, ctx);
+    if (r.ok) RK.chart = rkDrawChart(r, ctx.chartId);
 }
 
-function rkDrawChart(r) {
-    const canvas = document.getElementById('rk-dd-chart');
-    if (!canvas || typeof Chart === 'undefined') return;
+function rkDrawChart(r, canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || typeof Chart === 'undefined') return null;
     const s = r.portfolio.ddSeries;
-    RK.chart = new Chart(canvas.getContext('2d'), {
+    return new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels: s.map(x => x.date),

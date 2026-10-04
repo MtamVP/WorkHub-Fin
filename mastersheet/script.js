@@ -310,6 +310,21 @@ function cssVar(name) {
     return getComputedStyle(scope).getPropertyValue(name).trim();
 }
 
+// Canvas (Chart.js) không hiểu var()/color-mix: đổi màu token sang rgba() để tô nền biểu đồ đúng theme
+function cssVarAlpha(name, alpha) {
+    const v = cssVar(name);
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v);
+    if (hex) {
+        let h = hex[1];
+        if (h.length === 3) h = h.split('').map(c => c + c).join('');
+        const n = parseInt(h, 16);
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+    }
+    const rgb = /^rgba?\(([^)]+)\)/i.exec(v);
+    if (rgb) { const p = rgb[1].split(',').map(s => s.trim()); return `rgba(${p[0]}, ${p[1]}, ${p[2]}, ${alpha})`; }
+    return `rgba(128, 128, 128, ${alpha})`;
+}
+
 // Màu chart lấy từ bộ categorical palette đã validate (--series-1..4 + --series-other), cùng bộ với trang Nhập liệu
 function allocationColorFor(idx) {
     if (idx < ALLOCATION_COLOR_VARS.length) return cssVar(ALLOCATION_COLOR_VARS[idx]);

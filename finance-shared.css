@@ -126,6 +126,7 @@ body {
 .desk-wordmark .glyph { width: 24px; height: 24px; border-radius: 6px; background: var(--finance-accent); display: grid; place-items: center; color: #fff; flex-shrink: 0; }
 :root[data-theme="dark"] body.desk .desk-wordmark .glyph { color: #0E241C; }
 .desk-wordmark .sub { color: var(--text-muted); font-weight: 500; }
+@media (max-width: 1100px) { .desk-wordmark .sub { display: none; } }   /* tên khu vực dài hơn xưa (Investment Workbench): ẩn khi thanh trên cùng hẹp để không tràn ngang */
 
 .desk-nav { display: flex; gap: 2px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-pill); padding: 3px; }
 .desk-nav a {

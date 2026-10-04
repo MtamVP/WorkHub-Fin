@@ -222,3 +222,12 @@ td.jn-reason::before { content: none; }
 .at-dec-title { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin: 6px 0 6px; }
 .at-dec-title small { font-weight: 500; color: var(--text-muted); }
 #attr-card .spreadsheet-wrapper { overflow-x: auto; }
+
+/* ---- Phân tích cấp nhóm (mastersheet/group.js) ---- */
+.gr-table td, .gr-table th { white-space: nowrap; }
+.gr-table th .tl-link { font-weight: 700; font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); padding: 0; }
+.gr-table th .tl-link:hover { color: var(--text-primary); }
+.gr-table td.gr-holders { white-space: normal; min-width: 220px; }
+.gr-chip { display: inline-flex; align-items: center; gap: 5px; margin: 2px 4px 2px 0; padding: 1px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-color); background: var(--bg-color-2); font-size: 0.7rem; color: var(--text-secondary); }
+.gr-chip b { font-family: var(--font-mono); color: var(--text-primary); font-weight: 600; }
+#grp-card .spreadsheet-wrapper { overflow-x: auto; }

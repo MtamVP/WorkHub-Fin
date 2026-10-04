@@ -23,8 +23,9 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.7">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.8">
     <link rel="stylesheet" href="/mastersheet/style.css?v=1789060000000">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -140,10 +141,36 @@
             </div>
         </div>
 
+
+        <!-- Phân tích cấp nhóm: danh mục chung, thành viên, giới hạn -->
+        <section class="tl-card" id="grp-card" style="margin-top:22px">
+            <div class="tl-card-head">
+                <h3><i class="fa-solid fa-people-group"></i> Phân Tích Cấp Nhóm</h3>
+                <div class="tl-card-tools" id="grp-perf-tools" style="display:none">
+                    <select id="grp-range" class="tl-select" aria-label="Khoảng thời gian" onchange="grChangeRange()"><option value="3m">3 tháng</option><option value="6m">6 tháng</option><option value="ytd" selected>Từ đầu năm</option><option value="1y">12 tháng</option><option value="all">Từ đầu</option></select>
+                    <label class="tl-check" title="Dùng để tính Sharpe và alpha">Lãi phi rủi ro <input type="number" class="tl-input num" id="grp-rf" style="width:64px" step="0.1" min="0" max="30" value="4.5" onchange="grChangeRf()"> %/năm</label>
+                </div>
+                <button type="button" class="btn-tool" onclick="loadGroup(true)"><i class="fa-solid fa-rotate"></i> Tải lại</button>
+            </div>
+            <div class="task-view-toggle asset-tab-toggle" id="grp-tabs" style="margin-bottom:14px">
+                <button class="view-toggle-btn active" data-gtab="portfolio" onclick="switchGroupTab('portfolio')"><i class="fa-solid fa-layer-group"></i> Danh Mục Chung</button>
+                <button class="view-toggle-btn" data-gtab="members" onclick="switchGroupTab('members')"><i class="fa-solid fa-user-group"></i> Thành Viên</button>
+            </div>
+            <div id="grp-body"></div>
+        </section>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=1791500000000"></script>
+    <script src="../lib/finance-calc.js?v=2"></script>
+    <script src="../lib/portfolio-calc.js?v=1791900000000"></script>
+    <script src="../lib/perf-calc.js?v=1791900000000"></script>
+    <script src="../lib/risk-calc.js?v=1791900000000"></script>
+    <script src="../lib/group-calc.js?v=1791900000000"></script>
     <script src="script.js?v=1789060000000"></script>
+    <script src="assets/risk.js?v=1791900000000"></script>
+    <script src="group.js?v=1791900000000"></script>
+    <script>document.addEventListener('DOMContentLoaded', function () { loadGroup(); });</script>
 </body>
 </html>
