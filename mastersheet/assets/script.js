@@ -572,6 +572,7 @@ async function togglePriceLockUI(btn) {
 async function loadLedger() {
     const tbody = document.getElementById('ledger-body');
     if (!tbody) return;
+    if (typeof apLoadMine === 'function') apLoadMine();
     tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>';
 
     try {
@@ -630,6 +631,11 @@ async function handleTxnSubmit(e) {
     const plan = typeof readTxnPlan === 'function' ? readTxnPlan() : null;
     if (plan) txn.decision = plan;
 
+    // Lệnh lớn: vượt ngưỡng của nhóm thì phải có đề xuất đã được quản lý duyệt; chưa có thì mời gửi đề xuất (lệnh chưa được ghi)
+    if (typeof approvalGate === 'function') {
+        if (await approvalGate(txn) === false) return;
+    }
+
     // Giới hạn đầu tư: vượt thì hỏi lý do ngoại lệ hoặc chặn (máy chủ kiểm lại khi ghi)
     if (typeof limitsGate === 'function') {
         const gate = await limitsGate(txn);
@@ -649,15 +655,16 @@ async function handleTxnSubmit(e) {
             if (typeof updateTxnFeePreview === 'function') updateTxnFeePreview();
             if (typeof resetTxnPlan === 'function') { resetTxnPlan(); if (typeof JN !== 'undefined') JN.unplanned = []; if (typeof updateJournalBadge === 'function') updateJournalBadge(); }
             TAB_LOADED.reports = false;
+            if (typeof apLoadMine === 'function') apLoadMine();
             await loadLedger();
             await loadHoldings();
             await loadKpis();
             if (TAB_LOADED.performance) loadPerformanceChart();
         } else {
-            showToast('Lỗi: ' + String(response.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: '), 'error');
+            showToast('Lỗi: ' + String(response.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: '), 'error');
         }
     } catch (err) {
-        showToast('Lỗi: ' + String(err.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: '), 'error');
+        showToast('Lỗi: ' + String(err.message || '').replace(/^LIMIT_\w+:\s*/, 'Giới hạn đầu tư: ').replace(/^APPROVAL_REQUIRED:\s*/, 'Cần duyệt lệnh: '), 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHtml;

@@ -1628,6 +1628,16 @@ const API = {
                     }
                 }
             }
+            // Duyệt lệnh lớn: lệnh vượt ngưỡng phải có đề xuất đã duyệt, còn hạn, khớp người/mã/chiều/khối lượng. Không có quy định nào đang bật thì bỏ qua.
+            let approvalReq = null;
+            if (!txn.skipApprovalCheck && typeof ApprovalCalc !== 'undefined') {
+                const ap = await API.asset.orders.checkTrade(email, { type: txn.type === 'sell' ? 'sell' : 'buy', symbol, quantity, price });
+                if (ap.needed) {
+                    if (!ap.match) throw new Error('APPROVAL_REQUIRED: Lệnh ' + (txn.type === 'sell' ? 'bán ' : 'mua ') + symbol + ' trị giá ' + Math.round(ap.value).toLocaleString('vi-VN') + ' đ'
+                        + (ap.pct !== null ? ' (' + (Math.round(ap.pct * 10) / 10) + '% NAV)' : '') + ' vượt ngưỡng duyệt lệnh; cần đề xuất đã được quản lý duyệt (còn hạn) trước khi ghi.');
+                    approvalReq = ap.match;
+                }
+            }
             const { data: inserted, error } = await sbClient.from('finance_transactions').insert({
                 user_id: userId, symbol, type: txn.type === 'sell' ? 'sell' : 'buy', quantity, price,
                 fee: Number(txn.fee) || 0,
@@ -1640,6 +1650,11 @@ const API = {
             // làm thay đổi thứ tự tiêu thụ lô FIFO của những lệnh bán đó.
             await API.asset.recomputeRealizedPnl(userId);
             await API.asset.recomputeAndSnapshot(email);
+            // Đề xuất đã duyệt được dùng: đánh dấu đã thực hiện (lỗi ở đây KHÔNG làm hỏng lệnh đã lưu)
+            if (approvalReq && inserted) {
+                try { await API.asset.orders.markExecuted(approvalReq.id, inserted.id); }
+                catch (e) { return "Đã lưu lệnh giao dịch, nhưng chưa đánh dấu được đề xuất đã thực hiện: " + e.message; }
+            }
             // Ghi nhận ngoại lệ giới hạn (lý do bắt buộc đã kiểm ở trên): lỗi ở đây KHÔNG làm hỏng lệnh đã lưu
             if (gatedViolations.length && inserted) {
                 try {
@@ -2330,15 +2345,16 @@ const API = {
                     const { data } = await sbClient.auth.getUser();
                     if (data && data.user && data.user.email) { actorEmail = data.user.email; actorId = (await getUserId(actorEmail)) || targetId; }
                 } catch (e) { /* không đọc được phiên: coi như chính chủ */ }
-                let isManager = false;
+                let isManager = false, isAdmin = false;
                 if (actorId) {
                     const [{ data: roles }, { data: u }] = await Promise.all([
                         sbClient.from('fin_roles').select('role').eq('user_id', actorId),
                         sbClient.from('users').select('group_key').eq('id', actorId).maybeSingle()
                     ]);
-                    isManager = (roles || []).some(r => r.role === 'asset_manager') || !!(u && u.group_key === 'admin');
+                    isAdmin = !!(u && u.group_key === 'admin');
+                    isManager = (roles || []).some(r => r.role === 'asset_manager') || isAdmin;
                 }
-                return { targetId, actorId, actorEmail, isManager };
+                return { targetId, actorId, actorEmail, isManager, isAdmin };
             },
             // Kiểm tra 1 lệnh TRƯỚC khi ghi. trade: { type, symbol, quantity, price, fee, tax }. Không có giới hạn nào đang bật thì trả nhanh, không tải danh mục.
             checkTrade: async (email, trade) => {
@@ -2418,6 +2434,116 @@ const API = {
                 }
                 return "Đã lưu danh mục chuẩn chiến lược (tiền mặt chuẩn " + (Math.round(v.cashPct * 10) / 10) + "%)";
             },
+        },
+
+        // --- Duyệt lệnh lớn trước khi đặt (lib/approval-calc.js). Quy tắc hai người và hạn dùng được trigger DB (finance-approval-migration.sql) ép thật;
+        //     việc GHI lệnh có cần đề xuất đã duyệt hay không do addTransaction kiểm (kiểm soát phía ứng dụng, như giới hạn đầu tư). ---
+        approvalPolicy: {
+            get: async () => {
+                if (typeof ApprovalCalc === 'undefined') throw new Error("Thiếu thư viện duyệt lệnh (lib/approval-calc.js)");
+                const { data, error } = await sbClient.from('finance_approval_policy').select('*').eq('id', 1).maybeSingle();
+                if (error) throw error;
+                return Object.assign(ApprovalCalc.normalizePolicy(data), { updatedAt: data ? data.updated_at : null });
+            },
+            save: async (email, policy) => {
+                if (typeof ApprovalCalc === 'undefined') throw new Error("Thiếu thư viện duyệt lệnh (lib/approval-calc.js)");
+                const v = ApprovalCalc.validatePolicy(policy || {});
+                if (!v.ok) throw new Error(v.error);
+                const actor = await API.asset.limits._actor(email);
+                if (!actor.isManager) throw new Error("Chỉ quản lý danh mục hoặc admin mới đặt được quy định duyệt lệnh");
+                const p = v.policy;
+                const { error } = await sbClient.from('finance_approval_policy').upsert({
+                    id: 1, active: p.active, threshold_pct: p.thresholdPct, threshold_vnd: p.thresholdVnd, valid_days: p.validDays,
+                    updated_by: actor.actorId, updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
+                if (error) throw error;
+                return p.active ? "Đã bật quy định duyệt lệnh lớn" : "Đã lưu quy định duyệt lệnh (đang tắt)";
+            }
+        },
+        orders: {
+            _today: () => new Date().toISOString().slice(0, 10),
+            // NAV hiện tại của danh mục (giá trị mã + tiền mặt - nợ), cùng cách tính với giới hạn đầu tư
+            _nav: async (email, userId) => {
+                const [holdings, cd] = await Promise.all([
+                    API.asset.getHoldingsView(email),
+                    sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
+                ]);
+                const mv = (holdings || []).reduce((s, h) => s + (Number(h.marketValue) || 0), 0);
+                return mv + (cd && cd.data ? Number(cd.data.cash) || 0 : 0) - (cd && cd.data ? Number(cd.data.debt) || 0 : 0);
+            },
+            // Lệnh này có cần duyệt không, và đã có đề xuất đã duyệt (còn hạn) khớp chưa? trade: { type, symbol, quantity, price }
+            checkTrade: async (email, trade) => {
+                if (typeof ApprovalCalc === 'undefined') return { needed: false, policyActive: false };
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const policy = await API.asset.approvalPolicy.get();
+                if (!policy.active) return { needed: false, policyActive: false, policy };
+                const nav = await API.asset.orders._nav(email, userId);
+                const n = ApprovalCalc.needsApproval(policy, nav, trade);
+                if (!n.needed) return Object.assign({ policyActive: true, policy, nav }, n);
+                const { data, error } = await sbClient.from('finance_order_requests').select('*').eq('user_id', userId).eq('status', 'approved');
+                if (error) throw error;
+                const match = ApprovalCalc.matchApproval(data || [], userId, trade, API.asset.orders._today());
+                return Object.assign({ policyActive: true, policy, nav, match: match ? { id: match.id, valid_until: match.valid_until, quantity: match.quantity, value: match.value } : null }, n);
+            },
+            // input: { symbol, side, quantity, price, reason } -- đề xuất cho danh mục của `email`
+            create: async (email, input) => {
+                if (typeof ApprovalCalc === 'undefined') throw new Error("Thiếu thư viện duyệt lệnh (lib/approval-calc.js)");
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const nav = await API.asset.orders._nav(email, userId);
+                const b = ApprovalCalc.buildRequest(input || {}, { nav });
+                if (!b.ok) throw new Error(b.error);
+                const { error } = await sbClient.from('finance_order_requests').insert(Object.assign({ user_id: userId }, b.row));
+                if (error) throw error;
+                return "Đã gửi đề xuất lệnh, chờ quản lý duyệt";
+            },
+            list: async (email, limit) => {
+                const userId = await getUserId(email);
+                if (!userId) return [];
+                const { data, error } = await sbClient.from('finance_order_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(Math.min(Number(limit) || 50, 200));
+                if (error) throw error;
+                return data || [];
+            },
+            // Mọi đề xuất của nhóm: đang chờ (bất kể cũ) + các đề xuất trong `days` ngày gần đây
+            listAll: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 90) * 86400000).toISOString();
+                const [recent, pending] = await Promise.all([
+                    sbClient.from('finance_order_requests').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
+                    sbClient.from('finance_order_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(200)
+                ]);
+                if (recent.error) throw recent.error;
+                if (pending.error) throw pending.error;
+                const seen = new Set(), out = [];
+                (recent.data || []).concat(pending.data || []).forEach(r => { if (!seen.has(r.id)) { seen.add(r.id); out.push(r); } });
+                return out.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+            },
+            // decision: 'approved' | 'rejected'. Người duyệt = người đang đăng nhập; trigger DB kiểm lại nguyên tắc hai người.
+            decide: async (email, id, decision, note) => {
+                if (!['approved', 'rejected'].includes(decision)) throw new Error("Quyết định không hợp lệ");
+                const actor = await API.asset.limits._actor(email);
+                const { data: req, error: gErr } = await sbClient.from('finance_order_requests').select('*').eq('id', id).maybeSingle();
+                if (gErr) throw gErr;
+                if (!req) throw new Error("Không tìm thấy đề xuất");
+                const can = ApprovalCalc.canDecide({ isManager: actor.isManager, isAdmin: actor.isAdmin, actorId: actor.actorId }, req, decision, note);
+                if (!can.allowed) throw new Error(can.reason);
+                const patch = { status: decision, decision_note: String(note || '').trim().slice(0, 500) || null };
+                if (decision === 'approved') patch.valid_until = ApprovalCalc.validUntil(API.asset.orders._today(), (await API.asset.approvalPolicy.get()).validDays);
+                const { data, error } = await sbClient.from('finance_order_requests').update(patch).eq('id', id).eq('status', 'pending').select('id');
+                if (error) throw error;
+                if (!data || !data.length) throw new Error("Đề xuất đã được xử lý bởi người khác");
+                return decision === 'approved' ? "Đã duyệt đề xuất" : "Đã từ chối đề xuất";
+            },
+            cancel: async (id) => {
+                const { data, error } = await sbClient.from('finance_order_requests').update({ status: 'cancelled' }).eq('id', id).in('status', ['pending', 'approved']).select('id');
+                if (error) throw error;
+                if (!data || !data.length) throw new Error("Đề xuất không còn huỷ được");
+                return "Đã huỷ đề xuất";
+            },
+            markExecuted: async (id, txnId) => {
+                const { error } = await sbClient.from('finance_order_requests').update({ status: 'executed', txn_id: txnId }).eq('id', id).eq('status', 'approved');
+                if (error) throw error;
+            }
         },
 
         // Lịch sử giá đóng cửa nhiều mã (+ VN-Index) từ `from` tới nay, chia lô 20 mã. Trả { histories, error } -- lỗi một phần vẫn trả phần đã lấy được.
@@ -4064,7 +4190,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -4525,7 +4651,7 @@ const MUTATING_ACTIONS = new Set([
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
-    'savePolicy', 'saveReconciliation', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
+    'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
     'savePersonalItem', 'deletePersonalItem', 'setPersonalItemFlags',
     'saveCalendarConnection', 'disconnectCalendarConnection', 'touchCalendarSync', 'setSyncedCalendars',
     'upsertGoogleEvents', 'pruneGoogleEvents',
@@ -4689,6 +4815,14 @@ async function _dispatchAction(action, params = {}) {
             case 'setLimitActive': result = await API.asset.limits.setActive(params.id, params.active); break;
             case 'checkTradeLimits': result = await API.asset.limits.checkTrade(params.email, params.trade); break;
             case 'listPolicy': result = await API.asset.policy.list(); break;
+            case 'getApprovalPolicy': result = await API.asset.approvalPolicy.get(); break;
+            case 'saveApprovalPolicy': result = await API.asset.approvalPolicy.save(params.email, params.policy); break;
+            case 'checkTradeApproval': result = await API.asset.orders.checkTrade(params.email, params.trade); break;
+            case 'createOrderRequest': result = await API.asset.orders.create(params.email, params.request); break;
+            case 'listOrderRequests': result = await API.asset.orders.list(params.email, params.limit); break;
+            case 'listAllOrderRequests': result = await API.asset.orders.listAll(params.days); break;
+            case 'decideOrderRequest': result = await API.asset.orders.decide(params.email, params.id, params.decision, params.note); break;
+            case 'cancelOrderRequest': result = await API.asset.orders.cancel(params.id); break;
             case 'savePolicy': result = await API.asset.policy.save(params.email, params.weights); break;
             case 'getPriceHistories': result = await API.asset.getPriceHistories(params.symbols, params.from); break;
             case 'getSectorIndices': result = await API.asset.getSectorIndices(params.from); break;

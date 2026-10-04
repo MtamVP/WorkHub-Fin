@@ -19,15 +19,16 @@ async function ptContext(force) {
     if (!force && PT.ctx && Date.now() - PT.ctxAt < PT_CTX_TTL) return PT.ctx;
     if (PT.ctxLoading) return PT.ctxLoading;
     PT.ctxLoading = (async () => {
-        const [rows, actor, hv, cd] = await Promise.all([
+        const [rows, actor, hv, cd, approval] = await Promise.all([
             lmCall('listLimits').catch(() => []), lmCall('getLimitActor').catch(() => ({})),
             callGAS('getHoldingsView', { email: targetEmail }), callGAS('getCashDebt', { email: targetEmail }),
+            lmCall('getApprovalPolicy').catch(() => null),
         ]);
         const holdings = ((hv && hv.data) || []).map(h => ({ symbol: h.symbol, value: Number(h.marketValue) || 0, price: Number(h.marketPrice) || 0 }));
         const cash = Number(cd && cd.data ? cd.data.cash : 0) || 0, debt = Number(cd && cd.data ? cd.data.debt : 0) || 0;
         const limits = LimitsCalc.applicable(rows || [], actor.targetId, 'member');
         const mv = holdings.reduce((s, h) => s + h.value, 0);
-        PT.ctx = { holdings, cash, debt, limits, nav: mv + cash - debt };
+        PT.ctx = { holdings, cash, debt, limits, nav: mv + cash - debt, approval };
         PT.ctxAt = Date.now();
         return PT.ctx;
     })();
@@ -120,6 +121,15 @@ async function ptRender() {
         chk.violations.forEach(v => lines.push(flagLine(v.mode === 'warn' ? 'warn' : 'bad', `${v.text} — ${LimitsCalc.MODES[v.mode].label.toLowerCase()}`)));
         chk.near.forEach(v => lines.push(flagLine('info', v.text)));
     }
+    // Duyệt lệnh lớn: báo trước nếu lệnh sẽ phải qua quản lý duyệt
+    let approvalHtml = '';
+    if (ctx.approval && ctx.approval.active && typeof ApprovalCalc !== 'undefined' && qty > 0 && price > 0) {
+        const na = ApprovalCalc.needsApproval(ctx.approval, ctx.nav, { quantity: qty, price: price });
+        if (na.needed) {
+            lines.push(flagLine('warn', `Lệnh vượt ngưỡng duyệt lệnh lớn của nhóm (${na.pct !== null ? ptNum(na.pct, 1) + '% NAV' : ptVnd(na.value)}): cần quản lý duyệt trước khi ghi.`));
+            approvalHtml = '<div class="pt-sugg none"><div><span class="k">Duyệt lệnh lớn</span> <span class="s">Gửi đề xuất ngay bây giờ để quản lý duyệt trong lúc bạn chuẩn bị.</span></div><button type="button" class="btn-tool" onclick="apOpenFromForm()"><i class="fa-solid fa-stamp"></i> Gửi đề xuất</button></div>';
+        }
+    }
     if (!lines.length && a.value > 0) lines.push(flagLine('ok', 'Không có cảnh báo: lệnh nằm trong ngân sách rủi ro và các giới hạn.'));
 
     body.innerHTML = `
@@ -132,6 +142,7 @@ async function ptRender() {
         ${caps ? `<div class="pt-caps">${caps}</div>` : ''}
         ${impact}
         ${lines.length ? `<ul class="pt-flags">${lines.join('')}</ul>` : ''}
+        ${approvalHtml}
         <p class="tl-hint">Khối lượng gợi ý = ngân sách rủi ro ÷ lỗ mỗi cổ phiếu tới điểm cắt lỗ (đã gồm phí và thuế), làm tròn xuống lô 100, rồi bị chặn bởi tiền mặt, giới hạn đầu tư và thanh khoản (tối đa 3 phiên × 20% khối lượng trung bình ngày). Đây là công cụ hỗ trợ quyết định, không phải khuyến nghị.</p>`;
 }
 

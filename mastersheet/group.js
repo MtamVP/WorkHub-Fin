@@ -44,6 +44,7 @@ async function loadGroup(force) {
         GR.portfolios = GroupCalc.memberPortfolios(data);
         GR.group = GroupCalc.consolidate(GR.portfolios);
         if (typeof glLoad === 'function') await glLoad();   // giới hạn + ngoại lệ (lỗi không làm hỏng các tab khác)
+        if (typeof gqLoad === 'function') gqLoad(true);      // đề xuất lệnh chờ duyệt (chỉ để hiện số trên thẻ; không chặn tải nhóm)
         const symbols = GR.group.symbols.map(s => s.symbol).slice(0, 40);
         const firstNav = data.navHistory.reduce((m, r) => (!m || r.snapshot_date < m ? r.snapshot_date : m), null);
         const [market, bench] = await Promise.all([
@@ -83,6 +84,7 @@ function grLimits() {
 function switchGroupTab(tab) {
     GR.tab = tab;
     if (tab === 'strategy' && typeof gsLoad === 'function') gsLoad();
+    if (tab === 'approvals' && typeof gqLoad === 'function') gqLoad(true);
     document.querySelectorAll('#grp-tabs .view-toggle-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-gtab') === tab));
     grRender();
 }
@@ -199,6 +201,8 @@ function grRender() {
     } else if (GR.tab === 'strategy' && typeof grStrategyHtml === 'function') {
         body.innerHTML = grStrategyHtml();
         if (typeof grStrategyAfterRender === 'function') grStrategyAfterRender();
+    } else if (GR.tab === 'approvals' && typeof grApprovalHtml === 'function') {
+        body.innerHTML = grApprovalHtml();
     } else if (GR.tab === 'activity' && typeof gaActivityHtml === 'function') {
         body.innerHTML = gaActivityHtml();
     } else if (GR.tab === 'report' && typeof gaReportHtml === 'function') {

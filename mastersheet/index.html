@@ -156,6 +156,7 @@
                 <button class="view-toggle-btn active" data-gtab="portfolio" onclick="switchGroupTab('portfolio')"><i class="fa-solid fa-layer-group"></i> Danh Mục Chung</button>
                 <button class="view-toggle-btn" data-gtab="members" onclick="switchGroupTab('members')"><i class="fa-solid fa-user-group"></i> Thành Viên</button>
                 <button class="view-toggle-btn" data-gtab="limits" onclick="switchGroupTab('limits')"><i class="fa-solid fa-gauge-high"></i> Giới Hạn</button>
+                <button class="view-toggle-btn" data-gtab="approvals" onclick="switchGroupTab('approvals')"><i class="fa-solid fa-stamp"></i> Duyệt Lệnh <span class="tl-badge warn" id="grp-appr-badge" style="display:none"></span></button>
                 <button class="view-toggle-btn" data-gtab="strategy" onclick="switchGroupTab('strategy')"><i class="fa-solid fa-bullseye"></i> Chiến Lược</button>
                 <button class="view-toggle-btn" data-gtab="activity" onclick="switchGroupTab('activity')"><i class="fa-solid fa-receipt"></i> Hoạt Động</button>
                 <button class="view-toggle-btn" data-gtab="report" onclick="switchGroupTab('report')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
@@ -175,6 +176,7 @@
     <script src="../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../lib/group-calc.js?v=1791900000000"></script>
     <script src="../lib/limits-calc.js?v=1791900000000"></script>
+    <script src="../lib/approval-calc.js?v=1791900000000"></script>
     <script src="../lib/attribution-calc.js?v=1791900000000"></script>
     <script src="../lib/brinson-calc.js?v=1791900000000"></script>
     <script src="../lib/group-report.js?v=1791900000000"></script>
@@ -186,6 +188,7 @@
     <script src="group.js?v=1791900000000"></script>
     <script src="group-limits.js?v=1791900000000"></script>
     <script src="group-activity.js?v=1791900000000"></script>
+    <script src="group-approval.js?v=1791900000000"></script>
     <script src="assets/brinson.js?v=1791900000000"></script>
     <script src="group-strategy.js?v=1791900000000"></script>
     <script>document.addEventListener('DOMContentLoaded', function () { loadGroup(); });</script>

@@ -345,3 +345,11 @@ tr.rc-bad td { background: color-mix(in srgb, var(--danger-bg) 55%, transparent)
 .gs-sum b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .gs-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0 6px; }
 tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
+
+/* ---- Duyệt lệnh lớn (group-approval.js, assets/approval.js) ---- */
+.gq-act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.gq-act .tl-input { min-width: 180px; flex: 1 1 180px; }
+.asset-table td.gq-reason { min-width: 220px; max-width: 320px; white-space: normal; overflow-wrap: anywhere; font-size: 0.82rem; color: var(--text-secondary); }
+.ap-box { margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--warning-color); border-radius: var(--radius-md, 8px); background: var(--warning-bg); font-size: 0.86rem; }
+.ap-box.ok { border-color: var(--success-color); background: var(--success-bg); }
+.ap-box b { font-variant-numeric: tabular-nums; }

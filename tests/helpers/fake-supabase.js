@@ -23,6 +23,7 @@ const DEFAULTS = {
   finance_ideas: () => ({ id: uuid(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status_changed_at: new Date().toISOString(), tags: [], status: 'idea', direction: 'long', thesis: null, catalysts: null, risks: null, entry_price: null, index_at_entry: null, buy_below: null, target_price: null, stop_price: null, horizon_months: null, conviction: null, valuation: null, submitted_at: null, decided_at: null, decided_by: null, decision_note: null, closed_at: null, close_price: null, index_at_close: null, close_reason: null, close_note: null }),
   finance_idea_comments: () => ({ id: uuid(), created_at: new Date().toISOString(), kind: 'comment' }),
   finance_reconciliations: () => ({ id: uuid(), created_at: new Date().toISOString() }),
+  finance_order_requests: () => ({ id: uuid(), created_at: new Date().toISOString(), status: 'pending', decided_by: null, decided_at: null, decision_note: null, valid_until: null, txn_id: null, executed_at: null, created_by: null }),
   finance_idea_votes: () => ({ created_at: new Date().toISOString(), updated_at: new Date().toISOString(), reason: null }),
   finance_holdings_price: () => ({ locked: false, target_price: null, stop_loss: null, price_date: null, price_source: null, updated_at: new Date().toISOString() }),
 };

@@ -304,6 +304,10 @@
                 <p class="guide-text">
                     * <b>Lưu ý:</b> Giá vốn/lãi-lỗ đã chốt được tính theo phương pháp FIFO (lô mua cũ nhất bán trước) — chuẩn kế toán, không phải giá vốn bình quân đơn giản. Cột “Lãi/lỗ đã chốt” là <b>gộp</b> (chưa trừ phí/thuế); báo cáo ròng sau phí & thuế nằm ở tab Báo Cáo.
                 </p>
+                <details class="tl-details" id="ap-my" style="display:none; margin-bottom: 14px;">
+                    <summary id="ap-my-sum"><i class="fa-solid fa-stamp" style="color:var(--gold)"></i> Đề xuất lệnh lớn của tôi</summary>
+                    <div id="ap-my-body" style="margin-top:10px"></div>
+                </details>
                 <div class="export-bar export-bar-inline">
                     <button type="button" class="btn-tool" onclick="openImportModal()" title="Nhập hàng loạt từ file sao kê của công ty chứng khoán (Excel/CSV)"><i class="fa-solid fa-file-import"></i> Nhập từ sao kê</button>
                     <button type="button" class="btn-tool" onclick="openReconcileModal()" title="So sổ lệnh với sao kê số dư / sao kê lệnh của công ty chứng khoán để tìm chỗ lệch"><i class="fa-solid fa-scale-balanced"></i> Đối soát sao kê</button>
@@ -750,6 +754,7 @@
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../../lib/calendar-calc.js?v=1791900000000"></script>
     <script src="../../lib/limits-calc.js?v=1791900000000"></script>
+    <script src="../../lib/approval-calc.js?v=1791900000000"></script>
     <script src="../../lib/sizing-calc.js?v=1791900000000"></script>
     <script src="../../lib/perf-calc.js?v=1791900000000"></script>
     <script src="../../lib/attribution-calc.js?v=1791900000000"></script>
@@ -774,6 +779,7 @@
     <script src="mirror.js?v=1791900000000"></script>
     <script src="reconcile.js?v=1791900000000"></script>
     <script src="limits.js?v=1791900000000"></script>
+    <script src="approval.js?v=1791900000000"></script>
     <script src="pretrade.js?v=1791900000000"></script>
     <script src="perf.js?v=1791900000000"></script>
     <script src="attribution.js?v=1791900000000"></script>

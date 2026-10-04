@@ -103,6 +103,10 @@ describe('canDecide: nguyên tắc hai người', () => {
     expect(A.canDecide(admin, own, 'approved', 'Không còn quản lý nào khác trong nhóm').allowed).toBe(true);
     expect(A.canDecide(admin, own, 'approved', 'Không còn quản lý nào khác trong nhóm').selfApproval).toBe(true);
   });
+  it('đề xuất do chính mình nhập hộ người khác (created_by) cũng không tự duyệt được', () => {
+    expect(A.canDecide(mgr, { status: 'pending', user_id: 'u1', created_by: 'm1' }, 'approved', 'duyệt hộ chính mình').allowed).toBe(false);
+    expect(A.canDecide(mgr, { status: 'pending', user_id: 'u1', created_by: 'u1' }, 'approved', '').allowed).toBe(true);
+  });
   it('chỉ đề xuất đang chờ mới duyệt được', () => {
     expect(A.canDecide(mgr, { status: 'approved', user_id: 'u1' }, 'approved', '').allowed).toBe(false);
   });
