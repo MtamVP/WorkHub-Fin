@@ -2478,6 +2478,35 @@ const API = {
             };
         },
 
+        // Gom dữ liệu thô cho tab Rủi Ro (tính toán ở lib/risk-calc.js): danh mục hiện tại, tiền/nợ, giá lịch sử các mã đang giữ + VN-Index,
+        // sự kiện doanh nghiệp để điều chỉnh giá (lỗi ở các phần phụ KHÔNG làm hỏng cả báo cáo), lịch sử NAV đã chụp.
+        getRiskInputs: async (email, windowDays) => {
+            const userId = await getUserId(email);
+            if (!userId) throw new Error("User không tồn tại");
+            const win = Math.min(Math.max(Number(windowDays) || 365, 90), 1100);
+            const [holdings, navHistory, cd] = await Promise.all([
+                API.asset.getHoldingsView(email), API.asset.getNavHistory(email),
+                sbClient.from('finance_assets').select('cash, debt').eq('user_id', userId).maybeSingle()
+            ]);
+            const symbols = holdings.map(h => h.symbol).slice(0, 40);
+            const to = new Date().toISOString().slice(0, 10);
+            const from = new Date(Date.now() - (win + 20) * 86400000).toISOString().slice(0, 10);
+            let histories = {}, historyError = null, events = [], eventsError = null;
+            if (symbols.length) {
+                try {
+                    for (let i = 0; i < symbols.length; i += 20) {
+                        Object.assign(histories, await API.asset.getPriceHistory(symbols.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), from, to));
+                    }
+                } catch (e) { historyError = e.message || String(e); }
+                try { events = (await API.asset.events._fetchEvents(symbols, from)).events; } catch (e) { eventsError = e.message || String(e); }
+            }
+            return {
+                holdings: holdings.map(h => ({ symbol: h.symbol, quantity: h.quantity, marketValue: h.marketValue, marketPrice: h.marketPrice })),
+                cash: cd && cd.data ? Number(cd.data.cash) || 0 : 0, debt: cd && cd.data ? Number(cd.data.debt) || 0 : 0,
+                histories, historyError, events, eventsError, navHistory, from, to, windowDays: win
+            };
+        },
+
         // --- Tính lại NAV hiện tại (lưu vào finance_assets) + chốt 1 điểm snapshot/ngày (finance_nav_history) ---
         recomputeAndSnapshot: async (email) => {
             const userId = await getUserId(email);
@@ -4006,6 +4035,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getPriceFetchStatus': result = await API.asset.getPriceFetchStatus(); break;
             case 'getCashDebt': result = await API.asset.getCashDebt(params.email); break;
             case 'setCashDebt': result = await API.asset.setCashDebt(params.email, params.cash, params.debt); break;
+            case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;
             case 'getNavHistory': result = await API.asset.getNavHistory(params.email, params.days); break;
             case 'getAssetSummaryKpis': result = await API.asset.getSummaryKpis(params.email); break;
             case 'listCashFlows': result = await API.asset.cashFlow.list(params.email); break;

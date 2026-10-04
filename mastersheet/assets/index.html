@@ -124,6 +124,7 @@
             <button class="view-toggle-btn" data-tab="ledger" onclick="switchAssetTab('ledger')"><i class="fa-solid fa-receipt"></i> Sổ Lệnh <span class="jn-badge" id="ce-badge" style="display:none;" title="Sự kiện doanh nghiệp chưa ghi"></span></button>
             <button class="view-toggle-btn" data-tab="journal" onclick="switchAssetTab('journal')"><i class="fa-solid fa-book-open"></i> Nhật Ký <span class="jn-badge" id="jn-badge" style="display:none;"></span></button>
             <button class="view-toggle-btn" data-tab="performance" onclick="switchAssetTab('performance')"><i class="fa-solid fa-chart-area"></i> Hiệu Suất</button>
+            <button class="view-toggle-btn" data-tab="risk" onclick="switchAssetTab('risk')"><i class="fa-solid fa-shield-halved"></i> Rủi Ro</button>
             <button class="view-toggle-btn" data-tab="reports" onclick="switchAssetTab('reports')"><i class="fa-solid fa-file-lines"></i> Báo Cáo</button>
         </div>
 
@@ -533,6 +534,31 @@
         </section>
 
         <!-- Tab: Báo Cáo -->
+        <!-- Tab: Rủi Ro -->
+        <section id="tab-risk" class="asset-tab-panel" style="display:none;">
+            <div class="tl-card">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-shield-halved"></i> Rủi Ro Danh Mục</h3>
+                    <div class="tl-card-tools">
+                        <label class="tl-check" title="Khoảng giá lịch sử dùng để tính biến động, VaR, tương quan">Kỳ tính
+                            <select id="rk-window" class="tl-select" onchange="rkChangeWindow(this)"><option value="180">6 tháng</option><option value="365" selected>1 năm</option><option value="730">2 năm</option></select>
+                        </label>
+                        <button type="button" class="btn-tool" onclick="loadRisk(true)"><i class="fa-solid fa-rotate"></i> Tính lại</button>
+                    </div>
+                </div>
+                <p class="tl-hint" style="margin:-6px 0 12px">Trả lời câu hỏi “danh mục này đang rủi ro ở đâu”: mức tập trung theo mã và ngành, mã nào làm danh mục rung lắc nhiều nhất, sụt giảm tối đa, và danh mục chịu ra sao nếu VN-Index giảm.</p>
+                <details class="tl-details" style="margin:0 0 12px">
+                    <summary>Ngưỡng cảnh báo tập trung</summary>
+                    <div class="tl-fee-panel open" style="display:flex">
+                        <label>Mã đơn lẻ tối đa (%)<input type="number" class="tl-input num" id="rk-limit-single" min="5" max="100" step="1" value="25"></label>
+                        <label>Một ngành tối đa (%)<input type="number" class="tl-input num" id="rk-limit-sector" min="10" max="100" step="1" value="40"></label>
+                        <button type="button" class="btn-tool" onclick="rkSaveLimits()">Lưu ngưỡng</button>
+                    </div>
+                </details>
+                <div id="rk-body"></div>
+            </div>
+        </section>
+
         <section id="tab-reports" class="asset-tab-panel" style="display:none;">
             <div class="tl-card" id="rpt-realized">
                 <div class="tl-card-head">
@@ -633,6 +659,7 @@
     <script src="../../lib/finance-calc.js?v=2"></script>
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
     <script src="../../lib/corporate-events.js?v=1791900000000"></script>
+    <script src="../../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../../lib/statement-import.js?v=1791900000000"></script>
     <script src="../../lib/xlsx-writer.js?v=1791900000000"></script>
     <script src="../../lib/valuation-calc.js?v=1791900000000"></script>
@@ -644,6 +671,7 @@
     <script src="watchlist.js?v=1791900000000"></script>
     <script src="journal.js?v=1791900000000"></script>
     <script src="events.js?v=1791900000000"></script>
+    <script src="risk.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
 </body>

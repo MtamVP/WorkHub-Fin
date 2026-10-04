@@ -166,7 +166,7 @@ async function setupTargetUserSwitcher() {
 
 // --- TAB SWITCHING ---
 function switchAssetTab(tab) {
-    ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'reports'].forEach(t => {
+    ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'risk', 'reports'].forEach(t => {
         const panel = document.getElementById('tab-' + t);
         const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
         if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -178,6 +178,7 @@ function switchAssetTab(tab) {
     if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới
+    if (tab === 'risk') loadRisk();   // dữ liệu giữ trong phiên; nút "Tính lại" để lấy mới
     if (tab === 'reports' && !TAB_LOADED.reports) { initReportsTab(); TAB_LOADED.reports = true; }
 }
 
@@ -922,7 +923,7 @@ function renderNavChart(history) {
                 label: 'NAV',
                 data: history.map(h => Number(h.nav) || 0),
                 borderColor: cssVar('--finance-accent'),
-                backgroundColor: 'color-mix(in srgb, var(--finance-accent) 18%, transparent)',
+                backgroundColor: cssVarAlpha('--finance-accent', 0.18),
                 fill: true,
                 tension: 0.3,
                 pointRadius: history.length > 30 ? 0 : 3
@@ -1055,6 +1056,21 @@ function cssVar(name) {
     // được khai báo trên body/.asset-container — đọc từ <html> sẽ luôn ra giá trị theme tối cũ.
     const scope = document.querySelector('.asset-container') || document.documentElement;
     return getComputedStyle(scope).getPropertyValue(name).trim();
+}
+
+// Canvas (Chart.js) không hiểu var()/color-mix(): đổi màu token sang rgba() để tô nền biểu đồ đúng theme
+function cssVarAlpha(name, alpha) {
+    const v = cssVar(name);
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v);
+    if (hex) {
+        let h = hex[1];
+        if (h.length === 3) h = h.split('').map(c => c + c).join('');
+        const n = parseInt(h, 16);
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+    }
+    const rgb = /^rgba?\(([^)]+)\)/i.exec(v);
+    if (rgb) { const p = rgb[1].split(',').map(s => s.trim()); return `rgba(${p[0]}, ${p[1]}, ${p[2]}, ${alpha})`; }
+    return `rgba(128, 128, 128, ${alpha})`;
 }
 
 function formatVnd(num) {

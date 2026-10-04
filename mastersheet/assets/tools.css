@@ -183,3 +183,33 @@ td.jn-reason::before { content: none; }
 .btn-tool.ce-apply:hover { filter: brightness(1.06); }
 .btn-tool.ce-apply:disabled { opacity: 0.55; cursor: wait; }
 @media (max-width: 640px) { .ce-detail { min-width: 180px; } .ce-actions { white-space: normal; } }
+
+/* ---- Tab Rủi Ro (risk.js) ---- */
+.rk-meta { font-size: 0.76rem; color: var(--text-muted); margin: 0 0 6px; line-height: 1.6; }
+.rk-warns { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.rk-warn, .rk-ok { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 0.84rem; line-height: 1.5; border: 1px solid var(--border-color); background: var(--bg-color-2); }
+.rk-warn i, .rk-ok i { margin-top: 3px; }
+.rk-warn.high { border-color: var(--danger-color); background: var(--danger-bg); } .rk-warn.high i { color: var(--danger-color); }
+.rk-warn.med { border-color: var(--warning-color); background: var(--warning-bg); } .rk-warn.med i { color: var(--warning-color); }
+.rk-warn.low i { color: var(--text-muted); }
+.rk-ok { margin-bottom: 14px; } .rk-ok i { color: var(--success-color); }
+.rk-pair { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; font-variant-numeric: tabular-nums; }
+.rk-pair b { min-width: 46px; text-align: right; font-family: var(--font-mono); font-weight: 600; }
+.rk-bar { flex: 1; min-width: 50px; height: 7px; border-radius: 4px; background: var(--bg-color-2); overflow: hidden; display: inline-block; }
+.rk-bar i { display: block; height: 100%; border-radius: 4px; background: var(--finance-accent, var(--gold)); }
+.rk-bar.over i { background: var(--danger-color); }
+.rk-bar.risk i { background: var(--warning-color); }
+.rk-sectors { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.rk-sector-row { display: grid; grid-template-columns: minmax(110px, 190px) 1fr auto; gap: 12px; align-items: center; font-size: 0.82rem; }
+.rk-sector-name { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-sector-val { display: inline-flex; flex-direction: column; align-items: flex-end; min-width: 66px; font-family: var(--font-mono); }
+.rk-sector-val small { font-family: var(--font-body); font-size: 0.66rem; color: var(--text-muted); }
+.rk-corr-table { border-collapse: separate; border-spacing: 3px; font-size: 0.78rem; margin: 0 auto 6px; }
+.rk-corr { min-width: 46px; height: 34px; text-align: center; border-radius: 5px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.rk-corr.self { background: var(--bg-color-2); color: var(--text-muted); }
+.rk-corr-h { padding: 0 8px; font-weight: 700; font-size: 0.72rem; color: var(--text-secondary); text-align: center; }
+.rk-chart-card { padding: 12px 14px; }
+.rk-stress-detail { color: var(--text-muted); font-size: 0.78rem; }
+.rk-table td { vertical-align: middle; }
+@media (max-width: 640px) { .rk-sector-row { grid-template-columns: 1fr auto; } .rk-sector-row .rk-bar { grid-column: 1 / -1; order: 3; } }
+#tab-risk .spreadsheet-wrapper { overflow-x: auto; }
