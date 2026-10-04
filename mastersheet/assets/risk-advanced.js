@@ -6,7 +6,7 @@
 
 const RKX = { rk: null, grp: null };
 function rkxState(scope) {
-    if (!RKX[scope]) RKX[scope] = { rerender: null, market: null, holdings: [], volumes: null, volumesError: '', volumesLoading: false, rate: 0.2, custom: { index: -10, sectors: {}, symbols: {} }, customRun: false };
+    if (!RKX[scope]) RKX[scope] = { rerender: null, market: null, holdings: [], volumes: null, volumesError: '', volumesLoading: false, rate: 0.2, custom: { index: -10, sectors: {}, symbols: {} }, customRun: false, maintenance: 30 };
     return RKX[scope];
 }
 
@@ -95,7 +95,7 @@ function rkxPreset(scope, name) {
     if (st.rerender) st.rerender();
 }
 
-function rkxCustomHtml(scope, r) {
+function rkxCustomCoreHtml(scope, r) {
     const st = rkxState(scope);
     const c = st.custom;
     const sectors = (r.sectors || []).map(s => s.sector), symbols = (r.symbols || []).map(s => s.symbol);
@@ -120,6 +120,77 @@ function rkxCustomHtml(scope, r) {
         ${S.rows.map(x => `<tr><td><b>${rkEsc(x.symbol)}</b> <small>${rkEsc(x.sector)}</small></td><td class="text-right">${rkVnd(x.value)}</td><td>${src[x.source]}${x.source === 'beta' && x.defaultBeta ? ' <small title="Chưa tính được beta, dùng 1">(beta 1)</small>' : ''}</td><td class="text-right ${x.pct < 0 ? 'tl-down' : (x.pct > 0 ? 'tl-up' : '')}">${rkPct(x.pct, 1, true)}</td><td class="text-right ${x.vnd < 0 ? 'tl-down' : ''}">${rkVnd(x.vnd)}</td></tr>`).join('')}
         </tbody></table></div>
         <p class="tl-hint">Cú sốc theo mã ưu tiên hơn theo ngành, theo ngành ưu tiên hơn “beta điều chỉnh × thay đổi VN-Index”. Dùng để thử các giả định như “ngân hàng −15% do nợ xấu” hoặc “mã lớn nhất −25% do tin xấu riêng”.</p>`;
+}
+
+// ---------- 4) Hệ quả của kịch bản + kịch bản ngược (lib/stress-calc.js) ----------
+function rkxMaintenance(scope, v) {
+    const st = rkxState(scope), n = Number(v);
+    st.maintenance = n > 0 && n < 100 ? n : 30;
+    if (st.rerender) st.rerender();
+}
+
+// Giới hạn đầu tư áp dụng cho phạm vi đang xem (cá nhân: giới hạn chung + riêng của mình; nhóm: giới hạn danh mục gộp). Chưa tải được thì không chấm.
+function rkxLimitsFor(scope) {
+    try {
+        if (scope === 'grp' && typeof GL !== 'undefined' && GL.rows) return LimitsCalc.applicable(GL.rows, null, 'consolidated');
+        if (scope === 'rk' && typeof LM !== 'undefined' && LM.rows && LM.me) return LimitsCalc.applicable(LM.rows, LM.me, 'member');
+    } catch (e) { /* không chấm giới hạn */ }
+    return [];
+}
+
+function rkxConsequencesHtml(scope, r) {
+    if (typeof StressCalc === 'undefined') return '';
+    const st = rkxState(scope), limits = rkxLimitsFor(scope);
+    const S = RiskCalc.customStress(r, st.custom);
+    const c = StressCalc.consequences(r, S, { LC: LimitsCalc, limits, maintenancePct: st.maintenance });
+    const m = c.margin;
+    const lim = (i) => `<li><span class="tl-badge ${i.mode === 'warn' ? 'info' : (i.mode === 'block' ? 'bad' : 'warn')}">${rkEsc(LimitsCalc.MODES[i.mode].label)}</span> ${rkEsc(i.subject)}: ${rkEsc(LimitsCalc.KINDS[i.kind].label)} ${rkNum(i.current, 1)} / ${rkNum(i.threshold, 1)}</li>`;
+    let html = `<div class="ce-group-title">Hệ quả của kịch bản trên</div><div class="tl-kpis">${[
+        rkKpi('Tiền mặt / NAV', `${c.cashPctBefore === null ? '—' : rkPct(c.cashPctBefore, 1)} → ${c.cashPctAfter === null ? '—' : rkPct(c.cashPctAfter, 1)}`, 'tiền không đổi, NAV giảm nên tỷ trọng tiền tăng'),
+        m.before.hasDebt ? rkKpi('Đòn bẩy', `${m.before.leverage === null ? '—' : rkNum(m.before.leverage, 2) + '×'} → ${m.after.leverage === null ? '—' : rkNum(m.after.leverage, 2) + '×'}`, 'giá trị cổ phiếu ÷ NAV', m.after.breached ? 'tl-down' : '') : '',
+        m.before.hasDebt ? rkKpi('NAV ÷ giá trị cổ phiếu', `${m.before.equityPct === null ? '—' : rkPct(m.before.equityPct, 0)} → ${m.after.equityPct === null ? '—' : rkPct(m.after.equityPct, 0)}`, m.after.breached ? `dưới ngưỡng ký quỹ ${st.maintenance}%: có thể bị gọi ký quỹ` : `ngưỡng giả định ${st.maintenance}%`, m.after.breached ? 'tl-down' : '') : '',
+        c.limits ? rkKpi('Giới hạn vi phạm', `${c.limits.before.length} → ${c.limits.after.length}`, c.limits.added.length ? `${c.limits.added.length} vi phạm mới` : 'không thêm vi phạm mới', c.limits.added.length ? 'tl-down' : '') : '',
+    ].join('')}</div>`;
+    if (m.before.hasDebt) html += `<div class="rk-custom-row"><label>Ngưỡng ký quỹ giả định (% NAV ÷ giá trị cổ phiếu)<input type="number" class="tl-input num" min="1" max="99" step="1" value="${st.maintenance}" onchange="rkxMaintenance('${scope}', this.value)" style="width:90px"></label><span class="tl-hint" style="margin:0">Tuỳ công ty chứng khoán (thường 30–40%); chỉnh theo hợp đồng ký quỹ của bạn.</span></div>`;
+    if (c.limits && c.limits.added.length) html += `<div class="conc-warn"><i class="fa-solid fa-triangle-exclamation"></i><span>Sau kịch bản này sẽ vi phạm thêm:</span></div><ul class="lm-list">${c.limits.added.map(lim).join('')}</ul>`;
+    else if (c.limits) html += '<p class="tl-hint" style="margin:6px 0 0">Kịch bản này không làm vi phạm thêm giới hạn đầu tư nào.</p>';
+    else if (!limits.length) html += '<p class="tl-hint" style="margin:6px 0 0">Chưa có giới hạn đầu tư áp dụng nên không chấm tuân thủ sau kịch bản.</p>';
+    return html;
+}
+
+function rkxReverseHtml(scope, r) {
+    if (typeof StressCalc === 'undefined') return '';
+    const st = rkxState(scope);
+    const rev = StressCalc.reverse(r, { LC: LimitsCalc, limits: rkxLimitsFor(scope), maintenancePct: st.maintenance });
+    if (!rev.length) return '';
+    return `<div class="ce-group-title">Kịch bản ngược: VN-Index phải giảm bao nhiêu thì…</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Sự kiện</th><th class="text-right">VN-Index giảm</th><th class="text-right">NAV mất</th><th>Ghi chú</th></tr></thead><tbody>
+        ${rev.map(x => `<tr><td><b>${rkEsc(x.label)}</b></td><td class="text-right ${x.indexPct !== null && x.indexPct > -15 ? 'tl-down' : ''}">${x.indexPct === null ? '<span class="tl-badge mute">không xảy ra</span>' : rkPct(x.indexPct, 1, true)}</td><td class="text-right">${x.navLossPct === null || x.navLossPct === undefined ? '—' : rkPct(x.navLossPct, 0)}</td><td>${rkEsc(x.note || '')}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="tl-hint">Tính ngược từ beta điều chỉnh của từng mã (mã chưa có beta coi là 1) với cú sốc thị trường chung, không gồm cú sốc riêng theo ngành/mã ở trên. Beta là ước lượng từ quá khứ: khủng hoảng thật thường khiến các mã giảm cùng chiều mạnh hơn beta gợi ý, nên đọc đây là mức tối thiểu cần chịu được.</p>`;
+}
+
+// Bảng theo từng thành viên (chỉ cấp nhóm): cùng kịch bản ảnh hưởng ai nặng nhất, ai chạm giới hạn/ký quỹ
+function rkxMembersHtml(scope, r) {
+    if (scope !== 'grp' || typeof GR === 'undefined' || !GR.portfolios || typeof StressCalc === 'undefined') return '';
+    const st = rkxState(scope);
+    const beta = {}; (r.symbols || []).forEach(x => { beta[x.symbol] = x.betaAdj; });
+    const rows = GR.portfolios.filter(p => p.nav > 0 && p.holdings.length).map(p => {
+        const pr = { symbols: p.holdings.map(h => ({ symbol: h.symbol, sector: FinCalc.sectorOf(h.symbol), value: h.value, betaAdj: beta[h.symbol] })), cash: p.cash, debt: p.debt, nav: p.nav };
+        const S = RiskCalc.customStress(pr, st.custom);
+        const lim = (typeof GL !== 'undefined' && GL.rows) ? LimitsCalc.applicable(GL.rows, p.id, 'member') : [];
+        const c = StressCalc.consequences(pr, S, { LC: LimitsCalc, limits: lim, maintenancePct: st.maintenance });
+        return { name: p.name, nav: p.nav, pct: S.portfolioPct, navAfter: S.navAfter, added: c.limits ? c.limits.added.length : null, margin: c.margin.after.breached, hasDebt: c.margin.before.hasDebt, worst: S.worst };
+    }).sort((a, b) => a.pct - b.pct);
+    if (!rows.length) return '';
+    return `<div class="ce-group-title">Cùng kịch bản, từng thành viên chịu ra sao</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Thành viên</th><th class="text-right">NAV</th><th class="text-right">Thay đổi NAV</th><th class="text-right">NAV sau</th><th>Khoản mất nhiều nhất</th><th>Giới hạn mới vi phạm</th><th>Ký quỹ</th></tr></thead><tbody>
+        ${rows.map(x => `<tr><td><b>${rkEsc(x.name)}</b></td><td class="text-right">${rkVnd(x.nav)}</td><td class="text-right ${x.pct < 0 ? 'tl-down' : ''}">${rkPct(x.pct, 1, true)}</td><td class="text-right">${rkVnd(x.navAfter)}</td>
+            <td>${x.worst ? rkEsc(x.worst.symbol) + ' <small>' + rkPct(x.worst.pct, 0, true) + '</small>' : '—'}</td><td>${x.added === null ? '—' : (x.added ? `<span class="tl-badge bad">${x.added}</span>` : '<span class="tl-badge ok">không</span>')}</td>
+            <td>${x.hasDebt ? (x.margin ? '<span class="tl-badge bad">chạm ngưỡng</span>' : '<span class="tl-badge ok">an toàn</span>') : '—'}</td></tr>`).join('')}
+        </tbody></table></div><p class="tl-hint">Dùng chung beta của danh mục chung; giới hạn là giới hạn áp dụng cho từng người. Không phải bảng xếp hạng: danh mục nhiều tiền mặt hay ít cổ phiếu tất nhiên mất ít hơn.</p>`;
+}
+
+function rkxCustomHtml(scope, r) {
+    return rkxCustomCoreHtml(scope, r) + rkxConsequencesHtml(scope, r) + rkxMembersHtml(scope, r) + rkxReverseHtml(scope, r);
 }
 
 // Gộp 3 phần, đặt cuối khối rủi ro. scope: 'rk' | 'grp'.
