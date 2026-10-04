@@ -2460,20 +2460,57 @@ const API = {
                     const KEY = 'wh_sector_meta_v1', TTL = 24 * 3600 * 1000;
                     let cached = null;
                     try { cached = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* không có cache */ }
-                    if (!force && cached && cached.map && Date.now() - cached.ts < TTL) return FinCalc.registerSectors(cached.map);
+                    if (!force && cached && cached.map && Date.now() - cached.ts < TTL) { if (FinCalc.registerListings && cached.ls) FinCalc.registerListings(cached.ls); return FinCalc.registerSectors(cached.map); }
                     try {
-                        const rows = await API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('symbol, icb2_code').order('symbol'));
+                        const rows = await API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('symbol, icb2_code, exchange, type').order('symbol'));
                         const map = SectorMap.buildMap(rows || []);
+                        const ls = {}; (rows || []).forEach(r => { if (r.symbol && r.exchange) ls[String(r.symbol).toUpperCase()] = { exchange: r.exchange, type: r.type }; });
                         if (Object.keys(map).length) {
-                            try { localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), map })); } catch (e) { /* cache đầy: bỏ qua */ }
+                            try { localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), map, ls })); } catch (e) { /* cache đầy: bỏ qua */ }
+                            if (FinCalc.registerListings) FinCalc.registerListings(ls);
                             return FinCalc.registerSectors(map);
                         }
                     } catch (e) { /* không đọc được: dùng cache cũ nếu có */ }
-                    return cached && cached.map ? FinCalc.registerSectors(cached.map) : 0;
+                    if (cached && cached.map) { if (FinCalc.registerListings && cached.ls) FinCalc.registerListings(cached.ls); return FinCalc.registerSectors(cached.map); }
+                    return 0;
                 })();
                 return M._p;
             },
             listMeta: async () => API.asset._fetchAll(() => sbClient.from('finance_stock_meta').select('*').order('symbol')),
+            // Giá tham chiếu và biên độ/bước giá cho một mã (lib/vn-market.js). Tham chiếu = giá đóng cửa phiên gần nhất TRƯỚC phiên đang đặt: trước 15:05 giờ VN là phiên trước hôm nay, sau đó là phiên hôm nay.
+            // sessions = các phiên giao dịch gần đây theo VN-Index (để đếm T+2 đúng cả khi nghỉ lễ). UPCoM: trần/sàn xấp xỉ vì giá tham chiếu của sàn này là bình quân gia quyền.
+            reference: async (symbol) => {
+                if (typeof VnMarket === 'undefined') throw new Error("Thiếu thư viện quy định thị trường (lib/vn-market.js)");
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                await API.asset.market.ensureMeta();
+                const listing = (typeof FinCalc !== 'undefined' && FinCalc.listingOf) ? FinCalc.listingOf(sym) : { exchange: 'HOSE', type: 'STOCK', known: false };
+                const vn = new Date(Date.now() + 7 * 3600000), today = vn.toISOString().slice(0, 10), afterClose = vn.getUTCHours() * 60 + vn.getUTCMinutes() >= 15 * 60 + 5;
+                const from = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+                const hist = await API.asset.getPriceHistory([sym, 'VNINDEX'], from, today);
+                const series = (hist[sym] || []).filter(x => afterClose ? x[0] <= today : x[0] < today);
+                const last = series.length ? series[series.length - 1] : null;
+                const sessions = (hist.VNINDEX || []).map(x => x[0]);
+                const L = last ? VnMarket.limits(last[1], listing.exchange, listing.type) : null;
+                return { symbol: sym, exchange: listing.exchange, type: listing.type, listingKnown: listing.known, ref: last ? last[1] : null, refDate: last ? last[0] : null, limits: L, sessions, today };
+            },
+            // Cổ phiếu mua chưa về tài khoản (T+2), tiền bán chưa về và số cổ phiếu bán được hôm nay theo từng mã
+            settlement: async (email) => {
+                if (typeof VnMarket === 'undefined') throw new Error("Thiếu thư viện quy định thị trường (lib/vn-market.js)");
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const vn = new Date(Date.now() + 7 * 3600000), today = vn.toISOString().slice(0, 10);
+                const from = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+                const [txns, holdings, hist] = await Promise.all([
+                    API.asset.listTransactions(email), API.asset.computeHoldings(userId),
+                    API.asset.getPriceHistory(['VNINDEX'], from, today).catch(() => ({}))
+                ]);
+                const sessions = (hist.VNINDEX || []).map(x => x[0]);
+                const un = VnMarket.unsettled(txns, today, sessions);
+                const held = {}; (holdings || []).forEach(h => { held[String(h.symbol).toUpperCase()] = Number(h.quantity) || 0; });
+                const sellable = {}; Object.keys(held).forEach(s => { sellable[s] = VnMarket.sellable(s, held[s], un); });
+                return { today, sessions, unsettled: un, held, sellable };
+            },
             // Lợi suất trái phiếu chính phủ các kỳ hạn trong `days` ngày gần nhất (cũ -> mới)
             rates: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 400) * 86400000).toISOString().slice(0, 10);
@@ -4966,6 +5003,8 @@ async function _dispatchAction(action, params = {}) {
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
+            case 'getMarketReference': result = await API.asset.market.reference(params.symbol); break;
+            case 'getSettlement': result = await API.asset.market.settlement(params.email); break;
             case 'listDataHealth': result = await API.asset.market.healthList(params.days); break;
             case 'resolveDataHealth': result = await API.asset.market.healthResolve(params.email, params.id, params.note); break;
             case 'listFunctionRuns': result = await API.asset.market.runs(params.days); break;

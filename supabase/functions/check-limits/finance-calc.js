@@ -40,6 +40,17 @@ function sectorOf(symbol) {
   const s = String(symbol || '').trim().toUpperCase();
   return SECTOR_BY_SYMBOL[s] || DYNAMIC_SECTORS[s] || UNKNOWN_SECTOR;
 }
+// Sàn niêm yết và loại chứng khoán của mã (finance_stock_meta), nạp lúc chạy qua registerListings(); dùng cho biên độ giá, bước giá (lib/vn-market.js). Chưa biết thì mặc định HOSE / cổ phiếu.
+const DYNAMIC_LISTINGS = {};
+function registerListings(map) {
+  Object.keys(DYNAMIC_LISTINGS).forEach(function (k) { delete DYNAMIC_LISTINGS[k]; });
+  Object.keys(map || {}).forEach(function (k) { const v = map[k]; if (v && v.exchange) DYNAMIC_LISTINGS[String(k).trim().toUpperCase()] = { exchange: String(v.exchange).toUpperCase(), type: String(v.type || 'STOCK').toUpperCase() }; });
+  return Object.keys(DYNAMIC_LISTINGS).length;
+}
+function listingOf(symbol) {
+  const l = DYNAMIC_LISTINGS[String(symbol || '').trim().toUpperCase()];
+  return l ? { exchange: l.exchange, type: l.type, known: true } : { exchange: 'HOSE', type: 'STOCK', known: false };
+}
 // 'manual' | 'icb' | 'unknown' -- để giao diện biết ngành đến từ đâu
 function sectorSource(symbol) {
   const s = String(symbol || '').trim().toUpperCase();
@@ -150,7 +161,7 @@ function buildCsv(rows) {
   return '\uFEFF' + body;
 }
 
-return { sectorOf, sectorSource, registerSectors, sectorAllocation, concentrationWarnings, priceAgeLabel, priceStatusSummary, buildCsv, UNKNOWN_SECTOR, SECTOR_BY_SYMBOL };
+return { sectorOf, sectorSource, registerSectors, registerListings, listingOf, sectorAllocation, concentrationWarnings, priceAgeLabel, priceStatusSummary, buildCsv, UNKNOWN_SECTOR, SECTOR_BY_SYMBOL };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = FinCalc;

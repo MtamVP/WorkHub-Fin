@@ -1,5 +1,5 @@
 // API.asset.market: nạp phân ngành ICB vào FinCalc, lợi suất, cảnh báo chất lượng dữ liệu, nhật ký chạy -- chạy CHÍNH api.js trên Supabase giả.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -8,15 +8,16 @@ import { createFakeSupabase } from '../helpers/fake-supabase.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(here, '../../', rel), 'utf8');
-const LIBS = ['lib/finance-calc.js', 'lib/sector-map.js', 'lib/portfolio-calc.js', 'lib/limits-calc.js', 'lib/approval-calc.js', 'lib/corporate-events.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
+const LIBS = ['lib/finance-calc.js', 'lib/sector-map.js', 'lib/vn-market.js', 'lib/portfolio-calc.js', 'lib/limits-calc.js', 'lib/approval-calc.js', 'lib/corporate-events.js', 'lib/statement-import.js', 'lib/xlsx-writer.js', 'lib/decision-journal.js', 'lib/monthly-report.js'];
 
 const MEMBER = { id: 'u-1', email: 'an@x.vn', nickname: 'An', group_key: 'finance', active: true };
 const MANAGER = { id: 'u-2', email: 'mgr@x.vn', nickname: 'Quản lý', group_key: 'finance', active: true };
 
-function boot(actor = MEMBER, seed = {}, store = {}) {
+function boot(actor = MEMBER, seed = {}, store = {}, functions = {}) {
   const base = { users: [MEMBER, MANAGER], fin_roles: [{ user_id: 'u-2', role: 'asset_manager' }], finance_assets: [], finance_transactions: [] };
-  const fake = createFakeSupabase(Object.assign(base, seed), { authUser: { email: actor.email } });
+  const fake = createFakeSupabase(Object.assign(base, seed), { authUser: { email: actor.email }, functions });
   const sandbox = {
+    Date,
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval: () => 0, Blob, Buffer, URL, TextEncoder, TextDecoder, atob, btoa,
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
@@ -97,5 +98,49 @@ describe('cảnh báo chất lượng dữ liệu và nhật ký chạy', () => 
     expect((await c.callGAS('listDataHealth', {})).data).toHaveLength(1);
     expect((await c.callGAS('resolveDataHealth', { email: MANAGER.email, id: 'a', note: 'Đã xử lý xong' })).status).toBe('success');
     expect(Array.from(c.MUTATING)).toContain('resolveDataHealth');
+  });
+});
+
+
+describe('giá tham chiếu và T+2', () => {
+  afterEach(() => vi.useRealTimers());
+  const BARS = { FPT: [['2026-10-01', 63000], ['2026-10-02', 62700], ['2026-10-05', 62900]], VNINDEX: [['2026-09-30', 1900], ['2026-10-01', 1910], ['2026-10-02', 1905], ['2026-10-05', 1915]] };
+  const fns = { 'stock-history': async (b) => ({ data: { ok: true, series: Object.fromEntries(b.symbols.map(sym => [sym, (BARS[sym] || []).filter(([d]) => d >= b.from && d <= b.to)])) }, error: null }) };
+  const META2 = [{ symbol: 'FPT', icb2_code: '9500', exchange: 'HNX', type: 'STOCK' }];
+
+  it('trước 15:05 giờ VN: tham chiếu là phiên trước hôm nay; sau đó là phiên hôm nay; sàn và trần theo sàn niêm yết', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-05T03:00:00Z'));                 // 10:00 giờ VN thứ Hai
+    const c = boot(MEMBER, { finance_stock_meta: META2 }, {}, fns);
+    const r = await c.API.asset.market.reference('fpt');
+    expect(r).toMatchObject({ symbol: 'FPT', exchange: 'HNX', listingKnown: true, ref: 62700, refDate: '2026-10-02' });
+    expect(r.limits).toMatchObject({ ceiling: 68900, floor: 56500, bandPct: 10, tick: 100 });          // HNX ±10%: 62.700 x 1,1 = 68.970 -> làm tròn xuống bước giá 68.900; x 0,9 = 56.430 -> lên 56.500
+    vi.setSystemTime(new Date('2026-10-05T09:00:00Z'));                 // 16:00 giờ VN: đã đóng cửa
+    const c2 = boot(MEMBER, { finance_stock_meta: META2 }, {}, fns);
+    expect((await c2.API.asset.market.reference('FPT')).ref).toBe(62900);
+  });
+  it('mã chưa rõ sàn: mặc định HOSE và báo listingKnown=false; mã sai bị từ chối', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-05T03:00:00Z'));
+    const c = boot(MEMBER, {}, {}, fns);
+    const r = await c.API.asset.market.reference('FPT');
+    expect(r).toMatchObject({ exchange: 'HOSE', listingKnown: false });
+    expect(r.limits.ceiling).toBe(67000);
+    await expect(c.API.asset.market.reference('bad symbol')).rejects.toThrow(/Mã không hợp lệ/);
+  });
+  it('settlement: cổ phiếu mua chưa về, tiền bán chưa về, số bán được hôm nay', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-05T03:00:00Z'));
+    const tx = (id, o) => Object.assign({ id, user_id: 'u-1', fee: 0, tax: 0, created_at: '2026-10-01T00:00:00Z', deleted_at: null }, o);
+    const c = boot(MEMBER, { finance_transactions: [
+      tx('a', { type: 'buy', symbol: 'FPT', quantity: 500, price: 60000, trade_date: '2026-09-25' }),
+      tx('b', { type: 'buy', symbol: 'FPT', quantity: 300, price: 62000, trade_date: '2026-10-02' }),     // về 06/10
+      tx('c', { type: 'sell', symbol: 'FPT', quantity: 100, price: 63000, trade_date: '2026-10-02', fee: 9450, tax: 6300 }),
+    ] }, {}, fns);
+    const r = await c.API.asset.market.settlement(MEMBER.email);
+    expect(r.held.FPT).toBe(700);
+    expect(r.sellable.FPT).toEqual({ sellable: 400, locked: 300, nextSettle: '2026-10-06' });
+    expect(r.unsettled.cashPending).toBeCloseTo(100 * 63000 - 9450 - 6300, 6);
+    expect(r.sessions).toContain('2026-10-05');
   });
 });

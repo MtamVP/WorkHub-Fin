@@ -367,3 +367,12 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .gj-step.done { color: var(--text-primary); border-style: solid; background: var(--bg-color-2); }
 .gj-step small { font-size: 0.68rem; color: var(--text-muted); }
 .gj-arrow { font-style: normal; color: var(--text-muted); padding: 0 2px; }
+
+/* ---- Quy định thị trường dưới form lệnh (vn-rules.js) ---- */
+.vr-box { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md, 10px); background: var(--bg-color-2); font-size: 0.84rem; }
+.vr-line { display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; }
+.vr-line i { margin-top: 3px; flex: none; }
+.vr-line.bad i { color: var(--danger-color, #e5534b); }
+.vr-line.warn i { color: var(--warning-color, #d29922); }
+.vr-line.ok i { color: var(--success-color, #3fb950); }
+.vr-line.info i { color: var(--text-muted); }
