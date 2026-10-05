@@ -22,6 +22,13 @@ async function mkLoad(force) {
         MK.state = MK.rows.length ? 'ok' : 'empty';
     } catch (e) { MK.state = 'error'; MK.error = e.message || String(e); }
     renderMarketScreener();
+    if (MK.state === 'ok' && (force || !MK.hist)) {      // cảnh báo định giá: tải lịch sử nền, không chặn bảng lọc
+        call('getValuationHistory', { years: 6 }).then(h => { MK.hist = h; renderMkAlerts(); }).catch(() => { /* thiếu lịch sử: bỏ khung cảnh báo */ });
+    } else renderMkAlerts();
+}
+function renderMkAlerts() {
+    const el = document.getElementById('mk-alerts');
+    if (el) el.innerHTML = typeof vaAlertsHtml === 'function' ? vaAlertsHtml(MK.hist, true) : '';
 }
 
 const mkX = (v, d) => (v === null || v === undefined ? '—' : VU.dec(v, d === undefined ? 1 : d) + 'x');
@@ -44,6 +51,7 @@ function renderMarketScreener() {
     MarketScreener.CRITERIA.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, items: [] }); g.items.push(c); });
     const icbs = [...new Set(MK.rows.map(r => r.icb2_code).filter(Boolean))].sort();
     root.innerHTML = `
+    <div id="mk-alerts"></div>
     <div class="vl-card">
         <h3 class="vl-card-title"><i class="fa-solid fa-earth-asia" aria-hidden="true"></i> Sàng lọc toàn thị trường <span class="vl-muted">${MK.rows.length} mã niêm yết · số liệu ngày ${VU.esc(String(MK.asOf || '').slice(0, 10).split('-').reverse().join('/'))}
             <button type="button" class="vl-link" style="margin-left:10px" onclick="mkReset()">Đặt lại</button></span></h3>
@@ -57,6 +65,7 @@ function renderMarketScreener() {
     </div>
     <div id="mk-results"></div>`;
     renderMkResults();
+    renderMkAlerts();
 }
 
 function mkRow(e, i) {

@@ -111,3 +111,21 @@ describe('động lượng: chg3m và JdK', () => {
   });
   it('có mẫu "Dẫn đầu và có nền tảng"', () => { expect(MS.PRESETS.some((p) => p.key === 'momentum')).toBe(true); });
 });
+
+describe('matches (danh sách theo dõi)', () => {
+  const QQ = [4, 6, 8, 10, 12, 14, 16, 18, 20, 24, 30], QB = [0.5, 0.8, 1, 1.2, 1.5, 1.8, 2.1, 2.5, 3, 4, 6], QR = [0, 0.03, 0.06, 0.09, 0.11, 0.13, 0.15, 0.18, 0.21, 0.25, 0.35];
+  const ST = { '2700': { n: 40, as_of: '2026-10-05', stats: { pe: { n: 40, median: 14, q: QQ }, pb: { n: 40, median: 1.8, q: QB }, roae: { n: 40, median: 0.13, q: QR } } } };
+  const mk = (symbol, m) => ({ symbol, icb2_code: '2700', metrics: Object.assign({ marketcap: 5000e9, advValue20: 20e9, roae: 0.2, pe: 8, pb: 1 }, m) });
+  const rows = MS.buildRows([mk('GOOD', {}), mk('DEAR', { pe: 26, pb: 4 }), mk('LOWQ', { roae: 0.05 }), mk('OTHER', {})], ST, { GOOD: { name: 'Mã tốt' } });
+  it('chỉ trả mã đang theo dõi và đạt mẫu rẻ + chất lượng', () => {
+    const r = MS.matches(rows, ['good', 'DEAR', 'LOWQ', 'MISSING']);
+    expect(Object.keys(r)).toEqual(['GOOD']);
+    expect(r.GOOD.name).toBe('Mã tốt'); expect(r.GOOD.label).toBe('Rẻ và chất lượng');
+    expect(r.GOOD.roe).toBeCloseTo(0.2, 9); expect(r.GOOD.valuationPct).toBeLessThanOrEqual(40);
+  });
+  it('mẫu khác và đầu vào rỗng hoặc mẫu không tồn tại: không lỗi', () => {
+    expect(MS.matches(rows, [])).toEqual({});
+    expect(MS.matches(rows, ['GOOD'], 'khong-co')).toEqual({});
+    expect(MS.matches(null, ['GOOD'])).toEqual({});
+  });
+});

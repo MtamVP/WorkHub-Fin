@@ -8,6 +8,19 @@ const VM_KEY = 'wh.fin.valmap.v1';
 try { const sv = JSON.parse(localStorage.getItem(VM_KEY) || 'null'); if (sv) { if ([3, 5, 6].includes(sv.years)) VM.years = sv.years; if (sv.key === 'pb_agg') VM.key = 'pb_agg'; } } catch (e) { /* mặc định */ }
 function vmSave() { try { localStorage.setItem(VM_KEY, JSON.stringify({ years: VM.years, key: VM.key })); } catch (e) { /* bỏ qua */ } }
 
+// Cảnh báo định giá thị trường (lib/valuation-alerts.js), dùng chung cho Bản đồ và Thị trường. h: kết quả getValuationHistory ({ rows, bond10y }); compact: chỉ vài dòng kèm liên kết sang Bản đồ.
+function vaAlertsHtml(h, compact) {
+    if (typeof ValuationAlerts === 'undefined' || !h || !h.rows || !h.rows.length) return '';
+    const R = ValuationAlerts.build(h.rows, [], { bond10yPct: h.bond10y });
+    if (!R.enough) return '';
+    const shown = compact ? R.alerts.slice(0, 3) : R.alerts;
+    const head = `<h3 class="vl-card-title"><i class="fa-solid fa-bell" aria-hidden="true"></i> Cảnh báo định giá thị trường<span class="vl-muted">${R.warn ? `${R.warn} cần xem · ` : ''}số liệu ngày ${vmDate(R.asOf)}</span></h3>`;
+    if (!shown.length) return `<div class="vl-card">${head}<p class="vl-hint" style="margin:0">Thị trường đang quanh mức trung bình lịch sử 5 năm của chính nó: chưa có tín hiệu nào cần xem.</p></div>`;
+    return `<div class="vl-card">${head}<div class="va-list">${shown.map(a => `<div class="va-item"><span class="vl-pill ${a.level === 'warn' ? 'vl-pill-expensive' : 'vl-pill-cheap'}">${a.level === 'warn' ? 'Cần xem' : 'Thông tin'}</span><div><b>${VU.esc(a.title)}</b><small>${VU.esc(a.detail)}</small></div></div>`).join('')}</div>
+        ${compact && R.alerts.length > shown.length ? `<p class="vl-hint" style="margin:6px 0 0">Còn ${R.alerts.length - shown.length} tín hiệu khác. <button type="button" class="vl-link" onclick="showView('map')">Xem ở Bản đồ</button></p>` : (compact ? `<p class="vl-hint" style="margin:6px 0 0"><button type="button" class="vl-link" onclick="showView('map')">Xem Bản đồ định giá</button></p>` : '')}
+        <p class="vl-hint" style="margin:6px 0 0">Tín hiệu để soát, không phải lệnh mua bán: đắt hay rẻ so với lịch sử có thể kéo dài nhiều năm.</p></div>`;
+}
+
 async function vmLoad(force) {
     if (VM.state === 'loading') return;
     if (VM.state === 'ok' && !force) { renderValuationMap(); return; }
@@ -58,6 +71,7 @@ function renderValuationMap() {
     const board = ValuationHistory.sectorBoard(VM.rows, VM.key, VM.years, vmName);
     const keyLabel = VM.key === 'pb_agg' ? 'P/B' : 'P/E';
     root.innerHTML = `
+    ${vaAlertsHtml({ rows: VM.rows, bond10y: VM.bond10y }, false)}
     <div class="vl-card">
         <h3 class="vl-card-title"><i class="fa-solid fa-map" aria-hidden="true"></i> Bản đồ định giá <span class="vl-muted">số liệu đến ${vmDate(pe ? pe.date : '')}
             <select id="vm-years" class="vl-select-sm" aria-label="Cửa sổ lịch sử" onchange="vmSet('years', Number(this.value))">${[3, 5, 6].map(y => `<option value="${y}"${VM.years === y ? ' selected' : ''}>${y} năm</option>`).join('')}</select></span></h3>

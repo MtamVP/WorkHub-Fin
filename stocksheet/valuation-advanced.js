@@ -154,6 +154,7 @@ const ValuationAdvanced = (function () {
     const m = Object.assign({}, (peer.self && peer.self.metrics) || {}, metrics || {}), a = PEER.assess(m, peer.sector.stats);   // chỉ số mới của mã (nếu có) đè lên ảnh chụp thị trường
     if (!a.verdict) return '';
     const mk = PEER.assess(m, peer.market ? peer.market.stats : null);
+    const conf = PEER.quality ? PEER.quality(peer.sector, { financial: ['8300', '8500', '8700'].indexOf(String(peer.icb2_code || (peer.self && peer.self.icb2_code) || '')) !== -1 }) : null;
     const bar = (it, label, fmt) => {
       if (!it) return `<div class="vl-peer-row na"><span>${esc(label)}</span><span class="vl-peer-track"></span><b>chưa có</b></div>`;
       const good = it.higherIsBetter ? it.pct >= 50 : it.pct <= 50;
@@ -167,6 +168,7 @@ const ValuationAdvanced = (function () {
     const asOf = peer.sector.as_of ? ' · số liệu ngày ' + esc(String(peer.sector.as_of).slice(0, 10).split('-').reverse().join('/')) : '';
     return `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-scale-balanced"></i> So với ngành<span class="vl-muted">${esc(peer.sectorName || 'ngành')} · ${a.n || peer.sector.n} mã${asOf}</span></h3>
       <div class="vl-peer-verdict ${esc(a.verdict.tone)}"><b>${esc(a.verdict.label)}</b><span>${esc(a.verdict.text)}</span></div>
+      ${conf && conf.level !== 'high' ? `<p class="vl-hint vl-peer-conf ${esc(conf.level)}"><b>${esc(conf.label)}:</b> ${esc(conf.notes.join('; '))}.</p>` : ''}
       <div class="vl-peer">${bar(a.items.pe, 'P/E', x)}${bar(a.items.pb, 'P/B', (v) => dec(v, 2) + 'x')}${bar(a.items.roe, 'ROE', p1)}${bar(a.items.divYield, 'Cổ tức', p1)}</div>
       ${mk.items.pe ? `<p class="vl-hint">So với cả thị trường (${mk.items.pe.n} mã): P/E ở phân vị ${dec(mk.items.pe.pct, 0)}${mk.items.pb ? ', P/B ở phân vị ' + dec(mk.items.pb.pct, 0) : ''}.</p>` : ''}
       ${table}

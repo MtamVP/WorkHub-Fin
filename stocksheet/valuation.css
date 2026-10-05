@@ -320,3 +320,10 @@
 .vm-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .vm-spark { color: var(--gold); vertical-align: middle; }
 .vm-spark-cell { width: 130px; }
+
+.va-list { display: flex; flex-direction: column; gap: 6px; }
+.va-item { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; }
+.va-item .vl-pill { flex: none; margin-top: 1px; }
+.va-item small { display: block; color: var(--text-muted, #6b7280); font-weight: 400; }
+.vl-peer-conf { margin: 6px 0 0; }
+.vl-peer-conf.low b { color: var(--warn, #b45309); }

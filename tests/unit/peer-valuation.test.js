@@ -70,3 +70,34 @@ describe('peerTable', () => {
     expect(P.peerTable(rows, 'QQQ', stats).self).toBeNull();
   });
 });
+
+describe('quality', () => {
+  const sector = (n, asOf, q) => ({ n, as_of: asOf, stats: { pe: { n, median: 10, q: q || Q }, pb: { n, median: 1.5, q: [0.5, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.4, 3, 4] } } });
+  it('đủ mã, số liệu mới, phân phối vừa phải: tin cậy tốt, không ghi chú', () => {
+    const r = P.quality(sector(40, '2026-10-05'), { today: '2026-10-06' });
+    expect(r.level).toBe('high'); expect(r.notes).toEqual([]); expect(r.label).toBe('Tin cậy tốt');
+  });
+  it('ít mã: thấp (dưới 8) hoặc vừa (dưới 20)', () => {
+    expect(P.quality(sector(6, '2026-10-05'), { today: '2026-10-05' }).level).toBe('low');
+    const m = P.quality(sector(15, '2026-10-05'), { today: '2026-10-05' });
+    expect(m.level).toBe('medium'); expect(m.notes.join()).toMatch(/15 mã/);
+  });
+  it('số liệu cũ: hơn 5 ngày vừa, hơn 10 ngày thấp; không bị hạ nhầm khi hôm nay trùng ngày số liệu', () => {
+    expect(P.quality(sector(40, '2026-10-05'), { today: '2026-10-05' }).level).toBe('high');
+    expect(P.quality(sector(40, '2026-09-28'), { today: '2026-10-05' }).level).toBe('medium');
+    const lo = P.quality(sector(40, '2026-09-20'), { today: '2026-10-05' });
+    expect(lo.level).toBe('low'); expect(lo.notes.join()).toMatch(/15 ngày/);
+  });
+  it('phân phối P/E quá rộng (p80 > 4 lần p20): hạ xuống vừa; không hạ thấp hơn mức đã thấp', () => {
+    const wide = [1, 1.2, 2, 3, 4, 6, 8, 10, 12, 20, 40];
+    const r = P.quality(sector(40, '2026-10-05', wide), { today: '2026-10-05' });
+    expect(r.level).toBe('medium'); expect(r.notes.join()).toMatch(/P\/E.*phân tán/);
+    expect(P.quality(sector(5, '2026-10-05', wide), { today: '2026-10-05' }).level).toBe('low');
+  });
+  it('ngành tài chính thêm ghi chú nhưng không hạ mức; thiếu dữ liệu: thấp, không lỗi', () => {
+    const f = P.quality(sector(40, '2026-10-05'), { today: '2026-10-05', financial: true });
+    expect(f.level).toBe('high'); expect(f.notes.join()).toMatch(/P\/B/);
+    expect(P.quality(null).level).toBe('low');
+    expect(P.quality({}).notes.join()).toMatch(/không rõ/);
+  });
+});

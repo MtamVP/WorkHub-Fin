@@ -103,6 +103,7 @@ function gqtIdeasHtml() {
     if (!I.list.length) return `${head}<p class="tl-hint">Không vị thế nào đang đắt so với ngành hoặc tụt hậu so với thị trường: chưa có gì cần tìm thay thế.</p>`;
     return `${head}${I.list.map(x => `<div class="gqt-idea"><div><b>${rkEsc(x.symbol)}</b> <span class="text-muted">${rkEsc(x.name || '')}</span> · ${rkPct(x.weightPct, 1)} danh mục</div>
         <ul class="gr-rep-notes">${x.reasons.map(t => `<li>${rkEsc(t)}</li>`).join('')}</ul>
+        ${x.confidence && x.confidence.level !== 'high' ? `<p class="tl-hint"><b>${rkEsc(x.confidence.label)}:</b> ${rkEsc(x.confidence.notes.join('; '))}.</p>` : ''}
         ${x.candidates.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mã thay thế</th><th class="text-right">P/E</th><th class="text-right">P/B</th><th class="text-right">ROE</th><th class="text-right">Vốn hoá (tỷ)</th><th>Vì sao đáng xem</th></tr></thead><tbody>
             ${x.candidates.map(c => `<tr><td><b>${rkEsc(c.symbol)}</b>${c.name ? `<span class="symbol-sub">${rkEsc(c.name)}</span>` : ''}</td><td class="text-right">${c.pe === null ? '—' : rkNum(c.pe, 1) + 'x'}</td><td class="text-right">${c.pb === null ? '—' : rkNum(c.pb, 2) + 'x'}</td><td class="text-right">${rkPct(c.roe * 100, 1)}</td><td class="text-right">${rkNum(c.marketcap / 1e9, 0)}</td><td class="gr-reason">${rkEsc(c.why)}</td></tr>`).join('')}</tbody></table></div>${x.candidateCount > x.candidates.length ? `<p class="tl-hint">Còn ${x.candidateCount - x.candidates.length} mã khác thoả điều kiện; xem Nghiên Cứu → Thị trường để lọc kỹ hơn.</p>` : ''}`
             : '<p class="tl-hint">Không có mã cùng ngành nào vừa rẻ hơn rõ rệt, vừa ROE không thấp hơn, đủ lớn và thanh khoản.</p>'}</div>`).join('')}
@@ -113,7 +114,7 @@ function gqtIdeasHtml() {
 function gqtAlertsHtml() {
     const sh = gqtSectorHistory();
     if (typeof ValuationAlerts === 'undefined' || !GQT.hist || !GQT.hist.rows || !GQT.hist.rows.length) return '';
-    const R = ValuationAlerts.build(GQT.hist.rows, sh ? sh.rows.map(r => ({ code: r.code, name: r.name, weightPct: r.weightPct })) : []);
+    const R = ValuationAlerts.build(GQT.hist.rows, sh ? sh.rows.map(r => ({ code: r.code, name: r.name, weightPct: r.weightPct })) : [], { bond10yPct: GQT.hist.bond10y });
     if (!R.enough) return '';
     const head = `<div class="ce-group-title">Cảnh báo định giá${R.warn ? ` <span class="tl-badge warn">${R.warn}</span>` : ''}</div>`;
     if (!R.alerts.length) return `${head}<p class="tl-hint"><span class="tl-badge ok">●</span> Thị trường và các ngành bạn đang nắm đều quanh mức trung bình lịch sử 5 năm của chính chúng. Không có tín hiệu nào cần xem.</p>`;

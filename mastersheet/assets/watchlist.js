@@ -13,9 +13,23 @@ async function loadWatchlist() {
         if (resp.status !== 'success') throw new Error(resp.message);
         lastWatchlist = resp.data || [];
         renderWatchlist();
+        loadWatchSignals();
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
+}
+
+// Mã đang theo dõi vừa lọt vào nhóm "Rẻ và chất lượng" của bộ lọc thị trường (lib/market-screener.js). Tải nền, thiếu dữ liệu thì bỏ nhãn.
+let watchSignals = {};
+async function loadWatchSignals() {
+    if (typeof MarketScreener === 'undefined' || !lastWatchlist.length) return;
+    try {
+        const resp = await callGAS('getMarketUniverse', {});
+        if (resp.status !== 'success' || !resp.data) return;
+        const u = resp.data, rows = MarketScreener.buildRows(u.snapshot || [], u.stats || {}, u.meta || {});
+        watchSignals = MarketScreener.matches(rows, lastWatchlist.map(w => w.symbol));
+        renderWatchlist();
+    } catch (e) { /* không có ảnh chụp thị trường: không hiện nhãn */ }
 }
 
 function watchPctText(p) {
@@ -37,10 +51,12 @@ function renderWatchlist() {
         const sub = VN_NAMES[String(w.symbol || '').toUpperCase()];
         const age = typeof renderPriceAge === 'function' && w.price > 0 ? renderPriceAge(w) : '';
         const signal = w.signal === 'buy' ? '<span class="tl-badge ok" title="Giá thị trường đang ≤ giá muốn mua"><i class="fa-solid fa-bell"></i> Tới giá mua</span>' : '';
+        const sg = watchSignals[String(w.symbol || '').toUpperCase()];
+        const cheapQ = sg ? `<span class="tl-badge ${sg.flags && sg.flags.length ? 'warn' : 'ok'}" title="${escapeAssetHtml(`Đạt mẫu "${sg.label}" của bộ lọc thị trường: định giá thuộc 40% rẻ nhất ngành (phân vị ${Math.round(sg.valuationPct)}), ROE ${sg.roe === null ? '—' : (sg.roe * 100).toFixed(1) + '%'}, vốn hoá từ 1.000 tỷ, thanh khoản từ 5 tỷ/ngày.${sg.flags && sg.flags.length ? ' Cần soát: ' + sg.flags.join('; ') + '.' : ''} Đây là tín hiệu để xem xét, không phải khuyến nghị mua.`)}"><i class="fa-solid fa-magnifying-glass-dollar"></i> Rẻ và chất lượng</span>` : '';
         const held = w.held ? '<span class="tl-badge info" title="Bạn đang giữ mã này — cảnh báo mua sẽ không gửi">Đang giữ</span>' : '';
         const targetTitle = w.targetSource === 'valuation' ? `Từ Định Giá CP (năm ${w.targetYear}). Nhập giá để ghi đè.` : (w.targetSource === 'manual' ? 'Giá mục tiêu nhập tay. Xoá trống để quay về giá từ Định Giá CP.' : 'Chưa có — nhập giá hoặc lưu định giá ở trang Định Giá CP.');
         return `<tr class="${w.signal === 'buy' ? 'tl-row-signal' : ''}">
-            <td><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span><div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;">${signal}${held}</div></td>
+            <td><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span><div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;">${signal}${cheapQ}${held}</div></td>
             <td class="text-right"><span class="price-wrap"><span class="price-cell"><b>${w.price > 0 ? fmt(w.price) : '—'}</b></span>${age}</span></td>
             <td class="text-right"><input type="text" class="price-input level-input" data-id="${w.id}" data-kind="buyBelow" value="${w.buyBelow > 0 ? fmt(w.buyBelow) : ''}" placeholder="—" title="Báo khi giá thị trường ≤ mức này. Xoá trống để tắt." onchange="handleWatchEdit(this)"></td>
             <td class="text-right ${watchPctClass(w.buyGapPct === null ? null : -w.buyGapPct)}" title="Giá hiện tại so với giá muốn mua (âm = đã rẻ hơn mức muốn mua)">${w.buyGapPct === null ? '—' : watchPctText(w.buyGapPct)}</td>

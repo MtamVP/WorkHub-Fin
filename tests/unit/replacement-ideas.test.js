@@ -63,3 +63,12 @@ describe('tụt hậu và các trường hợp biên', () => {
     expect(x).toHaveLength(1); expect(x[0].candidates).toEqual([]); expect(x[0].candidateCount).toBe(0);
   });
 });
+
+describe('độ tin cậy so sánh', () => {
+  it('mang độ tin cậy của thống kê ngành vào kết quả để giao diện nêu rõ khi ít mã', () => {
+    const st = { '2700': { n: 6, as_of: '2026-10-05', stats: STATS['2700'].stats } };
+    const rs = MS.buildRows([S('HELD', { pe: 26, pb: 4, roae: 0.12 })], st, {});
+    const x = RI.suggest([{ symbol: 'HELD', value: 10 }], rs, []);
+    expect(x[0].confidence.level).toBe('low'); expect(x[0].confidence.notes.join()).toMatch(/6 mã/);
+  });
+});
