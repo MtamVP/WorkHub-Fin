@@ -2931,6 +2931,109 @@ const API = {
         },
 
         // --- Danh sách theo dõi: mã CHƯA mua nhưng muốn canh giá. Giá thị trường dùng chung bảng finance_holdings_price (cron cập nhật như mã đang giữ). ---
+        // --- VALUATION BENCH: định giá chuyên sâu một cổ phiếu (lib/vb-*.js) ---
+        // Dữ liệu một mã: Edge Function vb-data (báo cáo tài chính đầy đủ, nến OHLCV của mã và VN-Index, chuỗi P/E-P/B-P/S hằng ngày) + thống kê ngành + lịch sử định giá thị trường + lãi suất.
+        // Mỗi nguồn lỗi riêng được trả trong `errors` để giao diện vẫn dựng được phần còn lại.
+        vb: {
+            _LIGHT: 'id, user_id, symbol, as_of, price, form, fair_low, fair_base, fair_high, margin_of_safety, grade, stance, confidence, confidence_score, tech_score, tech_rating, timing, market_score, composite, accumulate_low, accumulate_high, invalidation, note, created_at',
+            data: async (symbol, opts) => {
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                const o = opts || {}, errors = {};
+                const fn = async () => {
+                    const { data, error } = await sbClient.functions.invoke('vb-data', { body: { symbol: sym, mode: 'all', years: o.years || 8, candleYears: o.candleYears || 5 } });
+                    if (error) {
+                        let detail = error.message;
+                        try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                        throw new Error(detail);
+                    }
+                    if (!data || data.ok === false) throw new Error((data && data.error) || 'Không lấy được dữ liệu từ nguồn');
+                    return data;
+                };
+                const [d, peers, hist] = await Promise.allSettled([fn(), API.asset.market.peers(sym), API.asset.market.valuationHistory(6)]);
+                if (d.status !== 'fulfilled') throw d.reason;
+                if (peers.status !== 'fulfilled') errors.peers = String(peers.reason && peers.reason.message || peers.reason);
+                if (hist.status !== 'fulfilled') errors.history = String(hist.reason && hist.reason.message || hist.reason);
+                const p = peers.status === 'fulfilled' ? peers.value : null, h = hist.status === 'fulfilled' ? hist.value : { rows: [], bond10y: null };
+                return { symbol: sym, vb: d.value, peers: p, history: h, errors: Object.assign({}, d.value.errors || {}, errors) };
+            },
+            // Lưu một bản định giá (bản ghi mới, lịch sử bất biến). rec: các cột của finance_vb_valuations do lib/vb-engine.js (toRecord) tạo ra.
+            save: async (email, rec) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("Không xác định được người dùng");
+                const r = rec || {};
+                const sym = String(r.symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.as_of || ''))) throw new Error("Thiếu ngày số liệu");
+                const numOrNull = (v) => (v === null || v === undefined || v === '' || !isFinite(Number(v)) ? null : Number(v));
+                const text = (v, n) => (v === null || v === undefined ? null : String(v).slice(0, n));
+                const json = (v, max) => { const s = JSON.stringify(v === undefined ? null : v); if (s && s.length > max) throw new Error("Dữ liệu định giá quá lớn để lưu"); return v === undefined ? null : v; };
+                if (!(numOrNull(r.fair_base) > 0)) throw new Error("Chưa có giá trị hợp lý để lưu");
+                const row = {
+                    user_id: userId, symbol: sym, as_of: r.as_of, price: numOrNull(r.price) > 0 ? numOrNull(r.price) : null, form: text(r.form, 20),
+                    fair_low: numOrNull(r.fair_low), fair_base: numOrNull(r.fair_base), fair_high: numOrNull(r.fair_high), margin_of_safety: numOrNull(r.margin_of_safety),
+                    grade: text(r.grade, 40), stance: text(r.stance, 60), confidence: text(r.confidence, 20), confidence_score: numOrNull(r.confidence_score),
+                    tech_score: numOrNull(r.tech_score), tech_rating: text(r.tech_rating, 60), timing: text(r.timing, 120), market_score: numOrNull(r.market_score), composite: numOrNull(r.composite),
+                    accumulate_low: numOrNull(r.accumulate_low), accumulate_high: numOrNull(r.accumulate_high), invalidation: numOrNull(r.invalidation),
+                    methods: json(Array.isArray(r.methods) ? r.methods.slice(0, 40) : [], 40000), assumptions: json(r.assumptions || {}, 40000), summary: json(r.summary || {}, 40000), note: text(r.note, 1000),
+                };
+                const { data, error } = await sbClient.from('finance_vb_valuations').insert(row).select('id, created_at').single();
+                if (error) throw error;
+                return { id: data.id, createdAt: data.created_at, message: 'Đã lưu định giá ' + sym };
+            },
+            // Bản MỚI NHẤT (đầy đủ cột) của một mã; null nếu chưa có
+            latest: async (symbol) => {
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                const { data, error } = await sbClient.from('finance_vb_valuations').select('*').eq('symbol', sym).order('created_at', { ascending: false }).limit(1);
+                if (error) throw error;
+                const row = (data && data[0]) || null;
+                if (row) row.author = (await API.asset.vb._authors([row.user_id]))[row.user_id] || '';
+                return row;
+            },
+            // Bản mới nhất (cột nhẹ) của nhiều mã: { SYM: row } -- cho Danh Mục / Bảng so sánh của Investment Workbench
+            latestMany: async (symbols) => {
+                const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
+                if (!list.length) return {};
+                const rows = await API.asset._fetchAll(() => sbClient.from('finance_vb_valuations').select(API.asset.vb._LIGHT).in('symbol', list).order('created_at', { ascending: false }));
+                const out = {};
+                (rows || []).forEach(r => { if (!out[r.symbol]) out[r.symbol] = r; });
+                return out;
+            },
+            // Lịch sử các bản đã lưu của một mã (cột nhẹ, mới trước)
+            history: async (symbol, limit) => {
+                const sym = String(symbol || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{1,12}$/.test(sym)) throw new Error("Mã không hợp lệ");
+                const { data, error } = await sbClient.from('finance_vb_valuations').select(API.asset.vb._LIGHT).eq('symbol', sym).order('created_at', { ascending: false }).limit(Math.min(200, Number(limit) || 50));
+                if (error) throw error;
+                const authors = await API.asset.vb._authors((data || []).map(r => r.user_id));
+                return (data || []).map(r => Object.assign({}, r, { author: authors[r.user_id] || '' }));
+            },
+            // Mọi mã đã có định giá: bản mới nhất mỗi mã (cột nhẹ), cho trang Tổng quan của Valuation Bench
+            listLatest: async (limit) => {
+                const rows = await API.asset._fetchAll(() => sbClient.from('finance_vb_valuations').select(API.asset.vb._LIGHT).order('created_at', { ascending: false }));
+                const out = [], seen = {};
+                (rows || []).forEach(r => { if (!seen[r.symbol]) { seen[r.symbol] = true; out.push(r); } });
+                const authors = await API.asset.vb._authors(out.map(r => r.user_id));
+                return out.slice(0, Math.min(500, Number(limit) || 200)).map(r => Object.assign({}, r, { author: authors[r.user_id] || '' }));
+            },
+            remove: async (email, id) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("Không xác định được người dùng");
+                const { data, error } = await sbClient.from('finance_vb_valuations').delete().eq('id', id).select('id');
+                if (error) throw error;
+                if (!data || !data.length) throw new Error("Không xoá được: bạn chỉ xoá được bản của mình (quản lý danh mục và admin xoá được mọi bản)");
+                return 'Đã xoá bản định giá';
+            },
+            _authors: async (ids) => {
+                const list = [...new Set((ids || []).filter(Boolean))];
+                if (!list.length) return {};
+                const { data } = await sbClient.from('users').select('id, nickname, email').in('id', list);
+                const out = {};
+                (data || []).forEach(u => { out[u.id] = u.nickname || String(u.email || '').split('@')[0]; });
+                return out;
+            }
+        },
         watchlist: {
             list: async (email) => {
                 const userId = await getUserId(email);
@@ -4478,7 +4581,7 @@ const API = {
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
                 'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
-                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'finance_restricted_symbols', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
+                'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_vb_valuations', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'finance_restricted_symbols', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
             const tables = Object.keys(snapshot).filter(t => !API.backup._RESTORE_EXCLUDE.has(t));
             tables.sort((a, b) => {
@@ -5100,6 +5203,13 @@ async function _dispatchAction(action, params = {}) {
             case 'listLimits': result = await API.asset.limits.list(); break;
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
+            case 'getVbData': result = await API.asset.vb.data(params.symbol, { years: params.years, candleYears: params.candleYears }); break;
+            case 'saveVbValuation': result = await API.asset.vb.save(params.email, params.record); break;
+            case 'getVbLatest': result = await API.asset.vb.latest(params.symbol); break;
+            case 'getVbLatestMany': result = await API.asset.vb.latestMany(params.symbols); break;
+            case 'getVbHistory': result = await API.asset.vb.history(params.symbol, params.limit); break;
+            case 'listVbLatest': result = await API.asset.vb.listLatest(params.limit); break;
+            case 'deleteVbValuation': result = await API.asset.vb.remove(params.email, params.id); break;
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
             case 'getDailyAverages': result = await API.asset.getDailyAverages(params.symbols, params.from, params.to); break;
             case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;

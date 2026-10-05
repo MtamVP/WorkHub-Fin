@@ -167,3 +167,16 @@ describe('VBEngine (ngân hàng)', () => {
     expect(w('ri')).toBeGreaterThan(w('peer-pe')); expect(w('peer-pb')).toBeGreaterThanOrEqual(w('peer-pe'));
   });
 });
+
+describe('VBEngine.toRecord', () => {
+  const ctx = { symbol: 'TEST', annualRows: ANNUAL.map((r) => Object.assign({}, r)), candles: candles(400, 15), ratioSeries: { pe: PE_SERIES }, metrics: { shares: 50e6, beta: 1, divYield: 0.025, advValue20: 20e9 }, peerStats: PEERS, price: 50000 };
+  it('chuyển kết quả thành bản ghi đủ cột để lưu và hiển thị lại', () => {
+    const r = E.analyze(ctx), rec = E.toRecord(r, { note: 'ghi chú', marginOfSafety: 0.25, weights: { dcf: 4 } });
+    expect(rec.symbol).toBe('TEST'); expect(rec.fair_base).toBeGreaterThan(0); expect(rec.fair_low).toBeLessThanOrEqual(rec.fair_base); expect(rec.fair_high).toBeGreaterThanOrEqual(rec.fair_base);
+    expect(rec.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/); expect(rec.methods.length).toBeGreaterThan(3); expect(rec.methods[0]).toHaveProperty('weight');
+    expect(rec.assumptions.dcf.wacc).toBeGreaterThan(0); expect(rec.assumptions.dcf.waccDetail).toBeUndefined(); expect(rec.assumptions.weights).toEqual({ dcf: 4 }); expect(rec.assumptions.marginOfSafety).toBe(0.25);
+    expect(rec.summary.stance.length).toBeGreaterThan(10); expect(rec.summary.quality.piotroski.available).toBeGreaterThan(0); expect(rec.note).toBe('ghi chú');
+    expect(rec.accumulate_high).toBeGreaterThan(rec.accumulate_low); expect(JSON.stringify(rec).length).toBeLessThan(40000);
+  });
+  it('chưa có giá trị hợp lý thì không tạo bản ghi', () => { expect(E.toRecord({ ok: false })).toBeNull(); expect(E.toRecord(E.analyze({ annualRows: [] }))).toBeNull(); });
+});

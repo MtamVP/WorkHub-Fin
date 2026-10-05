@@ -1,4 +1,4 @@
-// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch và valuation-watch (Deno không đọc được thư mục lib/ của app).
+// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch, valuation-watch và vb-data (Deno không đọc được thư mục lib/ của app).
 // Bản sao = nguyên văn lib/<tên>.js + một dòng `globalThis.<Tên> = <Tên>;` ở cuối (để các thư viện phụ thuộc nhau thấy global như khi nạp bằng thẻ <script>).
 // Chạy sau mỗi lần sửa lib/finance-calc.js, portfolio-calc.js, group-calc.js, limits-calc.js hoặc approval-calc.js:  node scripts/sync-edge-libs.mjs
 // tests/unit/check-limits.test.js kiểm tra bản sao khớp với lib/ nên quên chạy sẽ làm CI đỏ.
@@ -24,6 +24,8 @@ export const VALUATION_LIBS = [
   { file: 'valuation-history.js', global: 'ValuationHistory' },
   { file: 'valuation-alerts.js', global: 'ValuationAlerts' },
 ];
+// vb-data chỉ cần bảng ánh xạ mã khoản mục của lib/vb-statements.js để lọc đúng các khoản mục cần dùng
+export const VBDATA_LIBS = [{ file: 'vb-statements.js', global: 'VBStatements' }];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -43,5 +45,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const lib of VALUATION_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'valuation-watch', lib.file), expectedCopy(lib));
     console.log('đã sao chép (valuation-watch)', lib.file);
+  }
+  for (const lib of VBDATA_LIBS) {
+    fs.writeFileSync(path.join(root, 'supabase', 'functions', 'vb-data', lib.file), expectedCopy(lib));
+    console.log('đã sao chép (vb-data)', lib.file);
   }
 }
