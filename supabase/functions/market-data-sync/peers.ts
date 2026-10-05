@@ -7,7 +7,9 @@ export const SNAP_DAILY = [
   "PRICE_TO_EARNINGS", "PRICE_TO_BOOK", "PRICE_TO_SALES", "MARKETCAP", "DIVIDEND_YIELD", "PRICE_TO_EARNINGS_AVG_CR_5Y", "PRICE_TO_BOOK_AVG_CR_5Y",
   "NMVALUE_AVG_CR_20D", "PRICE_CHG_PCT_CR_1Y", "PRICE_CHG_PCT_CR_3M", "BETA", "DAILY_JDK_RS_CR", "DAILY_JDK_RS_MOMENTUM_CR",
 ];
-export const SNAP_QUARTER = ["ROAE_TR_AVG5Q", "NET_MARGIN_TR", "EPS_TR_GRYOY", "NET_SALES_TR_GRYOY", "DEBT_TO_EQUITY_AQ"];
+export const SNAP_QUARTER = ["ROAE_TR_AVG5Q", "NET_MARGIN_TR", "EPS_TR_GRYOY", "NET_SALES_TR_GRYOY", "DEBT_TO_EQUITY_AQ", "OPERATING_EBITDA_TR", "OWNERS_EQUITY_AQ", "NET_CASH_TO_EQUITY_AQ", "NET_SALES_TR"];
+// Ngân hàng (8300), bảo hiểm (8500), dịch vụ tài chính/chứng khoán (8700): giá trị doanh nghiệp (EV) không có nghĩa, không tính EV/EBITDA và EV/Doanh thu
+const EV_EXCLUDED_ICB = new Set(["8300", "8500", "8700"]);
 
 export const MIN_CAP_VND = 300e9;      // chỉ tính thống kê ngành trên mã vốn hoá từ 300 tỷ (loại mã quá nhỏ làm méo trung vị)
 export const MIN_SECTOR_N = 5;         // ngành ít hơn 5 mã hợp lệ thì không có thống kê
@@ -57,6 +59,17 @@ export function buildSnapshot(daily: Record<string, any[]>, quarter: Record<stri
     for (const x of usable(quarter[code])) { const c = latest.get(x.code); if (!c || x.date > c.date) latest.set(x.code, { date: x.date, value: x.value }); }
     latest.forEach((v, sym) => { const r = get(sym); r.metrics[name] = v.value; r.quarter_date = !r.quarter_date || v.date > r.quarter_date ? v.date : r.quarter_date; });
   }
+  // EV = vốn hoá + nợ ròng, nợ ròng = -(tỷ lệ tiền mặt ròng/vốn chủ x vốn chủ). Chỉ tính khi đủ cả ba số; EBITDA hoạt động 4 quý liền kề (TTM).
+  for (const r of bySym.values()) {
+    const m = r.metrics;
+    if (r.icb2_code && EV_EXCLUDED_ICB.has(r.icb2_code)) continue;
+    if (!(m.marketcap > 0) || !isFinite(m.netCashToEquity) || !(m.equity > 0)) continue;
+    const ev = m.marketcap - m.netCashToEquity * m.equity;
+    if (!(ev > 0)) continue;
+    m.ev = ev;
+    if (m.ebitdaTtm > 0) m.evEbitda = ev / m.ebitdaTtm;
+    if (m.salesTtm > 0) m.evSales = ev / m.salesTtm;
+  }
   // Chỉ giữ mã có ít nhất một chỉ số định giá hoặc vốn hoá
   return [...bySym.values()].filter((r) => r.metrics.marketcap > 0 || r.metrics.pe > 0 || r.metrics.pb > 0);
 }
@@ -71,7 +84,7 @@ const r4 = (v: number) => Math.round(v * 10000) / 10000;
 
 // Điều kiện hợp lệ của từng chỉ số khi đưa vào thống kê (loại giá trị vô lý: P/E âm, P/E hàng trăm lần do lợi nhuận tiệm cận 0...)
 const VALID: Record<string, (v: number) => boolean> = {
-  pe: (v) => v > 0 && v < 100, pb: (v) => v > 0 && v < 30, roae: (v) => v > -1 && v < 1, divYield: (v) => v >= 0 && v < 0.3, ps: (v) => v > 0 && v < 100,
+  pe: (v) => v > 0 && v < 100, pb: (v) => v > 0 && v < 30, roae: (v) => v > -1 && v < 1, divYield: (v) => v >= 0 && v < 0.3, ps: (v) => v > 0 && v < 100, evEbitda: (v) => v > 0 && v < 100, evSales: (v) => v > 0 && v < 100,
   // các chỉ số cho hồ sơ phong cách (quy mô, động lượng, biến động) và vòng quay ngành (JdK 100 = ngang thị trường)
   marketcap: (v) => v > 0, chg1y: (v) => v > -0.95 && v < 10, chg3m: (v) => v > -0.95 && v < 5, beta: (v) => v > -1 && v < 4, jdkRs: (v) => v > 50 && v < 150, jdkMom: (v) => v > 50 && v < 150,
 };

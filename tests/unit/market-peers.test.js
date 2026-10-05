@@ -28,6 +28,36 @@ describe('buildSnapshot', () => {
   it('rỗng thì trả mảng rỗng', () => { expect(buildSnapshot({}, {}, () => null)).toEqual([]); });
 });
 
+describe('buildSnapshot: EV/EBITDA và EV/Doanh thu', () => {
+  const q = (code, rows) => rows.map(([c, v]) => ({ code: c, reportDate: '2026-06-30', ratioCode: code, value: v, group: 'STOCK' }));
+  const dly = { MARKETCAP: d('MARKETCAP', D, [['IND', 1000e9], ['BNK', 1000e9], ['DBT', 1000e9], ['NEG', 1000e9], ['NOE', 1000e9]]), PRICE_TO_EARNINGS: d('PRICE_TO_EARNINGS', D, [['IND', 10]]) };
+  const qtr = {
+    OPERATING_EBITDA_TR: q('OPERATING_EBITDA_TR', [['IND', 200e9], ['BNK', 200e9], ['DBT', 200e9], ['NEG', -50e9]]),
+    OWNERS_EQUITY_AQ: q('OWNERS_EQUITY_AQ', [['IND', 500e9], ['BNK', 500e9], ['DBT', 500e9], ['NEG', 500e9], ['NOE', 500e9]]),
+    NET_CASH_TO_EQUITY_AQ: q('NET_CASH_TO_EQUITY_AQ', [['IND', 0.2], ['BNK', 0.2], ['DBT', -0.4], ['NEG', 0], ['NOE', 0.1]]),
+    NET_SALES_TR: q('NET_SALES_TR', [['IND', 2000e9], ['DBT', 1000e9]]),
+  };
+  const rows = buildSnapshot(dly, qtr, (s) => (s === 'BNK' ? '8300' : '2700'));
+  const m = (s) => rows.find((r) => r.symbol === s).metrics;
+  it('EV = vốn hoá - tiền mặt ròng; EV/EBITDA và EV/Doanh thu', () => {
+    // IND: tiền mặt ròng = 0,2 x 500 = 100 tỷ -> EV 900 tỷ
+    expect(m('IND').ev).toBeCloseTo(900e9, 0); expect(m('IND').evEbitda).toBeCloseTo(4.5, 9); expect(m('IND').evSales).toBeCloseTo(0.45, 9);
+  });
+  it('nợ ròng (tiền mặt ròng âm) làm EV lớn hơn vốn hoá', () => {
+    expect(m('DBT').ev).toBeCloseTo(1200e9, 0); expect(m('DBT').evEbitda).toBeCloseTo(6, 9);
+  });
+  it('ngân hàng không có EV; EBITDA âm hoặc thiếu thì không có EV/EBITDA; thiếu doanh thu thì không có EV/Doanh thu', () => {
+    expect(m('BNK').ev).toBeUndefined(); expect(m('BNK').evEbitda).toBeUndefined();
+    expect(m('NEG').ev).toBeCloseTo(1000e9, 0); expect(m('NEG').evEbitda).toBeUndefined();
+    expect(m('NOE').evEbitda).toBeUndefined(); expect(m('IND').evSales).toBeDefined(); expect(m('NOE').evSales).toBeUndefined();
+  });
+  it('thống kê ngành có evEbitda khi đủ mã hợp lệ, loại giá trị vô lý', () => {
+    const mk = (sym, ev) => ({ symbol: sym, icb2_code: '2700', daily_date: D, quarter_date: null, metrics: { pe: 10, marketcap: 1000e9, evEbitda: ev } });
+    const st = sectorStats([mk('A', 3), mk('B', 5), mk('C', 7), mk('D', 9), mk('E', 11), mk('X', 300), mk('Y', -2)], D, 'now').find((x) => x.icb2_code === '2700');
+    expect(st.stats.evEbitda.n).toBe(5); expect(st.stats.evEbitda.median).toBe(7);
+  });
+});
+
 describe('quantile và sectorStats', () => {
   it('phân vị tuyến tính', () => {
     expect(quantile([1, 2, 3, 4, 5], 0.5)).toBe(3);

@@ -169,6 +169,7 @@ export const QUARTER_MAP: Record<string, string> = {
   CFO_TO_SALES_TR: "cfoToSales", INTEREST_COVERAGE_TR: "interestCoverage", DEBT_TO_EQUITY_AQ: "debtToEquity", CURRENT_RATIO_AQ: "currentRatio", EQUITY_TO_ASSET_AQ: "equityToAsset",
   EPS_TR: "epsTtm", EPS_TR_GRYOY: "epsGrowthYoY", NET_SALES_TR_GRYOY: "salesGrowthYoY", PRETAX_PROFIT_TR_GRYOY: "pretaxGrowthYoY", DIVIDEND_PAYOUT_TR: "payoutTtm",
   NET_PROFIT_TR: "netProfitTtm", NET_SALES_TR: "salesTtm", TOTAL_SHARES: "shares", POSITIVE_CFO_NUM_CR_2YR: "positiveCfo2y",
+  OPERATING_EBITDA_TR: "ebitdaTtm", OWNERS_EQUITY_AQ: "equity", NET_CASH_TO_EQUITY_AQ: "netCashToEquity",
   NET_INTEREST_MARGIN_TR_AVG5Q: "nim", PROVISION_BAD_LOANS_AQ: "badDebtCoverage", FREEFLOAT: "freefloat",
 };
 function pick(rows: any[], map: Record<string, string>, into: Record<string, number>) {

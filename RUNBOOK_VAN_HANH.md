@@ -27,7 +27,7 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)
 
-`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v7 · `storage-proxy` v7 · `valuation-watch` (mới) · `vb-data` (mới; dữ liệu báo cáo tài chính + nến cho Valuation Bench, cần JWT người dùng).
+`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v8 · `storage-proxy` v7 · `valuation-watch` (mới) · `vb-data` (mới; dữ liệu báo cáo tài chính + nến cho Valuation Bench, cần JWT người dùng).
 
 Secrets (đặt trong Supabase → Edge Functions → Secrets, KHÔNG ghi vào kho mã): `RESEND_API_KEY`, `ALERT_FROM_EMAIL`. Chỉ cần cho email cảnh báo.
 
@@ -134,4 +134,5 @@ Lặp cho các đoạn kế tiếp tới tháng hiện tại (6 năm ≈ 6 lần
 - Bảng `finance_vb_valuations` (RLS: cả nhóm tài chính xem; mỗi người chỉ thêm bản của mình; xoá do chủ bản, quản lý tài sản hoặc admin) lưu từng bản định giá; Investment Workbench đọc bản MỚI NHẤT để hiện thẻ "Định giá chuyên môn" ở Chi tiết mã và huy hiệu ở Danh Mục (`stocksheet/vb-card.js`). Nút "Áp dụng vào danh mục" trong Valuation Bench ghi giá mục tiêu như cũ.
 - Edge Function `vb-data` (verify_jwt bật) lấy báo cáo tài chính nhiều năm + nến từ VNDirect, bản sao `lib/vb-statements.js` đồng bộ bằng `node scripts/sync-edge-libs.mjs`. `valuation-watch` + cron `valuation-watch-daily` gửi email cảnh báo định giá.
 - Triển khai lại `vb-data`: gửi MỌI tệp trong `supabase/functions/vb-data/` nguyên văn (index.ts, parse.ts, vb-statements.js).
-- Giới hạn đã biết: EV/EBITDA và EV/Sales ngành chưa có (cần mở rộng `market-data-sync`); NPL/CAR ngân hàng không có từ nguồn miễn phí; chưa kiểm trong ứng dụng Tauri thật với JWT thật, mới kiểm trên bản xem thử với dữ liệu VNDirect thật.
+- EV/EBITDA và EV/Doanh thu ngành (từ 05/10/2026, `market-data-sync` v8): tính trong `peers.ts` từ `OPERATING_EBITDA_TR`, `OWNERS_EQUITY_AQ`, `NET_CASH_TO_EQUITY_AQ`, `NET_SALES_TR` của VNDirect; EV = vốn hoá - tiền mặt ròng; bỏ ngân hàng/bảo hiểm/chứng khoán (ICB 8300, 8500, 8700). Ảnh chụp 05/10: 829 mã có EV/EBITDA, trung vị toàn thị trường 6,66x; sau khi triển khai phải chạy `{"mode":"snapshot"}` một lần để ngành có thống kê mới.
+- Giới hạn đã biết: NPL/CAR ngân hàng không có từ nguồn miễn phí; chưa kiểm trong ứng dụng Tauri thật với JWT thật, mới kiểm trên bản xem thử với dữ liệu VNDirect thật.
