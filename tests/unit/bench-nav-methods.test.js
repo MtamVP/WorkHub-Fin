@@ -37,6 +37,15 @@ describe('BenchNav', () => {
   });
 });
 
+describe('trang Finance chính', () => {
+  it('thanh bên có lối vào RIÊNG cho Investment Workbench và Valuation Bench (ngang hàng)', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    expect(html).toContain("location.href='/mastersheet/'");
+    expect(html).toContain("location.href='/valuation/'");
+    expect(html.indexOf("location.href='/valuation/'")).toBeGreaterThan(html.indexOf("location.href='/mastersheet/'"));
+  });
+});
+
 describe('thư viện phương pháp', () => {
   const L = VBMethods.LIST;
   it('đủ rộng: ≥ 45 mục, mọi nhóm đều có mục', () => {
