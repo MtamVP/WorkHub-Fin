@@ -388,3 +388,6 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .gqt-style-dot { position: absolute; top: -4px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--card-bg); background: var(--finance-accent); }
 .gqt-style-dot.warn { background: var(--danger-color); }
 @media (max-width: 600px) { .gqt-style-row { grid-template-columns: 1fr 70px; } .gqt-style-track { grid-column: 1 / -1; order: 3; } }
+
+.gqt-idea { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.gqt-idea > div:first-child { margin-bottom: 4px; }

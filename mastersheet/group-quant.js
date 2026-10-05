@@ -3,7 +3,7 @@
    P/E so với lịch sử của chính mã và P/E điều hoà của cả danh mục, thanh khoản (số phiên để thoát vị thế), room và dòng tiền khối ngoại. Số liệu từ VNDirect (finance_stock_ratios, cập nhật mỗi ngày làm việc).
    Phép tính ở /lib/quant-calc.js (có kiểm thử). Dùng global của group.js (GR, grCall, grRender), group-limits.js (glDate) và assets/risk.js (rkEsc, rkNum, rkPct, rkVnd, rkKpi). */
 
-const GQT = { state: 'idle', error: '', out: null, ratios: {}, peers: null, loadedKey: '', sort: 'weight' };
+const GQT = { state: 'idle', error: '', out: null, ratios: {}, peers: null, hist: null, ideas: null, loadedKey: '', sort: 'weight' };
 
 function gqtSetSort(v) { GQT.sort = v; grRender(); }
 
@@ -18,6 +18,8 @@ async function gqtLoad(force) {
         for (let i = 0; i < syms.length; i += 15) Object.assign(ratios, await grCall('getStockRatios', { symbols: syms.slice(i, i + 15) }));
         GQT.ratios = ratios;
         GQT.peers = await grCall('getPeerStats', { symbols: syms }).catch(() => null);     // thiếu ảnh chụp thị trường: bỏ cột so với ngành
+        GQT.hist = await grCall('getValuationHistory', { years: 6 }).catch(() => null);      // lịch sử định giá ngành; thiếu thì bỏ bảng ngành so với lịch sử
+        GQT.ideas = null;
         const prices = {}; GR.group.symbols.forEach(s => { if (s.price > 0) prices[s.symbol] = s.price; });
         GQT.out = QuantCalc.dashboard(GR.group.symbols.map(s => ({ symbol: s.symbol, value: s.value })), ratios, { prices });
         GQT.state = 'ok'; GQT.loadedKey = key;
@@ -56,6 +58,57 @@ function gqtStyleHtml() {
         <p class="tl-hint">Mỗi nhân tố là phân vị trung bình (có trọng số theo giá trị vị thế) trong phân phối của cả thị trường niêm yết (mã vốn hoá từ 300 tỷ): 50 là trung lập, trên 50 là nghiêng về nhân tố đó. Mã không phải ngân hàng và ngân hàng được so chung một thị trường nên P/E, P/B của ngân hàng thường làm danh mục trông "rẻ"; hãy đọc cùng bảng ngành. Đây là mô tả, không phải khuyến nghị.</p>`;
 }
 
+// Ngành đang nắm so với lịch sử định giá của chính ngành (lib/valuation-history.js): tỷ trọng danh mục theo ngành ICB + phân vị P/E, P/B tổng hợp trong 5 năm
+function gqtSectorHistory() {
+    const P = GQT.peers, H = GQT.hist;
+    if (!P || !H || !H.rows || !H.rows.length || typeof ValuationHistory === 'undefined' || !GQT.out) return null;
+    const total = GQT.out.rows.reduce((t, r) => t + r.value, 0), by = {};
+    GQT.out.rows.forEach(r => { const x = P.bySymbol[r.symbol]; if (x && x.icb2_code) by[x.icb2_code] = (by[x.icb2_code] || 0) + r.value; });
+    const rows = Object.keys(by).map(code => {
+        const pe = ValuationHistory.summarize(ValuationHistory.seriesOf(H.rows, code, 'pe_agg'), { years: 5 }), pb = ValuationHistory.summarize(ValuationHistory.seriesOf(H.rows, code, 'pb_agg'), { years: 5 });
+        return { code, name: (typeof SectorMap !== 'undefined' && SectorMap.icbName(code)) || ('ICB ' + code), weightPct: by[code] / total * 100, pe: pe && pe.enough ? pe : null, pb: pb && pb.enough ? pb : null };
+    }).sort((a, b) => b.weightPct - a.weightPct);
+    return rows.length ? { rows, expensivePct: rows.filter(r => r.pe && r.pe.pct >= 80).reduce((t, r) => t + r.weightPct, 0), cheapPct: rows.filter(r => r.pe && r.pe.pct <= 20).reduce((t, r) => t + r.weightPct, 0) } : null;
+}
+function gqtSectorHistoryHtml() {
+    const sh = gqtSectorHistory();
+    if (!sh) return '';
+    const badge = (s) => s ? `<span class="tl-badge ${s.label.tone}" title="${rkEsc(s.label.label)}">phân vị ${rkNum(s.pct, 0)}</span><span class="symbol-sub">TB ${rkNum(s.mean, s.now < 5 ? 2 : 1)}x · nay ${rkNum(s.now, s.now < 5 ? 2 : 1)}x</span>` : '—';
+    return `<div class="ce-group-title">Ngành đang nắm so với lịch sử định giá của chính nó</div>
+        <div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Ngành</th><th class="text-right">Tỷ trọng</th><th>P/E tổng hợp (5 năm)</th><th>P/B tổng hợp (5 năm)</th></tr></thead><tbody>
+        ${sh.rows.map(r => `<tr><td><b>${rkEsc(r.name)}</b></td><td class="text-right">${rkPct(r.weightPct, 1)}</td><td>${badge(r.pe)}</td><td>${badge(r.pb)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="tl-hint">${sh.expensivePct >= 20 ? `<b>${rkPct(sh.expensivePct, 0)} danh mục nằm trong ngành đang đắt so với lịch sử của chính ngành (phân vị từ 80).</b> ` : ''}${sh.cheapPct >= 20 ? `${rkPct(sh.cheapPct, 0)} danh mục nằm trong ngành đang rẻ so với lịch sử (phân vị đến 20). ` : ''}Phân vị 0 là rẻ nhất trong 5 năm của chính ngành đó, không so giữa các ngành. Ngành rẻ so với lịch sử vẫn có thể rẻ vì lợi nhuận đang đi xuống. Xem thêm Nghiên Cứu → Bản đồ.</p>`;
+}
+
+// Gợi ý mã thay thế cho vị thế đang đắt hoặc tụt hậu (lib/replacement-ideas.js): tải cả thị trường theo yêu cầu (vài trăm KB) khi bấm nút
+async function gqtLoadIdeas() {
+    if (GQT.ideas && GQT.ideas.state === 'loading') return;
+    GQT.ideas = { state: 'loading' }; grRender();
+    try {
+        const u = await grCall('getMarketUniverse', {});
+        const rows = MarketScreener.buildRows(u.snapshot || [], u.stats || {}, u.meta || {});
+        const restricted = ((typeof GL !== 'undefined' && GL.restricted) || []).filter(r => r.active && !r.user_id).map(r => r.symbol);
+        const list = ReplacementIdeas.suggest(GQT.out.rows.map(x => ({ symbol: x.symbol, value: x.value })), rows, restricted);
+        GQT.ideas = { state: 'ok', list, asOf: u.asOf };
+    } catch (e) { GQT.ideas = { state: 'error', error: e.message || String(e) }; }
+    grRender();
+}
+function gqtIdeasHtml() {
+    if (typeof ReplacementIdeas === 'undefined' || typeof MarketScreener === 'undefined' || !GQT.peers) return '';
+    const I = GQT.ideas;
+    const head = '<div class="ce-group-title">Gợi ý mã thay thế</div>';
+    if (!I) return `${head}<p class="tl-hint">Tìm trong cùng ngành những mã rẻ hơn rõ rệt, ROE không thấp hơn, đủ lớn và thanh khoản cho các vị thế đang đắt so với ngành hoặc tụt hậu so với thị trường.</p><button type="button" class="btn-tool" onclick="gqtLoadIdeas()"><i class="fa-solid fa-magnifying-glass-chart"></i> Tìm mã thay thế</button>`;
+    if (I.state === 'loading') return `${head}<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang quét cả thị trường…</div>`;
+    if (I.state === 'error') return `${head}<div class="tl-empty text-danger">Không tải được: ${rkEsc(I.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="gqtLoadIdeas()">Thử lại</button></div>`;
+    if (!I.list.length) return `${head}<p class="tl-hint">Không vị thế nào đang đắt so với ngành hoặc tụt hậu so với thị trường: chưa có gì cần tìm thay thế.</p>`;
+    return `${head}${I.list.map(x => `<div class="gqt-idea"><div><b>${rkEsc(x.symbol)}</b> <span class="text-muted">${rkEsc(x.name || '')}</span> · ${rkPct(x.weightPct, 1)} danh mục</div>
+        <ul class="gr-rep-notes">${x.reasons.map(t => `<li>${rkEsc(t)}</li>`).join('')}</ul>
+        ${x.candidates.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mã thay thế</th><th class="text-right">P/E</th><th class="text-right">P/B</th><th class="text-right">ROE</th><th class="text-right">Vốn hoá (tỷ)</th><th>Vì sao đáng xem</th></tr></thead><tbody>
+            ${x.candidates.map(c => `<tr><td><b>${rkEsc(c.symbol)}</b>${c.name ? `<span class="symbol-sub">${rkEsc(c.name)}</span>` : ''}</td><td class="text-right">${c.pe === null ? '—' : rkNum(c.pe, 1) + 'x'}</td><td class="text-right">${c.pb === null ? '—' : rkNum(c.pb, 2) + 'x'}</td><td class="text-right">${rkPct(c.roe * 100, 1)}</td><td class="text-right">${rkNum(c.marketcap / 1e9, 0)}</td><td class="gr-reason">${rkEsc(c.why)}</td></tr>`).join('')}</tbody></table></div>${x.candidateCount > x.candidates.length ? `<p class="tl-hint">Còn ${x.candidateCount - x.candidates.length} mã khác thoả điều kiện; xem Nghiên Cứu → Thị trường để lọc kỹ hơn.</p>` : ''}`
+            : '<p class="tl-hint">Không có mã cùng ngành nào vừa rẻ hơn rõ rệt, vừa ROE không thấp hơn, đủ lớn và thanh khoản.</p>'}</div>`).join('')}
+        <p class="tl-hint">Danh sách để nghiên cứu, không phải khuyến nghị đổi mã: chưa tính thuế phí khi đổi, tác động giá của lệnh, vị thế đang lãi lỗ hay lý do vì sao doanh nghiệp bị chấm đắt hoặc yếu. Đã loại mã đang nắm, mã bị hạn chế, mã vốn hoá dưới 1.000 tỷ hoặc thanh khoản dưới 5 tỷ/ngày, và mã có số liệu đẹp bất thường (P/E dưới 4x, EPS tăng gấp đôi). Số liệu ngày ${rkEsc(String(I.asOf || '').slice(0, 10).split('-').reverse().join('/'))}.</p>`;
+}
+
 function grQuantHtml() {
     if (GQT.state === 'loading' || GQT.state === 'idle') return '<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang lấy chỉ số thị trường của các mã đang nắm…</div>';
     if (GQT.state === 'error') return `<div class="tl-empty text-danger"><i class="fa-solid fa-triangle-exclamation"></i>Không tải được: ${rkEsc(GQT.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="gqtLoad(true)">Thử lại</button></div>`;
@@ -86,6 +139,8 @@ function grQuantHtml() {
             <td class="gr-reason">${r.flags.length ? r.flags.map(f => `<div><span class="tl-badge ${f.tone}">●</span> ${rkEsc(f.text)}</div>`).join('') : '<span class="text-muted">—</span>'}</td></tr>`).join('')}
         </tbody></table></div>`;
     html += gqtStyleHtml();
+    html += gqtSectorHistoryHtml();
+    html += gqtIdeasHtml();
     html += `<p class="tl-hint">Nguồn: VNDirect (chỉ số cập nhật mỗi ngày làm việc; ngày số liệu gần nhất ${rkEsc(Object.values(GQT.ratios).map(x => x.dailyDate).filter(Boolean).sort().pop() || '—')}). <b>Sức mạnh tương đối</b> theo vòng quay JdK: RS-Ratio &gt; 100 là mạnh hơn thị trường, RS-Momentum &gt; 100 là đang tăng tốc — Dẫn đầu (cả hai &gt; 100), Suy yếu (mạnh nhưng chậm lại), Tụt hậu (cả hai &lt; 100), Cải thiện (yếu nhưng tăng tốc). <b>So với ngành</b>: phân vị định giá (P/E và P/B) trong các mã cùng ngành ICB, 0 là rẻ nhất ngành; kèm ROE để không nhầm "rẻ vì kém" với "rẻ thật". <b>P/E / TB 5 năm</b>: dưới 100% là đang rẻ hơn lịch sử của chính mã (chưa tính tăng trưởng đã đổi hay chưa). <b>Thoát vị thế</b>: số phiên cần nếu chỉ chiếm 20% giá trị giao dịch trung bình ngày. Đây là chỉ báo để soát và đặt câu hỏi, không phải khuyến nghị mua hoặc bán.</p>`;
     return html;
 }
