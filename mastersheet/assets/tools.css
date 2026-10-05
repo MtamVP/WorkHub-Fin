@@ -391,3 +391,7 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 
 .gqt-idea { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
 .gqt-idea > div:first-child { margin-bottom: 4px; }
+
+.gqt-alerts { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
+.gqt-alert { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; }
+.gqt-alert .tl-badge { flex: none; margin-top: 1px; }

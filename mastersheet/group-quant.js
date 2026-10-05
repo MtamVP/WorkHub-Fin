@@ -109,6 +109,18 @@ function gqtIdeasHtml() {
         <p class="tl-hint">Danh sách để nghiên cứu, không phải khuyến nghị đổi mã: chưa tính thuế phí khi đổi, tác động giá của lệnh, vị thế đang lãi lỗ hay lý do vì sao doanh nghiệp bị chấm đắt hoặc yếu. Đã loại mã đang nắm, mã bị hạn chế, mã vốn hoá dưới 1.000 tỷ hoặc thanh khoản dưới 5 tỷ/ngày, và mã có số liệu đẹp bất thường (P/E dưới 4x, EPS tăng gấp đôi). Số liệu ngày ${rkEsc(String(I.asOf || '').slice(0, 10).split('-').reverse().join('/'))}.</p>`;
 }
 
+// Cảnh báo định giá (lib/valuation-alerts.js): thị trường và ngành đang nắm đắt/rẻ so với lịch sử của chính nó, gom thành vài dòng ưu tiên
+function gqtAlertsHtml() {
+    const sh = gqtSectorHistory();
+    if (typeof ValuationAlerts === 'undefined' || !GQT.hist || !GQT.hist.rows || !GQT.hist.rows.length) return '';
+    const R = ValuationAlerts.build(GQT.hist.rows, sh ? sh.rows.map(r => ({ code: r.code, name: r.name, weightPct: r.weightPct })) : []);
+    if (!R.enough) return '';
+    const head = `<div class="ce-group-title">Cảnh báo định giá${R.warn ? ` <span class="tl-badge warn">${R.warn}</span>` : ''}</div>`;
+    if (!R.alerts.length) return `${head}<p class="tl-hint"><span class="tl-badge ok">●</span> Thị trường và các ngành bạn đang nắm đều quanh mức trung bình lịch sử 5 năm của chính chúng. Không có tín hiệu nào cần xem.</p>`;
+    return `${head}<div class="gqt-alerts">${R.alerts.map(a => `<div class="gqt-alert"><span class="tl-badge ${a.level === 'warn' ? 'warn' : 'ok'}">${a.level === 'warn' ? 'Cần xem' : 'Thông tin'}</span><div><b>${rkEsc(a.title)}</b><div class="text-muted">${rkEsc(a.detail)}</div></div></div>`).join('')}</div>
+        <p class="tl-hint">Tín hiệu để soát danh mục, không phải lệnh mua bán: đắt hoặc rẻ so với lịch sử có thể kéo dài nhiều năm, và rẻ có thể do lợi nhuận đi xuống. Số liệu ngày ${rkEsc(String(R.asOf || '').split('-').reverse().join('/'))}.</p>`;
+}
+
 function grQuantHtml() {
     if (GQT.state === 'loading' || GQT.state === 'idle') return '<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang lấy chỉ số thị trường của các mã đang nắm…</div>';
     if (GQT.state === 'error') return `<div class="tl-empty text-danger"><i class="fa-solid fa-triangle-exclamation"></i>Không tải được: ${rkEsc(GQT.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="gqtLoad(true)">Thử lại</button></div>`;
@@ -123,6 +135,7 @@ function grQuantHtml() {
         rkKpi('Giá trị khó thoát (> 5 phiên)', rkPct(S.illiquidPct, 0), 'chiếm tối đa 20% thanh khoản ngày', S.illiquidPct >= 10 ? 'tl-down' : 'tl-up'),
         rkKpi('Mã có cờ cần chú ý', String(S.flagged), 'xem cột Ghi chú', S.flagged ? 'tl-down' : 'tl-up'),
     ].join('')}</div>`;
+    html += gqtAlertsHtml();
     const PM = gqtPeerMap();
     const rows = o.rows.slice().sort(GQT.sort === 'flags' ? (a, b) => b.flags.length - a.flags.length || b.value - a.value : (a, b) => b.value - a.value);
     html += `<div class="ce-group-title">Từng mã <select class="tl-select" style="margin-left:10px;font-weight:400" onchange="gqtSetSort(this.value)" aria-label="Sắp xếp"><option value="weight" ${GQT.sort === 'weight' ? 'selected' : ''}>Theo tỷ trọng</option><option value="flags" ${GQT.sort === 'flags' ? 'selected' : ''}>Nhiều cờ trước</option></select></div>
