@@ -303,7 +303,7 @@ async function loadHoldings() {
             const sub = VN_NAMES[String(h.symbol || '').toUpperCase()];
             return `
                 <tr>
-                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span></span></td>
+                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}<span class="vbc-slot" data-vbc="${sym}"></span></span></span></td>
                     <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
                     <td class="text-right">
@@ -333,9 +333,26 @@ async function loadHoldings() {
         renderAllocationChart(holdings);
         renderHeroFoot(holdings.length);
         onHoldingsLoaded(holdings);
+        loadVbBadges(holdings);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
+}
+
+// Huy hiệu "Định giá chuyên môn" dưới mã: bản mới nhất ở Valuation Bench; lỗi thì bỏ qua (không ảnh hưởng bảng Danh Mục)
+async function loadVbBadges(holdings) {
+    if (typeof VBCard === 'undefined') return;
+    try {
+        const resp = await callGAS('getVbLatestMany', { symbols: holdings.map(h => h.symbol) });
+        const recs = resp && resp.status === 'success' ? resp.data : null;
+        const byPrice = {};
+        holdings.forEach(h => { byPrice[String(h.symbol || '').toUpperCase()] = Number(h.marketPrice) || 0; });
+        const now = new Date();
+        document.querySelectorAll('#holdings-body .vbc-slot').forEach(el => {
+            const s = String(el.getAttribute('data-vbc') || '').toUpperCase();
+            if (recs && recs[s]) el.innerHTML = VBCard.badge(recs[s], byPrice[s], now);
+        });
+    } catch (e) { /* huy hiệu là phần phụ: bỏ qua */ }
 }
 
 // Ô "Mục tiêu / Cắt lỗ": 2 dòng, mỗi dòng 1 ô nhập + % cách giá hiện tại. Giá mục tiêu để trống thì

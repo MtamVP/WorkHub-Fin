@@ -47,9 +47,9 @@
             </div>
             <nav class="desk-nav">
                 <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
-                <a href="/mastersheet/assets/" class="active"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
+                <a href="/mastersheet/assets/" class="active" aria-current="page"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
                 <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
-                <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/valuation/" title="Khu định giá chuyên môn: phương pháp định giá, phân tích cơ bản và kỹ thuật"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
             </nav>
             <div class="desk-topbar-right">
                 <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
@@ -786,6 +786,7 @@
     <script src="../../lib/decision-mirror.js?v=1791900000000"></script>
     <script src="../../lib/monthly-report.js?v=1791900000000"></script>
     <script src="../../lib/save-file.js?v=1791900000000"></script>
+    <script src="../../stocksheet/vb-card.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
     <script src="insights.js?v=1791900000000"></script>
     <script src="ledger-tools.js?v=1791900000000"></script>
@@ -807,5 +808,7 @@
     <script src="rebalance.js?v=1791900000000"></script>
     <script src="reports.js?v=1791900000000"></script>
 
+    <script src="/bench-nav.js?v=1791900000000"></script>
+    <script>BenchNav.mount({ bench: 'investment', active: 'assets' });</script>
 </body>
 </html>

@@ -1,0 +1,158 @@
+/* --- FILE: /valuation/vb.css ---
+   Valuation Bench: định giá chuyên môn. Dùng lại hệ thiết kế của Investment Workbench (finance-shared.css, stocksheet/valuation.css) và chỉ thêm các thành phần riêng.
+   Accent XANH MỰC thay xanh rừng để nhìn là biết đang ở khu định giá (cả hai chế độ sáng và tối). */
+
+body.desk[data-bench="valuation"] {
+  --finance-accent: #27476E; --finance-accent-hover: #2F5784; --finance-accent-subtle: rgba(39, 71, 110, 0.10); --finance-accent-line: rgba(39, 71, 110, 0.28);
+  --shadow-gold: 0 6px 18px rgba(39, 71, 110, 0.18);
+  --vb-up: #12855A; --vb-down: #C23B3B; --vb-ma20: #D98E04; --vb-ma50: #2F6AE0; --vb-ma200: #7B3FA0; --vb-grid: rgba(28, 25, 21, 0.07); --vb-band: rgba(39, 71, 110, 0.10); --vb-cloud-up: rgba(18, 133, 90, 0.12); --vb-cloud-down: rgba(194, 59, 59, 0.12);
+}
+:root[data-theme="dark"] body.desk[data-bench="valuation"] {
+  --finance-accent: #7FA8DC; --finance-accent-hover: #93B7E4; --finance-accent-subtle: rgba(127, 168, 220, 0.14); --finance-accent-line: rgba(127, 168, 220, 0.34);
+  --vb-up: #3DBA87; --vb-down: #E8695B; --vb-ma20: #E3A93C; --vb-ma50: #5AA3F0; --vb-ma200: #B58AD6; --vb-grid: rgba(237, 233, 222, 0.08); --vb-band: rgba(127, 168, 220, 0.14); --vb-cloud-up: rgba(61, 186, 135, 0.14); --vb-cloud-down: rgba(232, 105, 91, 0.14);
+}
+:root[data-theme="dark"] body.desk[data-bench="valuation"] .desk-wordmark .glyph { color: #0E1A2C; }
+
+.vb-root { min-width: 0; }
+.vb-root * { min-width: 0; }
+.vb-muted { color: var(--text-muted); }
+.vb-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vb-up { color: var(--vb-up, var(--success-color)); } .vb-down { color: var(--vb-down, var(--danger-color)); }
+
+/* tìm mã và thanh trên cùng của trang */
+.vb-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vb-search input { flex: 1 1 220px; max-width: 360px; padding: 9px 13px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); font: inherit; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+.vb-search input:focus-visible, .vb-in:focus-visible, .vb-btn:focus-visible, .vb-tabs button:focus-visible { outline: 2px solid var(--finance-accent); outline-offset: 2px; }
+.vb-btn { border: 1px solid var(--finance-accent); background: var(--finance-accent); color: #fff; font: inherit; font-weight: 700; font-size: 0.84rem; padding: 9px 16px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: var(--transition-fast); text-decoration: none; }
+:root[data-theme="dark"] body.desk[data-bench="valuation"] .vb-btn { color: #0E1A2C; }
+.vb-btn:hover { background: var(--finance-accent-hover); }
+.vb-btn.ghost { background: var(--card-bg); color: var(--text-secondary); border-color: var(--border-strong); }
+:root[data-theme="dark"] body.desk[data-bench="valuation"] .vb-btn.ghost { color: var(--text-secondary); }
+.vb-btn.ghost:hover { color: var(--text-primary); border-color: var(--finance-accent); background: var(--card-bg-elevated); }
+.vb-btn.sm { padding: 6px 11px; font-size: 0.78rem; }
+.vb-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.vb-recent { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+/* tab */
+.vb-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-color); margin: 4px 0 18px; overflow-x: auto; scrollbar-width: thin; }
+.vb-tabs button { border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-weight: 600; font-size: 0.86rem; padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; display: inline-flex; gap: 8px; align-items: center; margin-bottom: -1px; }
+.vb-tabs button:hover { color: var(--text-primary); }
+.vb-tabs button[aria-selected="true"] { color: var(--finance-accent); border-bottom-color: var(--finance-accent); }
+.vb-tabs .vb-count { font-size: 0.68rem; padding: 1px 7px; border-radius: var(--radius-pill); background: var(--hover-bg); color: var(--text-muted); }
+
+/* tiêu đề mã */
+.vb-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: stretch; margin-bottom: 18px; }
+@media (max-width: 900px) { .vb-head { grid-template-columns: 1fr; } }
+.vb-sym { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.vb-sym h2 { margin: 0; font-family: var(--font-display); font-size: 2rem; letter-spacing: -0.02em; }
+.vb-sym .vb-name { color: var(--text-secondary); font-size: 0.9rem; }
+.vb-price { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.vb-price b { font-size: 1.5rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.vb-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* chip / pill theo sắc thái */
+.vb-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; white-space: nowrap; background: var(--hover-bg); color: var(--text-secondary); }
+.vb-pill.ok { background: var(--success-bg); color: var(--success-color); } .vb-pill.warn { background: var(--danger-bg); color: var(--danger-color); } .vb-pill.mute { background: var(--hover-bg); color: var(--text-secondary); } .vb-pill.info { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+
+/* lưới thẻ chỉ số */
+.vb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.vb-kpi { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 13px 15px; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: 4px; }
+.vb-kpi .l { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.vb-kpi .v { font-size: 1.45rem; font-weight: 700; font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.vb-kpi .s { font-size: 0.76rem; color: var(--text-secondary); }
+.vb-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.vb-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 980px) { .vb-grid2, .vb-grid3 { grid-template-columns: 1fr; } }
+
+/* bảng số liệu */
+.vb-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); }
+.vb-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+.vb-table th, .vb-table td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border-color); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vb-table th:first-child, .vb-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--card-bg); }
+.vb-table thead th { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; background: var(--bg-color-2); }
+.vb-table thead th:first-child { background: var(--bg-color-2); }
+.vb-table tbody tr:last-child td { border-bottom: 0; }
+.vb-table tbody tr.vb-strong td { font-weight: 700; background: var(--finance-accent-subtle); }
+.vb-table tbody tr.vb-sub td:first-child { padding-left: 26px; color: var(--text-secondary); }
+.vb-table tr.vb-clickable { cursor: pointer; } .vb-table tr.vb-clickable:hover td { background: var(--hover-bg); }
+.vb-table td.l, .vb-table th.l { text-align: left; }
+.vb-table .vb-sect td { background: var(--bg-color-2); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+
+/* football field */
+.vb-ff { display: grid; grid-template-columns: minmax(180px, 26%) minmax(0, 1fr) 62px; gap: 7px 12px; align-items: center; }
+.vb-ff-label { font-size: 0.8rem; line-height: 1.25; } .vb-ff-label small { display: block; color: var(--text-muted); font-size: 0.7rem; }
+.vb-ff-top { position: relative; height: 22px; }
+.vb-ff-tag { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.68rem; font-weight: 700; white-space: nowrap; padding: 1px 7px; border-radius: 4px; background: var(--card-bg); border: 1px solid var(--border-strong); z-index: 2; }
+.vb-ff-tag.price { color: var(--danger-color); border-color: var(--danger-color); } .vb-ff-tag.fair { color: var(--finance-accent); border-color: var(--finance-accent); }
+.vb-ff-track { position: relative; height: 22px; border-radius: 4px; background: var(--bg-color-2); }
+.vb-ff-bar { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; background: var(--finance-accent-line); border: 1px solid var(--finance-accent); }
+.vb-ff-bar.rel { background: rgba(47, 106, 224, 0.2); border-color: var(--info-color); } .vb-ff-bar.asset { background: rgba(154, 107, 13, 0.2); border-color: var(--warning-color); } .vb-ff-bar.income { background: rgba(123, 63, 160, 0.18); border-color: var(--vb-ma200); }
+.vb-ff-bar.off { opacity: 0.35; border-style: dashed; }
+.vb-ff-base { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--text-primary); }
+.vb-ff-v { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--danger-color); z-index: 1; pointer-events: none; } .vb-ff-v.fair { border-left: 2px solid var(--finance-accent); }
+.vb-ff-axis { position: relative; height: 26px; border-top: 1px solid var(--border-strong); margin-top: 2px; }
+.vb-ff-axis span { position: absolute; top: 5px; transform: translateX(-50%); font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono); } .vb-ff-axis span:first-child { transform: none; } .vb-ff-axis span:last-child { transform: translateX(-100%); }
+@media (max-width: 760px) { .vb-ff { grid-template-columns: 1fr; } .vb-ff-top, .vb-ff-axis { margin-left: 0; } }
+
+/* vùng giá tham khảo */
+.vb-zoneset { display: flex; flex-direction: column; gap: 8px; }
+.vb-zrow { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: center; } .vb-zrow .n { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
+.vb-zrow .t { position: relative; height: 26px; background: var(--bg-color-2); border-radius: 4px; }
+.vb-zrow .z { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 0.68rem; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.vb-zrow .z.acc { background: var(--success-bg); border: 1px solid var(--success-color); color: var(--success-color); } .vb-zrow .z.fair { background: var(--finance-accent-subtle); border: 1px solid var(--finance-accent); color: var(--finance-accent); } .vb-zrow .z.trim { background: var(--danger-bg); border: 1px solid var(--danger-color); color: var(--danger-color); }
+.vb-zrow .pl { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 2px solid var(--text-primary); } .vb-zrow .stop { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dotted var(--danger-color); }
+
+/* danh sách lý do / cờ / tín hiệu */
+.vb-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 0.86rem; }
+.vb-list li { display: flex; gap: 9px; align-items: flex-start; line-height: 1.4; } .vb-list li i { margin-top: 3px; font-size: 0.78rem; flex: none; }
+.vb-list li.pos i { color: var(--success-color); } .vb-list li.neg i { color: var(--danger-color); } .vb-list li.flag i { color: var(--warning-color); } .vb-list li.mute i { color: var(--text-muted); }
+.vb-sig { display: grid; grid-template-columns: 22px minmax(0, 1fr) 54px; gap: 8px 10px; align-items: start; padding: 8px 2px; border-bottom: 1px solid var(--border-color); font-size: 0.82rem; }
+.vb-sig:last-child { border-bottom: 0; }
+.vb-sig .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.62rem; color: #fff; margin-top: 1px; }
+.vb-sig .ic.bull { background: var(--success-color); } .vb-sig .ic.bear { background: var(--danger-color); } .vb-sig .ic.neutral { background: var(--text-muted); }
+.vb-sig b { display: block; font-weight: 600; } .vb-sig small { color: var(--text-secondary); line-height: 1.35; display: block; }
+.vb-sig .sc { text-align: right; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); }
+.vb-meter { height: 8px; border-radius: 4px; background: var(--bg-color-2); position: relative; overflow: hidden; margin: 6px 0; }
+.vb-meter i { position: absolute; top: 0; bottom: 0; } .vb-meter .mid { left: 50%; width: 1px; background: var(--border-strong); }
+.vb-meter .fill.pos { background: var(--vb-up, var(--success-color)); left: 50%; } .vb-meter .fill.neg { background: var(--vb-down, var(--danger-color)); right: 50%; }
+
+/* khung nhập giả định */
+.vb-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; margin-bottom: 14px; }
+.vb-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; }
+.vb-field small { color: var(--text-muted); font-weight: 400; font-size: 0.68rem; line-height: 1.3; }
+.vb-in { padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); font: inherit; font-family: var(--font-mono); font-size: 0.88rem; width: 100%; }
+.vb-in.changed { border-color: var(--finance-accent); background: var(--finance-accent-subtle); }
+.vb-in.w { width: 64px; text-align: right; padding: 4px 6px; }
+.vb-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.vb-note { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin: 10px 0 0; }
+.vb-note b { color: var(--text-secondary); }
+.vb-warn { background: var(--warning-bg); border: 1px solid var(--warning-color); color: var(--text-primary); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 0.8rem; margin: 8px 0; display: flex; gap: 9px; }
+.vb-warn i { color: var(--warning-color); margin-top: 2px; }
+
+/* biểu đồ */
+.vb-chart { position: relative; width: 100%; } .vb-chart canvas { width: 100%; display: block; }
+.vb-chart-tip { position: absolute; pointer-events: none; z-index: 5; background: var(--card-bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 7px 10px; font-size: 0.74rem; box-shadow: var(--shadow-modal); display: none; line-height: 1.5; white-space: nowrap; font-family: var(--font-mono); }
+.vb-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.vb-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px; } .vb-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.vb-sub-chart { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 8px; }
+.vb-sub-chart h5 { margin: 0 0 4px; font-size: 0.74rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; gap: 10px; align-items: baseline; } .vb-sub-chart h5 span { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; color: var(--text-secondary); font-weight: 600; }
+
+/* thư viện phương pháp */
+.vb-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.vb-lib-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 15px 17px; box-shadow: var(--shadow-soft); }
+.vb-lib-card h4 { margin: 0 0 6px; font-size: 0.95rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vb-lib-card p { margin: 6px 0; font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary); } .vb-lib-card p b { color: var(--text-primary); }
+.vb-lib-card code { display: block; background: var(--bg-color-2); border-radius: var(--radius-sm); padding: 7px 10px; font-family: var(--font-mono); font-size: 0.76rem; margin: 8px 0; white-space: pre-wrap; color: var(--text-primary); }
+.vb-lib-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+
+.vb-skeleton { display: flex; flex-direction: column; gap: 14px; }
+.vb-skeleton > div { height: 90px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--bg-color-2), var(--hover-bg), var(--bg-color-2)); background-size: 200% 100%; animation: vbshine 1.4s linear infinite; }
+@keyframes vbshine { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .vb-skeleton > div { animation: none; } }
+.vb-disclaimer { font-size: 0.72rem; color: var(--text-muted); margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border-color); line-height: 1.5; }
+
+/* thanh điều hướng 8 mục: cuộn ngang khi hẹp thay vì tràn */
+body[data-bench="valuation"] .desk-topbar-inner { min-width: 0; }
+body[data-bench="valuation"] .desk-nav { overflow-x: auto; min-width: 0; scrollbar-width: none; flex: 0 1 auto; }
+body[data-bench="valuation"] .desk-nav::-webkit-scrollbar { display: none; }
+body[data-bench="valuation"] .desk-nav a { flex: none; }

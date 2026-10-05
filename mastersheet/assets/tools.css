@@ -395,3 +395,11 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .gqt-alerts { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
 .gqt-alert { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; }
 .gqt-alert .tl-badge { flex: none; margin-top: 1px; }
+
+/* Huy hiệu định giá chuyên môn (stocksheet/vb-card.js) ở Danh Mục */
+.vbc-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; padding: 1px 8px; border-radius: var(--radius-pill, 999px); font-size: 0.68rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: none; background: var(--hover-bg); color: var(--text-secondary); white-space: nowrap; }
+.vbc-badge b { font-weight: 700; }
+.vbc-badge.vbc-ok { background: var(--success-bg); color: var(--success-color); } .vbc-badge.vbc-warn { background: var(--danger-bg); color: var(--danger-color); } .vbc-badge.vbc-info { background: var(--finance-accent-subtle, var(--hover-bg)); color: var(--finance-accent, var(--text-primary)); }
+.vbc-badge.stale { opacity: 0.6; border: 1px dashed currentColor; }
+.vbc-badge:hover { text-decoration: underline; }
+.vbc-slot { display: block; }

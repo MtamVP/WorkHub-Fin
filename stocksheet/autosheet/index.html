@@ -46,10 +46,14 @@
                 WorkHub Finance <span class="sub">· Investment Workbench</span>
             </div>
             <nav class="desk-nav">
-                <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
-                <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
-                <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
-                <a href="/stocksheet/autosheet/" class="active"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/valuation/"><i class="fa-solid fa-gauge-high"></i> Tổng quan</a>
+                <a href="/valuation/#stock"><i class="fa-solid fa-magnifying-glass-chart"></i> Hồ sơ cổ phiếu</a>
+                <a href="/stocksheet/?bench=valuation&amp;view=screener" data-view="screener"><i class="fa-solid fa-filter"></i> Bộ lọc</a>
+                <a href="/stocksheet/?bench=valuation&amp;view=market" data-view="market"><i class="fa-solid fa-earth-asia"></i> Thị trường</a>
+                <a href="/stocksheet/?bench=valuation&amp;view=map" data-view="map"><i class="fa-solid fa-map"></i> Bản đồ</a>
+                <a href="/stocksheet/autosheet/?bench=valuation" class="active" aria-current="page"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/valuation/#methods"><i class="fa-solid fa-book-open"></i> Phương pháp</a>
+                <a href="/mastersheet/" title="Về Investment Workbench (quản lý đầu tư)"><i class="fa-solid fa-arrow-left"></i> Investment</a>
             </nav>
             <div class="desk-topbar-right">
                 <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
@@ -271,5 +275,7 @@
     <script src="../financials-sync.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
 
+    <script src="/bench-nav.js?v=1791900000000"></script>
+    <script>BenchNav.mount({ bench: 'valuation', active: 'manual' });</script>
 </body>
 </html>

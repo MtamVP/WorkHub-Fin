@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valuation Bench | WorkHub Finance</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi cac trang Investment Workbench: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.9">
+    <link rel="stylesheet" href="/stocksheet/style.css?v=1789060000000">
+    <link rel="stylesheet" href="/stocksheet/valuation.css?v=1791900000000">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
+    <link rel="stylesheet" href="/valuation/vb.css?v=1791900000000">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#27476E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body class="desk" data-bench="valuation">
+
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M19 7l-3 7a3.5 3.5 0 0 0 6 0z"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Valuation Bench</span>
+            </div>
+            <nav class="desk-nav">
+                <a href="/valuation/" class="active" aria-current="page"><i class="fa-solid fa-gauge-high"></i> Tổng quan</a>
+                <a href="/valuation/#stock"><i class="fa-solid fa-magnifying-glass-chart"></i> Hồ sơ cổ phiếu</a>
+                <a href="/stocksheet/?bench=valuation&view=screener" data-view="screener"><i class="fa-solid fa-filter"></i> Bộ lọc</a>
+                <a href="/stocksheet/?bench=valuation&view=market" data-view="market"><i class="fa-solid fa-earth-asia"></i> Thị trường</a>
+                <a href="/stocksheet/?bench=valuation&view=map" data-view="map"><i class="fa-solid fa-map"></i> Bản đồ</a>
+                <a href="/stocksheet/autosheet/?bench=valuation"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/valuation/#methods"><i class="fa-solid fa-book-open"></i> Phương pháp</a>
+                <a href="/mastersheet/" title="Về Investment Workbench (quản lý đầu tư)"><i class="fa-solid fa-arrow-left"></i> Investment</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="asset-container desk">
+        <div class="desk-byline">
+            <h1 id="vb-title">Valuation Bench</h1>
+            <span class="desk-who">
+                <span class="av"><i class="fa-solid fa-scale-balanced"></i></span>
+                <span>Định giá chuyên môn: cơ bản · kỹ thuật · thị trường</span>
+            </span>
+        </div>
+        <main id="vb-root" class="vb-root" aria-live="polite"></main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js?v=1791900000000"></script>
+    <script src="../lib/finance-calc.js?v=2"></script>
+    <script src="../lib/sector-map.js?v=1791900000000"></script>
+    <script src="../lib/vn-market.js?v=1791900000000"></script>
+    <script src="../lib/valuation-calc.js?v=1791900000000"></script>
+    <script src="../stocksheet/valuation-ui.js?v=1791900000000"></script>
+    <script src="../lib/valuation-models.js?v=1791900000000"></script>
+    <script src="../lib/peer-valuation.js?v=1791900000000"></script>
+    <script src="../lib/valuation-history.js?v=1791900000000"></script>
+    <script src="../lib/valuation-alerts.js?v=1791900000000"></script>
+    <script src="../lib/vb-statements.js?v=1791900000000"></script>
+    <script src="../lib/vb-fundamental.js?v=1791900000000"></script>
+    <script src="../lib/vb-dcf.js?v=1791900000000"></script>
+    <script src="../lib/vb-asset.js?v=1791900000000"></script>
+    <script src="../lib/vb-multiples.js?v=1791900000000"></script>
+    <script src="../lib/vb-technical.js?v=1791900000000"></script>
+    <script src="../lib/vb-market.js?v=1791900000000"></script>
+    <script src="../lib/vb-synthesis.js?v=1791900000000"></script>
+    <script src="../lib/vb-engine.js?v=1791900000000"></script>
+    <script src="/bench-nav.js?v=1791900000000"></script>
+    <script src="vb-charts.js?v=1791900000000"></script>
+    <script src="vb-methods.js?v=1791900000000"></script>
+    <script src="vb-stock.js?v=1791900000000"></script>
+    <script src="vb-stock2.js?v=1791900000000"></script>
+    <script src="vb-app.js?v=1791900000000"></script>
+</body>
+</html>

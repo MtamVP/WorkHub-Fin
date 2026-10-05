@@ -44,10 +44,10 @@
                 WorkHub Finance <span class="sub">· Investment Workbench</span>
             </div>
             <nav class="desk-nav">
-                <a href="/mastersheet/" class="active"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
+                <a href="/mastersheet/" class="active" aria-current="page"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
                 <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
                 <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
-                <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/valuation/" title="Khu định giá chuyên môn: phương pháp định giá, phân tích cơ bản và kỹ thuật"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
             </nav>
             <div class="desk-topbar-right">
                 <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
@@ -220,5 +220,7 @@
     <script src="group-strategy.js?v=1791900000000"></script>
     <script src="group-rebalance.js?v=1791900000000"></script>
     <script>document.addEventListener('DOMContentLoaded', function () { loadGroup(); });</script>
+    <script src="/bench-nav.js?v=1791900000000"></script>
+    <script>BenchNav.mount({ bench: 'investment', active: 'group' });</script>
 </body>
 </html>

@@ -22,12 +22,37 @@ const state = {
 
 document.addEventListener('DOMContentLoaded', function () {
     applyThemeIcon();
+    initBench();
     bindOverviewEvents();
     loadOverview().then(function () {
+        if (state.bench === 'valuation') return;
         const m = /^#([A-Za-z0-9]{1,12})(?:\/(\d{4}))?$/.exec(location.hash || '');
         if (m) openDetail(m[1].toUpperCase(), m[2] ? Number(m[2]) : null);
     });
 });
+
+// Trang này phục vụ HAI khu vực (xem /bench-nav.js): Investment Workbench giữ Bảng so sánh, Ý tưởng, Chi tiết mã; Valuation Bench giữ Bộ lọc, Thị trường, Bản đồ định giá.
+// Khu vực chọn theo ?bench= (đường dẫn cũ /stocksheet/?view=market vẫn mở được và nay thuộc Valuation Bench). Không có chế độ xem nào bị xoá, chỉ đặt đúng khu.
+const BENCH_VIEWS = { investment: ['overview', 'ideas', 'detail'], valuation: ['screener', 'market', 'map'] };
+function initBench() {
+    const bench = typeof BenchNav !== 'undefined' ? BenchNav.benchFromSearch(location.search) : 'investment';
+    state.bench = bench;
+    const allowed = BENCH_VIEWS[bench];
+    ['overview', 'screener', 'market', 'map', 'ideas', 'detail'].forEach(function (v) {
+        const b = document.getElementById('seg-' + v);
+        if (b) b.style.display = allowed.indexOf(v) !== -1 ? '' : 'none';
+    });
+    const h1 = document.querySelector('.desk-byline h1');
+    if (h1) h1.textContent = bench === 'valuation' ? 'Sàng lọc và bản đồ định giá' : 'Nghiên cứu cổ phiếu';
+    const who = document.getElementById('vl-who');
+    if (who && bench === 'valuation') who.textContent = 'Dữ liệu thị trường hằng ngày từ VNDirect';
+    const bridge = document.getElementById('vb-bridge');
+    if (bridge && bench === 'valuation') { bridge.href = '/mastersheet/'; bridge.title = 'Về Investment Workbench'; bridge.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Investment Workbench'; }
+    const want = new URLSearchParams(location.search).get('view');
+    const first = bench === 'valuation' ? (BENCH_VIEWS.valuation.indexOf(want) !== -1 ? want : 'screener') : null;
+    if (typeof BenchNav !== 'undefined') BenchNav.mount({ bench: bench, active: bench === 'valuation' ? first : 'research', onView: bench === 'valuation' ? function (v) { showView(v); return true; } : null });
+    if (first) showView(first);
+}
 
 // ---------- tiện ích ----------
 async function call(action, params) {
@@ -73,6 +98,10 @@ function toggleDeskTheme() {
 // ---------- chuyển chế độ xem ----------
 function showView(view) {
     state.view = view;
+    if (state.bench === 'valuation') {
+        try { history.replaceState(null, '', location.pathname + '?bench=valuation&view=' + view); } catch (e) {}
+        if (typeof BenchNav !== 'undefined') BenchNav.setActive(view);
+    }
     document.getElementById('view-overview').style.display = view === 'overview' ? '' : 'none';
     document.getElementById('view-detail').style.display = view === 'detail' ? '' : 'none';
     document.getElementById('view-screener').style.display = view === 'screener' ? '' : 'none';
@@ -362,6 +391,7 @@ async function loadStockDetail(opts) {
         renderDetail();
         loadPriceHistory(state.detail); // chạy nền: có giá lịch sử thì vẽ lại thêm dải P/E
         loadAdvanced(state.detail);     // chạy nền: chỉ số cơ bản VNDirect + lãi suất trái phiếu cho thẻ Mô hình nâng cao
+        loadVbCard(state.detail);       // chạy nền: bản định giá chuyên môn mới nhất từ Valuation Bench
     } catch (e) {
         spinner.style.display = 'none';
         displayDiv.style.display = 'block';
@@ -408,6 +438,25 @@ async function loadAdvanced(d) {
         d.adv = { loading: false, ratios: null, rates: [], peer: null, error: e.message || String(e) };
     }
     if (state.view === 'detail') renderDetail();
+}
+// Thẻ "Định giá chuyên môn": bản mới nhất lưu ở Valuation Bench (không tính lại ở đây)
+async function loadVbCard(d) {
+    if (typeof VBCard === 'undefined') return;
+    d.vb = { loading: true, rec: null, error: '' };
+    try {
+        const rec = await call('getVbLatest', { symbol: d.symbol });
+        if (state.detail !== d) return;
+        d.vb = { loading: false, rec: rec || null, error: '' };
+    } catch (e) {
+        if (state.detail !== d) return;
+        d.vb = { loading: false, rec: null, error: e.message || String(e) };
+    }
+    if (state.view === 'detail') renderDetail();
+}
+function vbCardHtml(d) {
+    if (typeof VBCard === 'undefined' || !d.vb) return '';
+    const live = d.live && d.live.price !== undefined ? d.live.price : (d.a && d.a.price);
+    return VBCard.html(d.vb.rec, live, new Date(), { loading: d.vb.loading, error: d.vb.error, symbol: d.symbol });
 }
 // Người dùng đổi phần bù rủi ro / tăng trưởng: lưu lại và vẽ lại thẻ (không gọi mạng)
 function vaChange() {
@@ -557,7 +606,7 @@ function renderDetail() {
     </div>`;
 
     display.style.display = 'block';
-    display.innerHTML = hero + football + scen + advancedCardHtml(d) + groups + charts + thesis + apply +
+    display.innerHTML = hero + vbCardHtml(d) + football + scen + advancedCardHtml(d) + groups + charts + thesis + apply +
         '<p class="vl-hint">Kết quả là công cụ tham khảo dựa trên số liệu và giả định bạn nhập; không phải khuyến nghị đầu tư.</p>';
 
     drawCharts(d, hasBand);

@@ -180,3 +180,27 @@ describe('VBEngine.toRecord', () => {
   });
   it('chưa có giá trị hợp lý thì không tạo bản ghi', () => { expect(E.toRecord({ ok: false })).toBeNull(); expect(E.toRecord(E.analyze({ annualRows: [] }))).toBeNull(); });
 });
+
+describe('mặc định cho tài chính và trọng số cổ tức', () => {
+  it('trọng số mặc định nhân với hệ số điều chỉnh của phương pháp (cổ tức tiền mặt thấp thì DDM chỉ hiển thị)', () => {
+    const p = Y.prepare([{ key: 'ddm', group: 'income', label: 'x', base: 10, weightFactor: 0 }, { key: 'dcf', group: 'intrinsic', label: 'y', base: 10, weightFactor: 0.5 }], 'NON_FINANCE');
+    expect(p[0].weight).toBe(0); expect(p[1].weight).toBeCloseTo(1.5, 9); expect(p[1].defaultWeight).toBeCloseTo(1.5, 9);
+    expect(Y.prepare([{ key: 'ddm', group: 'income', label: 'x', base: 10, weightFactor: 0 }], 'NON_FINANCE', { ddm: 2 })[0].weight).toBe(2);       // người dùng vẫn ghi đè được
+  });
+  it('ngân hàng: tăng trưởng dài hạn mặc định không vượt 5%/lãi suất phi rủi ro; ROE cuối kỳ giữ nửa phần vượt Ke', () => {
+    const bank = (date, k) => { const s = Math.pow(1.15, k), m = (c, v, mt) => R(c, date, v * s, mt); return [m(421900, 60, 102), m(421701, 80, 102), m(22200, 28, 102), m(422900, 6, 102), m(23800, 40, 102), m(23003, 32, 102), m(23000, 31.5, 102), m(23001, 3000, 102), m(12700, 1500, 101), m(13000, 1350, 101), m(14000, 150, 101), m(14110, 50, 101), m(412000, 900, 101), m(14200, 60, 101)]; };
+    const rows = [0, 1, 2, 3].reduce((a, k) => a.concat(bank((2022 + k) + '-12-31', k)), []);
+    const r = E.analyze({ annualRows: rows, price: 30000, shares: 1e9, metrics: { beta: 1 }, bond10yPct: 4 });
+    const b = r.bankInputs;
+    expect(b.gT).toBeCloseTo(0.04, 9); expect(b.gT).toBeLessThanOrEqual(0.05);
+    expect(b.roeTerminal).toBeCloseTo(b.roe > b.ke ? b.ke + 0.5 * (b.roe - b.ke) : b.ke, 9);
+    const ov = E.analyze({ annualRows: rows, price: 30000, shares: 1e9, metrics: { beta: 1 }, bond10yPct: 4, bankInputs: { gT: 0.03, roeTerminal: 0.1 } }).bankInputs;
+    expect(ov.gT).toBe(0.03); expect(ov.roeTerminal).toBe(0.1);
+  });
+  it('doanh nghiệp trả cổ tức tiền mặt thấp: DDM có hệ số giảm và được ghi chú', () => {
+    const r = E.analyze({ symbol: 'T', annualRows: ANNUAL.map((x) => Object.assign({}, x)), candles: candles(400, 15), ratioSeries: { pe: PE_SERIES }, metrics: { shares: 50e6, beta: 1, divYield: 0.005 }, peerStats: PEERS, price: 50000 });
+    const d = r.methods.find((m) => m.key === 'ddm');
+    expect(d.weightFactor).toBeLessThan(1); expect(d.note).toMatch(/Tỷ lệ chi trả tiền mặt/);
+    expect(r.synthesis.methods.find((m) => m.key === 'ddm').weight).toBeLessThan(0.3);
+  });
+});

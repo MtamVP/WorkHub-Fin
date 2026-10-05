@@ -47,8 +47,8 @@
             <nav class="desk-nav">
                 <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
                 <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
-                <a href="/stocksheet/" class="active"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
-                <a href="/stocksheet/autosheet/"><i class="fa-solid fa-calculator"></i> Định Giá CP</a>
+                <a href="/stocksheet/" class="active" aria-current="page"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
+                <a href="/valuation/" title="Khu định giá chuyên môn: phương pháp định giá, phân tích cơ bản và kỹ thuật"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
             </nav>
             <div class="desk-topbar-right">
                 <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
@@ -78,7 +78,8 @@
                 <button type="button" id="seg-ideas" aria-pressed="false" onclick="showView('ideas')"><i class="fa-solid fa-lightbulb"></i> Ý tưởng</button>
                 <button type="button" id="seg-detail" aria-pressed="false" onclick="showView('detail')"><i class="fa-solid fa-magnifying-glass-chart"></i> Chi tiết mã</button>
             </div>
-            <a class="btn-refresh" href="/stocksheet/autosheet/"><i class="fa-solid fa-plus"></i> Thêm / sửa định giá</a>
+            <a class="btn-refresh" id="vb-add-link" href="/stocksheet/autosheet/?bench=valuation"><i class="fa-solid fa-plus"></i> Thêm / sửa định giá</a>
+            <a class="btn-refresh" id="vb-bridge" href="/valuation/" title="Mở Valuation Bench: định giá chuyên sâu một cổ phiếu"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
         </div>
 
         <!-- 1) BẢNG SO SÁNH: mọi mã đã định giá, kết luận Rẻ / Hợp lý / Đắt theo giá hiện tại -->
@@ -159,7 +160,9 @@
     <script src="../lib/valuation-alerts.js?v=1791900000000"></script>
     <script src="../lib/quant-calc.js?v=1791900000000"></script>
     <script src="valuation-advanced.js?v=1791900000000"></script>
+    <script src="vb-card.js?v=1791900000000"></script>
     <script src="financials-sync.js?v=1791900000000"></script>
+    <script src="/bench-nav.js?v=1791900000000"></script>
     <script src="script.js?v=1791900000000"></script>
     <script src="screener-ui.js?v=1791900000000"></script>
     <script src="market-screener-ui.js?v=1791900000000"></script>

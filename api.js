@@ -2981,6 +2981,12 @@ const API = {
                 if (error) throw error;
                 return { id: data.id, createdAt: data.created_at, message: 'Đã lưu định giá ' + sym };
             },
+            // Một bản theo mã định danh (đầy đủ cột), để nạp lại giả định của bản đã lưu
+            get: async (id) => {
+                const { data, error } = await sbClient.from('finance_vb_valuations').select('*').eq('id', String(id || '')).maybeSingle();
+                if (error) throw error;
+                return data || null;
+            },
             // Bản MỚI NHẤT (đầy đủ cột) của một mã; null nếu chưa có
             latest: async (symbol) => {
                 const sym = String(symbol || '').trim().toUpperCase();
@@ -5205,6 +5211,7 @@ async function _dispatchAction(action, params = {}) {
             case 'listRestricted': result = await API.asset.restricted.list(); break;
             case 'getVbData': result = await API.asset.vb.data(params.symbol, { years: params.years, candleYears: params.candleYears }); break;
             case 'saveVbValuation': result = await API.asset.vb.save(params.email, params.record); break;
+            case 'getVbById': result = await API.asset.vb.get(params.id); break;
             case 'getVbLatest': result = await API.asset.vb.latest(params.symbol); break;
             case 'getVbLatestMany': result = await API.asset.vb.latestMany(params.symbols); break;
             case 'getVbHistory': result = await API.asset.vb.history(params.symbol, params.limit); break;

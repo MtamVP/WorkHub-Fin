@@ -327,3 +327,20 @@
 .va-item small { display: block; color: var(--text-muted, #6b7280); font-weight: 400; }
 .vl-peer-conf { margin: 6px 0 0; }
 .vl-peer-conf.low b { color: var(--warn, #b45309); }
+
+/* Thẻ "Định giá chuyên môn" + huy hiệu (stocksheet/vb-card.js): bản định giá đã lưu ở Valuation Bench */
+.vbc-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 14px; }
+.vbc-main { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.vbc-fair { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.vbc-range { font-size: 0.82rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.vbc-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.vbc-pill { display: inline-flex; align-items: center; padding: 3px 11px; border-radius: var(--radius-pill, 999px); font-size: 0.74rem; font-weight: 700; white-space: nowrap; background: var(--hover-bg); color: var(--text-secondary); }
+.vbc-pill.ok { background: var(--success-bg); color: var(--success-color); } .vbc-pill.warn { background: var(--danger-bg); color: var(--danger-color); } .vbc-pill.info { background: var(--finance-accent-subtle, var(--hover-bg)); color: var(--finance-accent, var(--text-primary)); }
+.vbc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 18px; margin-bottom: 12px; }
+.vbc-kv { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vbc-k { font-size: 0.72rem; color: var(--text-secondary); }
+.vbc-v { font-size: 0.92rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.vbc-up { color: var(--success-color); } .vbc-down { color: var(--danger-color); }
+.vbc-stance { margin: 4px 0 8px; font-size: 0.88rem; }
+.vbc-list { margin: 0 0 10px; padding-left: 18px; font-size: 0.82rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 3px; }
+.vbc-list.warn { list-style: none; padding-left: 0; color: var(--danger-color); }

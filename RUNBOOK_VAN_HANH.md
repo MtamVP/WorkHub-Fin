@@ -22,11 +22,12 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 | market-health-daily | `45 10 * * 1-5` | market-data-sync `health` | kiểm hai nguồn giá + email cảnh báo mới |
 | market-ratios-daily | `0 11 * * 1-5` | market-data-sync `ratios` | P/E, P/B, beta, khối ngoại… |
 | market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành + ghi tiếp lịch sử định giá |
+| valuation-watch-daily | `40 11 * * 1-5` | valuation-watch | email cảnh báo định giá thị trường/ngành đang nắm cho quản lý đã bật nhận |
 | cleanup_system_logs | `0 3 1 * *` | SQL | dọn nhật ký hệ thống |
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)
 
-`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v7 · `storage-proxy` v7.
+`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v7 · `storage-proxy` v7 · `valuation-watch` (mới) · `vb-data` (mới; dữ liệu báo cáo tài chính + nến cho Valuation Bench, cần JWT người dùng).
 
 Secrets (đặt trong Supabase → Edge Functions → Secrets, KHÔNG ghi vào kho mã): `RESEND_API_KEY`, `ALERT_FROM_EMAIL`. Chỉ cần cho email cảnh báo.
 
@@ -127,3 +128,10 @@ curl -X POST <url hàm> -H "Authorization: Bearer <publishable key>" -H "apikey:
 Lặp cho các đoạn kế tiếp tới tháng hiện tại (6 năm ≈ 6 lần gọi). Chạy lại an toàn (ghi đè theo ngày + phạm vi). Kiểm: `select scope, count(*), min(as_of), max(as_of) from finance_valuation_history group by 1 order by 1;` (kỳ vọng ~70 ngày cho `ALL`).
 - 06/10: migration `fin_valuation_history` đã áp dụng (bảng `finance_valuation_history`); `market-data-sync` v7 đã triển khai; bù ngược lịch sử 10/2020 – 10/2026: 70 ngày cho `ALL` và từng ngành. Hai tháng không có dữ liệu trong vòng 7 ngày (03/2024, 01/2025) bị bỏ qua, chuỗi vẫn dùng được (theo tháng, có lỗ hổng). Snapshot hằng ngày từ nay ghi tiếp lịch sử và thêm JdK, beta, vốn hoá, biến động giá vào thống kê.
 
+## 12. Valuation Bench (tách khỏi Investment Workbench, 05/10/2026)
+
+- Giao diện: `/valuation/` (Tổng quan, Hồ sơ cổ phiếu, Phương pháp); Bộ lọc, Thị trường, Bản đồ và Định Giá CP thủ công vẫn là các trang cũ, chỉ đổi khu điều hướng (`bench-nav.js`). Không xoá tính năng nào của Investment Workbench.
+- Bảng `finance_vb_valuations` (RLS: cả nhóm tài chính xem; mỗi người chỉ thêm bản của mình; xoá do chủ bản, quản lý tài sản hoặc admin) lưu từng bản định giá; Investment Workbench đọc bản MỚI NHẤT để hiện thẻ "Định giá chuyên môn" ở Chi tiết mã và huy hiệu ở Danh Mục (`stocksheet/vb-card.js`). Nút "Áp dụng vào danh mục" trong Valuation Bench ghi giá mục tiêu như cũ.
+- Edge Function `vb-data` (verify_jwt bật) lấy báo cáo tài chính nhiều năm + nến từ VNDirect, bản sao `lib/vb-statements.js` đồng bộ bằng `node scripts/sync-edge-libs.mjs`. `valuation-watch` + cron `valuation-watch-daily` gửi email cảnh báo định giá.
+- Triển khai lại `vb-data`: gửi MỌI tệp trong `supabase/functions/vb-data/` nguyên văn (index.ts, parse.ts, vb-statements.js).
+- Giới hạn đã biết: EV/EBITDA và EV/Sales ngành chưa có (cần mở rộng `market-data-sync`); NPL/CAR ngân hàng không có từ nguồn miễn phí; chưa kiểm trong ứng dụng Tauri thật với JWT thật, mới kiểm trên bản xem thử với dữ liệu VNDirect thật.
