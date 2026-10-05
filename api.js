@@ -2588,6 +2588,15 @@ const API = {
                 M._uniAt = Date.now();
                 return M._uni;
             },
+            // Lịch sử định giá thị trường + ngành (finance_valuation_history) trong `years` năm gần nhất, kèm lợi suất trái phiếu 10 năm mới nhất. Rỗng nếu bảng chưa có dữ liệu.
+            valuationHistory: async (years) => {
+                const since = new Date(Date.now() - (Number(years) > 0 ? Number(years) : 6) * 366 * 86400000).toISOString().slice(0, 10);
+                let rows = [];
+                try { rows = await API.asset._fetchAll(() => sbClient.from('finance_valuation_history').select('as_of, scope, n, n_pe, n_pb, pe_median, pb_median, pe_agg, pb_agg, mcap_total').gte('as_of', since).order('as_of').order('scope')); } catch (e) { rows = []; }
+                let bond10y = null, bondDate = null;
+                try { const r = await API.asset.market.rates(15); const t = (r || []).filter(x => x.tenor === '10Y'); if (t.length) { bond10y = Number(t[t.length - 1].yield_pct); bondDate = t[t.length - 1].rate_date; } } catch (e) { /* không có lợi suất */ }
+                return { rows: rows || [], bond10y, bondDate };
+            },
             healthList: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 60) * 86400000).toISOString();
                 // chưa xử lý (bất kể cũ) + đã xử lý trong khoảng gần đây
@@ -5094,6 +5103,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getMarketRates': result = await API.asset.market.rates(params.days); break;
             case 'getDailyAverages': result = await API.asset.getDailyAverages(params.symbols, params.from, params.to); break;
             case 'getStockRatios': result = await API.asset.market.ratios(params.symbols); break;
+            case 'getValuationHistory': result = await API.asset.market.valuationHistory(params.years); break;
             case 'getMarketUniverse': result = await API.asset.market.marketUniverse(params.force); break;
             case 'getPeerStats': result = await API.asset.market.peerStats(params.symbols); break;
             case 'getPeerValuation': result = await API.asset.market.peers(params.symbol); break;

@@ -79,12 +79,15 @@ function showView(view) {
     document.getElementById('view-ideas').style.display = view === 'ideas' ? '' : 'none';
     document.getElementById('view-market').style.display = view === 'market' ? '' : 'none';
     document.getElementById('seg-market').setAttribute('aria-pressed', String(view === 'market'));
+    document.getElementById('view-map').style.display = view === 'map' ? '' : 'none';
+    document.getElementById('seg-map').setAttribute('aria-pressed', String(view === 'map'));
     document.getElementById('seg-ideas').setAttribute('aria-pressed', String(view === 'ideas'));
     document.getElementById('seg-overview').setAttribute('aria-pressed', String(view === 'overview'));
     document.getElementById('seg-detail').setAttribute('aria-pressed', String(view === 'detail'));
     document.getElementById('seg-screener').setAttribute('aria-pressed', String(view === 'screener'));
     if (view === 'screener') renderScreener();
     if (view === 'market' && typeof mkLoad === 'function') mkLoad();
+    if (view === 'map' && typeof vmLoad === 'function') vmLoad();
     if (view === 'ideas' && typeof loadIdeas === 'function') loadIdeas();
     if (view === 'overview') {
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}

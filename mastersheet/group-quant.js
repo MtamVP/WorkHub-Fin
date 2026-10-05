@@ -38,6 +38,24 @@ function gqtPeerMap() {
     return out;
 }
 
+// Hồ sơ phong cách của danh mục gộp (lib/style-exposure.js): phân vị có trọng số của từng nhân tố so với cả thị trường; null nếu thiếu thống kê thị trường hoặc chưa đủ dữ liệu
+function gqtStyle() {
+    const P = GQT.peers;
+    if (!P || typeof StyleExposure === 'undefined' || !P.stats || !P.stats.ALL || !GQT.out) return null;
+    const r = StyleExposure.compute(GQT.out.rows.map(x => ({ symbol: x.symbol, value: x.value })), P.bySymbol, P.stats.ALL.stats);
+    return r.factors.some(f => f.pct !== null) ? r : null;
+}
+function gqtStyleHtml() {
+    const st = gqtStyle();
+    if (!st) return '';
+    const bar = (f) => f.pct === null ? `<div class="gqt-style-row mute"><span>${rkEsc(f.label)}</span><span class="gqt-style-track"></span><b>chưa đủ dữ liệu</b></div>`
+        : `<div class="gqt-style-row"><span>${rkEsc(f.label)}</span><span class="gqt-style-track" title="Phân vị ${rkNum(f.pct, 0)} so với cả thị trường (50 = trung lập)"><i class="gqt-style-mid"></i><i class="gqt-style-dot ${f.tone}" style="left:${Math.min(98, Math.max(2, f.pct))}%"></i></span><b>${rkNum(f.pct, 0)}</b></div>`;
+    return `<div class="ce-group-title">Hồ sơ phong cách <small style="font-weight:400">(${st.counted}/${st.count} mã có số liệu, ${rkPct(st.coverage * 100, 0)} giá trị)</small></div>
+        <div class="gqt-style">${st.factors.map(bar).join('')}</div>
+        ${st.tilts.length ? `<ul class="gr-rep-notes">${st.tilts.map(t => `<li>${rkEsc(t.text)}</li>`).join('')}</ul>` : '<p class="tl-hint">Danh mục không nghiêng rõ về nhân tố nào so với thị trường.</p>'}
+        <p class="tl-hint">Mỗi nhân tố là phân vị trung bình (có trọng số theo giá trị vị thế) trong phân phối của cả thị trường niêm yết (mã vốn hoá từ 300 tỷ): 50 là trung lập, trên 50 là nghiêng về nhân tố đó. Mã không phải ngân hàng và ngân hàng được so chung một thị trường nên P/E, P/B của ngân hàng thường làm danh mục trông "rẻ"; hãy đọc cùng bảng ngành. Đây là mô tả, không phải khuyến nghị.</p>`;
+}
+
 function grQuantHtml() {
     if (GQT.state === 'loading' || GQT.state === 'idle') return '<div class="tl-empty"><i class="fa-solid fa-spinner fa-spin"></i>Đang lấy chỉ số thị trường của các mã đang nắm…</div>';
     if (GQT.state === 'error') return `<div class="tl-empty text-danger"><i class="fa-solid fa-triangle-exclamation"></i>Không tải được: ${rkEsc(GQT.error)}<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="gqtLoad(true)">Thử lại</button></div>`;
@@ -67,6 +85,7 @@ function grQuantHtml() {
             <td class="text-right ${r.foreignNet5d !== null && r.foreignNet5d < 0 ? 'tl-down' : 'tl-up'}">${r.foreignNet5d === null ? '—' : rkVnd(r.foreignNet5d)}${r.foreignRoomLeftPct !== null ? `<span class="symbol-sub">room còn ${rkNum(r.foreignRoomLeftPct, 0)}%</span>` : ''}</td>
             <td class="gr-reason">${r.flags.length ? r.flags.map(f => `<div><span class="tl-badge ${f.tone}">●</span> ${rkEsc(f.text)}</div>`).join('') : '<span class="text-muted">—</span>'}</td></tr>`).join('')}
         </tbody></table></div>`;
+    html += gqtStyleHtml();
     html += `<p class="tl-hint">Nguồn: VNDirect (chỉ số cập nhật mỗi ngày làm việc; ngày số liệu gần nhất ${rkEsc(Object.values(GQT.ratios).map(x => x.dailyDate).filter(Boolean).sort().pop() || '—')}). <b>Sức mạnh tương đối</b> theo vòng quay JdK: RS-Ratio &gt; 100 là mạnh hơn thị trường, RS-Momentum &gt; 100 là đang tăng tốc — Dẫn đầu (cả hai &gt; 100), Suy yếu (mạnh nhưng chậm lại), Tụt hậu (cả hai &lt; 100), Cải thiện (yếu nhưng tăng tốc). <b>So với ngành</b>: phân vị định giá (P/E và P/B) trong các mã cùng ngành ICB, 0 là rẻ nhất ngành; kèm ROE để không nhầm "rẻ vì kém" với "rẻ thật". <b>P/E / TB 5 năm</b>: dưới 100% là đang rẻ hơn lịch sử của chính mã (chưa tính tăng trưởng đã đổi hay chưa). <b>Thoát vị thế</b>: số phiên cần nếu chỉ chiếm 20% giá trị giao dịch trung bình ngày. Đây là chỉ báo để soát và đặt câu hỏi, không phải khuyến nghị mua hoặc bán.</p>`;
     return html;
 }

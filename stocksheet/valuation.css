@@ -309,3 +309,14 @@
 
 .mk-flag { color: var(--danger-color) !important; max-width: 340px; white-space: normal; }
 .mk-flag i { margin-right: 3px; }
+
+/* Bản đồ định giá */
+.vl-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 6px 0 14px; }
+.vl-kpi { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-color-2); }
+.vl-kpi-label { font-size: 0.74rem; color: var(--text-muted); }
+.vl-kpi-value { font-family: var(--font-mono); font-size: 1.45rem; color: var(--text-primary); }
+.vl-kpi small { color: var(--text-muted); font-size: 0.72rem; line-height: 1.4; }
+.vl-select-sm { margin-left: 8px; padding: 3px 8px; font: inherit; font-size: 0.78rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-color-2); color: var(--text-primary); }
+.vm-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.vm-spark { color: var(--gold); vertical-align: middle; }
+.vm-spark-cell { width: 130px; }

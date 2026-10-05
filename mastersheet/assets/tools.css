@@ -376,3 +376,15 @@ tr.tl-total-row td { border-top: 2px solid var(--border-strong); }
 .vr-line.warn i { color: var(--warning-color, #d29922); }
 .vr-line.ok i { color: var(--success-color, #3fb950); }
 .vr-line.info i { color: var(--text-muted); }
+
+/* Hồ sơ phong cách (Toàn Nhóm > Định Lượng) */
+.gqt-style { display: grid; gap: 8px; max-width: 640px; margin: 6px 0 10px; }
+.gqt-style-row { display: grid; grid-template-columns: 190px minmax(120px, 1fr) 70px; align-items: center; gap: 12px; font-size: 0.84rem; }
+.gqt-style-row > span:first-child { color: var(--text-muted); }
+.gqt-style-row b { font-family: var(--font-mono); text-align: right; }
+.gqt-style-row.mute { opacity: 0.55; }
+.gqt-style-track { position: relative; height: 6px; border-radius: 3px; background: var(--border-color); }
+.gqt-style-mid { position: absolute; left: 50%; top: -3px; width: 1px; height: 12px; background: var(--text-muted); }
+.gqt-style-dot { position: absolute; top: -4px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--card-bg); background: var(--finance-accent); }
+.gqt-style-dot.warn { background: var(--danger-color); }
+@media (max-width: 600px) { .gqt-style-row { grid-template-columns: 1fr 70px; } .gqt-style-track { grid-column: 1 / -1; order: 3; } }

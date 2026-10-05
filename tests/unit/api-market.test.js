@@ -248,3 +248,29 @@ describe('định giá so với ngành: peers / peerStats', () => {
     expect((await c.callGAS('getPeerStats', { symbols: ['AAA'] })).status).toBe('success');
   });
 });
+
+describe('valuationHistory / marketUniverse', () => {
+  const hist = [
+    { as_of: '2024-01-31', scope: 'ALL', n: 700, pe_agg: 12, pb_agg: 1.8 }, { as_of: '2026-09-30', scope: 'ALL', n: 720, pe_agg: 11, pb_agg: 1.9 },
+    { as_of: '2015-01-31', scope: 'ALL', n: 300, pe_agg: 20, pb_agg: 3 },
+  ];
+  it('lịch sử trong N năm gần nhất kèm lợi suất TPCP 10 năm mới nhất', async () => {
+    const c = boot(MEMBER, { finance_valuation_history: hist, finance_rates: [{ rate_date: '2026-10-01', tenor: '10Y', yield_pct: 4.5 }, { rate_date: '2026-10-02', tenor: '10Y', yield_pct: 4.59 }, { rate_date: '2026-10-02', tenor: '1Y', yield_pct: 3.7 }] });
+    const r = await c.API.asset.market.valuationHistory(6);
+    expect(r.rows.map(x => x.as_of)).toEqual(['2024-01-31', '2026-09-30']);
+    expect(r.bond10y).toBeCloseTo(4.59, 9); expect(r.bondDate).toBe('2026-10-02');
+    expect((await c.callGAS('getValuationHistory', { years: 6 })).status).toBe('success');
+  });
+  it('chưa có bảng/dữ liệu: trả rỗng, không lỗi', async () => {
+    const c = boot(MEMBER, {});
+    const r = await c.API.asset.market.valuationHistory(6);
+    expect(r.rows).toEqual([]); expect(r.bond10y).toBeNull();
+  });
+  it('marketUniverse: gộp ảnh chụp, thống kê ngành và tên/sàn; cache trong phiên', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: [{ symbol: 'AAA', icb2_code: '8300', metrics: { pe: 8 } }], finance_sector_stats: [{ icb2_code: '8300', n: 20, as_of: '2026-10-02', stats: {} }], finance_stock_meta: [{ symbol: 'AAA', name: 'Ngân hàng A', exchange: 'HOSE', icb2_code: '8300' }] });
+    const u = await c.API.asset.market.marketUniverse();
+    expect(u.snapshot).toHaveLength(1); expect(u.meta.AAA.name).toBe('Ngân hàng A'); expect(u.asOf).toBe('2026-10-02'); expect(u.stats['8300'].n).toBe(20);
+    c.fake.db && (c.fake.db.finance_market_snapshot = []);
+    expect((await c.API.asset.market.marketUniverse()).snapshot).toHaveLength(1);      // cache
+  });
+});

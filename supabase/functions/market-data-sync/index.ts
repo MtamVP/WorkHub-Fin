@@ -3,13 +3,14 @@
 //  "rates"  (pg_cron mỗi ngày làm việc): lợi suất trái phiếu chính phủ 1-15 năm (TradingView scanner công khai) -> finance_rates; app dùng làm lãi phi rủi ro THEO NGÀY.
 //  "ratios" (pg_cron mỗi ngày làm việc, hoặc gọi từ app kèm body.symbols <= 15 mã): chỉ số cơ bản và thị trường từ VNDirect (P/E, P/B, beta, ROE, biên lợi nhuận, đòn bẩy, tăng trưởng, 52 tuần, thanh khoản, khối ngoại) -> finance_stock_ratios.
 //  "snapshot" (pg_cron mỗi ngày làm việc): ẢNH CHỤP CẢ THỊ TRƯỜNG (~1.600 mã: P/E, P/B, vốn hoá, ROE... mỗi chỉ số một lần gọi) -> finance_market_snapshot, và thống kê theo ngành ICB (trung vị, phân vị) -> finance_sector_stats để định giá tương đối.
+//  "history" (chạy tay, body {from:"2021-01", to:"2021-12"}, tối đa 14 tháng mỗi lần): BÙ NGƯỢC lịch sử định giá (P/E, P/B trung vị và tổng hợp theo vốn hoá của thị trường và từng ngành, cuối mỗi tháng) -> finance_valuation_history; chế độ snapshot hằng ngày ghi tiếp.
 //  "health" (pg_cron mỗi ngày làm việc): kiểm chất lượng dữ liệu giá của các mã đang nắm/theo dõi -- so VNDirect với VCI, nhảy giá vượt biên độ, thiếu phiên, giá cũ -> finance_data_health,
 //     và gửi email cho quản lý đã bật email cảnh báo khi có cảnh báo MỚI mức lỗi/cảnh báo (Resend, secrets RESEND_API_KEY / ALERT_FROM_EMAIL như approval-watch).
 // Mỗi lần chạy ghi finance_function_runs (app cảnh báo khi hàm quá hạn). Nguồn đều là điểm cuối công khai KHÔNG có cam kết dịch vụ: có thể đổi/chặn bất cứ lúc nào, nên có kiểm tra và ghi nhận "nguồn lỗi".
 // Gọi bởi pg_cron (Bearer = publishable key, verify_jwt giữ true). Phản hồi chỉ có SỐ LƯỢNG. {"selftest":true} chạy bài tự kiểm không đụng mạng/CSDL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildSnapshot, sectorStats, snapshotDate, SNAP_DAILY, SNAP_QUARTER } from "./peers.ts";
-import { BAND, buildHealthEmail, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
+import { buildSnapshot, historyRows, monthEnds, sectorStats, snapshotDate, SNAP_DAILY, SNAP_QUARTER } from "./peers.ts";
+import { addDays, BAND, buildHealthEmail, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -180,7 +181,47 @@ async function syncSnapshot(supabase: any) {
   const stats = sectorStats(rows, snapshotDate(rows), now);
   const { error } = await supabase.from("finance_sector_stats").upsert(stats, { onConflict: "icb2_code" });
   if (error) throw new Error(error.message);
-  return { ok: true, symbols: rows.length, sectors: stats.length, date };
+  // lịch sử định giá: ghi dòng của ngày này; lỗi (ví dụ bảng chưa tạo) chỉ ghi nhận, không làm hỏng ảnh chụp đã lưu
+  let history: number | string = 0;
+  try {
+    const hist = historyRows(rows, snapshotDate(rows) ?? date);
+    const { error: hErr } = await supabase.from("finance_valuation_history").upsert(hist, { onConflict: "as_of,scope" });
+    history = hErr ? "lỗi: " + hErr.message.slice(0, 80) : hist.length;
+  } catch (e) { history = "lỗi: " + String((e as Error).message || e).slice(0, 80); }
+  return { ok: true, symbols: rows.length, sectors: stats.length, date, history };
+}
+
+// Bù ngược lịch sử định giá theo tháng: mỗi tháng dò lùi tối đa 7 ngày tới ngày có dữ liệu, hỏi P/E, P/B, vốn hoá của cả thị trường (3 lần gọi) rồi tổng hợp như ảnh chụp hằng ngày.
+async function syncHistory(supabase: any, from: string, to: string) {
+  const months = monthEnds(from, to).slice(0, 14);
+  if (!months.length) return { ok: false, error: "Khoảng tháng không hợp lệ: cần from và to dạng YYYY-MM (from <= to), tối đa 14 tháng mỗi lần." };
+  const B = "https://api-finfo.vndirect.com.vn/v4";
+  const metaRows = await fetchAll(() => supabase.from("finance_stock_meta").select("symbol, icb2_code").order("symbol"));
+  const icb = new Map((metaRows ?? []).map((m: any) => [m.symbol, m.icb2_code]));
+  const got: string[] = [], skipped: string[] = [];
+  let saved = 0;
+  await inBatches(months, 2, async (end) => {
+    let day: string | null = null, pe: any[] = [];
+    for (let k = 0; k < 7 && !day; k++) {
+      const d = addDays(end, -k);
+      const j = await getJson(`${B}/ratios?q=ratioCode:PRICE_TO_EARNINGS~reportDate:${d}&size=4000`);
+      const data = j && Array.isArray(j.data) ? j.data : [];
+      if (data.length >= 500) { day = d; pe = data; }
+    }
+    if (!day) { skipped.push(end); return; }
+    const [pb, cap] = await Promise.all([
+      getJson(`${B}/ratios?q=ratioCode:PRICE_TO_BOOK~reportDate:${day}&size=4000`),
+      getJson(`${B}/ratios?q=ratioCode:MARKETCAP~reportDate:${day}&size=4000`),
+    ]);
+    const rows = buildSnapshot({ PRICE_TO_EARNINGS: pe, PRICE_TO_BOOK: pb?.data ?? [], MARKETCAP: cap?.data ?? [] }, {}, (sym) => (icb.get(sym) as string | null) ?? null);
+    const hist = historyRows(rows, day);
+    if (!hist.length) { skipped.push(end); return; }
+    const { error } = await supabase.from("finance_valuation_history").upsert(hist, { onConflict: "as_of,scope" });
+    if (error) throw new Error(error.message);
+    saved += hist.length; got.push(day);
+  });
+  if (!got.length) return { ok: false, error: "Không tháng nào có dữ liệu.", skipped };
+  return { ok: true, months: got.length, rows: saved, skipped: skipped.length ? skipped : undefined };
 }
 
 async function checkHealth(supabase: any) {
@@ -233,7 +274,7 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, band: BAND, tenors: TENORS });
-  const mode = ["meta", "rates", "health", "ratios", "snapshot", "all"].includes(body?.mode) ? body.mode : "health";
+  const mode = ["meta", "rates", "health", "ratios", "snapshot", "history", "all"].includes(body?.mode) ? body.mode : "health";
   const only: string[] = Array.isArray(body?.symbols) ? [...new Set(body.symbols.map((x: unknown) => String(x).trim().toUpperCase()))].filter((x) => /^[A-Z0-9]{1,12}$/.test(x as string)).slice(0, 15) as string[] : [];
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();
@@ -241,7 +282,7 @@ Deno.serve(async (req: Request) => {
   let ok = true;
   try {
     for (const m of mode === "all" ? ["meta", "rates", "health"] : [mode]) {
-      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : (m === "ratios" ? await syncRatios(supabase, only) : (m === "snapshot" ? await syncSnapshot(supabase) : await checkHealth(supabase)))); }
+      try { result[m] = m === "meta" ? await syncMeta(supabase) : (m === "rates" ? await syncRates(supabase) : (m === "ratios" ? await syncRatios(supabase, only) : (m === "snapshot" ? await syncSnapshot(supabase) : (m === "history" ? await syncHistory(supabase, String(body?.from || ""), String(body?.to || "")) : await checkHealth(supabase))))); }
       catch (e) { result[m] = { ok: false, error: String((e as Error).message || e).slice(0, 200) }; }
       if (!(result[m] as any).ok) ok = false;
     }

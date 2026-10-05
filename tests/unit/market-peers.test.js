@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSnapshot, sectorStats, quantile, snapshotDate, MIN_CAP_VND } from '../../supabase/functions/market-data-sync/peers.ts';
+import { buildSnapshot, sectorStats, quantile, snapshotDate, historyRows, monthEnds, MIN_CAP_VND } from '../../supabase/functions/market-data-sync/peers.ts';
 
 const d = (code, date, rows) => rows.map(([c, v, g]) => ({ code: c, reportDate: date, ratioCode: code, value: v, group: g || 'STOCK' }));
 const D = '2026-10-02';
@@ -56,5 +56,38 @@ describe('quantile và sectorStats', () => {
   it('ngày dữ liệu chung là ngày phổ biến nhất', () => {
     expect(snapshotDate([{ daily_date: '2026-10-02' }, { daily_date: '2026-10-02' }, { daily_date: '2026-10-01' }])).toBe('2026-10-02');
     expect(snapshotDate([])).toBeNull();
+  });
+});
+
+describe('historyRows: lịch sử định giá', () => {
+  const mk = (sym, icb, pe, pb, cap) => ({ symbol: sym, icb2_code: icb, daily_date: '2026-09-30', quarter_date: null, metrics: { pe, pb, marketcap: cap } });
+  const rows = [];
+  for (let i = 1; i <= 6; i++) rows.push(mk('A' + i, '8300', i * 2, i / 2, i * 1000e9));       // P/E 2..12; vốn hoá 1..6 nghìn tỷ
+  rows.push(mk('LOSS', '8300', -4, 1, 1000e9), mk('TINY', '8300', 1, 1, 100e9), mk('X1', '1700', 10, 1, 500e9), mk('X2', '1700', 12, 1.2, 500e9));
+  const out = historyRows(rows, '2026-09-30');
+  const bank = out.find((x) => x.scope === '8300'), all = out.find((x) => x.scope === 'ALL');
+  it('trung vị và giá trị tổng hợp theo vốn hoá (điều hoà), bỏ mã lỗ và mã nhỏ', () => {
+    expect(bank.n_pe).toBe(6);
+    expect(bank.pe_median).toBe(7);
+    const cap = 21000e9, denom = [1, 2, 3, 4, 5, 6].reduce((s, i) => s + (i * 1000e9) / (i * 2), 0);
+    expect(bank.pe_agg).toBeCloseTo(Math.round(cap / denom * 10000) / 10000, 3);
+    expect(bank.n).toBe(7);                                   // 6 mã + LOSS (đủ vốn hoá); TINY bị loại
+  });
+  it('ngành chỉ 2 mã không có dòng; toàn thị trường có và cộng vốn hoá', () => {
+    expect(out.find((x) => x.scope === '1700')).toBeUndefined();
+    expect(all.mcap_total).toBe(21000e9 + 1000e9 + 1000e9);
+    expect(out[0].scope).toBe('8300');
+  });
+  it('không đủ dữ liệu: rỗng', () => { expect(historyRows([], '2026-09-30')).toEqual([]); });
+});
+
+describe('monthEnds', () => {
+  it('ngày cuối mỗi tháng, mới nhất trước, qua năm, tháng 2 nhuận', () => {
+    expect(monthEnds('2023-11', '2024-03')).toEqual(['2024-03-31', '2024-02-29', '2024-01-31', '2023-12-31', '2023-11-30']);
+  });
+  it('đầu vào xấu hoặc ngược thứ tự: rỗng', () => {
+    expect(monthEnds('2024-13', '2024-03')).toEqual([]);
+    expect(monthEnds('2024-05', '2024-03')).toEqual([]);
+    expect(monthEnds('abc', '2024-03')).toEqual([]);
   });
 });

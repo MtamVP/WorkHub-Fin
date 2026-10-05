@@ -5,7 +5,7 @@ import { DAILY_MAP, QUARTER_MAP } from "./logic.ts";
 
 export const SNAP_DAILY = [
   "PRICE_TO_EARNINGS", "PRICE_TO_BOOK", "PRICE_TO_SALES", "MARKETCAP", "DIVIDEND_YIELD", "PRICE_TO_EARNINGS_AVG_CR_5Y", "PRICE_TO_BOOK_AVG_CR_5Y",
-  "NMVALUE_AVG_CR_20D", "PRICE_CHG_PCT_CR_1Y", "PRICE_CHG_PCT_CR_3M", "BETA",
+  "NMVALUE_AVG_CR_20D", "PRICE_CHG_PCT_CR_1Y", "PRICE_CHG_PCT_CR_3M", "BETA", "DAILY_JDK_RS_CR", "DAILY_JDK_RS_MOMENTUM_CR",
 ];
 export const SNAP_QUARTER = ["ROAE_TR_AVG5Q", "NET_MARGIN_TR", "EPS_TR_GRYOY", "NET_SALES_TR_GRYOY", "DEBT_TO_EQUITY_AQ"];
 
@@ -72,6 +72,8 @@ const r4 = (v: number) => Math.round(v * 10000) / 10000;
 // Điều kiện hợp lệ của từng chỉ số khi đưa vào thống kê (loại giá trị vô lý: P/E âm, P/E hàng trăm lần do lợi nhuận tiệm cận 0...)
 const VALID: Record<string, (v: number) => boolean> = {
   pe: (v) => v > 0 && v < 100, pb: (v) => v > 0 && v < 30, roae: (v) => v > -1 && v < 1, divYield: (v) => v >= 0 && v < 0.3, ps: (v) => v > 0 && v < 100,
+  // các chỉ số cho hồ sơ phong cách (quy mô, động lượng, biến động) và vòng quay ngành (JdK 100 = ngang thị trường)
+  marketcap: (v) => v > 0, chg1y: (v) => v > -0.95 && v < 10, chg3m: (v) => v > -0.95 && v < 5, beta: (v) => v > -1 && v < 4, jdkRs: (v) => v > 50 && v < 150, jdkMom: (v) => v > 50 && v < 150,
 };
 export const STAT_KEYS = Object.keys(VALID);
 
@@ -106,4 +108,50 @@ export function snapshotDate(rows: SnapRow[]): string | null {
   let best: string | null = null, n = 0;
   c.forEach((v, k) => { if (v > n || (v === n && best !== null && k > best)) { best = k; n = v; } });
   return best;
+}
+
+// ---------- LỊCH SỬ ĐỊNH GIÁ ----------
+// Mỗi ngày (và khi bù ngược quá khứ) ghi một dòng cho toàn thị trường ('ALL') và mỗi ngành ICB: trung vị và giá trị TỔNG HỢP theo vốn hoá của P/E, P/B.
+// P/E tổng hợp = tổng vốn hoá / tổng lợi nhuận (điều hoà có trọng số vốn hoá, chỉ mã có lãi): gần với P/E của chỉ số. Chỉ tính mã vốn hoá từ 300 tỷ.
+// LƯU Ý thiên lệch: ngành ICB lấy theo danh sách HIỆN TẠI nên mã đã hủy niêm yết chỉ có trong 'ALL' (thiên lệch người sống sót nhẹ ở các ngành).
+export type HistRow = { as_of: string; scope: string; n: number; n_pe: number; n_pb: number; pe_median: number | null; pb_median: number | null; pe_agg: number | null; pb_agg: number | null; mcap_total: number };
+
+function aggRatio(list: SnapRow[], key: string, valid: (v: number) => boolean): { median: number | null; agg: number | null; n: number } {
+  const xs = list.filter((r) => typeof r.metrics[key] === "number" && valid(r.metrics[key]) && r.metrics.marketcap > 0);
+  if (xs.length < MIN_SECTOR_N) return { median: null, agg: null, n: xs.length };
+  const sorted = xs.map((r) => r.metrics[key]).sort((a, b) => a - b);
+  const cap = xs.reduce((s, r) => s + r.metrics.marketcap, 0), denom = xs.reduce((s, r) => s + r.metrics.marketcap / r.metrics[key], 0);
+  return { median: r4(quantile(sorted, 0.5)), agg: denom > 0 ? r4(cap / denom) : null, n: xs.length };
+}
+
+export function historyRows(rows: SnapRow[], asOf: string): HistRow[] {
+  const groups = new Map<string, SnapRow[]>();
+  const put = (k: string, r: SnapRow) => { const g = groups.get(k); if (g) g.push(r); else groups.set(k, [r]); };
+  for (const r of rows) {
+    if (!(r.metrics.marketcap >= MIN_CAP_VND)) continue;
+    put("ALL", r);
+    if (r.icb2_code) put(r.icb2_code, r);
+  }
+  const out: HistRow[] = [];
+  groups.forEach((list, scope) => {
+    const pe = aggRatio(list, "pe", VALID.pe), pb = aggRatio(list, "pb", VALID.pb);
+    if (pe.median === null && pb.median === null) return;
+    out.push({ as_of: asOf, scope, n: list.length, n_pe: pe.n, n_pb: pb.n, pe_median: pe.median, pb_median: pb.median, pe_agg: pe.agg, pb_agg: pb.agg, mcap_total: Math.round(list.reduce((s, r) => s + r.metrics.marketcap, 0)) });
+  });
+  return out.sort((a, b) => (a.scope < b.scope ? -1 : 1));
+}
+
+// Các ngày cuối tháng (YYYY-MM-DD) từ tháng `from` tới tháng `to` (YYYY-MM, gồm cả hai), mới nhất trước; ngày thật có dữ liệu do hàm gọi tự dò lùi (cuối tuần, lễ).
+export function monthEnds(from: string, to: string): string[] {
+  const ok = (x: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(x);
+  if (!ok(from) || !ok(to) || from > to) return [];
+  const out: string[] = [];
+  let [y, m] = to.split("-").map(Number);
+  const [fy, fm] = from.split("-").map(Number);
+  while (y > fy || (y === fy && m >= fm)) {
+    out.push(new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10));
+    m--; if (m === 0) { m = 12; y--; }
+    if (out.length > 120) break;
+  }
+  return out;
 }

@@ -21,12 +21,12 @@ Dự án Supabase dùng chung: `gqsbsqaxzpzcloaopzvv`. Mọi tác vụ định k
 | market-rates-daily | `30 10 * * 1-5` | market-data-sync `rates` | lợi suất TPCP |
 | market-health-daily | `45 10 * * 1-5` | market-data-sync `health` | kiểm hai nguồn giá + email cảnh báo mới |
 | market-ratios-daily | `0 11 * * 1-5` | market-data-sync `ratios` | P/E, P/B, beta, khối ngoại… |
-| market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành |
+| market-snapshot-daily | `20 11 * * 1-5` | market-data-sync `snapshot` | ảnh chụp cả thị trường + thống kê ngành + ghi tiếp lịch sử định giá |
 | cleanup_system_logs | `0 3 1 * *` | SQL | dọn nhật ký hệ thống |
 
 ### Edge Function (phiên bản đang chạy tại 04/10/2026)
 
-`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v6 · `storage-proxy` v7.
+`fetch-stock-prices` v6 · `send-price-alerts` v6 · `stock-history` v5 · `stock-financials` v1 · `stock-events` v2 · `refresh-financials` v2 · `check-limits` v1 (bản triển khai CŨ hơn kho mã) · `approval-watch` v2 · `market-data-sync` v7 · `storage-proxy` v7.
 
 Secrets (đặt trong Supabase → Edge Functions → Secrets, KHÔNG ghi vào kho mã): `RESEND_API_KEY`, `ALERT_FROM_EMAIL`. Chỉ cần cho email cảnh báo.
 
@@ -118,3 +118,12 @@ Nguồn đều là điểm cuối công khai, không cam kết dịch vụ.
 - Trigger đã kiểm bằng khối `DO` có huỷ dữ liệu (9 ca): mua nhỏ cho phép; mua vượt 10% NAV bị chặn `LIMIT_BLOCKED`; bán không bị chặn; quản lý không bị chặn; chế độ "phải ghi lý do" không chặn; giới hạn riêng cho mã thay thế giới hạn chung; cộng dồn vị thế vượt `max_position_vnd` bị chặn; nhập sao kê vượt giới hạn không chặn và ghi 1 dòng kiểm tra `limit`. Sau kiểm không còn dữ liệu thử.
 - Còn lại: `check-limits` v1 trên máy chủ cũ hơn kho mã (triển khai lại khi cần). 523 mã trong ảnh chụp chưa có ngành ICB (phần lớn UPCoM nhỏ) nên không vào thống kê ngành.
 - 05/10 (sau đó): phát hiện và sửa lỗi thật: PostgREST chỉ trả tối đa 1.000 dòng mỗi lần dù `.limit(5000)`, nên 523 mã trong ảnh chụp mất ngành ICB (thống kê ngành lệch: ngân hàng chỉ 20 mã thay vì 28). Đã thêm `fetchAll` đọc theo trang trong `market-data-sync` (v6) cho meta, giao dịch, theo dõi; chạy lại snapshot: 0 mã thiếu ngành. BẪY: mọi đọc bảng có thể quá 1.000 dòng trong Edge Function phải phân trang.
+
+### Bù ngược lịch sử định giá (chạy tay, một lần)
+Chế độ `history` bù theo tháng, tối đa 14 tháng mỗi lần gọi (mỗi tháng 3 lần gọi VNDirect, dò lùi tối đa 7 ngày để tìm ngày có dữ liệu):
+```
+curl -X POST <url hàm> -H "Authorization: Bearer <publishable key>" -H "apikey: <publishable key>" -H "Content-Type: application/json" -d '{"mode":"history","from":"2021-01","to":"2022-02"}'
+```
+Lặp cho các đoạn kế tiếp tới tháng hiện tại (6 năm ≈ 6 lần gọi). Chạy lại an toàn (ghi đè theo ngày + phạm vi). Kiểm: `select scope, count(*), min(as_of), max(as_of) from finance_valuation_history group by 1 order by 1;` (kỳ vọng ~70 ngày cho `ALL`).
+- 06/10: migration `fin_valuation_history` đã áp dụng (bảng `finance_valuation_history`); `market-data-sync` v7 đã triển khai; bù ngược lịch sử 10/2020 – 10/2026: 70 ngày cho `ALL` và từng ngành. Hai tháng không có dữ liệu trong vòng 7 ngày (03/2024, 01/2025) bị bỏ qua, chuỗi vẫn dùng được (theo tháng, có lỗ hổng). Snapshot hằng ngày từ nay ghi tiếp lịch sử và thêm JdK, beta, vốn hoá, biến động giá vào thống kê.
+

@@ -96,3 +96,18 @@ describe('flags: cảnh báo coi chừng', () => {
     r.entries.forEach((e) => expect(Array.isArray(e.flags)).toBe(true));
   });
 });
+
+describe('động lượng: chg3m và JdK', () => {
+  const snap = [S('LEAD', '2700', { pe: 10, pb: 1.2, roae: 0.15, chg3m: 0.12, jdkRs: 104, jdkMom: 101 }), S('LAG', '2700', { pe: 10, pb: 1.2, roae: 0.15, chg3m: -0.1, jdkRs: 96, jdkMom: 98 }), S('NODATA', '2700', { pe: 10, pb: 1.2, roae: 0.15 })];
+  const rr = MS.buildRows(snap, STATS, {});
+  it('lọc mã dẫn đầu (RS và Momentum từ 100); mã thiếu JdK bị loại và đếm riêng', () => {
+    const r = MS.evaluate(rr, { values: { jdkRs: 100, jdkMom: 100 } });
+    expect(r.entries.map((e) => e.row.symbol)).toEqual(['LEAD']);
+    expect(r.counts.missing.jdkRs).toBe(1);
+    expect(r.counts.failedBy.jdkRs).toBe(1);
+  });
+  it('động lượng 3 tháng tính theo % gõ vào', () => {
+    expect(MS.evaluate(rr, { values: { chg3m: 10 } }).entries.map((e) => e.row.symbol)).toEqual(['LEAD']);
+  });
+  it('có mẫu "Dẫn đầu và có nền tảng"', () => { expect(MS.PRESETS.some((p) => p.key === 'momentum')).toBe(true); });
+});

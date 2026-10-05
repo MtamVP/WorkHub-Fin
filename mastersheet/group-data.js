@@ -12,7 +12,7 @@ const GD_KIND = {
 };
 const GD_SEV = { error: 'bad', warn: 'warn', info: 'mute' };
 // Hạn chạy tối đa (giờ) trước khi coi là "trễ": rates/health chạy ngày làm việc nên cho 3 ngày để qua cuối tuần; meta chạy hằng tuần
-const GD_MAX_AGE_H = { meta: 24 * 9, rates: 24 * 3.5, health: 24 * 3.5 };
+const GD_MAX_AGE_H = { meta: 24 * 9, rates: 24 * 3.5, health: 24 * 3.5, snapshot: 24 * 3.5 };
 
 function gdAge(iso) { const h = (Date.now() - Date.parse(iso)) / 3600000; return isFinite(h) ? h : null; }
 function gdAgeText(h) { return h === null ? '—' : (h < 1 ? Math.max(1, Math.round(h * 60)) + ' phút trước' : (h < 48 ? Math.round(h) + ' giờ trước' : Math.round(h / 24) + ' ngày trước')); }
@@ -91,7 +91,7 @@ function grDataHtml() {
     const manager = gdManager();
     const open = GD.health.filter(h => !h.resolved), errors = open.filter(h => h.severity === 'error').length, warns = open.filter(h => h.severity === 'warn').length;
     const lastBy = {}; GD.runs.forEach(r => { if (!lastBy[r.mode] || r.run_at > lastBy[r.mode].run_at) lastBy[r.mode] = r; });
-    const modes = [['meta', 'Thông tin mã + phân ngành ICB', 'hằng tuần'], ['rates', 'Lợi suất trái phiếu chính phủ', 'mỗi ngày làm việc'], ['health', 'Kiểm chất lượng giá (hai nguồn)', 'mỗi ngày làm việc']];
+    const modes = [['meta', 'Thông tin mã + phân ngành ICB', 'hằng tuần'], ['rates', 'Lợi suất trái phiếu chính phủ', 'mỗi ngày làm việc'], ['health', 'Kiểm chất lượng giá (hai nguồn)', 'mỗi ngày làm việc'], ['snapshot', 'Ảnh chụp thị trường + thống kê ngành + lịch sử định giá', 'mỗi ngày làm việc']];
     const lateModes = modes.filter(([m]) => { const r = lastBy[m]; return !r || !r.ok || gdAge(r.run_at) > GD_MAX_AGE_H[m]; }).length;
     const fresh = gdFreshness(), staleData = fresh.filter(f => f.days === null || f.days > f.limit).length;
     const meta = GL && GR.portfolios ? SectorMap.coverage(GR.portfolios.flatMap(p => p.holdings.map(h => h.symbol)), FinCalc.sectorOf) : { total: 0, known: 0, unknown: [] };
