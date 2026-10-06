@@ -2997,6 +2997,14 @@ const API = {
                 if (row) row.author = (await API.asset.vb._authors([row.user_id]))[row.user_id] || '';
                 return row;
             },
+            // Bội số của các mã do người dùng chọn làm bộ so sánh: lấy từ ảnh chụp thị trường hằng ngày; mã không có trong ảnh chụp bị bỏ qua
+            peerRows: async (symbols) => {
+                const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 40);
+                if (list.length < 3) throw new Error('Cần tối thiểu 3 mã so sánh');
+                const { data, error } = await sbClient.from('finance_market_snapshot').select('symbol, icb2_code, metrics').in('symbol', list);
+                if (error) throw error;
+                return (data || []).map(r => ({ symbol: r.symbol, icb2_code: r.icb2_code, metrics: r.metrics || {} }));
+            },
             // Bản mới nhất (cột nhẹ) của nhiều mã: { SYM: row } -- cho Danh Mục / Bảng so sánh của Investment Workbench
             latestMany: async (symbols) => {
                 const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))];
@@ -5213,6 +5221,7 @@ async function _dispatchAction(action, params = {}) {
             case 'saveVbValuation': result = await API.asset.vb.save(params.email, params.record); break;
             case 'getVbById': result = await API.asset.vb.get(params.id); break;
             case 'getVbLatest': result = await API.asset.vb.latest(params.symbol); break;
+            case 'getVbPeerRows': result = await API.asset.vb.peerRows(params.symbols); break;
             case 'getVbLatestMany': result = await API.asset.vb.latestMany(params.symbols); break;
             case 'getVbHistory': result = await API.asset.vb.history(params.symbol, params.limit); break;
             case 'listVbLatest': result = await API.asset.vb.listLatest(params.limit); break;

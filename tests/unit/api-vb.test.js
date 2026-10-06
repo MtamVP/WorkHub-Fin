@@ -94,6 +94,22 @@ describe('đọc bản đã lưu', () => {
   });
 });
 
+describe('bộ mã so sánh tự chọn (peerRows)', () => {
+  const snap = [{ symbol: 'CMG', icb2_code: '9500', metrics: { pe: 12, pb: 1.4, marketcap: 5e12 } }, { symbol: 'ELC', icb2_code: '9500', metrics: { pe: 9 } }, { symbol: 'VGI', icb2_code: '6500', metrics: { pe: 30 } }, { symbol: 'HPG', icb2_code: '1700', metrics: { pe: 8 } }];
+  it('trả bội số của các mã có trong ảnh chụp thị trường, bỏ mã sai và mã trùng, bỏ mã không có', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: snap });
+    const rows = await c.API.asset.vb.peerRows(['cmg', 'ELC', 'VGI', 'cmg', '!!', 'ZZZ']);
+    expect(rows.map((x) => x.symbol).sort()).toEqual(['CMG', 'ELC', 'VGI']);
+    expect(rows.find((x) => x.symbol === 'CMG').metrics.pe).toBe(12);
+  });
+  it('cần tối thiểu 3 mã; callGAS định tuyến hành động mới', async () => {
+    const c = boot(MEMBER, { finance_market_snapshot: snap });
+    await expect(c.API.asset.vb.peerRows(['CMG', 'ELC'])).rejects.toThrow(/3 mã/);
+    const r = await c.callGAS('getVbPeerRows', { symbols: ['CMG', 'ELC', 'VGI'] });
+    expect(r.status).toBe('success'); expect(r.data).toHaveLength(3);
+  });
+});
+
 describe('xoá', () => {
   it('gọi xoá qua DB; không xoá được thì báo lỗi rõ', async () => {
     const c = boot(MEMBER, { finance_vb_valuations: [{ id: 'a', user_id: 'u-1', symbol: 'FPT', as_of: '2026-09-01', fair_base: 1, created_at: '2026-09-01T00:00:00Z' }] });

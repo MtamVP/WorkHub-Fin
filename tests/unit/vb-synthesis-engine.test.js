@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import K from '../../lib/vb-market.js';
 import Y from '../../lib/vb-synthesis.js';
 import E from '../../lib/vb-engine.js';
+import M2 from '../../lib/vb-multiples.js';
 
 // ---------- bối cảnh thị trường ----------
 function hist(scope, key, vals) {
@@ -216,5 +217,49 @@ describe('mặc định cho tài chính và trọng số cổ tức', () => {
     const d = r.methods.find((m) => m.key === 'ddm');
     expect(d.weightFactor).toBeLessThan(1); expect(d.note).toMatch(/Tỷ lệ chi trả tiền mặt/);
     expect(r.synthesis.methods.find((m) => m.key === 'ddm').weight).toBeLessThan(0.3);
+  });
+});
+
+describe('VBEngine: điều chỉnh khoản bất thường, bộ so sánh tự chọn, DCF theo động lực', () => {
+  const ctx = { symbol: 'TEST', annualRows: ANNUAL.map((r) => Object.assign({}, r)), candles: candles(400, 15), ratioSeries: { pe: PE_SERIES }, metrics: { shares: 50e6, beta: 1, divYield: 0.025, advValue20: 20e9 }, peerStats: PEERS, price: 50000 };
+  const r0 = E.analyze(ctx);
+  it('điều chỉnh loại lãi một lần: EPS giảm, P/E tăng, giá ngầm định theo P/E ngành giảm; ghi nhận trong kết quả', () => {
+    const adj = [{ label: 'Lãi bán đầu tư', type: 'nonoperating', amount: -30 * 1e9 }];
+    const r1 = E.analyze(Object.assign({}, ctx, { adjustments: adj }));
+    expect(r1.normalization.list).toHaveLength(1); expect(r1.normalization.after.netIncome).toBeLessThan(r1.normalization.before.netIncome);
+    expect(r1.multiples.eps).toBeLessThan(r0.multiples.eps); expect(r1.multiples.pe).toBeGreaterThan(r0.multiples.pe);
+    expect(r1.methods.find((m) => m.key === 'peer-pe').base).toBeLessThan(r0.methods.find((m) => m.key === 'peer-pe').base);
+    expect(r0.normalization).toBeNull();
+    expect(r1.process.checks.find((c) => c.key === 'normalized').level).toBe('info');
+  });
+  it('khoản trong EBIT dịch biên DCF cơ sở và EBITDA cho EV/EBITDA', () => {
+    const r1 = E.analyze(Object.assign({}, ctx, { adjustments: [{ label: 'Hoàn nhập dự phòng', type: 'operating', amount: -20 * 1e9 }] }));
+    expect(r1.dcfBase.ebitMargin).toBeLessThan(r0.dcfBase.ebitMargin); expect(r1.dcf.perShare).toBeLessThan(r0.dcf.perShare);
+  });
+  it('bộ so sánh tự chọn thay thống kê ngành (cho phép từ 3 mã) và được ghi nhận', () => {
+    const rows = [{ symbol: 'A', metrics: { pe: 8, pb: 1 } }, { symbol: 'B', metrics: { pe: 9, pb: 1.2 } }, { symbol: 'C', metrics: { pe: 10, pb: 1.4 } }];
+    const stats = M2.statsFromRows(rows), r1 = E.analyze(Object.assign({}, ctx, { peerOverride: { stats: stats, symbols: ['A', 'B', 'C'], minN: 3 } }));
+    expect(r1.peerSet.mode).toBe('custom'); expect(r1.peerSet.symbols).toEqual(['A', 'B', 'C']);
+    const pe = r1.methods.find((m) => m.key === 'peer-pe'); expect(pe.n).toBe(3); expect(pe.base).toBeCloseTo(9 * r1.multiples.eps, 4);
+    expect(r1.methods.find((m) => m.key === 'peer-ps')).toBeUndefined();      // bộ tự chọn không có P/S thì không tạo phương pháp P/S
+    expect(r0.peerSet.mode).toBe('sector'); expect(r1.process.checks.find((c) => c.key === 'peerset').detail).toContain('A, B, C');
+  });
+  it('mặc định chưa bật DCF theo động lực, nhưng có mẫu điền sẵn; bật thì thành phương pháp chính và hạ DCF tự ngoại suy xuống hỗ trợ', () => {
+    expect(r0.driver).toBeUndefined(); expect(r0.driverDefaults.segments).toHaveLength(1); expect(r0.methods.map((m) => m.key)).not.toContain('dcf-driver');
+    const r1 = E.analyze(Object.assign({}, ctx, { driver: { enabled: true } }));
+    expect(r1.driver.ok).toBe(true); const m = r1.methods.find((x) => x.key === 'dcf-driver'); expect(m.base).toBeGreaterThan(0); expect(m.low).toBeLessThan(m.base); expect(m.high).toBeGreaterThan(m.base);
+    const pr = (k) => r1.process.rows.find((x) => x.key === k);
+    expect(pr('dcf-driver').role).toBe('core'); expect(pr('dcf').role).toBe('support'); expect(r1.process.gaps.map((g) => g.key)).not.toContain('dcf-driver');
+  });
+  it('người dùng sửa mảng và tăng trưởng thì giá trị đổi đúng hướng', () => {
+    const d = r0.driverDefaults, hi = E.analyze(Object.assign({}, ctx, { driver: { enabled: true, segments: [Object.assign({}, d.segments[0], { margin: d.segments[0].margin.map((x) => x + 0.05) })] } }));
+    const base = E.analyze(Object.assign({}, ctx, { driver: { enabled: true } }));
+    expect(hi.driver.perShare).toBeGreaterThan(base.driver.perShare);
+  });
+  it('bản ghi lưu điều chỉnh, bộ so sánh và động lực để nạp lại', () => {
+    const adj = [{ label: 'x', type: 'nonoperating', amount: -1e9 }], drv = { enabled: true, capexPct: 0.06 };
+    const rec = E.toRecord(E.analyze(Object.assign({}, ctx, { adjustments: adj, driver: drv })), { adjustments: adj, driver: drv, peerSet: { mode: 'custom', symbols: ['A', 'B', 'C'] } });
+    expect(rec.assumptions.adjustments).toEqual(adj); expect(rec.assumptions.driver).toEqual(drv); expect(rec.assumptions.peerSet.symbols).toEqual(['A', 'B', 'C']);
+    expect(E.toRecord(r0, {}).assumptions.adjustments).toBeNull();
   });
 });

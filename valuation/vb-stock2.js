@@ -24,8 +24,8 @@ function sensGrid(rowLabels, colLabels, values, price, rowFmt, colFmt, cr, cc) {
 // ---------- tab Định giá ----------
 function tabValuation(r) {
     let html = '';
-    if (r.form === 'NON_FINANCE') html += dcfSection(r); else html += bankSection(r);
-    html += multiplesSection(r) + assetSection(r);
+    if (r.form === 'NON_FINANCE') html += dcfSection(r) + driverSection(r) + normalizeSection(r); else html += bankSection(r);
+    html += peerSetSection(r) + multiplesSection(r) + assetSection(r);
     return html;
 }
 

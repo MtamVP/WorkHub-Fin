@@ -180,3 +180,5 @@ body[data-bench="valuation"] .desk-nav a { flex: none; }
 .vb-proc-banner { margin-bottom: 14px; } .vb-proc-banner-in { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 720px) { .vb-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .vb-table select.vb-in { min-width: 124px; } .vb-table td.l.vb-muted { min-width: 260px; max-width: 420px; white-space: normal; }
+.vb-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: pointer; }
+.vb-table .vb-in.w { min-width: 96px; width: 100%; }

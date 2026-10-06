@@ -91,6 +91,8 @@ function buildCtx() {
         histRows: b.history ? b.history.rows : [], bond10yPct: b.history ? b.history.bond10y : null,
         dcf: P.dcf, weights: P.weights, marginOfSafety: P.mos, bankInputs: P.bank, navAdjustments: P.navAdj, sotp: P.sotp,
         process: P.process,
+        adjustments: P.adjustments, driver: P.driver,
+        peerOverride: P.peerSet && P.peerSet.mode === 'custom' && VB.customPeerRows && VB.customPeerRows.length >= 3 ? { stats: VBMultiples.statsFromRows(VB.customPeerRows, 3), symbols: VB.customPeerRows.map(function (x) { return x.symbol; }), minN: 3 } : null,
         erp: P.erp !== null && P.erp !== undefined ? P.erp : undefined, sizePremium: P.sizePremium !== null && P.sizePremium !== undefined ? P.sizePremium : undefined,
         mc: { n: 1500 },
     };
@@ -102,12 +104,12 @@ function recompute() {
 }
 async function loadStock(sym) {
     const seq = ++VB.loadSeq;
-    VB.symbol = sym; VB.loading = true; VB.error = ''; VB.bundle = null; VB.result = null; VB.params = loadParams(sym);
+    VB.symbol = sym; VB.loading = true; VB.error = ''; VB.bundle = null; VB.result = null; VB.params = loadParams(sym); VB.customPeerRows = null;
     renderStock();
     try {
         const bundle = await call('getVbData', { symbol: sym, years: 8, candleYears: 5 });
         if (seq !== VB.loadSeq) return;
-        VB.bundle = bundle; recompute(); rememberRecent(sym);
+        VB.bundle = bundle; await ensureCustomPeers(); recompute(); rememberRecent(sym);
         try { VB.history = await call('getVbHistory', { symbol: sym, limit: 60 }); } catch (e) { VB.history = []; }
         if (seq !== VB.loadSeq) return;
         VB.loading = false; renderStock();
@@ -141,8 +143,12 @@ function resetParams(what) {
     if (what === 'dcf' || what === 'all') { VB.params.erp = null; VB.params.beta = null; VB.params.sizePremium = null; }
     recompute(); renderStockBody();
 }
-function loadParamsDefault() { return { dcf: {}, weights: {}, mos: 0.2, bank: {}, navAdj: [], sotp: [], erp: null, beta: null, sizePremium: null, process: { archetype: null, roles: {}, reasons: {}, ack: '' } }; }
-function normalizeProcess(P) { const q = P.process || {}; P.process = { archetype: q.archetype || null, roles: q.roles || {}, reasons: q.reasons || {}, ack: q.ack || '' }; return P; }
+function loadParamsDefault() { return { dcf: {}, weights: {}, mos: 0.2, bank: {}, navAdj: [], sotp: [], erp: null, beta: null, sizePremium: null, process: { archetype: null, roles: {}, reasons: {}, ack: '' }, adjustments: [], peerSet: { mode: 'sector', symbols: [] }, driver: { enabled: false } }; }
+function normalizeProcess(P) {
+    if (!Array.isArray(P.adjustments)) P.adjustments = [];
+    if (!P.peerSet || (P.peerSet.mode !== 'custom' && P.peerSet.mode !== 'sector')) P.peerSet = { mode: 'sector', symbols: [] };
+    if (!Array.isArray(P.peerSet.symbols)) P.peerSet.symbols = [];
+    if (!P.driver || typeof P.driver !== 'object') P.driver = { enabled: false }; const q = P.process || {}; P.process = { archetype: q.archetype || null, roles: q.roles || {}, reasons: q.reasons || {}, ack: q.ack || '' }; return P; }
 // đọc ô nhập: inputEl.dataset.group / key / mode ('pct' chia 100, 'num', 'bool')
 function onParamInput(el) {
     const g = el.dataset.group, k = el.dataset.key, mode = el.dataset.mode || 'num';
@@ -179,7 +185,7 @@ async function saveValuation() {
         const box = document.getElementById('vb-proc-ack'); if (box) { box.scrollIntoView({ block: 'center' }); box.focus(); }
         return;
     }
-    const rec = VBEngine.toRecord(r, { note: note.trim(), weights: VB.params.weights, marginOfSafety: VB.params.mos, process: VB.params.process });
+    const rec = VBEngine.toRecord(r, { note: note.trim(), weights: VB.params.weights, marginOfSafety: VB.params.mos, process: VB.params.process, adjustments: VB.params.adjustments, driver: VB.params.driver, peerSet: VB.params.peerSet });
     if (!rec) { showToast('Chưa có giá trị hợp lý để lưu', 'error'); return; }
     const btn = document.getElementById('vb-save-btn'); if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu…'; }
     try {
@@ -205,8 +211,9 @@ async function restoreSaved(id) {
         const data = await call('getVbById', { id: id });
         if (!data) throw new Error('Không đọc được bản định giá');
         const a = data.assumptions || {};
-        VB.params = Object.assign(loadParamsDefault(), { dcf: a.dcf ? pickEditable(a.dcf) : {}, bank: a.bank || {}, weights: a.weights || {}, mos: a.marginOfSafety === null || a.marginOfSafety === undefined ? 0.2 : a.marginOfSafety, process: a.process || null });
+        VB.params = Object.assign(loadParamsDefault(), { dcf: a.dcf ? pickEditable(a.dcf) : {}, bank: a.bank || {}, weights: a.weights || {}, mos: a.marginOfSafety === null || a.marginOfSafety === undefined ? 0.2 : a.marginOfSafety, process: a.process || null, adjustments: a.adjustments || [], driver: a.driver || { enabled: false }, peerSet: a.peerSet || null });
         normalizeProcess(VB.params);
+        await ensureCustomPeers();
         recompute(); renderStockBody(); showToast('Đã nạp lại giả định của bản ngày ' + vbDate(data.created_at), 'success');
     } catch (e) { showToast(e.message, 'error'); }
 }
