@@ -182,3 +182,11 @@ body[data-bench="valuation"] .desk-nav a { flex: none; }
 .vb-table select.vb-in { min-width: 124px; } .vb-table td.l.vb-muted { min-width: 260px; max-width: 420px; white-space: normal; }
 .vb-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: pointer; }
 .vb-table .vb-in.w { min-width: 96px; width: 100%; }
+
+/* Trang Độ chính xác (vb-accuracy-ui.js) */
+.vb-bars { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
+.vb-bar-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 64px 150px; align-items: center; gap: 10px; font-size: 0.82rem; }
+.vb-bar-t { display: block; height: 14px; background: var(--hover-bg); border-radius: 7px; overflow: hidden; }
+.vb-bar-t i { display: block; height: 100%; border-radius: 7px; } .vb-bar-t i.pos { background: var(--vb-up, var(--success-color)); } .vb-bar-t i.neg { background: var(--vb-down, var(--danger-color)); }
+.vb-bar-v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 720px) { .vb-bar-row { grid-template-columns: 70px minmax(0, 1fr) 56px; } .vb-bar-row .vb-muted { display: none; } }

@@ -72,6 +72,15 @@ function procStep2(p) {
     return procCard(2, 'fa-database', 'Cổng dữ liệu', 'đủ dữ liệu để kết luận chưa', body, g.status === 'ok' ? 'done' : (g.status === 'limited' ? 'warn' : 'fail'));
 }
 
+// IC 12 tháng của phương pháp trong backtest (theo mô hình nếu có đủ mẫu, không thì toàn bộ)
+function procEvidenceHtml(e) {
+    if (!e) return '<span class="vb-muted">—</span>';
+    const ic = (e.ic >= 0 ? '+' : '−') + Math.abs(e.ic).toFixed(2).replace('.', ',');
+    const cls = e.verdict === 'positive' ? 'vb-up' : (e.verdict === 'negative' ? 'vb-down' : 'vb-muted');
+    const tip = 'IC 12 tháng ' + ic + ' trong backtest (' + (e.scope === 'archetype' ? 'riêng mô hình này' : 'toàn bộ mã') + ', ' + e.n + ' mẫu); ' + (e.verdict === 'positive' ? 'có bằng chứng dự báo được' : (e.verdict === 'negative' ? 'dự báo ngược' : 'chưa có bằng chứng'));
+    return '<span class="' + cls + '" title="' + vbE(tip) + '"><b>' + ic + '</b>' + (e.scope === 'overall' ? '<sup>*</sup>' : '') + '</span>';
+}
+
 // ---------- 3. Kế hoạch phương pháp ----------
 function procRoleSelect(row) {
     return '<select class="vb-in sm' + (row.user ? ' changed' : '') + '" onchange="setProcRole(\'' + vbE(row.key) + '\',this.value)" aria-label="Vai trò của ' + vbE(row.label) + '">' +
@@ -85,10 +94,10 @@ function procStep3(r, p) {
         const dev = x.computed && r.synthesis && r.synthesis.fair ? r.synthesis.fair.base : null;
         const reasonIn = x.user ? '<input class="vb-in" style="margin-top:6px;width:100%" maxlength="160" placeholder="Lý do đổi vai trò" aria-label="Lý do đổi vai trò" value="' + vbE((VB.params.process.reasons || {})[x.key] || '') + '" onchange="setProcReason(\'' + vbE(x.key) + '\',this.value)">' : '';
         return '<tr class="vb-role-' + x.role + '"><td class="l"><b>' + vbE(x.label) + '</b>' + (x.lib ? ' <a class="vb-muted" href="/valuation/#methods" title="Xem định nghĩa và công thức trong thư viện phương pháp">?</a>' : '') + '</td><td>' + procRoleSelect(x) + '</td><td>' + (x.computed ? vbN(x.base) : '—') +
-            '</td><td>' + (x.computed && dev ? vbPct(x.base / dev - 1, 0, true) : '—') + '</td><td><b>' + vbN(x.weight, 2) + '</b></td><td>' + stt + '</td><td class="l vb-muted">' + vbE(x.limit ? x.limit + ' ' : '') + vbE(x.why) + reasonIn + '</td></tr>';
+            '</td><td>' + (x.computed && dev ? vbPct(x.base / dev - 1, 0, true) : '—') + '</td><td><b>' + vbN(x.weight, 2) + '</b></td><td>' + procEvidenceHtml(x.evidence) + '</td><td>' + stt + '</td><td class="l vb-muted">' + vbE(x.limit ? x.limit + ' ' : '') + vbE(x.why) + reasonIn + '</td></tr>';
     }).join('');
-    const tbl = '<div class="vb-table-wrap"><table class="vb-table"><thead><tr><th class="l">Phương pháp</th><th>Vai trò</th><th>Giá trị cơ sở</th><th>So với đồng thuận</th><th>Trọng số</th><th>Tình trạng</th><th class="l">Vì sao</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-    const body = gaps + tbl + '<p class="vb-note">Trọng số = trọng số của vai trò (Chính ' + vbN(VBProcess.ROLES.core.weight, 1) + ', Hỗ trợ ' + vbN(VBProcess.ROLES.support.weight, 1) + ', Đối chiếu ' + vbN(VBProcess.ROLES.check.weight, 1) + ', Tham khảo/Loại 0), giảm một nửa khi phương pháp ở tình trạng "Hạn chế". Đổi vai trò để thay đổi cách phương pháp tham gia; muốn tinh chỉnh từng trọng số, dùng cột trọng số ở tab Tổng hợp (lựa chọn thủ công thắng quy trình).' +
+    const tbl = '<div class="vb-table-wrap"><table class="vb-table"><thead><tr><th class="l">Phương pháp</th><th>Vai trò</th><th>Giá trị cơ sở</th><th>So với đồng thuận</th><th>Trọng số</th><th>Backtest</th><th>Tình trạng</th><th class="l">Vì sao</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    const body = gaps + tbl + '<p class="vb-note">Trọng số = trọng số của vai trò (Chính ' + vbN(VBProcess.ROLES.core.weight, 1) + ', Hỗ trợ ' + vbN(VBProcess.ROLES.support.weight, 1) + ', Đối chiếu ' + vbN(VBProcess.ROLES.check.weight, 1) + ', Tham khảo/Loại 0), giảm một nửa khi phương pháp ở tình trạng "Hạn chế". Đổi vai trò để thay đổi cách phương pháp tham gia; muốn tinh chỉnh từng trọng số, dùng cột trọng số ở tab Tổng hợp (lựa chọn thủ công thắng quy trình). Cột Backtest là IC 12 tháng của phương pháp trong bảng điểm lịch sử (xem trang Độ chính xác); dấu * nghĩa là lấy IC của toàn bộ mã vì mô hình này chưa đủ mẫu riêng.' +
         (Object.keys(VB.params.process.roles || {}).length || VB.params.process.archetype ? ' <button type="button" class="vb-btn ghost sm" onclick="resetProcess()"><i class="fa-solid fa-rotate-left"></i> Về mặc định của quy trình</button>' : '') + '</p>';
     return procCard(3, 'fa-diagram-project', 'Kế hoạch phương pháp', 'vai trò, trọng số và lý do cho từng phương pháp', body, p.gaps.length ? 'warn' : (p.coreActive >= 2 ? 'done' : 'fail'));
 }

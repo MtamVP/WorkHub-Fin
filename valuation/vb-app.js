@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 function parseHash() {
     const parts = String(location.hash || '').replace(/^#/, '').split('/').filter(Boolean);
-    const view = ['stock', 'methods', 'overview'].indexOf(parts[0]) !== -1 ? parts[0] : 'overview';
+    const view = ['stock', 'methods', 'accuracy', 'overview'].indexOf(parts[0]) !== -1 ? parts[0] : 'overview';
     const sym = view === 'stock' && parts[1] && /^[A-Za-z0-9]{1,12}$/.test(parts[1]) ? parts[1].toUpperCase() : null;
     const tab = ['summary', 'process', 'fundamental', 'valuation', 'technical', 'market', 'saved'].indexOf(parts[2]) !== -1 ? parts[2] : 'summary';
     return { view: view, sym: sym, tab: tab };
@@ -57,10 +57,11 @@ function setHash(view, sym, tab) { const h = '#' + view + (sym ? '/' + sym + (ta
 function route() {
     const h = parseHash();
     VB.view = h.view; VB.tab = h.tab;
-    if (typeof BenchNav !== 'undefined') BenchNav.setActive(h.view === 'stock' ? 'stock' : (h.view === 'methods' ? 'methods' : 'overview'));
+    if (typeof BenchNav !== 'undefined') BenchNav.setActive(h.view === 'stock' ? 'stock' : (h.view === 'methods' ? 'methods' : (h.view === 'accuracy' ? 'accuracy' : 'overview')));
     const title = document.getElementById('vb-title');
     if (h.view === 'overview') { if (title) title.textContent = 'Valuation Bench'; renderOverview(); return; }
     if (h.view === 'methods') { if (title) title.textContent = 'Thư viện phương pháp'; renderMethods('all'); return; }
+    if (h.view === 'accuracy') { if (title) title.textContent = 'Độ chính xác'; renderAccuracy(); return; }
     if (title) title.textContent = 'Hồ sơ cổ phiếu';
     if (!h.sym) { renderStockHome(); return; }
     if (VB.symbol === h.sym && VB.result && !VB.loading) { renderStock(); return; }
@@ -90,7 +91,7 @@ function buildCtx() {
         ratioSeries: v.ratioSeries || null, metrics: metrics, peerStats: stats, sectorStats: stats, sectorCode: p ? p.icb2_code : null, sectorName: p ? p.sectorName : null,
         histRows: b.history ? b.history.rows : [], bond10yPct: b.history ? b.history.bond10y : null,
         dcf: P.dcf, weights: P.weights, marginOfSafety: P.mos, bankInputs: P.bank, navAdjustments: P.navAdj, sotp: P.sotp,
-        process: P.process,
+        process: P.process, scorecard: typeof VB_SCORECARD !== 'undefined' ? VB_SCORECARD : null,
         adjustments: P.adjustments, driver: P.driver,
         peerOverride: P.peerSet && P.peerSet.mode === 'custom' && VB.customPeerRows && VB.customPeerRows.length >= 3 ? { stats: VBMultiples.statsFromRows(VB.customPeerRows, 3), symbols: VB.customPeerRows.map(function (x) { return x.symbol; }), minN: 3 } : null,
         erp: P.erp !== null && P.erp !== undefined ? P.erp : undefined, sizePremium: P.sizePremium !== null && P.sizePremium !== undefined ? P.sizePremium : undefined,

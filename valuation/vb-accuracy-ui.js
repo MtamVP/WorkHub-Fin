@@ -1,0 +1,49 @@
+/* --- FILE: /valuation/vb-accuracy-ui.js ---
+   Valuation Bench > trang "Độ chính xác": bảng điểm backtest (VB_SCORECARD, tạo bởi scripts/vb-backtest-run.mjs, tính bằng lib/vb-backtest.js).
+   Chỉ hiển thị kết quả đã tính sẵn; không tính toán tài chính tại đây. Mọi chuỗi chèn vào HTML đều qua vbE(). */
+
+const accVerdict = (ic, lo, hi) => (ic === null || ic === undefined || lo === null || lo === undefined ? 'none' : (lo > 0 ? 'positive' : (hi < 0 ? 'negative' : 'none')));
+const accPill = (v) => ({ positive: vbPill('ok', 'Dự báo được', 'fa-arrow-trend-up'), negative: vbPill('warn', 'Dự báo ngược', 'fa-arrow-trend-down'), none: vbPill('mute', 'Chưa có bằng chứng', 'fa-circle-question') }[v]);
+const accIc = (x) => (x === null || x === undefined ? '—' : (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(2).replace('.', ','));
+const accCi = (a, b) => (a === null || a === undefined ? '' : '[' + accIc(a) + '; ' + accIc(b) + ']');
+const ACC_ARCH = { BANK: 'Ngân hàng', SECURITIES: 'Chứng khoán', INSURANCE: 'Bảo hiểm', MATURE: 'Trưởng thành', GROWTH: 'Tăng trưởng cao', CYCLICAL: 'Chu kỳ', DIVIDEND: 'Cổ tức / tiện ích', REAL_ESTATE: 'Bất động sản', HOLDING: 'Công ty mẹ', TURNAROUND: 'Phục hồi / đang lỗ' };
+
+function renderAccuracy() {
+    const root = document.getElementById('vb-root'); if (!root) return;
+    const sc = typeof VB_SCORECARD !== 'undefined' ? VB_SCORECARD : null;
+    if (!sc) { root.innerHTML = '<div class="vl-card"><div class="vl-empty"><i class="fa-solid fa-chart-column"></i> Chưa có bảng điểm. Chạy <code>node scripts/vb-backtest-run.mjs</code> để tạo.</div></div>'; return; }
+    const h12 = sc.horizons.r12, h6 = sc.horizons.r6;
+    const kpi = function (l, v, s, cls) { return '<div class="vb-kpi"><span class="l">' + vbE(l) + '</span><span class="v ' + (cls || '') + '">' + v + '</span><span class="s">' + s + '</span></div>'; };
+    const bk = h12 && h12.buckets && h12.buckets.length ? h12.buckets : [];
+    const spread = bk.length ? bk[bk.length - 1].avgExcess - bk[0].avgExcess : null;
+    const sp = sc.splits;
+    const kpis = '<div class="vb-kpis">' +
+        kpi('IC 12 tháng', h12.insufficient ? '—' : accIc(h12.overall.ic), h12.insufficient ? '' : accCi(h12.overall.lo, h12.overall.hi) + ' · ' + vbN(h12.n) + ' mẫu', h12.overall && h12.overall.lo > 0 ? 'vb-up' : '') +
+        kpi('IC 6 tháng', h6.insufficient ? '—' : accIc(h6.overall.ic), h6.insufficient ? '' : accCi(h6.overall.lo, h6.overall.hi)) +
+        kpi('Nhóm rẻ nhất so với đắt nhất (12 tháng)', spread === null ? '—' : vbPct(spread, 0, true), 'chênh lợi suất vượt VN-Index', spread > 0 ? 'vb-up' : 'vb-down') +
+        kpi('Ngoài mẫu (T sau ' + (sp ? vbDate(sp.splitDate) : '') + ')', sp && sp.test.r12 && !sp.test.r12.insufficient ? accIc(sp.test.r12.ic) : '—', sp && sp.test.r12 && !sp.test.r12.insufficient ? accCi(sp.test.r12.lo, sp.test.r12.hi) + ' · IC 12 tháng nửa sau' : '') + '</div>';
+    const maxAbs = Math.max.apply(null, bk.map(function (b) { return Math.abs(b.avgExcess); }).concat([0.01]));
+    const bars = bk.length ? '<div class="vb-bars" role="img" aria-label="Lợi suất vượt VN-Index 12 tháng theo nhóm định giá">' + bk.map(function (b) {
+        const w = Math.abs(b.avgExcess) / maxAbs * 100, pos = b.avgExcess >= 0;
+        return '<div class="vb-bar-row"><span class="vb-bar-l">' + (b.group === 1 ? 'Đắt nhất' : (b.group === bk.length ? 'Rẻ nhất' : 'Nhóm ' + b.group)) + '</span><span class="vb-bar-t"><i class="' + (pos ? 'pos' : 'neg') + '" style="width:' + w.toFixed(1) + '%"></i></span><span class="vb-bar-v ' + (pos ? 'vb-up' : 'vb-down') + '">' + vbPct(b.avgExcess, 1, true) + '</span><span class="vb-muted">' + vbPct(b.hit, 0) + ' thắng thị trường</span></div>'; }).join('') + '</div>' +
+        '<p class="vb-note">Chia mọi quan sát thành 5 nhóm theo mức giá thấp hơn giá trị hợp lý bao nhiêu (nhóm 1 = đắt nhất so với giá trị hợp lý, nhóm 5 = rẻ nhất), rồi đo lợi suất 12 tháng sau trừ lợi suất VN-Index. Nếu bộ máy có giá trị, nhóm rẻ phải vượt nhóm đắt.</p>' : '';
+    const meth = (h12.methods || []).filter(function (m) { return !m.insufficient; }).map(function (m) {
+        const meta = typeof VBProcess !== 'undefined' && VBProcess.META[m.key] ? VBProcess.META[m.key].label : m.key;
+        return '<tr><td class="l"><b>' + vbE(meta) + '</b></td><td>' + vbN(m.n) + '</td><td><b>' + accIc(m.ic) + '</b> <span class="vb-muted">' + accCi(m.icLo, m.icHi) + '</span></td><td>' + (m.spread === null ? '—' : vbPct(m.spread, 0, true)) + '</td><td>' + vbN(Math.exp(m.medianAbsLogErr) * 100 - 100, 0) + '%</td><td>' + accPill(accVerdict(m.ic, m.icLo, m.icHi)) + '</td></tr>'; }).join('');
+    const arch = (h12.archetypes || []).map(function (a) {
+        return '<tr><td class="l"><b>' + vbE(ACC_ARCH[a.key] || a.key) + '</b></td><td>' + a.symbols + '</td><td>' + vbN(a.n) + '</td>' + (a.insufficient ? '<td colspan="3" class="vb-muted">chưa đủ mẫu</td>' : '<td><b>' + accIc(a.ic) + '</b> <span class="vb-muted">' + accCi(a.icLo, a.icHi) + '</span></td><td>' + (a.spread === null ? '—' : vbPct(a.spread, 0, true)) + '</td><td>' + accPill(accVerdict(a.ic, a.icLo, a.icHi)) + '</td>') + '</tr>'; }).join('');
+    const bias = h12.bias ? '<p class="vb-note"><b>Sai số giá trị hợp lý:</b> so với giá 12 tháng sau, giá trị hợp lý lệch trung vị ' + vbN(Math.exp(h12.bias.medianAbsLogErr) * 100 - 100, 0) + '% (chỉ ' + vbPct(h12.bias.within20, 0) + ' quan sát nằm trong ±20%). Đừng đọc giá trị hợp lý như dự báo giá: nó xếp hạng mã rẻ/đắt tốt hơn nhiều so với đoán đúng mức giá.</p>' : '';
+    const unis = sc.universe ? sc.universe.used + ' mã' + (sc.universe.skipped && sc.universe.skipped.length ? ' (bỏ ' + sc.universe.skipped.join(', ') + ' vì thiếu dữ liệu)' : '') : '';
+    root.innerHTML = '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-chart-column"></i> Bảng điểm độ chính xác<span class="vl-muted">backtest đi tới từng thời điểm · tính ngày ' + vbE(vbDate(sc.generatedAt)) + '</span></h3>' +
+        '<p class="vb-note" style="margin-top:0">Tại mỗi tháng từ ' + vbE(vbDate(sc.range.from)) + ' đến ' + vbE(vbDate(sc.range.to)) + ', bộ máy được chạy lại CHỈ với dữ liệu có sẵn lúc đó (báo cáo đã công bố, chuỗi bội số đến ngày đó, giá ngày đó), rồi so giá trị hợp lý với lợi suất 6 và 12 tháng sau. ' + vbN(sc.nObs) + ' quan sát, ' + unis + ', ' + vbN(sc.nDates) + ' ngày.</p>' + kpis +
+        '<p class="vb-note"><b>IC</b> (hệ số tương quan hạng) đo mã được định giá thấp hơn giá trị hợp lý có vượt thị trường sau đó không: 0 = không có thông tin, +1 = hoàn hảo. Với dữ liệu thị trường, IC +0,05 đến +0,10 đã đáng kể; trên +0,20 là rất tốt. Khoảng trong ngoặc là khoảng tin cậy 95% (bootstrap theo ngày): chứa 0 nghĩa là chưa chắc có tác dụng.</p></div>' +
+        '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-layer-group"></i> Mã rẻ có thật sự vượt thị trường?</h3>' + bars + bias + '</div>' +
+        '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-flask"></i> Từng phương pháp<span class="vl-muted">IC theo lợi suất vượt 12 tháng</span></h3><div class="vb-table-wrap"><table class="vb-table"><thead><tr><th class="l">Phương pháp</th><th>Mẫu</th><th>IC [khoảng tin cậy]</th><th>Rẻ − đắt</th><th>Sai số trung vị</th><th>Kết luận</th></tr></thead><tbody>' + meth + '</tbody></table></div>' +
+        '<p class="vb-note">"Rẻ − đắt" là chênh lợi suất vượt giữa tam phân vị rẻ nhất và đắt nhất theo phương pháp đó. Phương pháp so sánh với ngành (P/E, P/B, EV/EBITDA ngành) và các điểm kỹ thuật, thị trường không có trong bảng vì không có thống kê ngành lịch sử.</p></div>' +
+        '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-sitemap"></i> Từng mô hình kinh doanh<span class="vl-muted">giá trị hợp lý đồng thuận</span></h3><div class="vb-table-wrap"><table class="vb-table"><thead><tr><th class="l">Mô hình</th><th>Số mã</th><th>Mẫu</th><th>IC [khoảng tin cậy]</th><th>Rẻ − đắt</th><th>Kết luận</th></tr></thead><tbody>' + arch + '</tbody></table></div>' +
+        '<p class="vb-note">Quy trình dùng bảng này để cảnh báo ở bước 6: nếu mô hình của mã bạn đang xem dự báo ngược trong backtest thì kết luận theo giá trị cần thêm lý do riêng.</p></div>' +
+        '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-sliders"></i> Lần hiệu chỉnh gần nhất<span class="vl-muted">10/2026</span></h3>' +
+        '<p class="vb-note" style="margin-top:0">Dựa trên giai đoạn huấn luyện (T đến 2023), bảng vai trò phương pháp đã đổi: bội số lịch sử của chính cổ phiếu (P/E, P/B) hạ xuống đối chiếu/tham khảo ở nhóm phi tài chính vì không dự báo được; EPV, Graham, Lynch được nâng ở các nhóm có bằng chứng; DCF và công thức tăng trưởng của Graham bị hạ ở nhóm cổ tức vì dự báo ngược. Kết quả: IC 12 tháng giai đoạn huấn luyện tăng từ +0,16 lên +0,27 (điều này không đáng ngạc nhiên vì đã chọn theo chính giai đoạn đó), nhưng <b>ngoài mẫu (2024 trở đi) gần như không đổi: +0,25 → +0,24</b>. Nghĩa là hiệu chỉnh hợp lý về kinh tế và không làm xấu đi, nhưng chưa có bằng chứng nó cải thiện dự báo thật.</p>' +
+        (sp ? '<div class="vb-kvs"><div class="vb-kv"><span class="l">IC 12 tháng, giai đoạn huấn luyện (đến ' + vbE(vbDate(sp.splitDate)) + ')</span><span class="v">' + (sp.train.r12.insufficient ? '—' : accIc(sp.train.r12.ic) + ' ' + accCi(sp.train.r12.lo, sp.train.r12.hi)) + '</span></div><div class="vb-kv"><span class="l">IC 12 tháng, ngoài mẫu (sau đó)</span><span class="v">' + (sp.test.r12.insufficient ? '—' : accIc(sp.test.r12.ic) + ' ' + accCi(sp.test.r12.lo, sp.test.r12.hi)) + '</span></div></div>' : '') + '</div>' +
+        '<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-triangle-exclamation"></i> Giới hạn cần đọc kèm</h3><ul class="vb-list">' + sc.limits.map(function (t) { return '<li class="flag"><i class="fa-solid fa-circle-exclamation"></i><span>' + vbE(t) + '</span></li>'; }).join('') + '</ul></div>';
+}

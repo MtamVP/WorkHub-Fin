@@ -67,9 +67,10 @@ describe('plan (bước 3): vai trò -> trọng số', () => {
     const pl = P.plan(res(), methods, { now: NOW });
     const by = (k) => pl.rows.find((r) => r.key === k);
     expect(by('dcf').role).toBe('core'); expect(by('dcf').weight).toBe(2.5);
-    expect(by('hist-pe').role).toBe('support'); expect(by('hist-pe').weight).toBe(1.2);
+    expect(by('hist-pe').role).toBe('check'); expect(by('hist-pe').weight).toBe(0.5);      // hiệu chỉnh theo bảng điểm: bội số lịch sử không dự báo được ở nhóm phi tài chính
     expect(by('peer-pb').role).toBe('check'); expect(by('peer-pb').weight).toBe(0.5);
-    expect(by('graham').role).toBe('ref'); expect(by('graham').weight).toBe(0);
+    expect(by('graham').role).toBe('check'); expect(by('graham').weight).toBe(0.5);        // số Graham dự báo tốt trong bảng điểm
+    expect(P.plan(res(), [m('hist-pb', 70, { n: 20 })], { now: NOW }).rows.find((r) => r.key === 'hist-pb').weight).toBe(0);
     expect(pl.weights.dcf).toBe(2.5); expect(pl.coreActive).toBe(3);
   });
   it('phương pháp "hạn chế" bị giảm nửa trọng số và nêu lý do', () => {
@@ -107,7 +108,7 @@ describe('plan (bước 3): vai trò -> trọng số', () => {
   it('trọng số của quy trình đi vào tổng hợp; người dùng chỉnh trọng số vẫn thắng', () => {
     const pl = P.plan(res(), methods, { now: NOW });
     const s = Y.synthesize({ price: 100, form: 'NON_FINANCE', methods, weightDefaults: pl.weights });
-    expect(s.methods.find((x) => x.key === 'dcf').weight).toBe(2.5); expect(s.methods.find((x) => x.key === 'graham').weight).toBe(0);
+    expect(s.methods.find((x) => x.key === 'dcf').weight).toBe(2.5); expect(s.methods.find((x) => x.key === 'graham').weight).toBe(0.5);
     const s2 = Y.synthesize({ price: 100, form: 'NON_FINANCE', methods, weightDefaults: pl.weights, weightOverrides: { dcf: 0.5 } });
     expect(s2.methods.find((x) => x.key === 'dcf').weight).toBe(0.5); expect(s2.methods.find((x) => x.key === 'dcf').defaultWeight).toBe(2.5);
   });
@@ -130,7 +131,7 @@ describe('review (bước 5-7)', () => {
     expect(rv.triangulation.verdict.key).toBe('disagree'); expect(rv.status).toBe('review'); expect(rv.needsAck).toBe(true); expect(rv.fails).toBeGreaterThan(0);
   });
   it('từ 4 phương pháp chính, phương pháp lệch xa nhất được tách riêng thay vì phá đồng thuận', () => {
-    const { rv } = run([m('dcf', 100), m('peer-pe', 104, 'relative'), m('peer-evEbitda', 97, 'relative'), m('hist-pb', 250, 'relative')], { archetype: 'CYCLICAL', roles: { dcf: 'core', 'peer-pe': 'core' } });
+    const { rv } = run([m('dcf', 100), m('peer-pe', 104, 'relative'), m('peer-evEbitda', 97, 'relative'), m('hist-pb', 250, 'relative')], { archetype: 'CYCLICAL', roles: { dcf: 'core', 'peer-pe': 'core', 'hist-pb': 'core' } });
     expect(rv.triangulation.dropped.key).toBe('hist-pb'); expect(rv.triangulation.verdict.key).toBe('agree');
   });
   it('so sánh giá trị nội tại với giá trị theo bội số và giải thích chênh lệch', () => {
@@ -166,6 +167,34 @@ describe('review (bước 5-7)', () => {
     expect(c.archetype).toBe('MATURE'); expect(c.ack).toBe('Chấp nhận vì lý do X'); expect(c.methods.find((x) => x.key === 'dcf').role).toBe('core'); expect(Array.isArray(c.checks)).toBe(true);
     expect(JSON.stringify(c).length).toBeLessThan(6000);
     expect(P.compact(null)).toBeNull();
+  });
+});
+
+describe('bằng chứng từ bảng điểm backtest', () => {
+  const sc = { generatedAt: '2026-10-06', horizons: { r12: { n: 500, archetypes: [{ key: 'MATURE', n: 183, symbols: 8, ic: 0.35, icLo: 0.2, icHi: 0.5 }, { key: 'DIVIDEND', n: 330, symbols: 9, ic: -0.17, icLo: -0.26, icHi: -0.06 }, { key: 'GROWTH', n: 143, symbols: 7, ic: 0.09, icLo: -0.09, icHi: 0.26 }, { key: 'HOLDING', n: 10, symbols: 1, insufficient: true }],
+    methods: [{ key: 'dcf', n: 2000, ic: 0.2, icLo: 0.15, icHi: 0.24 }, { key: 'hist-pe', n: 3000, ic: 0.01, icLo: -0.04, icHi: 0.06 }], matrix: { MATURE: { dcf: { n: 172, ic: 0.23, lo: 0.1, hi: 0.36 } } } } } };
+  const m = (key, base) => ({ key, label: key, base, group: 'intrinsic' });
+  it('verdict: dương khi khoảng tin cậy trên 0, âm khi dưới 0, còn lại chưa có bằng chứng', () => {
+    expect(P.verdictOf(0.2, 0.1, 0.3)).toBe('positive'); expect(P.verdictOf(-0.2, -0.3, -0.1)).toBe('negative'); expect(P.verdictOf(0.05, -0.05, 0.15)).toBe('none'); expect(P.verdictOf(null, null, null)).toBe('none');
+  });
+  it('mỗi phương pháp mang IC theo đúng mô hình nếu có, nếu không thì IC toàn bộ', () => {
+    const pl = P.plan(res(), [m('dcf', 100), m('hist-pe', 90)], { now: NOW, scorecard: sc });
+    const dcf = pl.rows.find((r) => r.key === 'dcf').evidence, hp = pl.rows.find((r) => r.key === 'hist-pe').evidence;
+    expect(dcf.scope).toBe('archetype'); expect(dcf.verdict).toBe('positive'); expect(hp.scope).toBe('overall'); expect(hp.verdict).toBe('none');
+    expect(P.plan(res(), [m('dcf', 100)], { now: NOW }).rows[0].evidence).toBeNull();
+  });
+  it('kiểm tra độ chính xác lịch sử theo mô hình: dương/ không bằng chứng/ âm/ thiếu mẫu', () => {
+    const run = (archetype) => { const r = res(), o = { now: NOW, scorecard: sc, override: { archetype } }, methods = [m('dcf', 100), { key: 'peer-pe', label: 'x', base: 100, group: 'relative', n: 20 }], pl = P.plan(r, methods, o); return P.review(r, Y.synthesize({ price: 100, form: 'NON_FINANCE', methods, weightDefaults: pl.weights }), pl, o).checks.find((c) => c.key === 'backtest'); };
+    expect(run('MATURE').level).toBe('pass'); expect(run('GROWTH').level).toBe('info'); expect(run('DIVIDEND').level).toBe('warn'); expect(run('HOLDING').level).toBe('info');
+    expect(run('DIVIDEND').detail).toContain('kém hơn thị trường');
+  });
+  it('không có bảng điểm thì không thêm kiểm tra', () => {
+    const r = res(), pl = P.plan(r, [m('dcf', 100)], { now: NOW }), rv = P.review(r, Y.synthesize({ price: 100, form: 'NON_FINANCE', methods: [m('dcf', 100)], weightDefaults: pl.weights }), pl, { now: NOW });
+    expect(rv.checks.some((c) => c.key === 'backtest')).toBe(false);
+  });
+  it('compact lưu verdict độ chính xác của mô hình', () => {
+    const r = res(), o = { now: NOW, scorecard: sc, override: { archetype: 'DIVIDEND' } }, pl = P.plan(r, [m('dcf', 100)], o);
+    expect(P.compact(Object.assign(pl, P.review(r, Y.synthesize({ price: 100, form: 'NON_FINANCE', methods: [m('dcf', 100)], weightDefaults: pl.weights }), pl, o))).reliability).toBe('negative');
   });
 });
 

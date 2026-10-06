@@ -25,6 +25,7 @@ const BenchNav = (function () {
         { key: 'map', href: '/stocksheet/?bench=valuation&view=map', icon: 'fa-map', label: 'Bản đồ', view: 'map' },
         { key: 'manual', href: '/stocksheet/autosheet/?bench=valuation', icon: 'fa-calculator', label: 'Định Giá CP' },
         { key: 'methods', href: '/valuation/#methods', icon: 'fa-book-open', label: 'Phương pháp' },
+        { key: 'accuracy', href: '/valuation/#accuracy', icon: 'fa-chart-column', label: 'Độ chính xác', title: 'Bảng điểm backtest: bộ máy định giá đã dự báo đúng đến đâu trong quá khứ' },
         { key: 'back', href: '/mastersheet/', icon: 'fa-arrow-left', label: 'Investment', title: 'Về Investment Workbench (quản lý đầu tư)' },
       ],
     },
