@@ -298,6 +298,12 @@ const VBMethods = (function () {
       'Trên +30: gió thuận; dưới −30: gió ngược; giữa: hỗn hợp.'),
 
     // ---------- tổng hợp ----------
+    M('process', 'synth', 'Quy trình định giá 7 bước (phân loại, dữ liệu, vai trò, giả định, đối chiếu, kiểm tra, kết luận)',
+      'Thay vì chạy mọi phương pháp rồi lấy trọng số cố định, quy trình (1) phân loại mô hình kinh doanh từ số liệu, (2) kiểm cổng dữ liệu, (3) gán cho từng phương pháp một VAI TRÒ (Chính / Hỗ trợ / Đối chiếu / Tham khảo / Loại) kèm lý do, (4) liệt kê nguồn gốc giả định, (5) đối chiếu chéo các phương pháp chính, (6) chạy danh mục kiểm tra hợp lý có ngưỡng, (7) kết luận kèm hồ sơ quyết định và lý do chấp nhận.',
+      'Trọng số = trọng số của vai trò (Chính 2,5; Hỗ trợ 1,2; Đối chiếu 0,5; Tham khảo và Loại 0), giảm một nửa khi phương pháp ở tình trạng "Hạn chế"',
+      'Mọi lần định giá một cổ phiếu: bảo đảm phương pháp được chọn vì đúng mô hình kinh doanh, không phải vì có sẵn số.',
+      'Luật phân loại và ngưỡng kiểm tra là phán đoán thực hành, không phải ước lượng thống kê; phân loại sai thì vai trò sai, nên luôn cho chọn lại. Quy trình không thay phán đoán của người định giá.',
+      'Trạng thái: "Quy trình hoàn tất" khi dữ liệu đủ, các phương pháp chính đồng thuận và mọi kiểm tra đạt; "Kết luận có điều kiện" khi còn cảnh báo; "Cần xử lý" khi có mục không đạt (phải ghi lý do chấp nhận mới lưu được).'),
     M('football', 'synth', 'Biểu đồ khoảng giá và giá trị đồng thuận',
       'Mỗi phương pháp một thanh [thấp - cao] với vạch cơ sở; giá trị đồng thuận là TRUNG VỊ có trọng số của các giá trị cơ sở (bền với phương pháp lệch xa), dải là trung bình có trọng số của đầu thấp và đầu cao. Trọng số mặc định theo loại doanh nghiệp và chỉnh được.',
       'Đồng thuận = trung vị có trọng số; dải = trung bình có trọng số của thấp/cao',

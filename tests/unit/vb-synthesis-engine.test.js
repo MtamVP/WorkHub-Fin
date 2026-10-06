@@ -179,6 +179,20 @@ describe('VBEngine.toRecord', () => {
     expect(rec.accumulate_high).toBeGreaterThan(rec.accumulate_low); expect(JSON.stringify(rec).length).toBeLessThan(40000);
   });
   it('chưa có giá trị hợp lý thì không tạo bản ghi', () => { expect(E.toRecord({ ok: false })).toBeNull(); expect(E.toRecord(E.analyze({ annualRows: [] }))).toBeNull(); });
+  it('bản ghi mang hồ sơ quy trình: mô hình, vai trò từng phương pháp, kết quả kiểm tra, lý do chấp nhận', () => {
+    const rec = E.toRecord(E.analyze(Object.assign({}, ctx, { process: { ack: 'Chấp nhận vì X' } })), { process: { archetype: null, roles: {}, reasons: {}, ack: 'Chấp nhận vì X' } });
+    const p = rec.summary.process;
+    expect(p.archetype).toBeTruthy(); expect(p.ack).toBe('Chấp nhận vì X'); expect(p.methods.length).toBeGreaterThan(3); expect(p.methods[0]).toHaveProperty('role'); expect(p.checks.length).toBeGreaterThan(3);
+    expect(rec.assumptions.process).toBeNull();      // không có chỉnh sửa của người dùng thì không lưu phần ghi đè
+  });
+  it('lựa chọn của người dùng (mô hình, vai trò) được lưu để nạp lại và làm đổi kết quả', () => {
+    const base = E.analyze(ctx), pr = { archetype: 'CYCLICAL', roles: { dcf: 'off' }, reasons: { dcf: 'không tin giả định' }, ack: '' };
+    const user = E.analyze(Object.assign({}, ctx, { process: pr }));
+    expect(user.process.archetype.key).toBe('CYCLICAL'); expect(user.process.rows.find((r) => r.key === 'dcf').weight).toBe(0);
+    expect(user.synthesis.methods.find((m) => m.key === 'dcf').weight).toBe(0); expect(user.synthesis.fair.base).not.toBe(base.synthesis.fair.base);
+    const rec = E.toRecord(user, { process: pr });
+    expect(rec.assumptions.process).toEqual({ archetype: 'CYCLICAL', roles: { dcf: 'off' }, reasons: { dcf: 'không tin giả định' } });
+  });
 });
 
 describe('mặc định cho tài chính và trọng số cổ tức', () => {

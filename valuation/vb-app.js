@@ -50,7 +50,7 @@ function parseHash() {
     const parts = String(location.hash || '').replace(/^#/, '').split('/').filter(Boolean);
     const view = ['stock', 'methods', 'overview'].indexOf(parts[0]) !== -1 ? parts[0] : 'overview';
     const sym = view === 'stock' && parts[1] && /^[A-Za-z0-9]{1,12}$/.test(parts[1]) ? parts[1].toUpperCase() : null;
-    const tab = ['summary', 'fundamental', 'valuation', 'technical', 'market', 'saved'].indexOf(parts[2]) !== -1 ? parts[2] : 'summary';
+    const tab = ['summary', 'process', 'fundamental', 'valuation', 'technical', 'market', 'saved'].indexOf(parts[2]) !== -1 ? parts[2] : 'summary';
     return { view: view, sym: sym, tab: tab };
 }
 function setHash(view, sym, tab) { const h = '#' + view + (sym ? '/' + sym + (tab && tab !== 'summary' ? '/' + tab : '') : ''); if (location.hash !== h) location.hash = h; else route(); }
@@ -69,8 +69,8 @@ function route() {
 
 // ---------- giả định người dùng (theo mã) ----------
 function loadParams(sym) {
-    const base = { dcf: {}, weights: {}, mos: 0.2, bank: {}, navAdj: [], sotp: [], erp: null, beta: null, sizePremium: null };
-    try { const s = JSON.parse(localStorage.getItem(VB_PARAMS_KEY + sym) || 'null'); if (s) return Object.assign(base, s); } catch (e) { /* mặc định */ }
+    const base = loadParamsDefault();
+    try { const s = JSON.parse(localStorage.getItem(VB_PARAMS_KEY + sym) || 'null'); if (s) return normalizeProcess(Object.assign(base, s)); } catch (e) { /* mặc định */ }
     return base;
 }
 function saveParams() { if (!VB.symbol) return; try { localStorage.setItem(VB_PARAMS_KEY + VB.symbol, JSON.stringify(VB.params)); } catch (e) { /* bỏ qua */ } }
@@ -90,6 +90,7 @@ function buildCtx() {
         ratioSeries: v.ratioSeries || null, metrics: metrics, peerStats: stats, sectorStats: stats, sectorCode: p ? p.icb2_code : null, sectorName: p ? p.sectorName : null,
         histRows: b.history ? b.history.rows : [], bond10yPct: b.history ? b.history.bond10y : null,
         dcf: P.dcf, weights: P.weights, marginOfSafety: P.mos, bankInputs: P.bank, navAdjustments: P.navAdj, sotp: P.sotp,
+        process: P.process,
         erp: P.erp !== null && P.erp !== undefined ? P.erp : undefined, sizePremium: P.sizePremium !== null && P.sizePremium !== undefined ? P.sizePremium : undefined,
         mc: { n: 1500 },
     };
@@ -124,13 +125,24 @@ function setParam(group, key, value) {
     } else VB.params[key] = value;
     recompute(); renderStockBody();
 }
+// ---------- quy trình: người dùng chỉnh mô hình, vai trò, lý do, lý do chấp nhận ----------
+function setProcArch(v) { VB.params.process.archetype = v || null; VB.params.process.roles = {}; VB.params.process.reasons = {}; recompute(); renderStockBody(); }
+function setProcRole(key, role) {
+    const pr = VB.params.process, row = VB.result && VB.result.process ? VB.result.process.rows.find(function (x) { return x.key === key; }) : null;
+    if (!role || (row && role === row.defaultRole)) { delete pr.roles[key]; delete pr.reasons[key]; } else pr.roles[key] = role;
+    recompute(); renderStockBody();
+}
+function setProcReason(key, text) { const pr = VB.params.process; if (String(text || '').trim()) pr.reasons[key] = String(text).trim().slice(0, 160); else delete pr.reasons[key]; recompute(); saveParams(); }
+function setProcAck(text) { VB.params.process.ack = String(text || '').trim().slice(0, 600); recompute(); saveParams(); renderStockBody(); }
+function resetProcess() { VB.params.process = { archetype: null, roles: {}, reasons: {}, ack: VB.params.process.ack || '' }; recompute(); renderStockBody(); }
 function resetParams(what) {
     const d = { dcf: {}, weights: {}, bank: {}, navAdj: [], sotp: [] };
     if (what === 'all') { VB.params = loadParamsDefault(); } else if (d[what] !== undefined) VB.params[what] = d[what];
     if (what === 'dcf' || what === 'all') { VB.params.erp = null; VB.params.beta = null; VB.params.sizePremium = null; }
     recompute(); renderStockBody();
 }
-function loadParamsDefault() { return { dcf: {}, weights: {}, mos: 0.2, bank: {}, navAdj: [], sotp: [], erp: null, beta: null, sizePremium: null }; }
+function loadParamsDefault() { return { dcf: {}, weights: {}, mos: 0.2, bank: {}, navAdj: [], sotp: [], erp: null, beta: null, sizePremium: null, process: { archetype: null, roles: {}, reasons: {}, ack: '' } }; }
+function normalizeProcess(P) { const q = P.process || {}; P.process = { archetype: q.archetype || null, roles: q.roles || {}, reasons: q.reasons || {}, ack: q.ack || '' }; return P; }
 // đọc ô nhập: inputEl.dataset.group / key / mode ('pct' chia 100, 'num', 'bool')
 function onParamInput(el) {
     const g = el.dataset.group, k = el.dataset.key, mode = el.dataset.mode || 'num';
@@ -160,7 +172,14 @@ function addSotp() { VB.params.sotp = (VB.params.sotp || []).concat([{ name: 'M�
 // ---------- lưu và áp dụng ----------
 async function saveValuation() {
     const r = VB.result, note = (document.getElementById('vb-save-note') || {}).value || '';
-    const rec = VBEngine.toRecord(r, { note: note.trim(), weights: VB.params.weights, marginOfSafety: VB.params.mos });
+    const pr = r && r.process;
+    if (pr && pr.needsAck && !String(VB.params.process.ack || '').trim()) {      // quy trình còn mục không đạt / thiếu dữ liệu: buộc ghi lý do chấp nhận trước khi lưu
+        showToast('Quy trình còn mục chưa đạt: ghi lý do chấp nhận ở bước 7 trước khi lưu', 'error');
+        if (VB.tab !== 'process') { VB.tab = 'process'; renderStockBody(); }
+        const box = document.getElementById('vb-proc-ack'); if (box) { box.scrollIntoView({ block: 'center' }); box.focus(); }
+        return;
+    }
+    const rec = VBEngine.toRecord(r, { note: note.trim(), weights: VB.params.weights, marginOfSafety: VB.params.mos, process: VB.params.process });
     if (!rec) { showToast('Chưa có giá trị hợp lý để lưu', 'error'); return; }
     const btn = document.getElementById('vb-save-btn'); if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu…'; }
     try {
@@ -186,7 +205,8 @@ async function restoreSaved(id) {
         const data = await call('getVbById', { id: id });
         if (!data) throw new Error('Không đọc được bản định giá');
         const a = data.assumptions || {};
-        VB.params = Object.assign(loadParamsDefault(), { dcf: a.dcf ? pickEditable(a.dcf) : {}, bank: a.bank || {}, weights: a.weights || {}, mos: a.marginOfSafety === null || a.marginOfSafety === undefined ? 0.2 : a.marginOfSafety });
+        VB.params = Object.assign(loadParamsDefault(), { dcf: a.dcf ? pickEditable(a.dcf) : {}, bank: a.bank || {}, weights: a.weights || {}, mos: a.marginOfSafety === null || a.marginOfSafety === undefined ? 0.2 : a.marginOfSafety, process: a.process || null });
+        normalizeProcess(VB.params);
         recompute(); renderStockBody(); showToast('Đã nạp lại giả định của bản ngày ' + vbDate(data.created_at), 'success');
     } catch (e) { showToast(e.message, 'error'); }
 }

@@ -3,7 +3,7 @@
    Chỉ dựng HTML và vẽ biểu đồ từ kết quả của VBEngine.analyze (VB.result); không tính toán tài chính tại đây. Mọi chuỗi chèn vào HTML đều qua vbE() (VU.esc). */
 
 const VB_TABS = [
-    ['summary', 'fa-gauge-high', 'Tổng hợp'], ['fundamental', 'fa-building-columns', 'Cơ bản'], ['valuation', 'fa-scale-balanced', 'Định giá'],
+    ['summary', 'fa-gauge-high', 'Tổng hợp'], ['process', 'fa-list-check', 'Quy trình'], ['fundamental', 'fa-building-columns', 'Cơ bản'], ['valuation', 'fa-scale-balanced', 'Định giá'],
     ['technical', 'fa-chart-line', 'Kỹ thuật'], ['market', 'fa-earth-asia', 'Thị trường'], ['saved', 'fa-bookmark', 'Đã lưu'],
 ];
 
@@ -27,8 +27,8 @@ function renderStockBody() {
         const cnt = t[0] === 'saved' ? VB.history.length : (t[0] === 'technical' && r.technical && r.technical.ok ? r.technical.signals.length : 0);
         return '<button type="button" role="tab" aria-selected="' + (VB.tab === t[0]) + '" onclick="setHash(\'stock\',\'' + vbE(VB.symbol) + '\',\'' + t[0] + '\')"><i class="fa-solid ' + t[1] + '"></i> ' + t[2] + (cnt ? ' <span class="vb-count">' + cnt + '</span>' : '') + '</button>';
     }).join('');
-    const fn = { summary: tabSummary, fundamental: tabFundamental, valuation: tabValuation, technical: tabTechnical, market: tabMarket, saved: tabSaved }[VB.tab] || tabSummary;
-    body.innerHTML = fn(r);
+    const fn = { summary: tabSummary, process: tabProcess, fundamental: tabFundamental, valuation: tabValuation, technical: tabTechnical, market: tabMarket, saved: tabSaved }[VB.tab] || tabSummary;
+    body.innerHTML = (VB.tab === 'summary' && typeof procBannerHtml === 'function' ? procBannerHtml(r) : '') + fn(r);
     const after = { summary: afterSummary, fundamental: afterFundamental, valuation: afterValuation, technical: afterTechnical, market: afterMarket, saved: afterSaved }[VB.tab];
     if (after) after(r);
     window.scrollTo(0, y);
