@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>WorkHub Fin 0.1.10 · Hướng dẫn sử dụng</title>
+<style>
+  :root { --navy: #27476E; --navy-deep: #1B3350; --ink: #1F2933; --muted: #5B6773; --rule: #D5DBE3; --wash: #F2F5F9; --ok: #12755A; --warn: #A15C00; --bad: #B3362E; --info: #2F5FA8; }
+  @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
+  * { box-sizing: border-box; }
+  html { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.55; }
+  body { margin: 0; }
+  h1, h2, h3, h4 { font-family: "Segoe UI Semibold", "Segoe UI", Arial, sans-serif; color: var(--navy-deep); line-height: 1.25; text-wrap: balance; margin: 0; }
+  h1 { font-size: 20pt; padding-top: 2mm; margin-bottom: 4mm; border-bottom: 2px solid var(--navy); padding-bottom: 3mm; break-before: page; }
+  h1.first { break-before: auto; }
+  h2 { font-size: 13.5pt; margin: 8mm 0 2.5mm; }
+  h3 { font-size: 11.2pt; margin: 5.5mm 0 1.8mm; }
+  h4 { font-size: 10.2pt; margin: 4mm 0 1mm; color: var(--navy); }
+  p { margin: 0 0 2.6mm; orphans: 3; widows: 3; }
+  ul, ol { margin: 0 0 3mm 5.2mm; padding: 0; } li { margin: 0 0 1.2mm; }
+  a { color: var(--info); text-decoration: none; }
+  code, .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 9.2pt; background: var(--wash); padding: 0.2mm 1.1mm; border-radius: 1mm; }
+  .ui { font-weight: 600; color: var(--navy-deep); }
+  .cover { height: 245mm; display: flex; flex-direction: column; justify-content: space-between; break-after: page; }
+  .cover .top { border-left: 3mm solid var(--navy); padding-left: 6mm; margin-top: 30mm; }
+  .cover .kicker { font-size: 10pt; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .cover h1 { font-size: 34pt; border: 0; padding: 0; margin: 4mm 0 3mm; break-before: auto; }
+  .cover .sub { font-size: 14pt; color: var(--navy); margin: 0; }
+  .cover .meta { color: var(--muted); font-size: 10pt; border-top: 1px solid var(--rule); padding-top: 4mm; }
+  .cover .meta b { color: var(--ink); }
+  .toc { columns: 2; column-gap: 10mm; margin-top: 4mm; } .toc ol { list-style: none; margin: 0; } .toc li { margin: 0 0 1.4mm; break-inside: avoid; } .toc .n { color: var(--navy); font-weight: 700; display: inline-block; width: 6.5mm; }
+  .callout { border: 1px solid var(--rule); border-left: 3mm solid var(--info); background: var(--wash); border-radius: 1.2mm; padding: 2.6mm 4mm; margin: 3.5mm 0; break-inside: avoid; }
+  .callout b.t { display: block; font-size: 9.2pt; text-transform: uppercase; letter-spacing: 0.06em; color: var(--info); margin-bottom: 0.8mm; }
+  .callout.warn { border-left-color: var(--warn); } .callout.warn b.t { color: var(--warn); }
+  .callout.ok { border-left-color: var(--ok); } .callout.ok b.t { color: var(--ok); }
+  .callout.bad { border-left-color: var(--bad); } .callout.bad b.t { color: var(--bad); }
+  .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 2.5mm 0 4mm; font-size: 9.2pt; break-inside: auto; }
+  th, td { border: 1px solid var(--rule); padding: 1.5mm 2.2mm; vertical-align: top; text-align: left; }
+  th { background: var(--navy); color: #fff; font-weight: 600; } tr { break-inside: avoid; } tbody tr:nth-child(even) td { background: #FAFBFD; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; padding: 0.3mm 1.8mm; border-radius: 2mm; background: var(--wash); color: var(--navy); border: 1px solid var(--rule); white-space: nowrap; }
+  .tag.core { background: #E3EEF9; color: #1B4C8C; border-color: #B8D1EA; } .tag.support { background: #E6F3EC; color: var(--ok); border-color: #BFDECC; } .tag.check { background: #FBF0DC; color: var(--warn); border-color: #EBD3A6; } .tag.ref { background: #EEF0F3; color: var(--muted); }
+  .steps { counter-reset: s; list-style: none; margin-left: 0; } .steps > li { counter-increment: s; position: relative; padding-left: 9mm; margin-bottom: 2.4mm; break-inside: avoid; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: 0.2mm; width: 6mm; height: 6mm; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 8.6pt; text-align: center; line-height: 6mm; }
+  figure { margin: 3.5mm 0 4.5mm; break-inside: avoid; } figure img { width: 100%; border: 1px solid var(--rule); border-radius: 1.5mm; display: block; } figcaption { font-size: 8.8pt; color: var(--muted); margin-top: 1.2mm; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; } .two > * { break-inside: avoid; }
+  .small { font-size: 9pt; color: var(--muted); }
+  .pb { break-before: page; }
+  .arch { break-inside: avoid; margin: 0 0 4mm; } .arch h4 { margin-top: 0; } .arch p { margin-bottom: 1mm; } table.roles { margin: 1mm 0 2mm; } table.roles td { background: #fff !important; } .tag { margin: 0.4mm 0.2mm; line-height: 1.7; }
+  .def dt { font-weight: 700; color: var(--navy-deep); margin-top: 2mm; } .def dd { margin: 0 0 1mm 0; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="top">
+    <div class="kicker">WorkHub Finance · Tài liệu cho người dùng</div>
+    <h1>WorkHub Fin<br>Hướng dẫn sử dụng</h1>
+    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.10</p>
+  </div>
+  <div>
+    <div class="callout warn"><b class="t">Đọc trước khi dùng</b><p>WorkHub Fin là công cụ phân tích nội bộ dùng dữ liệu miễn phí của thị trường Việt Nam. Mọi con số, nhận định và vùng giá đều là ước tính phụ thuộc vào giả định và số liệu đầu vào; <b>không phải khuyến nghị đầu tư</b>. Số liệu miễn phí có thể trễ hoặc khác báo cáo gốc: luôn đối chiếu trước khi ra quyết định.</p></div>
+    <div class="meta"><b>Phiên bản:</b> 0.1.10 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 06/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
+  </div>
+</section>
+
+<h1 class="first">Mục lục</h1>
+<div class="toc"><ol>
+  <li><span class="n">1</span><a href="#s1">Giới thiệu và cài đặt</a></li>
+  <li><span class="n">2</span><a href="#s2">Bắt đầu nhanh trong 10 phút</a></li>
+  <li><span class="n">3</span><a href="#s3">Cách di chuyển trong ứng dụng</a></li>
+  <li><span class="n">4</span><a href="#s4">Investment Workbench</a></li>
+  <li><span class="n">5</span><a href="#s5">Valuation Bench: tổng quan</a></li>
+  <li><span class="n">6</span><a href="#s6">Quy trình định giá 7 bước</a></li>
+  <li><span class="n">7</span><a href="#s7">Tab Định giá: DCF, bội số, tài sản</a></li>
+  <li><span class="n">8</span><a href="#s8">Ba công cụ làm sâu định giá</a></li>
+  <li><span class="n">9</span><a href="#s9">Kỹ thuật, thị trường và kết luận kết hợp</a></li>
+  <li><span class="n">10</span><a href="#s10">Lưu, nạp lại và áp dụng vào danh mục</a></li>
+  <li><span class="n">11</span><a href="#s11">Bảng điểm độ chính xác</a></li>
+  <li><span class="n">12</span><a href="#s12">Ví dụ làm từ đầu đến cuối</a></li>
+  <li><span class="n">13</span><a href="#s13">Giới hạn và nguyên tắc dùng đúng</a></li>
+  <li><span class="n">14</span><a href="#s14">Xử lý sự cố và câu hỏi thường gặp</a></li>
+  <li><span class="n">A</span><a href="#pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</a></li>
+  <li><span class="n">B</span><a href="#pb">Phụ lục B: thư viện phương pháp</a></li>
+  <li><span class="n">C</span><a href="#pc">Phụ lục C: thuật ngữ</a></li>
+</ol></div>
+
+<h1 id="s1">1. Giới thiệu và cài đặt</h1>
+<p>WorkHub Fin là ứng dụng máy tính (Windows) giúp một nhóm đầu tư cổ phiếu Việt Nam <b>quản lý danh mục</b> và <b>định giá chuyên môn</b> trên cùng một bộ dữ liệu. Ứng dụng gồm hai khu độc lập, liên kết với nhau:</p>
+<div class="two">
+  <div class="callout"><b class="t">Investment Workbench</b><p>Khu <b>quản lý</b>: danh mục, sổ lệnh, theo dõi, hiệu suất, rủi ro, giới hạn đầu tư, duyệt lệnh, báo cáo; cả nhóm xem tổng hợp.</p></div>
+  <div class="callout ok"><b class="t">Valuation Bench</b><p>Khu <b>định giá chuyên môn</b>: hồ sơ từng cổ phiếu với phân tích cơ bản, hơn 50 phương pháp định giá, phân tích kỹ thuật, bối cảnh thị trường, quy trình 7 bước và bảng điểm độ chính xác.</p></div>
+</div>
+<p>Hai khu dùng chung dữ liệu: kết quả định giá lưu ở Valuation Bench hiện ngay trong Investment Workbench (thẻ "Định giá chuyên môn" ở Chi tiết mã và huy hiệu dưới mỗi mã trong Danh Mục).</p>
+
+<h2>1.1 Cài đặt và cập nhật</h2>
+<ol class="steps">
+  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.10_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
+  <li>Mở <span class="ui">WorkHub-Fin</span> và đăng nhập bằng tài khoản WorkHub của bạn. Cần có Internet để lấy dữ liệu thị trường.</li>
+  <li>Từ các bản sau, ứng dụng <b>tự kiểm tra và cập nhật</b>: khi có bản mới sẽ hỏi bạn; không cần cài lại thủ công.</li>
+</ol>
+<div class="callout"><b class="t">Quyền hạn</b><p>Thành viên nhóm tài chính dùng được toàn bộ phần nghiên cứu, định giá và danh mục cá nhân. Một số thao tác dành cho <b>quản lý tài sản</b> (ví dụ đặt giới hạn đầu tư của nhóm, ngưỡng duyệt lệnh, duyệt ý tưởng) hoặc quản trị viên. Nếu không thấy một nút, nhiều khả năng bạn chưa có vai trò đó: hỏi quản trị nhóm.</p></div>
+
+<h2>1.2 Dữ liệu đến từ đâu</h2>
+<table>
+  <thead><tr><th>Dữ liệu</th><th>Nguồn</th><th>Lưu ý</th></tr></thead>
+  <tbody>
+    <tr><td>Báo cáo tài chính năm và quý, chỉ số, bội số lịch sử</td><td>VNDirect (miễn phí)</td><td>Có thể trễ vài ngày sau khi doanh nghiệp công bố; một số khoản mục khác báo cáo gốc.</td></tr>
+    <tr><td>Giá và nến ngày, VN-Index</td><td>VNDirect, đối chiếu thêm với VCI</td><td>Giá cổ phiếu trong lịch sử là giá <b>đã điều chỉnh</b> cổ tức và chia tách.</td></tr>
+    <tr><td>Ảnh chụp cả thị trường, thống kê ngành ICB</td><td>Tự tổng hợp hằng ngày từ VNDirect</td><td>Khoảng 1.500 mã; ngành lấy theo ICB cấp 2 (rộng).</td></tr>
+    <tr><td>Lợi suất trái phiếu chính phủ</td><td>TradingView (công khai)</td><td>Dùng làm lãi suất phi rủi ro theo ngày.</td></tr>
+  </tbody>
+</table>
+<p>Các nguồn miễn phí <b>không có cam kết dịch vụ</b>: có thể đổi định dạng hoặc chặn bất cứ lúc nào. Ứng dụng kiểm tra chất lượng dữ liệu hằng ngày và báo "nguồn lỗi" ở tab Dữ Liệu của Toàn Nhóm khi có vấn đề.</p>
+
+<h1 id="s2">2. Bắt đầu nhanh trong 10 phút</h1>
+<p>Lộ trình ngắn nhất để thấy ứng dụng làm được gì:</p>
+<ol class="steps">
+  <li><b>Vào Finance.</b> Sau khi đăng nhập, thanh bên trái có nhóm <span class="ui">Tài Chính</span> với hai mục: <span class="ui">Investment Workbench</span> và <span class="ui">Valuation Bench</span>.</li>
+  <li><b>Định giá một mã.</b> Mở <span class="ui">Valuation Bench</span>, gõ mã (ví dụ <code>FPT</code>) ở ô tìm kiếm, nhấn Enter. Đợi vài giây để tải báo cáo tài chính, nến giá và bội số.</li>
+  <li><b>Đọc tab Tổng hợp.</b> Xem giá trị hợp lý, biên an toàn, độ tin cậy và các vùng giá. Đây là kết quả; các bước sau cho biết nó được tạo ra thế nào.</li>
+  <li><b>Mở tab Quy trình.</b> Xem mô hình kinh doanh mà ứng dụng nhận ra, phương pháp nào được dùng làm chính, các kiểm tra hợp lý đạt hay không. Nếu có mục "không đạt", đọc gợi ý xử lý.</li>
+  <li><b>Chỉnh giả định (tuỳ chọn).</b> Ở tab <span class="ui">Định giá</span>, đổi WACC, tăng trưởng, biên; hoặc dựng DCF theo từng mảng kinh doanh. Kết quả cập nhật ngay.</li>
+  <li><b>Lưu bản định giá.</b> Ở bước 7 của tab Quy trình bấm <span class="ui">Lưu bản định giá kèm hồ sơ quy trình</span>. Nếu còn mục chưa đạt, ghi lý do chấp nhận trước.</li>
+  <li><b>Quay lại Investment Workbench.</b> Mở <span class="ui">Nghiên Cứu → Chi tiết mã</span> hoặc <span class="ui">Danh Mục</span>: bản định giá vừa lưu hiện trong thẻ "Định giá chuyên môn" và dưới mã trong danh mục.</li>
+</ol>
+
+<h1 id="s3">3. Cách di chuyển trong ứng dụng</h1>
+<h2>3.1 Trang Finance và hai khu</h2>
+<p>Trang Finance chính có thanh bên trái. Nhóm <span class="ui">Tài Chính</span> gồm: Pipeline, <span class="ui">Investment Workbench</span>, <span class="ui">Valuation Bench</span>, Format Reports và Kế Toán (OnyxLine). Hai khu có thanh điều hướng riêng ở đầu trang; ở cả hai đều có lối sang khu kia.</p>
+<table>
+  <thead><tr><th>Khu</th><th>Thanh điều hướng</th></tr></thead>
+  <tbody>
+    <tr><td>Investment Workbench</td><td>Toàn Nhóm · Danh Mục · Nghiên Cứu · Valuation Bench</td></tr>
+    <tr><td>Valuation Bench</td><td>Tổng quan · Hồ sơ cổ phiếu · Bộ lọc · Thị trường · Bản đồ · Định Giá CP · Phương pháp · Độ chính xác · Investment</td></tr>
+  </tbody>
+</table>
+<p>Nút <span class="ui">mặt trăng</span> ở góc phải đổi giao diện sáng/tối; nút <span class="ui">ngôi nhà</span> về trang Finance.</p>
+<div class="callout"><b class="t">Đường dẫn trực tiếp</b><p>Trong Valuation Bench, mỗi mã và mỗi tab có địa chỉ riêng, ví dụ <code>#stock/FPT/process</code>. Nút Quay lại của ứng dụng hoạt động đúng theo từng tab.</p></div>
+
+<h1 id="s4">4. Investment Workbench</h1>
+<p>Khu quản lý đầu tư. Mỗi thành viên quản lý danh mục riêng; nhóm xem tổng hợp ở Toàn Nhóm.</p>
+<h2>4.1 Danh Mục</h2>
+<figure><img src="img/danh-muc.jpg" alt="Danh Mục với huy hiệu định giá"><figcaption>Tab Danh Mục: dưới mỗi mã có huy hiệu giá trị hợp lý và biên an toàn từ Valuation Bench (viền đứt = bản đã cũ).</figcaption></figure>
+<p>Trang chứa các tab sau (thanh tab ở đầu trang):</p>
+<table>
+  <thead><tr><th style="width:24%">Tab</th><th>Dùng để</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ui">Danh Mục</span></td><td>Các vị thế đang nắm: khối lượng, giá vốn, giá thị trường (tự cập nhật trong giờ giao dịch, có thể khoá giá), tỷ trọng, lãi/lỗ, giá mục tiêu và cắt lỗ. <b>Mới 0.1.10:</b> dưới mỗi mã có huy hiệu giá trị hợp lý từ Valuation Bench và biên an toàn so với giá hiện tại; bản đã lưu quá 45 ngày hiện viền đứt. Bấm vào huy hiệu để mở hồ sơ mã.</td></tr>
+    <tr><td><span class="ui">Theo Dõi</span></td><td>Danh sách mã quan tâm kèm giá muốn mua, giá mục tiêu và cảnh báo giá (email và thông báo máy tính).</td></tr>
+    <tr><td><span class="ui">Sổ Lệnh</span></td><td>Ba nhóm: <b>Giao Dịch CP</b> (nhập tay hoặc nhập từ tệp sao kê Excel/CSV; thuế bán và phí tự tính), <b>Dòng Tiền</b>, <b>Hành Động DN</b> (cổ tức, thưởng, quyền mua, được nhắc theo sự kiện thật). Có kiểm tra trước lệnh: khối lượng theo ngân sách rủi ro, tỷ trọng sau lệnh, thanh khoản, giới hạn bị chạm. Nút <b>Đối soát</b> so sổ lệnh với sao kê số dư / sao kê lệnh của công ty chứng khoán, gợi ý nguyên nhân lệch và tạo lệnh điều chỉnh.</td></tr>
+    <tr><td><span class="ui">Nhật Ký</span></td><td>Nhật ký quyết định: ghi lý do và kỳ vọng lúc ra quyết định, đối chiếu với giá thực tế và VN-Index, đánh giá lại.</td></tr>
+    <tr><td><span class="ui">Hiệu Suất</span></td><td>Hiệu quả so với VN-Index (alpha, beta, Sharpe, sụt giảm tối đa), phân tích đóng góp theo mã và ngành, phân rã Brinson so với danh mục chuẩn của chiến lược.</td></tr>
+    <tr><td><span class="ui">Gương</span></td><td>Soi lại hành vi quyết định: hiệu chỉnh mức tự tin, thiên kiến chốt lời sớm / giữ lỗ lâu, mua đuổi, bán hoảng loạn; mọi nhận xét kèm cỡ mẫu để biết đáng tin đến đâu.</td></tr>
+    <tr><td><span class="ui">Rủi Ro</span></td><td>Rủi ro danh mục (VaR/ES, kiểm thử căng thẳng, tập trung ngành và mã, thanh khoản khi bán).</td></tr>
+    <tr><td><span class="ui">Lịch</span></td><td>Lịch cổ tức và sự kiện doanh nghiệp của các mã đang nắm.</td></tr>
+    <tr><td><span class="ui">Báo Cáo</span></td><td>Lãi/lỗ đã chốt theo năm, cân bằng danh mục về tỷ trọng mục tiêu, xuất số liệu báo cáo cuối tháng ra Excel (tệp để đưa cho AI điền mẫu PowerPoint).</td></tr>
+  </tbody>
+</table>
+<h2>4.2 Nghiên Cứu</h2>
+<p>Trang nghiên cứu cổ phiếu. Các chế độ xem ở thanh trên cùng: <span class="ui">Bảng so sánh</span> (các mã bạn đã định giá, xếp Rẻ / Hợp lý / Đắt), <span class="ui">Ý tưởng</span> (đề xuất, bình luận, bỏ phiếu) và <span class="ui">Chi tiết mã</span>.</p>
+<p>Trong <b>Chi tiết mã</b>, ngay dưới phần đầu trang có thẻ <span class="ui">Định giá chuyên môn</span> (mới 0.1.10): giá trị hợp lý, khoảng giá, biên an toàn <b>tính theo giá hiện tại</b>, vùng tích luỹ, mức vô hiệu hoá, điểm kỹ thuật, lý do và cờ cần soát, kèm nút mở hồ sơ đầy đủ ở Valuation Bench. Đánh giá "Lúc lưu" là kết luận tại thời điểm lưu; giá có thể đã đổi.</p>
+<figure><img src="img/chi-tiet-ma.jpg" alt="Chi tiết mã"><figcaption>Chi tiết mã: thẻ "Định giá chuyên môn" ngay dưới phần đầu trang.</figcaption></figure>
+<div class="callout"><b class="t">Chuyển sang Valuation Bench</b><p>Các chế độ <b>Bộ lọc</b>, <b>Thị trường</b> và <b>Bản đồ</b> (sàng lọc cả thị trường, mặt bằng định giá, lịch sử P/E-P/B) nay nằm ở Valuation Bench; đường dẫn cũ vẫn hoạt động. Trang <b>Định Giá CP</b> (nhập số liệu và định giá theo mẫu thủ công) vẫn còn nguyên.</p></div>
+<h2>4.3 Toàn Nhóm</h2>
+<table>
+  <thead><tr><th style="width:24%">Tab</th><th>Dùng để</th></tr></thead>
+  <tbody>
+    <tr><td>Danh Mục Chung · Thành Viên</td><td>Danh mục hợp nhất của nhóm, mức trùng danh mục giữa các thành viên, từng thành viên.</td></tr>
+    <tr><td>Giới Hạn</td><td>Giới hạn đầu tư của nhóm và cá nhân (cảnh báo / ghi lý do / chặn); áp dụng cả khi nhập sao kê; chấm tuân thủ mỗi chiều ngày giao dịch.</td></tr>
+    <tr><td>Định Lượng · Dữ Liệu</td><td>Bảng định lượng (vòng quay ngành, biên 52 tuần, thanh khoản, khối ngoại); trạng thái chất lượng dữ liệu và cảnh báo nguồn.</td></tr>
+    <tr><td>Khớp Lệnh · Hành Trình</td><td>Chất lượng khớp lệnh (so với giá đóng cửa và VWAP ngày); hành trình quyết định.</td></tr>
+    <tr><td>Duyệt Lệnh</td><td>Lệnh vượt ngưỡng (đặt bởi quản lý, theo % NAV và/hoặc số tiền) cần đề xuất được người KHÁC duyệt trước khi ghi. Mặc định đang tắt, quản lý bật khi cần.</td></tr>
+    <tr><td>Chiến Lược · Hoạt Động · Báo Cáo</td><td>Danh mục chuẩn và tỷ trọng mục tiêu theo ngành; nhật ký hoạt động; báo cáo nhóm.</td></tr>
+  </tbody>
+</table>
+
+<h1 id="s5">5. Valuation Bench: tổng quan</h1>
+<p>Valuation Bench là khu để <b>định giá chuyên môn một cổ phiếu</b>: kết hợp phân tích cơ bản, nhiều phương pháp định giá, phân tích kỹ thuật và bối cảnh thị trường thành một kết luận có giải thích, được tạo theo một quy trình có ghi vết.</p>
+<h2>5.1 Tổng quan</h2>
+<p>Trang đầu có ô tìm mã, các mã xem gần đây, bản tóm tắt mặt bằng định giá thị trường so với lịch sử, và danh sách các bản định giá đã lưu của cả nhóm (mã, giá trị hợp lý, người lập, ngày).</p>
+<h2>5.2 Hồ sơ cổ phiếu và bảy tab</h2>
+<table>
+  <thead><tr><th style="width:18%">Tab</th><th>Nội dung</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ui">Tổng hợp</span></td><td>Giá trị hợp lý đồng thuận và dải, giá hiện tại, <b>biên an toàn</b>, độ tin cậy, điểm kỹ thuật và thị trường; biểu đồ khoảng giá của từng phương pháp; vùng giá tham khảo; lý do chính; cờ cần soát. Có banner trạng thái quy trình.</td></tr>
+    <tr><td><span class="ui">Quy trình</span></td><td>Bảy bước ghi vết (xem mục 6).</td></tr>
+    <tr><td><span class="ui">Cơ bản</span></td><td>Tỷ số tài chính nhiều năm, DuPont, chất lượng báo cáo (Piotroski, Altman, Beneish, Sloan), vốn lưu động; riêng ngân hàng có chỉ số ngân hàng.</td></tr>
+    <tr><td><span class="ui">Định giá</span></td><td>DCF, DCF ngược, Monte Carlo, kịch bản; DCF theo động lực; điều chỉnh khoản bất thường; bộ mã so sánh; bội số; phương pháp tài sản, thu nhập, cổ tức (mục 7 và 8).</td></tr>
+    <tr><td><span class="ui">Kỹ thuật</span></td><td>Xu hướng, động lượng, dòng tiền, biến động, hỗ trợ/kháng cự, mẫu nến, phân kỳ, sức mạnh so với VN-Index; điểm kỹ thuật tổng hợp.</td></tr>
+    <tr><td><span class="ui">Thị trường</span></td><td>Mặt bằng định giá thị trường và ngành, vòng quay ngành, dòng tiền khối ngoại, thanh khoản; điểm bối cảnh thị trường.</td></tr>
+    <tr><td><span class="ui">Đã lưu</span></td><td>Các bản đã lưu của mã này (mới trước): so sánh theo thời gian, nạp lại giả định, xoá bản của mình.</td></tr>
+  </tbody>
+</table>
+<figure><img src="img/tong-hop.jpg" alt="Tab Tổng hợp"><figcaption>Tab Tổng hợp của hồ sơ cổ phiếu.</figcaption></figure>
+<h2>5.3 Bốn con số cần đọc đúng</h2>
+<dl class="def">
+  <dt>Giá trị hợp lý (đồng thuận)</dt><dd>Trung vị có trọng số của giá trị mà từng phương pháp cho ra. Dùng trung vị để một phương pháp lệch xa không kéo cả kết quả. Dải là trung bình có trọng số của đầu thấp và đầu cao.</dd>
+  <dt>Biên an toàn</dt><dd>1 − giá / giá trị hợp lý. Dương nghĩa là giá thấp hơn giá trị ước tính. Vùng tích luỹ tham khảo nằm dưới giá trị hợp lý đúng biên an toàn bạn đặt (mặc định 20%).</dd>
+  <dt>Độ tin cậy (0–100)</dt><dd>Giảm khi ít phương pháp, các phương pháp bất đồng, báo cáo có dấu hiệu rủi ro (Altman, Beneish), điểm Piotroski yếu. Không phải xác suất đúng.</dd>
+  <dt>Kết luận kết hợp</dt><dd>Bảng quy tắc cố định giữa mức rẻ/đắt, xu hướng giá và bối cảnh thị trường. Ví dụ "Rẻ nhưng giá chưa xác nhận" là giá thấp hơn giá trị ước tính nhưng xu hướng đang xấu: có thể là bẫy giá trị.</dd>
+</dl>
+
+<h1 id="s6">6. Quy trình định giá 7 bước</h1>
+<p>Thay vì chạy mọi phương pháp rồi lấy trọng số cố định, mỗi lần định giá đi qua một quy trình. Quy trình <b>không đưa ra khuyến nghị</b>: nó bảo đảm mỗi con số có lý do được chọn, có giới hạn được nêu và có kiểm tra chéo. Mở tab <span class="ui">Quy trình</span>; thanh tiến độ ở đầu cho thấy từng bước xanh (đạt), vàng (cảnh báo) hay đỏ (không đạt).</p>
+<figure><img src="img/quy-trinh.jpg" alt="Tab Quy trình"><figcaption>Tab Quy trình: thanh tiến độ bảy bước và bước 1 (phân loại mô hình kinh doanh).</figcaption></figure>
+<h2>6.1 Từng bước</h2>
+<table>
+  <thead><tr><th style="width:5%" class="n">#</th><th style="width:20%">Bước</th><th>Việc quy trình làm và việc bạn làm</th></tr></thead>
+  <tbody>
+    <tr><td class="n">1</td><td><b>Phân loại mô hình kinh doanh</b></td><td>Ứng dụng nhận ra mô hình bằng luật cố định (xem Phụ lục A): ngân hàng, chứng khoán, bảo hiểm, bất động sản, công ty mẹ, phục hồi/đang lỗ, chu kỳ, cổ tức, tăng trưởng cao hay trưởng thành. Mỗi kết luận kèm lý do và các chỉ số căn cứ. <b>Bạn có thể chọn lại</b> mô hình trong ô chọn; khi đó vai trò phương pháp tính lại.</td></tr>
+    <tr><td class="n">2</td><td><b>Cổng dữ liệu</b></td><td>Kiểm tra: số năm báo cáo, giá và số cổ phiếu, 4 quý gần nhất (TTM), độ mới của báo cáo, lịch sử giá, lịch sử bội số, số mã cùng ngành. Thiếu giá hoặc dưới 3 năm báo cáo thì chặn ("Thiếu dữ liệu then chốt"); các hạn chế còn lại hạ độ tin cậy và được ghi vào hồ sơ.</td></tr>
+    <tr><td class="n">3</td><td><b>Kế hoạch phương pháp</b></td><td>Mỗi phương pháp có một <b>vai trò</b>: <span class="tag core">Chính</span> (trọng số 2,5) <span class="tag support">Hỗ trợ</span> (1,2) <span class="tag check">Đối chiếu</span> (0,5) <span class="tag ref">Tham khảo</span> hoặc Loại (0, chỉ hiển thị). Tình trạng "Hạn chế" (ví dụ ngành chỉ có 6 mã so sánh, giá trị cuối kỳ DCF quá lớn) giảm một nửa trọng số và nêu lý do. Cột <b>Backtest</b> cho biết phương pháp đó dự báo tốt đến đâu trong quá khứ. Bạn đổi vai trò từng phương pháp bằng ô chọn và ghi lý do. Phương pháp chính chưa tính được hiện thành <b>lỗ hổng</b> (ví dụ bất động sản thiếu NAV) kèm hướng bổ sung.</td></tr>
+    <tr><td class="n">4</td><td><b>Giả định và nguồn gốc</b></td><td>Liệt kê từng giả định (WACC, tăng trưởng, biên, thuế, vốn đầu tư...) và nó được suy ra từ đâu; giả định bạn đã sửa được đánh dấu "Bạn sửa".</td></tr>
+    <tr><td class="n">5</td><td><b>Chạy và đối chiếu chéo</b></td><td>Các phương pháp chính có đồng thuận không (chênh ≤25% đồng thuận, ≤50% lệch vừa, trên 50% bất đồng). Từ 4 phương pháp chính, phương pháp lệch xa nhất được tách riêng để không che sự đồng thuận của số còn lại. So giá trị nội tại với giá trị theo bội số ngành và giải thích chênh lệch.</td></tr>
+    <tr><td class="n">6</td><td><b>Kiểm tra hợp lý</b></td><td>Khoảng 15 mục có ngưỡng: tỷ trọng giá trị cuối kỳ trong DCF, tăng trưởng dài hạn so với lãi suất phi rủi ro, WACC, tăng trưởng và biên so với lịch sử, EV/EBITDA ngầm định so với ngành, P/E ngầm định so với phân bố ngành, kỳ vọng thị trường (DCF ngược), chất lượng báo cáo, lợi nhuận đỉnh chu kỳ, giá lệch xa giá trị đồng thuận, khoản bất thường chưa xử lý, độ chính xác lịch sử của mô hình. Mục không đạt có nút dẫn tới chỗ cần sửa.</td></tr>
+    <tr><td class="n">7</td><td><b>Kết luận và hồ sơ quyết định</b></td><td>Trạng thái: <b>Quy trình hoàn tất</b> / <b>Kết luận có điều kiện</b> / <b>Cần xử lý trước khi dùng</b> / <b>Chưa đủ dữ liệu</b>. Hiện giá trị hợp lý, nhận định và danh sách "điều gì làm đổi kết luận". Nếu còn mục không đạt hoặc thiếu dữ liệu, bạn <b>phải ghi lý do chấp nhận</b> mới lưu được.</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><b class="t">"Không đạt" không có nghĩa là sai</b><p>Ví dụ DCF và P/E ngành lệch nhau hơn 50% là chuyện thường gặp ở doanh nghiệp tăng trưởng. Quy trình không bác bỏ kết quả; nó buộc bạn giải thích vì sao chấp nhận chênh lệch đó (hợp đồng đã ký, giả định nào khác ngành), và lý do được lưu cùng bản định giá.</p></div>
+<h2>6.2 Trọng số đi đâu?</h2>
+<p>Trọng số theo vai trò là mặc định. Ở tab <span class="ui">Tổng hợp</span>, cột trọng số cho phép chỉnh tay từng phương pháp; <b>lựa chọn thủ công thắng quy trình</b>. Nút "Về mặc định của quy trình" ở bước 3 xoá mọi đổi vai trò.</p>
+
+<h1 id="s7">7. Tab Định giá: DCF, bội số, tài sản</h1>
+<h2>7.1 DCF dòng tiền doanh nghiệp (FCFF)</h2>
+<p>Dành cho doanh nghiệp phi tài chính. Ứng dụng dựng giả định mặc định từ chính lịch sử của doanh nghiệp: biên EBIT bình quân 3 năm, tăng trưởng giai đoạn đầu (60% CAGR doanh thu + 40% tăng trưởng bền vững, kẹp 2%–20%), thuế hội tụ về 20%, WACC theo CAPM (beta điều chỉnh Blume, phần bù rủi ro 8% mặc định) và cổ đông thiểu số theo tỷ lệ lợi nhuận. Mọi ô đều ghi đè được; để trống là quay về mặc định.</p>
+<ul>
+  <li><b>Bảng nhạy cảm</b> WACC × tăng trưởng dài hạn và biên × tăng trưởng: xem giá trị đổi bao nhiêu khi giả định lệch 1 điểm %.</li>
+  <li><b>Monte Carlo</b> (phân phối tam giác, hạt giống cố định): phân phối giá trị và xác suất vượt giá hiện tại.</li>
+  <li><b>DCF ngược</b>: điều gì đã được tính vào giá hiện tại (tăng trưởng, WACC hoặc biên nào làm DCF bằng đúng giá).</li>
+  <li><b>Kịch bản</b> bi quan / cơ sở / lạc quan.</li>
+</ul>
+<h2>7.2 Ngân hàng, chứng khoán, bảo hiểm</h2>
+<p>Nợ là nguyên liệu kinh doanh nên không dùng dòng tiền doanh nghiệp. Thay vào đó: <b>thu nhập thặng dư</b>, <b>P/B hợp lý</b> = (ROE − g)/(Ke − g), <b>FCFE</b> nhiều giai đoạn và mô hình cổ tức; các giả định ROE, g, Ke, tỷ lệ chi trả chỉnh được.</p>
+<h2>7.3 Bội số: so với ngành và với lịch sử</h2>
+<p>Bảng bội số hiện tại (P/E, P/B, P/S, EV/EBITDA, EV/EBIT, EV/Doanh thu...) với trung vị ngành, <b>phân vị trong ngành</b> (0 = rẻ nhất ngành) và dải 5 năm của chính cổ phiếu. Bên dưới là giá ngầm định khi áp bội số phân vị 20/50/80 của ngành hoặc của lịch sử vào số liệu của mã. Ngân hàng và tài chính chỉ so P/E, P/B.</p>
+<div class="callout"><b class="t">EV/EBITDA và EV/Doanh thu của ngành (mới)</b><p>Thống kê ngành nay gồm hai bội số này, tính từ EBITDA hoạt động 4 quý và tiền mặt ròng; loại ngân hàng, bảo hiểm, chứng khoán. EBITDA của ngành lấy từ VNDirect còn của mã tính từ báo cáo nên có thể lệch nhẹ định nghĩa: đọc như xu hướng, không phải con số chính xác.</p></div>
+<h2>7.4 Phương pháp tài sản, thu nhập và cổ tức</h2>
+<p>Giá trị sức sinh lời (EPV), số Graham và công thức tăng trưởng của Graham, PEG của Lynch, mô hình cổ tức, NCAV, giá trị sổ sách và Tobin's Q; <b>NAV</b> (điều chỉnh đánh giá lại tài sản) và <b>SOTP</b> (tổng các phần) do bạn nhập.</p>
+
+<h1 id="s8">8. Ba công cụ làm sâu định giá</h1>
+<figure><img src="img/dcf-dong-luc.jpg" alt="DCF theo động lực"><figcaption>Thẻ "DCF theo động lực" trong tab Định giá: bảng mảng kinh doanh, các tỷ lệ dự báo và kết quả theo năm.</figcaption></figure>
+<h2>8.1 DCF theo động lực</h2>
+<p>DCF mặc định ngoại suy từ lịch sử. Khi bạn có luận điểm cụ thể (công suất mới, hợp đồng đã ký, một mảng đang tăng tốc hoặc suy giảm), hãy dựng dự báo riêng:</p>
+<ol class="steps">
+  <li>Tích <span class="ui">Dùng DCF theo động lực</span>. Mẫu một mảng "Toàn công ty" được điền sẵn từ lịch sử.</li>
+  <li>Sửa tên mảng, <b>doanh thu cơ sở (tỷ)</b>, <b>đường tăng trưởng theo năm</b> và <b>biên EBIT</b> (nhập cách nhau dấu phẩy, ví dụ <code>20, 15, 12, 10</code>). Thiếu năm thì giữ giá trị cuối rồi giảm dần về tăng trưởng dài hạn. Thêm mảng bằng <span class="ui">Thêm mảng</span>.</li>
+  <li>Chỉnh các tỷ lệ chung: số năm dự báo (2–10), capex/doanh thu, khấu hao, vốn lưu động/doanh thu, chi phí chung chưa phân bổ, thuế, WACC, tăng trưởng dài hạn.</li>
+  <li>Đọc kết quả: giá trị mỗi cổ phiếu, EV, tỷ trọng giá trị cuối kỳ, bảng theo năm (doanh thu, biên, NOPAT, capex, Δ vốn lưu động, FCFF). Cảnh báo hiện khi tăng trưởng bình quân trên 25%/năm hoặc biên cuối trên 40%.</li>
+</ol>
+<p>FCFF = EBIT × (1 − thuế) + khấu hao − capex − Δ vốn lưu động. Khi bật, phương pháp này thành <span class="tag core">Chính</span> trong quy trình và DCF tự ngoại suy chuyển thành <span class="tag support">Hỗ trợ</span>. Tổng doanh thu cơ sở các mảng nên khớp doanh thu 4 quý gần nhất (ứng dụng nhắc con số này).</p>
+<div class="callout warn"><b class="t">Cẩn thận với sự chính xác giả</b><p>Dự báo chi tiết tạo cảm giác chắc chắn. Con số chỉ tốt bằng giả định bạn nhập, và giá trị cuối kỳ thường vẫn chiếm quá nửa EV. Hãy ghi luận điểm cho từng đường tăng trưởng (ở ô lý do khi lưu).</p></div>
+<h2>8.2 Bộ mã so sánh tự chọn</h2>
+<p>Ngành ICB cấp 2 rất rộng (ví dụ "Công nghệ" gồm phần mềm, viễn thông, bán lẻ thiết bị...). Trong thẻ <span class="ui">Bộ mã so sánh</span> chọn <span class="ui">Tự chọn mã</span>, nhập các đối thủ trực tiếp (từ 3 mã, cách nhau dấu phẩy hoặc khoảng trắng) rồi <span class="ui">Áp dụng bộ này</span>. Nút <span class="ui">Lấy 10 mã lớn nhất cùng ngành</span> cho điểm xuất phát. Bảng hiện P/E, P/B, P/S, EV/EBITDA, EV/Doanh thu và vốn hoá từng mã; thống kê của bộ thay cho thống kê ngành ở mọi phương pháp so sánh.</p>
+<div class="callout"><b class="t">Nên và không nên</b><p>Chọn bộ theo tiêu chí có trước (cùng mô hình, quy mô, thị trường), không theo kết quả mong muốn. Bộ nhỏ cho trung vị kém ổn định; quy trình ghi chú bộ tự chọn trong bước 6. Mã mới niêm yết hoặc thiếu báo cáo có thể không đủ bội số.</p></div>
+<h2>8.3 Điều chỉnh khoản bất thường</h2>
+<p>Lợi nhuận kế toán có thể chứa khoản một lần (hoàn nhập dự phòng, lãi bán đầu tư, thanh lý tài sản) làm P/E thấp hoặc cao giả tạo. Thẻ <span class="ui">Điều chỉnh khoản bất thường</span> cho phép loại chúng khỏi kỳ cơ sở (4 quý gần nhất hoặc năm gần nhất):</p>
+<ul>
+  <li><b>Dưới EBIT</b> (lãi bán đầu tư, đánh giá lại): chỉ đổi lợi nhuận.</li>
+  <li><b>Trong EBIT</b> (hoàn nhập dự phòng, thanh lý): đổi cả EBIT, EBITDA và lợi nhuận; biên DCF cơ sở dịch theo.</li>
+  <li>Số tiền tính bằng tỷ đồng, <b>âm</b> để loại khoản lãi khỏi lợi nhuận. Mặc định là số trước thuế (nhân thuế suất thực tế); tích "đã sau thuế" nếu bạn nhập số sau thuế.</li>
+  <li>Ứng dụng <b>gợi ý</b> khi thu nhập tài chính vượt xa mức thường lệ (kèm số tiền và căn cứ) và cảnh báo khi lợi nhuận đổi mạnh trong khi doanh thu gần như không đổi hoặc thuế suất lệch xa 20%. Gợi ý chỉ là heuristic: bạn quyết định, nên đọc thuyết minh báo cáo.</li>
+</ul>
+<p>Điều chỉnh đi vào P/E, EV/EBITDA, EPV và biên DCF; thẻ hiện lợi nhuận trước/sau, EPS và P/E mới.</p>
+
+<h1 id="s9">9. Kỹ thuật, thị trường và kết luận kết hợp</h1>
+<h2>9.1 Phân tích kỹ thuật</h2>
+<p>Tab <span class="ui">Kỹ thuật</span> tính từ nến ngày: đường trung bình, RSI, MACD, Stochastic, CCI, ADX, Bollinger/Keltner/Donchian, OBV, MFI, CMF, VWAP, Aroon, Supertrend/Parabolic SAR, Ichimoku, biến động và sụt giảm, điểm xoay và Fibonacci, hỗ trợ/kháng cự theo cụm, mẫu nến, phân kỳ, sức mạnh tương đối so với VN-Index. <b>Điểm kỹ thuật</b> (−100 đến +100) gộp xu hướng (40%), động lượng (30%), dòng tiền (15%) và vị trí giá (15%).</p>
+<h2>9.2 Bối cảnh thị trường</h2>
+<p>Tab <span class="ui">Thị trường</span> đo mặt bằng định giá của thị trường và ngành so với lịch sử, so với lợi suất trái phiếu, vòng quay sức mạnh ngành, dòng tiền khối ngoại, thanh khoản và beta. Điểm trên +30 là gió thuận, dưới −30 là gió ngược.</p>
+<h2>9.3 Kết luận kết hợp</h2>
+<p>Điểm kết hợp = 50% định giá + 30% kỹ thuật + 20% thị trường, rồi đối chiếu theo bảng quy tắc cố định (rẻ/đắt × xu hướng giá × bối cảnh) ra nhận định bằng lời. Kỹ thuật và thị trường chỉ cho biết <b>thời điểm</b>, không thay giá trị hợp lý.</p>
+
+<h1 id="s10">10. Lưu, nạp lại và áp dụng vào danh mục</h1>
+<h2>10.1 Lưu bản định giá</h2>
+<p>Mỗi lần lưu là một <b>bản ghi mới, không sửa được</b> (lịch sử bất biến), gồm giá trị hợp lý và dải, vùng giá, phương pháp và trọng số, giả định, hồ sơ quy trình (mô hình, vai trò, kết quả kiểm tra, lỗ hổng, lý do chấp nhận), lựa chọn điều chỉnh/bộ so sánh/động lực, và ghi chú của bạn. Cả nhóm xem được; chỉ người lập, quản lý tài sản hoặc quản trị viên xoá được.</p>
+<h2>10.2 Nạp lại giả định</h2>
+<p>Ở tab <span class="ui">Đã lưu</span>, nút nạp lại đưa mọi giả định của một bản về trạng thái lúc lưu (DCF, ngân hàng, trọng số, biên an toàn, vai trò quy trình, điều chỉnh, bộ so sánh, động lực) để tiếp tục chỉnh hoặc đối chiếu.</p>
+<h2>10.3 Áp dụng vào danh mục</h2>
+<p>Nút <span class="ui">Áp dụng vào danh mục</span> ghi <b>giá mục tiêu</b> (giá trị hợp lý đồng thuận) và <b>giá muốn mua</b> (đầu trên của vùng tích luỹ) cho mã trong Danh Mục / Theo Dõi của bạn, sau khi hỏi xác nhận. Cảnh báo giá chạy như cũ.</p>
+
+<h1 id="s11">11. Bảng điểm độ chính xác</h1>
+<p>Trang <span class="ui">Độ chính xác</span> trả lời câu hỏi "bộ máy này đã đúng đến đâu trong quá khứ?".</p>
+<figure><img src="img/do-chinh-xac.jpg" alt="Trang Độ chính xác"><figcaption>Trang Độ chính xác: IC, nhóm rẻ/đắt, bảng từng phương pháp và từng mô hình.</figcaption></figure>
+<h2>11.1 Cách tính</h2>
+<p>Tại mỗi tháng trong quá khứ, bộ máy được chạy lại <b>chỉ với dữ liệu có sẵn lúc đó</b> (báo cáo đã công bố sau độ trễ, chuỗi bội số đến ngày đó, giá ngày đó), rồi so giá trị hợp lý với lợi suất 6 và 12 tháng sau trừ lợi suất VN-Index.</p>
+<h2>11.2 Cách đọc</h2>
+<ul>
+  <li><b>IC</b> (hệ số tương quan hạng): mã được định giá thấp hơn giá trị hợp lý có vượt thị trường sau đó không. 0 = không có thông tin, +1 = hoàn hảo. Với dữ liệu thị trường, +0,05 đến +0,10 đã đáng kể; trên +0,20 là rất tốt.</li>
+  <li><b>Khoảng tin cậy 95%</b> trong ngoặc vuông: chứa 0 nghĩa là chưa chắc có tác dụng.</li>
+  <li><b>5 nhóm rẻ/đắt</b>: nếu bộ máy có giá trị, nhóm rẻ nhất phải vượt nhóm đắt nhất.</li>
+  <li><b>Từng phương pháp / từng mô hình</b>: phương pháp nào dự báo được, nhóm doanh nghiệp nào bộ máy mạnh hay yếu. Quy trình hiện IC này cạnh từng phương pháp (cột Backtest) và cảnh báo ở bước 6 nếu mô hình của mã dự báo ngược.</li>
+  <li><b>Ngoài mẫu</b>: IC của nửa thời gian sau, không dùng để chọn vai trò phương pháp.</li>
+</ul>
+<h2>11.3 Kết quả hiện tại (tính ngày 06/10/2026)</h2>
+<table>
+  <thead><tr><th>Chỉ số</th><th class="n">Giá trị</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td>Phạm vi</td><td class="n">53 mã · 4.017 quan sát</td><td>Từ 05/2020 đến 10/2026; VN30 hiện tại cộng một số mã thanh khoản lớn.</td></tr>
+    <tr><td>IC 12 tháng</td><td class="n">+0,27</td><td>Khoảng tin cậy +0,24 đến +0,30: có tác dụng, ở mức tốt.</td></tr>
+    <tr><td>IC 6 tháng</td><td class="n">+0,17</td><td>Khoảng tin cậy +0,13 đến +0,20.</td></tr>
+    <tr><td>Ngoài mẫu (T sau 12/2023)</td><td class="n">+0,24</td><td>Nửa sau, không dùng để hiệu chỉnh.</td></tr>
+    <tr><td>Nhóm rẻ nhất so với đắt nhất</td><td class="n">+38 điểm %</td><td>Chênh lợi suất vượt VN-Index sau 12 tháng.</td></tr>
+  </tbody>
+</table>
+<div class="callout bad"><b class="t">Đọc kèm giới hạn</b><ul>
+  <li>Chỉ <b>một chu kỳ thị trường</b> (2020–2026); tập mã là mã đã thành công (thiên lệch người sống sót và nhìn trước); giá đã điều chỉnh; các quan sát chồng lấn nên số mẫu độc lập ít hơn con số "mẫu" hiển thị nhiều.</li>
+  <li>Không đo được phần so sánh với ngành, kỹ thuật và bối cảnh thị trường (không có thống kê ngành lịch sử).</li>
+  <li>Hiệu chỉnh vai trò phương pháp (10/2026) làm IC giai đoạn huấn luyện tăng từ +0,16 lên +0,27 nhưng <b>ngoài mẫu gần như không đổi</b> (+0,25 → +0,24): phần lớn mức tăng chỉ là khớp với dữ liệu đã dùng để chọn.</li>
+  <li>Các phương pháp lịch sử của chính cổ phiếu (P/E, P/B) gần như không dự báo được; ở nhóm cổ tức/tiện ích, các phương pháp giá trị dự báo <b>ngược</b>.</li></ul></div>
+
+<h1 id="s12">12. Ví dụ làm từ đầu đến cuối</h1>
+<p class="small">Ví dụ minh hoạ với số liệu ngày 05/10/2026; con số thực sẽ khác khi bạn dùng. Mục đích là cho thấy cách đọc, không phải kết luận về FPT.</p>
+<ol class="steps">
+  <li><b>Tìm mã.</b> Valuation Bench → gõ <code>FPT</code>. Tab Tổng hợp cho giá trị hợp lý đồng thuận cao hơn giá nhiều; độ tin cậy "Vừa"; nhận định "Rẻ nhưng giá chưa xác nhận" vì xu hướng giá đang xấu.</li>
+  <li><b>Mở Quy trình.</b> Mô hình: <i>Tăng trưởng cao</i> (doanh thu tăng khoảng 17%/năm, vượt ngưỡng 15%). Cổng dữ liệu: "Đủ dùng, có hạn chế" vì ngành công nghệ chỉ có 7 mã so sánh. Phương pháp chính: DCF và P/E so với ngành.</li>
+  <li><b>Đối chiếu.</b> DCF cho giá trị cao hơn nhiều so với P/E ngành (chênh trên 50%): các phương pháp chính <b>bất đồng</b>, bước 6 báo "không đạt". Giải thích mà quy trình đưa ra: ngành đang được định giá thấp hơn kỳ vọng dòng tiền, hoặc giả định tăng trưởng/biên của DCF lạc quan. DCF ngược cho thấy giá hiện tại ngầm định tăng trưởng thấp hơn nhiều so với giả định.</li>
+  <li><b>Soát giả định.</b> Sang tab Định giá: nếu bạn có luận điểm cụ thể, dựng <b>DCF theo động lực</b> theo từng mảng; nếu P/E của ngành không phản ánh đúng đối thủ, đổi sang <b>bộ mã so sánh tự chọn</b> (các công ty phần mềm và dịch vụ CNTT); nếu lợi nhuận có khoản một lần, thêm <b>điều chỉnh</b>.</li>
+  <li><b>Xem lại quy trình.</b> Các kiểm tra cập nhật theo giả định mới. Nếu chênh lệch còn lại là có chủ đích, ghi lý do ở bước 7 (ví dụ "DCF cao hơn vì hợp đồng X đã ký; chấp nhận").</li>
+  <li><b>Lưu.</b> Bản lưu mang mô hình, vai trò, kiểm tra và lý do. Sau này mở lại để xem đã kết luận vì sao.</li>
+  <li><b>Theo dõi.</b> Trong Danh Mục, huy hiệu dưới mã cho biết giá trị hợp lý và biên an toàn theo giá hôm nay; bản quá 45 ngày hiện viền đứt: nên định giá lại sau báo cáo quý mới.</li>
+</ol>
+
+<h1 id="s13">13. Giới hạn và nguyên tắc dùng đúng</h1>
+<div class="two">
+  <div class="callout bad"><b class="t">Công cụ làm được</b><ul>
+    <li>Cho một ước tính có giải thích, có ghi vết và có kiểm tra chéo.</li>
+    <li>Xếp hạng mã rẻ/đắt tốt hơn đoán mò (theo backtest).</li>
+    <li>Cho thấy giả định nào làm kết quả đổi nhiều nhất.</li></ul></div>
+  <div class="callout warn"><b class="t">Công cụ không làm được</b><ul>
+    <li>Dự báo giá hoặc bảo đảm lợi nhuận. Chỉ khoảng 19% giá trị hợp lý nằm trong ±20% so với giá 12 tháng sau (sai số trung vị khoảng 66%).</li>
+    <li>Thay phán đoán về chất lượng ban lãnh đạo, ngành, pháp lý.</li>
+    <li>Phát hiện số liệu đầu vào sai hoặc khoản bất thường chưa được công bố.</li></ul></div>
+</div>
+<h2>Nguyên tắc</h2>
+<ol>
+  <li>Luôn đọc <b>độ tin cậy</b>, <b>trạng thái quy trình</b> và các cờ trước khi nhìn giá trị hợp lý.</li>
+  <li>Đối chiếu số liệu quan trọng với báo cáo gốc (đặc biệt số cổ phiếu, nợ, khoản bất thường).</li>
+  <li>Không dùng một phương pháp: tìm hai cách nhìn độc lập cùng dẫn tới một vùng giá.</li>
+  <li>Khi giá lệch xa giá trị hợp lý (ngoài 50%–180%), nghi ngờ mô hình trước khi nghi ngờ thị trường.</li>
+  <li>Ghi lý do khi chấp nhận kết quả "không đạt": bạn của sáu tháng sau sẽ cần nó.</li>
+  <li>Định giá lại khi có báo cáo mới; bản cũ hơn 45 ngày được đánh dấu.</li>
+</ol>
+
+<h1 id="s14">14. Xử lý sự cố và câu hỏi thường gặp</h1>
+<table>
+  <thead><tr><th style="width:32%">Hiện tượng</th><th>Nguyên nhân thường gặp và cách xử lý</th></tr></thead>
+  <tbody>
+    <tr><td>"Không tải được &lt;mã&gt;" ở Valuation Bench</td><td>Nguồn dữ liệu không phản hồi hoặc mã sai. Bấm <span class="ui">Tải lại dữ liệu</span>; kiểm tra mã; xem tab Dữ Liệu của Toàn Nhóm có cảnh báo nguồn không.</td></tr>
+    <tr><td>"Thiếu dữ liệu then chốt" ở bước 2</td><td>Mã mới niêm yết (dưới 3 năm báo cáo) hoặc thiếu giá/số cổ phiếu. Giá trị chỉ mang tính minh hoạ.</td></tr>
+    <tr><td>Phương pháp so với ngành biến mất</td><td>Ngành có dưới 5 mã hợp lệ cho bội số đó. Dùng <b>Bộ mã so sánh tự chọn</b> (từ 3 mã).</td></tr>
+    <tr><td>Chưa lưu được vì "còn mục chưa đạt"</td><td>Ghi lý do chấp nhận ở bước 7 của tab Quy trình rồi lưu lại.</td></tr>
+    <tr><td>Phương pháp NAV hoặc SOTP không có giá trị</td><td>Hai phương pháp này cần bạn nhập điều chỉnh tài sản / các mảng ở tab Định giá; chưa nhập thì không có.</td></tr>
+    <tr><td>Huy hiệu định giá không hiện ở Danh Mục</td><td>Mã chưa có bản định giá lưu ở Valuation Bench, hoặc mất kết nối tạm thời (phần này bỏ qua lỗi và không ảnh hưởng bảng danh mục).</td></tr>
+    <tr><td>Trang hiện "Không có bản lưu ngoại tuyến"</td><td>Mất mạng. Kiểm tra Internet rồi thử lại; từ 0.1.6 ứng dụng đã sửa lỗi hiện trang cũ.</td></tr>
+    <tr><td>Số liệu khác báo cáo công bố</td><td>Nguồn miễn phí có thể trễ hoặc chuẩn hoá khác. Đối chiếu báo cáo gốc trước khi quyết định.</td></tr>
+    <tr><td>Muốn hiểu một phương pháp / chỉ báo</td><td>Valuation Bench → <span class="ui">Phương pháp</span>: mỗi mục có định nghĩa, công thức, khi nào dùng, giới hạn, cách đọc (Phụ lục B).</td></tr>
+  </tbody>
+</table>
+<h2>Không Gian Riêng</h2>
+<p>Ngoài phần tài chính, ứng dụng còn có <b>Không Gian Riêng</b> (tổng quan "Hôm nay", lịch riêng đồng bộ Google Calendar, việc riêng, ghi chú, đồng bộ thư mục). Phần này không thuộc hướng dẫn này; sau khi cập nhật có thể cần bấm lại <span class="ui">Kết nối Google Calendar</span>.</p>
+
+<h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>
+<p>Bảng do ứng dụng dùng thật (sinh trực tiếp từ mã nguồn). Vai trò mặc định; bạn đổi được trong tab Quy trình. Phương pháp nào chưa tính được (ví dụ cần bạn nhập NAV) sẽ hiện là lỗ hổng nếu là Chính hoặc Hỗ trợ.</p>
+<!--ARCH_TABLE-->
+<div class="callout"><b class="t">Luật phân loại (theo thứ tự)</b><p>Mẫu báo cáo tài chính → lợi nhuận không dương → đầu tư dài hạn ≥35% tài sản hoặc có SOTP → bất động sản (ICB 8600 hoặc tồn kho ≥35% tài sản) → chu kỳ (ngành chu kỳ hoặc hệ số biến thiên lợi nhuận ≥0,6) → cổ tức/tiện ích (ICB 7500, hoặc chi trả ≥40% lợi nhuận, doanh thu tăng ≤10%/năm và lợi nhuận ổn định) → tăng trưởng (doanh thu tăng ≥15%/năm) → trưởng thành.</p></div>
+
+<h1 id="pb">Phụ lục B: thư viện phương pháp</h1>
+<p>Danh sách các phương pháp, chỉ báo và bước tổng hợp trong Valuation Bench, kèm công thức chính. Định nghĩa đầy đủ, cách dùng, giới hạn và cách đọc có trong ứng dụng ở mục <span class="ui">Phương pháp</span>.</p>
+<!--METHODS_TABLE-->
+
+<h1 id="pc">Phụ lục C: thuật ngữ</h1>
+<dl class="def">
+  <dt>Biên an toàn</dt><dd>1 − giá / giá trị hợp lý. Càng cao, giá càng thấp hơn giá trị ước tính.</dd>
+  <dt>CAGR</dt><dd>Tốc độ tăng trưởng kép hằng năm.</dd>
+  <dt>DCF</dt><dd>Chiết khấu dòng tiền: giá trị hiện tại của các dòng tiền tương lai.</dd>
+  <dt>EBIT, EBITDA</dt><dd>Lợi nhuận trước lãi vay và thuế; thêm khấu hao thì là EBITDA.</dd>
+  <dt>EPV</dt><dd>Giá trị sức sinh lời: giá trị của lợi nhuận chuẩn hoá hiện tại nếu không tăng trưởng.</dd>
+  <dt>EV</dt><dd>Giá trị doanh nghiệp = vốn hoá + nợ + cổ đông thiểu số − tiền − đầu tư liên kết.</dd>
+  <dt>FCFF, FCFE</dt><dd>Dòng tiền tự do cho toàn doanh nghiệp / cho cổ đông.</dd>
+  <dt>IC</dt><dd>Hệ số tương quan hạng (Spearman) giữa tín hiệu định giá và lợi suất vượt thị trường sau đó.</dd>
+  <dt>ICB</dt><dd>Phân ngành chuẩn quốc tế (ứng dụng dùng cấp 2).</dd>
+  <dt>Ke, WACC</dt><dd>Chi phí vốn chủ / chi phí vốn bình quân có trọng số.</dd>
+  <dt>NAV, SOTP</dt><dd>Giá trị tài sản ròng điều chỉnh; tổng giá trị từng mảng kinh doanh.</dd>
+  <dt>NOPAT</dt><dd>Lợi nhuận hoạt động sau thuế = EBIT × (1 − thuế suất).</dd>
+  <dt>P/E, P/B, P/S</dt><dd>Giá trên lợi nhuận / giá trị sổ sách / doanh thu mỗi cổ phiếu.</dd>
+  <dt>ROE, ROIC</dt><dd>Lợi nhuận trên vốn chủ / trên vốn đầu tư.</dd>
+  <dt>TTM</dt><dd>4 quý gần nhất cộng lại.</dd>
+  <dt>VaR / ES</dt><dd>Mức lỗ tối đa ở một xác suất cho trước / lỗ trung bình khi vượt mức đó.</dd>
+</dl>
+</body>
+</html>
