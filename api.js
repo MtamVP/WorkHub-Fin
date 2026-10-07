@@ -2633,7 +2633,14 @@ const API = {
             },
             runs: async (days) => {
                 const since = new Date(Date.now() - (Number(days) || 14) * 86400000).toISOString();
-                const { data, error } = await sbClient.from('finance_function_runs').select('id, fn, mode, run_at, ok, duration_ms, detail').gte('run_at', since).order('run_at', { ascending: false }).limit(400);
+                const { data, error } = await sbClient.from('finance_function_runs').select('id, fn, mode, run_at, ok, duration_ms, detail').neq('fn', 'source-watch').gte('run_at', since).order('run_at', { ascending: false }).limit(400);   // thăm dò nguồn (source-watch) có bảng riêng: không để chúng đẩy các lần chạy hằng ngày/tuần ra khỏi 400 dòng
+                if (error) throw error;
+                return data || [];
+            },
+            // Thăm dò nguồn dữ liệu trong phiên của Edge Function source-watch (mỗi 30 phút, 3 nguồn): { mode: 'probe:vci'|'probe:finfo'|'probe:dchart', run_at, ok, duration_ms, detail }. Lỗi/chưa có bảng thì trả mảng rỗng.
+            sourceProbes: async (days) => {
+                const since = new Date(Date.now() - (Number(days) || 7) * 86400000).toISOString();
+                const { data, error } = await sbClient.from('finance_function_runs').select('mode, run_at, ok, duration_ms, detail').eq('fn', 'source-watch').like('mode', 'probe:%').gte('run_at', since).order('run_at', { ascending: false }).limit(1200);
                 if (error) throw error;
                 return data || [];
             }
@@ -5253,6 +5260,7 @@ async function _dispatchAction(action, params = {}) {
             case 'listDataHealth': result = await API.asset.market.healthList(params.days); break;
             case 'resolveDataHealth': result = await API.asset.market.healthResolve(params.email, params.id, params.note); break;
             case 'listFunctionRuns': result = await API.asset.market.runs(params.days); break;
+            case 'listSourceProbes': result = await API.asset.market.sourceProbes(params.days); break;
             case 'ensureMarketMeta': result = await API.asset.market.ensureMeta(params.force); break;
             case 'addRestricted': result = await API.asset.restricted.add(params.email, params.restricted); break;
             case 'setRestrictedActive': result = await API.asset.restricted.setActive(params.email, params.id, params.active); break;

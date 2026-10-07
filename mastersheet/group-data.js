@@ -4,12 +4,31 @@
    Dữ liệu từ Edge Function market-data-sync (finance_data_health, finance_function_runs, finance_rates, finance_stock_meta) và độ tươi của các bảng giá/NAV/tuân thủ đã có.
    Dùng global của group.js (GR, grCall, grRender), group-limits.js (GL, glDate) và assets/risk.js (rkEsc, rkNum, rkKpi). */
 
-const GD = { state: 'idle', error: '', health: [], runs: [], rates: [], filter: 'open', loadedKey: '' };
+const GD = { state: 'idle', error: '', health: [], runs: [], rates: [], probes: [], filter: 'open', loadedKey: '' };
 
 const GD_KIND = {
     price_mismatch: ['Hai nguồn giá lệch', 'bad'], price_jump: ['Nhảy giá vượt biên độ', 'warn'], price_level: ['Khác cách điều chỉnh giá', 'mute'],
     stale_price: ['Giá cũ / dừng giao dịch', 'warn'], missing_session: ['Thiếu phiên', 'warn'], source_down: ['Nguồn dữ liệu lỗi', 'bad'], meta_gap: ['Mã chưa có ngành', 'mute'],
+    source_probe: ['Nguồn giá trực tiếp lỗi', 'bad'], snapshot_stale: ['Ảnh chụp thị trường chậm', 'bad'],
 };
+const GD_PROBE_LABEL = { vci: 'Bảng giá VCI (giá trực tiếp)', finfo: 'VNDirect finfo (dự phòng)', dchart: 'VNDirect dchart (nến, VN-Index)' };
+// Cảnh báo do source-watch: mô tả ngắn
+function gdProbeText(h) {
+    const d = h.detail || {};
+    if (h.kind === 'snapshot_stale') return d.asOf ? `${d.source || 'Ảnh chụp thị trường'}: số liệu ngày ${glDate(d.asOf + 'T00:00:00')}, chậm ${d.behind} ngày giao dịch` : 'Ảnh chụp thị trường: chưa có số liệu';
+    if (d.level === 'day') return `${d.source}: lỗi quá nửa số lần thăm dò hai ngày giao dịch liên tiếp (hôm nay ${d.today && d.today.ok}/${d.today && d.today.total} đạt)`;
+    return `${d.source}: ${d.failed} lần thăm dò liên tiếp thất bại`;
+}
+// Thăm dò trong phiên: mỗi nguồn một dòng gồm kết quả hôm nay (theo ngày giờ máy), 7 ngày, lần gần nhất
+function gdProbeRows() {
+    const today = new Date(); const dayKey = (iso) => { const d = new Date(iso); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }, tk = today.getFullYear() + '-' + today.getMonth() + '-' + today.getDate();
+    return ['vci', 'finfo', 'dchart'].map(k => {
+        const mine = GD.probes.filter(r => r.mode === 'probe:' + k), t = mine.filter(r => dayKey(r.run_at) === tk), last = mine[0] || null, lastOk = mine.find(r => r.ok) || null;
+        const rate = (a) => (a.length ? Math.round(a.filter(r => r.ok).length / a.length * 100) : null);
+        const ms = mine.filter(r => r.ok).slice(0, 10).map(r => r.duration_ms).filter(x => x > 0);
+        return { key: k, label: GD_PROBE_LABEL[k], today: { ok: t.filter(r => r.ok).length, total: t.length }, rate7: rate(mine), last, lastOk, avgMs: ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : null };
+    });
+}
 const GD_SEV = { error: 'bad', warn: 'warn', info: 'mute' };
 // Hạn chạy tối đa (giờ) trước khi coi là "trễ": rates/health chạy ngày làm việc nên cho 3 ngày để qua cuối tuần; meta chạy hằng tuần
 const GD_MAX_AGE_H = { meta: 24 * 9, rates: 24 * 3.5, health: 24 * 3.5, snapshot: 24 * 3.5 };
@@ -24,8 +43,8 @@ async function gdLoad(force) {
     if (GD.state === 'ok' && !force && GD.loadedKey === key) { grRender(); return; }
     GD.state = 'loading'; GD.error = ''; grRender();
     try {
-        const [health, runs, rates] = await Promise.all([grCall('listDataHealth', { days: 60 }), grCall('listFunctionRuns', { days: 21 }).catch(() => []), grCall('getMarketRates', { days: 400 }).catch(() => [])]);
-        GD.health = health || []; GD.runs = runs || []; GD.rates = rates || [];
+        const [health, runs, rates, probes] = await Promise.all([grCall('listDataHealth', { days: 60 }), grCall('listFunctionRuns', { days: 21 }).catch(() => []), grCall('getMarketRates', { days: 400 }).catch(() => []), grCall('listSourceProbes', { days: 7 }).catch(() => [])]);
+        GD.health = health || []; GD.runs = runs || []; GD.rates = rates || []; GD.probes = probes || [];
         GD.state = 'ok'; GD.loadedKey = key;
         const b = document.getElementById('grp-data-badge'), n = GD.health.filter(h => !h.resolved && h.severity !== 'info').length;
         if (b) { b.textContent = n ? String(n) : ''; b.style.display = n ? '' : 'none'; }
@@ -115,12 +134,19 @@ function grDataHtml() {
         ${fresh.map(f => `<tr><td><b>${rkEsc(f.name)}</b></td><td>ngày giao dịch</td><td>${f.date ? glDate(f.date + 'T00:00:00') + `<span class="symbol-sub">${f.days} ngày trước</span>` : '—'}</td><td>${f.days === null || f.days > f.limit ? '<span class="tl-badge bad">Cũ</span>' : '<span class="tl-badge ok"><i class="fa-solid fa-check"></i> Còn mới</span>'}</td></tr>`).join('')}
         </tbody></table></div>`;
 
+    // Nguồn giá trong phiên (source-watch thăm dò mỗi 30 phút trong giờ giao dịch)
+    const pr = gdProbeRows(), anyProbe = pr.some(p => p.last);
+    html += `<div class="ce-group-title">Nguồn giá trực tiếp (thăm dò mỗi 30 phút trong phiên)</div>` + (anyProbe ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Nguồn</th><th class="text-right">Hôm nay</th><th class="text-right">7 ngày</th><th>Lần gần nhất</th><th class="text-right">Độ trễ TB</th></tr></thead><tbody>
+        ${pr.map(p => { const bad = p.last && !p.last.ok; return `<tr><td><b>${rkEsc(p.label)}</b></td><td class="text-right">${p.today.total ? `${p.today.ok}/${p.today.total}` : '—'}</td><td class="text-right">${p.rate7 === null ? '—' : p.rate7 + '%'}</td>
+            <td>${p.last ? `<span class="tl-badge ${bad ? 'bad' : 'ok'}">${bad ? 'Lỗi' : 'Tốt'}</span> ${gdAgeText(gdAge(p.last.run_at))}${bad && p.lastOk ? `<span class="symbol-sub">lần tốt gần nhất ${gdAgeText(gdAge(p.lastOk.run_at))}</span>` : ''}` : '—'}</td><td class="text-right">${p.avgMs === null ? '—' : (p.avgMs / 1000).toFixed(1) + ' giây'}</td></tr>`; }).join('')}
+        </tbody></table></div><p class="tl-hint">Hàm source-watch gọi thử ba nguồn mà giá trực tiếp phụ thuộc. Nguồn lỗi 4 lần liền thì có cảnh báo bên dưới; lỗi quá nửa số lần trong hai ngày giao dịch liên tiếp, hoặc ảnh chụp thị trường chậm từ 2 ngày giao dịch, thì email quản lý. App tự quay về giá VNDirect khi bảng giá VCI lỗi.</p>` : '<div class="tl-empty" style="padding:14px">Chưa có lần thăm dò nào (hàm source-watch chạy trong giờ giao dịch của ngày làm việc).</div>');
+
     // Cảnh báo
     const shown = GD.health.filter(h => GD.filter === 'all' || (GD.filter === 'open' ? !h.resolved : h.resolved));
     html += `<div class="ce-group-title">Cảnh báo chất lượng dữ liệu <select class="tl-select" style="margin-left:10px;font-weight:400" onchange="gdSetFilter(this.value)" aria-label="Lọc">${[['open', 'Đang mở'], ['done', 'Đã xử lý'], ['all', 'Tất cả']].map(([v, l]) => `<option value="${v}" ${GD.filter === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
     html += shown.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Loại</th><th>Mã</th><th>Ngày</th><th>Chi tiết</th><th>Xử lý</th></tr></thead><tbody>
         ${shown.slice(0, 120).map(h => { const k = GD_KIND[h.kind] || [h.kind, 'mute'], d = h.detail || {};
-            const detail = h.kind === 'price_mismatch' ? `VNDirect ${rkNum(d.vndirect, 0)} · VCI ${rkNum(d.vci, 0)} (${d.diffPct > 0 ? '+' : ''}${rkNum(d.diffPct, 2)}%)`
+            const detail = (h.kind === 'source_probe' || h.kind === 'snapshot_stale') ? gdProbeText(h) : h.kind === 'price_mismatch' ? `VNDirect ${rkNum(d.vndirect, 0)} · VCI ${rkNum(d.vci, 0)} (${d.diffPct > 0 ? '+' : ''}${rkNum(d.diffPct, 2)}%)`
                 : (h.kind === 'price_jump' ? `${rkNum(d.prev, 0)} → ${rkNum(d.close, 0)} (${d.retPct > 0 ? '+' : ''}${rkNum(d.retPct, 2)}%, biên độ ±${rkNum(d.bandPct, 0)}%)`
                 : (h.kind === 'price_level' ? `chênh đều hệ số ${rkNum(d.factor, 4)}` : (h.kind === 'stale_price' ? `giá cuối ${glDate((d.lastBar || '') + 'T00:00:00')}, chậm ${d.sessionsBehind} phiên` : (h.kind === 'missing_session' ? `thiếu ${(d.missing || []).map(x => glDate(x + 'T00:00:00')).join(', ')}` : (h.kind === 'meta_gap' ? `${d.count} mã: ${(d.symbols || []).slice(0, 8).join(', ')}` : (d.source ? `${d.source}: ${d.failed}/${d.of} mã lỗi` : ''))))));
             return `<tr><td><span class="tl-badge ${GD_SEV[h.severity] || 'mute'}">${rkEsc(k[0])}</span></td><td><b>${rkEsc(h.symbol || '—')}</b></td><td>${h.ref_date ? glDate(h.ref_date + 'T00:00:00') : glDate(h.detected_at)}</td><td class="gr-reason">${rkEsc(detail)}${d.note ? `<span class="symbol-sub">${rkEsc(d.note)}</span>` : ''}</td>

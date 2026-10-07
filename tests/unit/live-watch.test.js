@@ -102,7 +102,7 @@ describe('LiveUI: Theo Dõi và VN-Index', () => {
     const t = boot(), ts = T(day, 10, 30);
     t.UI.afterHoldings([H('FPT', 100000)]);
     t.LQ.refresh = async () => { t.LQ.state.quotes = { FPT: quote(101000, 100000, ts) }; t.LQ.state.fetchedAt = ts * 1000; t.LQ.state.error = null;
-      t.LQ.state.index = { symbol: 'VNINDEX', value: 1751.25, ref: 1742.5, pct: 0.5022, ts, time: '10:30:00', date: day }; return t.LQ.state; };
+      t.LQ.state.index = { symbol: 'VNINDEX', value: 1751.25, ref: 1742.5, pct: 0.5022, ts, time: '10:30:00', date: t.LQ.vnParts().date }; return t.LQ.state; };   // chỉ số chỉ hiện khi là của hôm nay: lấy ngày VN thật của lúc chạy test
     t.LQ.session = () => 'open';
     await cycle(t);
     const html = t.els['live-status'].innerHTML;

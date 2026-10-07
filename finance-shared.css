@@ -769,6 +769,9 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .tb-sec li.tb-act::before { background: var(--gold); }
 .tb-sec li.tb-bad, .tb-sec li.tb-warn { font-weight: 600; }
 .tb-foot { margin: 10px 0 0; font-size: 0.7rem; color: var(--text-muted); }
+/* màu số tăng/giảm dạng chữ: dùng ở dòng giá trực tiếp, thẻ Hôm nay, nhật ký phiên (trang Valuation Bench có bản riêng cùng nghĩa) */
+.pnl-up-text { color: var(--success-color); }
+.pnl-down-text { color: var(--danger-color); }
 .day-chip { font-family: var(--font-body); font-size: 0.66rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .day-chip.up { color: var(--success-color, #1f9d63); }
 .day-chip.down { color: var(--danger-color); }

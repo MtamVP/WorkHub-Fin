@@ -26,6 +26,8 @@ export const VALUATION_LIBS = [
 ];
 // vb-data chỉ cần bảng ánh xạ mã khoản mục của lib/vb-statements.js để lọc đúng các khoản mục cần dùng
 export const VBDATA_LIBS = [{ file: 'vb-statements.js', global: 'VBStatements' }];
+// source-watch cần lịch nghỉ lễ của sàn để không báo sai vào ngày lễ
+export const SOURCEWATCH_LIBS = [{ file: 'vn-holidays.js', global: 'VnHolidays' }];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -49,5 +51,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const lib of VBDATA_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'vb-data', lib.file), expectedCopy(lib));
     console.log('đã sao chép (vb-data)', lib.file);
+  }
+  for (const lib of SOURCEWATCH_LIBS) {
+    fs.writeFileSync(path.join(root, 'supabase', 'functions', 'source-watch', lib.file), expectedCopy(lib));
+    console.log('đã sao chép (source-watch)', lib.file);
   }
 }

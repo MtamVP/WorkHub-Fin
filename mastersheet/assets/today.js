@@ -42,6 +42,7 @@ const TodayUI = (function () {
                 nav: nav || [], kpi: S.kpi, holdingsCount: S.holdings ? S.holdings.length : 0, watch: watch || [], limits: limits, sectors: sectors,
                 events: typeof CE !== 'undefined' && CE.state === 'ok' ? (CE.items || []) : [],
                 filterwatch: lsGet(FILTERWATCH_KEY), alertsPrev: lsGet(ALERTS_PREV_KEY),
+                lastSession: typeof SessionLog !== 'undefined' && typeof SessionUI !== 'undefined' ? SessionLog.lastBefore(SessionUI.state.store, localDate()) : null,
             };
             S.result = TodayBrief.build(input, localDate()); S.loadedAt = Date.now(); S.error = '';
         } catch (e) { S.error = e && e.message || String(e); }

@@ -130,6 +130,15 @@ const LiveUI = (function () {
         renderAlerts();
     }
 
+    // Nhật ký phiên cuối ngày (session-ui.js): giao cho SessionUI ghi bản tạm trong phiên / bản cuối phiên sau 14:50 (lưu trong máy)
+    function recordSession(live, t) {
+        if (typeof SessionUI === 'undefined' || !S.on || !t || !t.liveCount) return;
+        const today = LiveQuotes.vnParts().date, hasToday = Object.values(LiveQuotes.state.quotes).some(q => q.date === today);
+        const nav = S.kpi ? (Number(S.kpi.nav) || 0) + (t.marketValue - (Number(S.kpi.marketValue) || 0)) : null;
+        SessionUI.record({ session: LiveQuotes.session(), hasToday: hasToday, date: today, holdings: live, totals: t, nav: nav, index: LiveQuotes.state.index,
+            alerts: S.alertLog, series: typeof LiveSeries !== 'undefined' ? LiveSeries.points(S.series, today) : [], source: LiveQuotes.state.source });
+    }
+
     // Vẽ lại bảng, KPI và tiêu đề NAV theo giá trực tiếp (hoặc theo giá lưu khi tắt / chưa có giá)
     function apply(force) {
         if (!S.base || !hasLib()) return;
@@ -138,7 +147,7 @@ const LiveUI = (function () {
         const sig = live.map(h => h.symbol + ':' + h.marketPrice).join('|') + '|' + S.on;
         const liveWatch = S.watch ? (S.on ? LiveQuotes.applyToWatchlist(S.watch, LiveQuotes.state.quotes) : S.watch) : null;
         if (S.on && t.liveCount) ensureLimits();
-        recordSeries(t); checkAlerts(live, t, liveWatch);
+        recordSeries(t); checkAlerts(live, t, liveWatch); recordSession(live, t);
         renderStatus(); renderSeries();
         if (liveWatch && typeof renderWatchlist === 'function') {         // tab Theo Dõi: vẽ lại khi có giá đổi (không khi đang gõ trong bảng)
             const wsig = liveWatch.map(w => w.symbol + ':' + w.price).join('|') + '|' + S.on, a = document.activeElement;

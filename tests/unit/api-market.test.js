@@ -99,6 +99,21 @@ describe('cảnh báo chất lượng dữ liệu và nhật ký chạy', () => 
     expect((await c.callGAS('resolveDataHealth', { email: MANAGER.email, id: 'a', note: 'Đã xử lý xong' })).status).toBe('success');
     expect(Array.from(c.MUTATING)).toContain('resolveDataHealth');
   });
+  it('thăm dò nguồn (source-watch): có API riêng, và không chen vào danh sách lần chạy hằng ngày/tuần', async () => {
+    const day = (n) => new Date(Date.now() - n * 86400000).toISOString();
+    const c = boot(MANAGER, {
+      finance_function_runs: [
+        { id: 1, fn: 'market-data-sync', mode: 'snapshot', run_at: day(1), ok: true },
+        { id: 2, fn: 'source-watch', mode: 'probe:vci', run_at: day(0.01), ok: true, duration_ms: 900 },
+        { id: 3, fn: 'source-watch', mode: 'probe:finfo', run_at: day(0.02), ok: false, duration_ms: 12000 },
+        { id: 4, fn: 'source-watch', mode: 'daily', run_at: day(0.5), ok: true },
+        { id: 5, fn: 'source-watch', mode: 'probe:vci', run_at: day(30), ok: true },
+      ],
+    });
+    expect((await c.API.asset.market.runs(14)).map(r => r.id)).toEqual([1]);                              // thăm dò không lẫn vào
+    expect((await c.API.asset.market.sourceProbes(7)).map(r => r.mode).sort()).toEqual(['probe:finfo', 'probe:vci']);   // chỉ thăm dò trong 7 ngày, bỏ dòng "daily" và dòng quá cũ
+    expect((await c.callGAS('listSourceProbes', { days: 7 })).data).toHaveLength(2);
+  });
 });
 
 

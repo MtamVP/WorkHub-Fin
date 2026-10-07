@@ -3,7 +3,7 @@
    tỷ trọng mã/ngành/tiền mặt sau lệnh, lỗ tối đa, tỷ lệ lời/lỗ, thanh khoản (cần mấy phiên) và các giới hạn đầu tư bị chạm -- trước khi bấm lưu.
    Phép tính ở /lib/sizing-calc.js và /lib/limits-calc.js (có kiểm thử). Dùng global của script.js / limits.js: callGAS, targetEmail, parseMoney, escapeAssetHtml, lmCall, getFeeSettings. */
 
-const PT = { ctx: null, ctxAt: 0, ctxLoading: null, vol: {}, volLoading: {}, timer: null, riskPct: 1 };
+const PT = { ctx: null, ctxAt: 0, ctxLoading: null, vol: {}, volLoading: {}, timer: null, riskPct: 1, q: {}, lastAuto: null, filling: false, symTimer: null };
 const PT_RISK_KEY = 'wh.fin.pt.risk';
 const PT_CTX_TTL = 60000;
 
@@ -50,6 +50,53 @@ async function ptAdv(symbol) {
     return PT.vol[symbol];
 }
 
+// ---- Giá trực tiếp trong form (lib/pretrade-live.js): chỉ gợi ý, không đổi sổ và không chặn lưu lệnh ----
+const ptSession = () => (typeof LiveQuotes !== 'undefined' ? LiveQuotes.session() : 'closed');
+// Báo giá của một mã: ưu tiên hàm VCI (có trần/sàn), dự phòng giá đang có trong LiveQuotes. Nhớ 15 giây. null = không có.
+async function ptLiveQuote(sym) {
+    if (!sym || !/^[A-Z0-9]{1,12}$/.test(sym) || typeof PretradeLive === 'undefined') return null;
+    const c = PT.q[sym];
+    if (c && Date.now() - c.at < 15000) return c.v;
+    let raw = null;
+    try {
+        if (typeof API !== 'undefined' && API.asset && API.asset.market && API.asset.market.liveQuotes) {
+            const r = await API.asset.market.liveQuotes([sym]), x = r && r.quotes && r.quotes[sym];
+            if (x) raw = Object.assign({}, x, { time: typeof LiveQuotes !== 'undefined' ? LiveQuotes.hhmmss(Math.floor(Date.parse(r.asOf) / 1000)) : null });
+        }
+    } catch (e) { /* hàm giá VCI lỗi: dùng giá đang có của Danh Mục nếu có */ }
+    if (!raw && typeof LiveQuotes !== 'undefined' && LiveQuotes.state.quotes[sym]) { const s = LiveQuotes.state.quotes[sym]; raw = { price: s.price, ref: s.ref, time: s.time }; }
+    const v = raw ? PretradeLive.describe(raw, ptSession()) : null;
+    PT.q[sym] = { at: Date.now(), v: v };
+    return v;
+}
+// Vẽ lại bối cảnh danh mục theo giá trực tiếp của các mã đang nắm (khi Danh Mục đang bật giá trực tiếp)
+function ptApplyLive(ctx) {
+    if (typeof PretradeLive === 'undefined' || typeof LiveUI === 'undefined' || !LiveUI.active()) return ctx;
+    const o = PretradeLive.overlay(ctx.holdings, LiveQuotes.state.quotes, ctx.cash, ctx.debt);
+    if (!o.liveCount) return ctx;
+    return Object.assign({}, ctx, { holdings: o.holdings, nav: o.nav, liveCount: o.liveCount, navDelta: o.navDelta });
+}
+// Khi đổi mã (hoặc loại lệnh): tự điền giá trực tiếp vào ô Giá nếu ô trống hoặc đang giữ giá tự điền lần trước; luôn hiện dòng giá thị trường dưới ô
+async function ptAutofillPrice() {
+    const symEl = document.getElementById('txn-symbol'), el = document.getElementById('txn-price'), hint = document.getElementById('txn-live-hint');
+    if (!symEl || !el || typeof PretradeLive === 'undefined') return;
+    const sym = String(symEl.value).trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,12}$/.test(sym)) { if (hint) hint.textContent = ''; return; }
+    const lq = await ptLiveQuote(sym);
+    if (String(symEl.value).trim().toUpperCase() !== sym) return;                 // đã đổi mã trong lúc chờ
+    if (hint) hint.textContent = lq ? lq.text : '';
+    if (lq && PretradeLive.shouldAutofill(el.value, el.dataset.auto === '1', PT.lastAuto)) {
+        PT.filling = true; el.value = lq.price; el.dataset.auto = '1'; PT.lastAuto = lq.price;
+        el.dispatchEvent(new Event('input', { bubbles: true })); PT.filling = false;
+    }
+}
+async function ptUseLivePrice() {
+    const el = document.getElementById('txn-price'), sym = String((document.getElementById('txn-symbol') || {}).value || '').trim().toUpperCase();
+    const lq = await ptLiveQuote(sym);
+    if (!el || !lq) return;
+    PT.filling = true; el.value = lq.price; el.dataset.auto = '1'; PT.lastAuto = lq.price; el.dispatchEvent(new Event('input', { bubbles: true })); PT.filling = false;
+}
+
 function ptInputs() {
     const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     return {
@@ -72,14 +119,16 @@ async function ptRender() {
     if (!x.symbol) { body.innerHTML = '<p class="tl-hint">Nhập mã, giá dự kiến và điểm cắt lỗ (mục “Kế hoạch &amp; lý do” bên dưới) để tính khối lượng nên mua.</p>'; return; }
     let ctx;
     try { ctx = await ptContext(); } catch (e) { body.innerHTML = `<p class="tl-hint text-danger">Không tải được danh mục: ${ptEsc(e.message || e)}</p>`; return; }
+    ctx = ptApplyLive(ctx);                         // giá trị vị thế và NAV theo giá trực tiếp (nếu đang bật), không dùng giá lưu 5 phút
     const adv = await ptAdv(x.symbol);
+    const lq = await ptLiveQuote(x.symbol);
     // Có thể người dùng đã gõ tiếp trong lúc chờ: chỉ vẽ nếu đầu vào không đổi
     const y = ptInputs();
     if (y.symbol !== x.symbol || y.qty !== x.qty || y.price !== x.price || y.stop !== x.stop || y.target !== x.target || y.type !== x.type) return;
 
     const rates = (typeof getFeeSettings === 'function') ? { buyFeeRate: getFeeSettings().buyFeeRate, sellFeeRate: getFeeSettings().sellFeeRate, sellTaxRate: getFeeSettings().sellTaxRate } : PortfolioCalc.DEFAULT_RATES;
     const held = ctx.holdings.find(h => h.symbol === x.symbol);
-    const price = x.price > 0 ? x.price : (held ? held.price : 0);
+    const price = x.price > 0 ? x.price : (held ? held.price : (lq ? lq.price : 0));
     const pf = { holdings: ctx.holdings.map(h => ({ symbol: h.symbol, value: h.value })), cash: ctx.cash, debt: ctx.debt };
     const base = { nav: ctx.nav, cash: ctx.cash, price: price, stop: x.stop, riskPct: PT.riskPct, rates: rates, adv: adv || 0 };
     const sz = SizingCalc.size(Object.assign({}, base, { limits: { LC: LimitsCalc, rows: ctx.limits, pf: pf, symbol: x.symbol } }));
@@ -121,6 +170,7 @@ async function ptRender() {
         chk.violations.forEach(v => lines.push(flagLine(v.mode === 'warn' ? 'warn' : 'bad', `${v.text} — ${LimitsCalc.MODES[v.mode].label.toLowerCase()}`)));
         chk.near.forEach(v => lines.push(flagLine('info', v.text)));
     }
+    if (lq) PretradeLive.priceFlags(x.price, lq, ptSession()).forEach(f => lines.push(flagLine(f.tone, f.text)));      // giá nhập lệch giá trực tiếp hoặc ngoài trần/sàn
     // Danh sách hạn chế: mã bị cấm thì không ghi được lệnh
     const rs = (ctx.restricted || []).find(r => r.symbol === x.symbol);
     if (rs) lines.unshift(flagLine('bad', `${x.symbol} đang trong danh sách hạn chế của nhóm (${rs.reason}): không được mua hoặc bán cho tới khi quản lý gỡ hạn chế.`));
@@ -139,8 +189,9 @@ async function ptRender() {
         <div class="pt-controls">
             <label>Ngân sách rủi ro <span class="tl-hint" style="margin:0">(% NAV chịu mất nếu chạm cắt lỗ)</span>
                 <input type="number" id="pt-risk" class="tl-input num" min="0.1" max="20" step="0.1" value="${PT.riskPct}" onchange="ptSetRisk(this.value)"></label>
-            <div class="pt-meta">NAV hiện tại <b>${ptVnd(ctx.nav)}</b> · tiền mặt <b>${ptVnd(ctx.cash)}</b> · ${ctx.limits.length} giới hạn áp dụng${price > 0 ? '' : ' · <span class="text-danger">chưa có giá</span>'}</div>
+            <div class="pt-meta">NAV hiện tại <b>${ptVnd(ctx.nav)}</b>${ctx.liveCount ? ` <span class="tl-badge info" title="Giá trị vị thế và NAV tính theo giá trực tiếp của ${ctx.liveCount} mã (chỉ để kiểm tra trước lệnh; sổ vẫn dùng giá lưu)">giá trực tiếp</span>` : ''} · tiền mặt <b>${ptVnd(ctx.cash)}</b> · ${ctx.limits.length} giới hạn áp dụng${price > 0 ? '' : ' · <span class="text-danger">chưa có giá</span>'}</div>
         </div>
+        ${lq ? `<div class="pt-sugg none"><div><span class="k">Giá thị trường</span> <span class="s">${ptEsc(lq.text)}</span></div><button type="button" class="btn-tool" onclick="ptUseLivePrice()">Dùng giá này</button></div>` : ''}
         ${sugg}
         ${caps ? `<div class="pt-caps">${caps}</div>` : ''}
         ${impact}
@@ -166,10 +217,13 @@ function ptUseQty(q) {
 document.addEventListener('DOMContentLoaded', () => {
     ptLoadRisk();
     ['txn-symbol', 'txn-quantity', 'txn-price', 'txn-plan-stop', 'txn-plan-expected'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', ptSchedule); });
+    const symEl = document.getElementById('txn-symbol'), priceEl = document.getElementById('txn-price');
+    if (symEl) symEl.addEventListener('input', () => { clearTimeout(PT.symTimer); PT.symTimer = setTimeout(ptAutofillPrice, 450); });
+    if (priceEl) priceEl.addEventListener('input', () => { if (!PT.filling) priceEl.dataset.auto = '0'; });       // người dùng tự gõ giá: không tự điền đè nữa
     const seg = document.querySelector('#txn-form .seg');
-    if (seg) seg.addEventListener('click', () => setTimeout(ptRender, 0));
+    if (seg) seg.addEventListener('click', () => setTimeout(() => { ptRender(); ptAutofillPrice(); }, 0));
     const box = document.getElementById('txn-pretrade');
     if (box) box.addEventListener('toggle', () => { if (box.open) ptRender(); });
     const form = document.getElementById('txn-form');
-    if (form) form.addEventListener('submit', () => { PT.ctx = null; setTimeout(() => { PT.ctx = null; }, 3000); });   // sau khi ghi lệnh danh mục đổi nên bối cảnh phải tải lại
+    if (form) form.addEventListener('submit', () => { PT.ctx = null; setTimeout(() => { PT.ctx = null; if (priceEl) priceEl.dataset.auto = '0'; PT.lastAuto = null; const h = document.getElementById('txn-live-hint'); if (h) h.textContent = ''; }, 3000); });   // sau khi ghi lệnh danh mục đổi nên bối cảnh phải tải lại
 });

@@ -44,6 +44,16 @@ export function createFakeSupabase(seed = {}, opts = {}) {
         case 'in': return f.val.map(String).includes(String(v));
         case 'notin': return !f.val.map(String).includes(String(v));
         case 'neq': return String(v) !== String(f.val);
+        case 'like': {                                          // LIKE chỉ với % (không có _): tiền tố, hậu tố và đoạn giữa theo thứ tự
+          const parts = String(f.val).split('%'), s = String(v); let pos = 0;
+          for (let i = 0; i < parts.length; i++) {
+            const p = parts[i];
+            if (i === 0) { if (!s.startsWith(p)) return false; pos = p.length; continue; }
+            if (i === parts.length - 1) return s.length - pos >= p.length && s.endsWith(p);
+            const at = s.indexOf(p, pos); if (at < 0) return false; pos = at + p.length;
+          }
+          return s === String(f.val);
+        }
         case 'gte': return v >= f.val;
         case 'lte': return v <= f.val;
         case 'or': return f.val.some(c => String(row[c.col]) === String(c.val));
@@ -79,6 +89,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
       delete() { q.op = 'delete'; return api; },
       eq(col, val) { q.filters.push({ op: 'eq', col, val }); return api; },
       neq(col, val) { q.filters.push({ op: 'neq', col, val }); return api; },
+      like(col, val) { q.filters.push({ op: 'like', col, val }); return api; },
       is(col, val) { q.filters.push({ op: 'is', col, val }); return api; },
       in(col, val) { q.filters.push({ op: 'in', col, val }); return api; },
       gte(col, val) { q.filters.push({ op: 'gte', col, val }); return api; },
