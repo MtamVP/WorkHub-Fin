@@ -5259,6 +5259,53 @@ function loadBackupRestorePanel() {
   loadMarketHistoryStatus();
 }
 
+// ---- Kiểm tra hệ thống (self-check.js): chạy các phép thử và hiện kết quả ----
+function openSelfCheckModal() {
+  openAppModal('selfcheck-modal');
+  const last = window.WorkHubSelfCheck && window.WorkHubSelfCheck.last();
+  if (last) renderSelfCheck(last);
+}
+function renderSelfCheck(results, running) {
+  const S = SelfCheck.summarize(results), box = document.getElementById('selfcheck-results'), sum = document.getElementById('selfcheck-summary');
+  const label = { ok: 'Đạt', warn: 'Chú ý', fail: 'Lỗi', skip: 'Bỏ qua', running: 'Đang chạy…' };
+  const color = { ok: 'var(--success-color, #1f9d63)', warn: 'var(--warning-color)', fail: 'var(--danger-color)', skip: 'var(--text-muted)', running: 'var(--text-muted)' };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  box.innerHTML = results.map((r) => `<div style="display:grid; grid-template-columns:76px 1fr; gap:4px 12px; padding:8px 0; border-top:1px solid var(--border-color); font-size:0.85rem;">
+      <b style="color:${color[r.status]};">${label[r.status]}</b>
+      <div><b>${esc(r.label)}</b>${r.ms ? ` <span class="text-muted" style="font-size:0.74rem;">${r.ms} ms</span>` : ''}<div class="text-muted" style="margin-top:2px;">${esc(r.detail || '')}</div></div></div>`).join('');
+  sum.innerHTML = running ? '<b>Đang kiểm tra…</b>' : `<b style="color:${color[S.verdict]};">${esc(S.text)}</b> <span class="text-muted">(${S.ok} đạt, ${S.warn} chú ý, ${S.fail} lỗi, ${S.skip} bỏ qua)</span>`;
+}
+async function runSelfCheckAction() {
+  const btn = document.getElementById('selfcheck-run-btn'), copyBtn = document.getElementById('selfcheck-copy-btn');
+  if (btn) btn.disabled = true;
+  try {
+    if (!window.WorkHubSelfCheck) throw new Error('Chưa nạp bộ kiểm tra.');
+    const shown = [];
+    const results = await window.WorkHubSelfCheck.run((p) => {
+      if (p.status === 'running') { shown.push({ label: p.label, status: 'running', detail: '', ms: 0 }); }
+      else { shown[shown.length - 1] = p; }
+      renderSelfCheck(shown.slice(), p.status === 'running' || p.done < p.total);
+    });
+    renderSelfCheck(results);
+    if (copyBtn) copyBtn.disabled = false;
+  } catch (e) {
+    showToast('Không chạy được kiểm tra: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+async function copySelfCheckReport() {
+  try {
+    const text = await window.WorkHubSelfCheck.report();
+    await navigator.clipboard.writeText(text);
+    showToast('Đã sao chép báo cáo.', 'success');
+  } catch (e) { showToast('Không sao chép được: ' + (e.message || e), 'error'); }
+}
+async function testNotificationAction() {
+  const r = window.WorkHubSelfCheck ? await window.WorkHubSelfCheck.testNotification() : { ok: false, detail: 'Chưa nạp bộ kiểm tra.' };
+  showToast(r.detail, r.ok ? 'success' : 'error');
+}
+
 // Lịch sử ảnh chụp thị trường lưu trong máy (market-history.js): tóm tắt số ngày đã lưu và vị trí thư mục.
 async function loadMarketHistoryStatus() {
   const el = document.getElementById('market-history-status');

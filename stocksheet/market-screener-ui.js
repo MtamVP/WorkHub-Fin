@@ -7,6 +7,9 @@ const MK = { state: 'idle', error: '', rows: [], asOf: null, filters: { values: 
 const MK_BATCH_MAX = 150;                                   // số mã tối đa mỗi lần định giá hàng loạt
 const MK_SAVED_KEY = 'wh.fin.marketscreener.saved.v1';
 const MK_KEY = 'wh.fin.marketscreener.v1';
+const MK_HEAT_KEY = 'wh.fin.sectorheat.v1';
+const MKH = { key: 'chg1m' };                              // kỳ đang xem trên bản đồ nhiệt ngành
+try { const hv = JSON.parse(localStorage.getItem(MK_HEAT_KEY) || 'null'); if (hv && SectorHeatmap.PERIODS.some(p => p.key === hv.key)) MKH.key = hv.key; } catch (e) { /* mặc định 1 tháng */ }
 try {
     const saved = JSON.parse(localStorage.getItem(MK_KEY) || 'null');
     if (saved && saved.filters) { MK.filters = MarketScreener.normalizeFilters(saved.filters); MK.preset = saved.preset || null; }
@@ -57,6 +60,7 @@ function renderMarketScreener() {
     const icbs = [...new Set(MK.rows.map(r => r.icb2_code).filter(Boolean))].sort();
     root.innerHTML = `
     <div id="mk-alerts"></div>
+    <div id="mk-heat"></div>
     <div class="vl-card">
         <h3 class="vl-card-title"><i class="fa-solid fa-earth-asia" aria-hidden="true"></i> Sàng lọc toàn thị trường <span class="vl-muted">${MK.rows.length} mã niêm yết · số liệu ngày ${VU.esc(String(MK.asOf || '').slice(0, 10).split('-').reverse().join('/'))}
             <button type="button" class="vl-link" style="margin-left:10px" onclick="mkReset()">Đặt lại</button></span></h3>
@@ -82,7 +86,57 @@ function renderMarketScreener() {
     <div id="mk-results"></div>`;
     renderMkResults();
     renderMkAlerts();
+    renderMkHeat();
 }
+
+// ---------- bản đồ nhiệt ngành (lib/sector-heatmap.js) ----------
+const mkSgn = (v, d) => (v === null || v === undefined ? '—' : (v > 0 ? '+' : (v < 0 ? '−' : '')) + VU.dec(Math.abs(v * 100), d === undefined ? 1 : d) + '%');
+const mkRel = (v) => (v === null || v === undefined ? '—' : (v >= 0 ? '+' : '−') + VU.dec(Math.abs(v * 100), 1));
+const hmClass = (b) => (b === null || b === undefined ? 'hm-bn' : (b === 0 ? 'hm-b0' : 'hm-b' + (b < 0 ? 'd' + (-b) : 'u' + b)));    // bậc màu -> lớp CSS (null = thiếu số liệu)
+function renderMkHeat() {
+    const box = document.getElementById('mk-heat');
+    if (!box) return;
+    const names = {}; MK.rows.forEach(r => { if (r.icb2_code) names[r.icb2_code] = mkIcbName(r.icb2_code); });
+    const H = SectorHeatmap.build(MK.rows, MKH.key, { names }), per = SectorHeatmap.periodOf(MKH.key);
+    const chips = SectorHeatmap.PERIODS.map(p => `<button type="button" class="vl-chip" aria-pressed="${p.key === MKH.key}" onclick="mkHeatPeriod('${p.key}')">${VU.esc(p.label)}</button>`).join('');
+    const mk = H.market, head = `<h3 class="vl-card-title"><i class="fa-solid fa-table-cells" aria-hidden="true"></i> Bản đồ nhiệt ngành <span class="vl-muted">biến động giá ${VU.esc(per.label)} · diện tích theo vốn hoá</span></h3>
+        <div class="sc-presets" role="group" aria-label="Kỳ xem biến động giá">${chips}</div>`;
+    if (H.empty) { box.innerHTML = `<div class="vl-card hm-card">${head}<div class="vl-empty">Kỳ “${VU.esc(per.label)}” chưa có đủ số liệu trong ảnh chụp thị trường. Số liệu mới được nạp mỗi ngày làm việc lúc 18:20; hãy thử lại sau hoặc chọn kỳ khác.</div></div>`; return; }
+    const shown = H.sectors.filter(s => s.cap > 0), W = 100, HH = 56;
+    const rects = SectorHeatmap.treemap(shown.map(s => ({ key: s.code || '_', value: s.cap })), W, HH), by = {}; shown.forEach(s => { by[s.code || '_'] = s; });
+    const sel = new Set(MK.filters.icbs);
+    const tile = (r) => {
+        const s = by[r.key], b = s.ok ? SectorHeatmap.bucket(s.chg, MKH.key) : null, big = r.w >= 11 && r.h >= 10, mid = r.w >= 7 && r.h >= 7, code = s.code || '', on = !!(code && sel.has(code));
+        const tip = `${s.name}: ${s.ok ? mkSgn(s.chg) + ' (so với thị trường ' + mkRel(s.rel) + ' điểm %)' : 'chưa đủ số liệu'} · ${s.n} mã · vốn hoá ${VU.dec(s.cap / 1e12, 1)} nghìn tỷ${s.up === null ? '' : ' · ' + VU.dec(s.up * 100, 0) + '% mã tăng'}`;
+        const cls = hmClass(b);
+        return `<button type="button" class="hm-tile ${cls}${on ? ' hm-sel' : ''}" style="left:${(r.x / W * 100).toFixed(3)}%;top:${(r.y / HH * 100).toFixed(3)}%;width:${(r.w / W * 100).toFixed(3)}%;height:${(r.h / HH * 100).toFixed(3)}%" title="${VU.esc(tip)}" aria-pressed="${on}" aria-label="${VU.esc(tip)}"${code ? ` onclick="mkHeatToggle('${code}')"` : ' disabled'}>${mid ? `<span class="hm-name">${VU.esc(s.name)}</span><span class="hm-chg">${s.ok ? mkSgn(s.chg) : 'thiếu số liệu'}</span>` : ''}${big ? `<span class="hm-sub">${s.n} mã · ${VU.dec(s.cap / 1e12, 0)} nghìn tỷ</span>` : ''}</button>`;
+    };
+    const legend = [-3, -2, -1, 0, 1, 2, 3].map(b => `<span class="hm-leg ${hmClass(b)}">${b === 0 ? '≈ 0' : (b < 0 ? '−' : '+') + VU.dec(Math.abs(b) / 3 * per.span * 100, 0) + '%'}</span>`).join('');
+    const sorted = shown.filter(s => s.ok).sort((a, b) => b.chg - a.chg).concat(shown.filter(s => !s.ok));
+    const trs = sorted.map(s => {
+        const code = s.code || '', on = !!(code && sel.has(code));
+        return `<tr><td>${code ? `<button type="button" class="vl-link" aria-pressed="${on}" onclick="mkHeatToggle('${code}')" title="${on ? 'Bỏ ngành khỏi bộ lọc' : 'Thêm ngành vào bộ lọc bên dưới'}">${on ? '✓ ' : ''}${VU.esc(s.name)}</button>` : VU.esc(s.name)}</td><td class="num">${s.n}</td><td class="num">${VU.dec(s.cap / 1e12, 1)}</td>
+            <td class="num">${s.ok ? `<b class="${s.chg >= 0 ? 'pnl-up-text' : 'pnl-down-text'}">${mkSgn(s.chg)}</b>` : '—'}</td><td class="num">${s.ok ? mkRel(s.rel) : '—'}</td><td class="num">${mkSgn(s.median)}</td><td class="num">${s.up === null ? '—' : VU.dec(s.up * 100, 0) + '%'}</td><td class="num">${s.pe === null ? '—' : VU.dec(s.pe, 1) + 'x'}</td>
+            <td><small>${s.biggest.map(x => `${VU.esc(x.symbol)} ${x.chg === null ? '' : mkSgn(x.chg, 0)}`).join(' · ')}</small></td><td><small>${s.best ? `${VU.esc(s.best.symbol)} ${mkSgn(s.best.chg, 0)}` : '—'}${s.worst ? ` / ${VU.esc(s.worst.symbol)} ${mkSgn(s.worst.chg, 0)}` : ''}</small></td></tr>`;
+    }).join('');
+    box.innerHTML = `<div class="vl-card hm-card">${head}
+        <p class="hm-market">Toàn thị trường: <b class="${mk.chg >= 0 ? 'pnl-up-text' : 'pnl-down-text'}">${mkSgn(mk.chg)}</b> (bình quân theo vốn hoá) · trung vị ${mkSgn(mk.median)} · ${mk.up === null ? '—' : VU.dec(mk.up * 100, 0) + '%'} mã tăng · ${mk.n} mã</p>
+        <div class="hm-map" role="group" aria-label="Bản đồ nhiệt ngành: bấm một ô để chọn hoặc bỏ chọn ngành trong bộ lọc">${rects.map(tile).join('')}</div>
+        <div class="hm-list" role="group" aria-label="Danh sách ngành theo biến động giá">${sorted.map(s => { const code = s.code || '', on = !!(code && sel.has(code)); return `<button type="button" class="hm-row ${hmClass(s.ok ? SectorHeatmap.bucket(s.chg, MKH.key) : null)}${on ? ' hm-sel' : ''}" aria-pressed="${on}"${code ? ` onclick="mkHeatToggle('${code}')"` : ' disabled'}><span class="hm-rname">${VU.esc(s.name)}<small>${s.n} mã · ${VU.dec(s.cap / 1e12, 0)} nghìn tỷ</small></span><b>${s.ok ? mkSgn(s.chg) : 'thiếu số liệu'}</b></button>`; }).join('')}</div>
+        <div class="hm-legend" aria-hidden="true">${legend}</div>
+        <details class="hm-details"><summary>Bảng chi tiết theo ngành (${shown.length} ngành)</summary>
+            <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>Ngành</th><th class="num">Số mã</th><th class="num" title="Tổng vốn hoá, nghìn tỷ đồng">Vốn hoá</th><th class="num" title="Bình quân gia quyền theo vốn hoá của các mã có số liệu">Biến động</th><th class="num" title="Chênh lệch so với toàn thị trường, điểm phần trăm">So TT</th><th class="num" title="Trung vị biến động các mã trong ngành">Trung vị</th><th class="num" title="Tỷ lệ mã có giá tăng trong kỳ">Mã tăng</th><th class="num" title="P/E trung vị của các mã có lãi">P/E</th><th>Vốn hoá lớn nhất</th><th title="Mã từ 1.000 tỷ đồng: tăng mạnh nhất / giảm mạnh nhất trong kỳ">Mạnh / yếu nhất</th></tr></thead><tbody>${trs}</tbody></table></div>
+        </details>
+        <p class="vl-hint">Bấm một ô (hoặc tên ngành trong bảng) để thêm hoặc bỏ ngành đó khỏi bộ lọc bên dưới${MK.filters.icbs.length ? ` · đang chọn ${MK.filters.icbs.length} ngành. <button type="button" class="vl-link" onclick="mkHeatGo()">Xem danh sách mã</button>` : ''}. Mô tả biến động giá đã qua để biết ngành nào mạnh hay yếu; không phải tín hiệu mua bán.</p></div>`;
+}
+function mkHeatPeriod(key) { if (!SectorHeatmap.PERIODS.some(p => p.key === key)) return; MKH.key = key; try { localStorage.setItem(MK_HEAT_KEY, JSON.stringify({ key })); } catch (e) { /* bỏ qua */ } renderMkHeat(); }
+function mkHeatToggle(code) {
+    const box = document.querySelector(`#mk-root [data-mk-icb="${code}"]`);
+    if (!box) return;
+    box.checked = !box.checked;
+    mkOnInput(); renderMkHeat();
+}
+function mkHeatGo() { const el = document.getElementById('mk-results'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
 function mkValCells(sym) {
     const x = MK.vals[sym];

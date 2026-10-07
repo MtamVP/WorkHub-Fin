@@ -92,6 +92,7 @@
           <button class="dropdown-item" onclick="toggleMembersDrawer()"><i class="fa-solid fa-users"></i> Xem nhóm Finance</button>
           <button class="dropdown-item" onclick="switchAccount()"><i class="fa-solid fa-user-gear"></i> Đổi tài khoản</button>
           <button class="dropdown-item" onclick="refreshFinanceSession()"><i class="fa-solid fa-rotate"></i> Làm mới quyền truy cập</button>
+          <button class="dropdown-item" onclick="openSelfCheckModal()"><i class="fa-solid fa-stethoscope"></i> Kiểm tra hệ thống</button>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item" onclick="window.location.href='/change_nickname/index.html'"><i class="fa-solid fa-address-card me-2"></i> Đổi Biệt
               danh</button>
@@ -1623,6 +1624,29 @@
   </div>
 
 
+  <!-- Kiểm tra hệ thống: thử từng thứ app cài trên máy cần (giá trực tiếp, ghi tệp, thông báo, dữ liệu) -->
+  <div class="modal-overlay" id="selfcheck-modal">
+    <div class="modal-card" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-stethoscope" style="color: var(--gold);"></i> Kiểm tra hệ thống</h3>
+        <button class="header-btn" onclick="closeAppModal('selfcheck-modal')" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted" style="margin:0 0 12px;">Bấm chạy để thử từng thứ app cần trên máy này: giá trực tiếp, ghi tệp lịch sử, thông báo, dữ liệu thị trường và định giá. Chỉ đọc dữ liệu; chỉ ghi một tệp tạm rồi xoá ngay. Báo cáo không chứa mật khẩu hay email.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+          <button type="button" class="btn btn-primary" id="selfcheck-run-btn" onclick="runSelfCheckAction()"><i class="fa-solid fa-play"></i> Chạy kiểm tra</button>
+          <button type="button" class="btn btn-outline" id="selfcheck-copy-btn" onclick="copySelfCheckReport()" disabled><i class="fa-solid fa-copy"></i> Sao chép báo cáo</button>
+          <button type="button" class="btn btn-outline" onclick="testNotificationAction()"><i class="fa-solid fa-bell"></i> Gửi thông báo thử</button>
+        </div>
+        <div id="selfcheck-summary" class="small" style="margin-bottom:8px;" aria-live="polite"></div>
+        <div id="selfcheck-results"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('selfcheck-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Backup & Restore Modal (admin-only; the guard below is cosmetic — backups are
        scoped by whatever the logged-in user's own RLS can already see) -->
   <div class="modal-overlay" id="backup-restore-modal">
@@ -1880,6 +1904,10 @@
   <script src="backup-config.js?v=3"></script>
   <script src="local-backup.js?v=1788532002219"></script>
   <script src="lib/market-history.js?v=1791990000000"></script>
+  <script src="lib/vn-holidays.js?v=1792000000000"></script>
+  <script src="lib/live-quotes.js?v=1792000000000"></script>
+  <script src="lib/self-check.js?v=1792000000000"></script>
+  <script src="self-check.js?v=1792000000000"></script>
   <script src="market-history.js?v=1791990000000"></script>
   <script src="updater.js?v=1788532002219"></script>
 </body>

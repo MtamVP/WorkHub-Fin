@@ -149,6 +149,13 @@
   <li>Giá lấy từ <b>bảng giá VCI</b> qua một hàm trên máy chủ của nhóm: trễ vài giây. Nếu hàm này lỗi, app tự dùng giá VNDirect, <b>trễ khoảng 1 đến 2 phút</b>, và dòng trạng thái cho biết đang dùng nguồn nào. Đây là giá khớp gần nhất của nguồn công khai, không phải dữ liệu chính thức của công ty chứng khoán.</li>
   <li><b>Chỉ để xem.</b> Sổ lệnh, NAV lưu và lịch sử hiệu suất vẫn dùng giá do máy chủ lưu mỗi 5 phút trong phiên. Mã đã <b>khoá giá</b> không bị ghi đè. App không cập nhật khi bạn đang gõ trong bảng. Ngoài giờ giao dịch app dùng giá lưu; nếu nguồn lỗi, dòng trạng thái báo và app quay về giá lưu.</li>
   <li>Không cần khoá hay tài khoản chứng khoán nào. Các nguồn công khai (VCI, VNDirect) không có cam kết dịch vụ nên có thể đổi hoặc ngừng bất cứ lúc nào.</li>
+  <li>Ngày thường nghỉ lễ (Tết, Giỗ Tổ, 30/4 - 1/5, Quốc khánh...) dòng trạng thái ghi rõ "thị trường nghỉ lễ" và dùng giá lưu. Lịch lễ do app giữ; nếu một ngày nghỉ chưa có trong lịch, app vẫn tự nhận biết vì nguồn không có giá của hôm nay.</li>
+</ul></div>
+<div class="callout"><b class="t">Cảnh báo theo giá trực tiếp và đường lãi/lỗ trong ngày (mới)</b>
+<ul>
+  <li><b>Cảnh báo:</b> khi Danh Mục đang mở, app báo ngay khi một mã bạn nắm <b>chạm giá mục tiêu</b>, <b>thủng ngưỡng cắt lỗ</b> hoặc <b>tăng/giảm vượt ngưỡng</b> so với giá tham chiếu (chọn Tắt, 3%, 5% hoặc 7% ở ô <span class="ui">Báo biến động</span>, mặc định 5%). Cảnh báo hiện thành thông báo của Windows và thành dải màu phía trên bảng; mỗi mức chỉ báo <b>một lần mỗi ngày</b>. Bấm <span class="ui">Ẩn cảnh báo</span> để dọn dải.</li>
+  <li>Cảnh báo chỉ chạy khi trang Danh Mục đang mở. Khi app đóng, email cảnh báo (nếu đã bật) vẫn do máy chủ gửi theo giá lưu 5 phút.</li>
+  <li><b>Diễn biến hôm nay:</b> mỗi phút app ghi một điểm lãi/lỗ trong ngày <b>ngay trên máy này</b> (không gửi lên máy chủ, giữ 10 ngày) và vẽ thành đường: đường 0 nét đứt, điểm cuối được nhấn, kèm mức cao nhất và thấp nhất; di chuột vào đường để xem từng điểm. Chỉ có điểm cho những phút app đang mở; nếu bạn mua hoặc bán giữa phiên, đường đổi mức tương ứng.</li>
 </ul></div>
 <p>Trang chứa các tab sau (thanh tab ở đầu trang):</p>
 <table>
@@ -177,6 +184,13 @@
   <li><b>Định giá cả danh sách:</b> chạy bộ máy Valuation Bench cho từng mã trong danh sách (tối đa 150 mã mỗi lần, khoảng vài phút) với giả định <b>mặc định</b>, rồi xếp theo biên an toàn. Kết quả chỉ để sàng, không được lưu: mở <i>Hồ sơ</i> để xem quy trình, chỉnh giả định và lưu bản chính thức.</li>
   <li><b>Xuất CSV</b> (mở được bằng Excel) và <b>lưu bộ lọc có tên</b>: bộ lọc đã lưu nằm trong máy này, không lên máy chủ.</li>
   <li>Số liệu tăng trưởng và giá mới có sau lần cập nhật dữ liệu ban đêm đầu tiên sau khi nâng cấp; trước đó các tiêu chí này báo "thiếu số liệu".</li>
+</ul></div>
+<div class="callout ok"><b class="t">Bản đồ nhiệt ngành (mới)</b>
+<ul>
+  <li>Ở đầu chế độ <b>Thị trường</b> (Valuation Bench) có bản đồ các ngành ICB: <b>diện tích ô theo vốn hoá</b>, <b>màu theo biến động giá</b> của kỳ bạn chọn (1 tháng, 3 tháng, 6 tháng, từ 1/1 hoặc 12 tháng). Xanh là tăng, đỏ là giảm, màu càng đậm càng mạnh; con số luôn ghi trong ô nên không phải chỉ dựa vào màu.</li>
+  <li>Biến động của ngành là <b>bình quân theo vốn hoá</b> của các mã có số liệu; bảng chi tiết bên dưới có thêm trung vị, tỷ lệ mã tăng, P/E trung vị, mã vốn hoá lớn nhất và mã mạnh/yếu nhất (chỉ xét mã từ 1.000 tỷ đồng). Bình quân theo vốn hoá bị vài mã lớn chi phối, nên xem cùng trung vị và tỷ lệ mã tăng.</li>
+  <li><b>Bấm một ô</b> (hoặc tên ngành trong bảng) để thêm hoặc bỏ ngành đó khỏi bộ lọc bên dưới. Màn hình hẹp hiện danh sách xếp theo biến động thay cho bản đồ.</li>
+  <li>Đây là mô tả biến động giá đã qua để biết ngành nào đang mạnh hay yếu, không phải tín hiệu mua bán. Kỳ chưa có số liệu hiện thông báo thay vì bản đồ trống.</li>
 </ul></div>
 <h2>4.3 Toàn Nhóm</h2>
 <table>
@@ -369,6 +383,7 @@
     <tr><td>Phương pháp NAV hoặc SOTP không có giá trị</td><td>Hai phương pháp này cần bạn nhập điều chỉnh tài sản / các mảng ở tab Định giá; chưa nhập thì không có.</td></tr>
     <tr><td>Huy hiệu định giá không hiện ở Danh Mục</td><td>Mã chưa có bản định giá lưu ở Valuation Bench, hoặc mất kết nối tạm thời (phần này bỏ qua lỗi và không ảnh hưởng bảng danh mục).</td></tr>
     <tr><td>Trang hiện "Không có bản lưu ngoại tuyến"</td><td>Mất mạng. Kiểm tra Internet rồi thử lại; từ 0.1.6 ứng dụng đã sửa lỗi hiện trang cũ.</td></tr>
+    <tr><td>Không chắc giá trực tiếp, thông báo hay lịch sử ảnh chụp có chạy trên máy mình</td><td>Mở menu tài khoản (góc trên bên phải) → <span class="ui">Kiểm tra hệ thống</span> → <span class="ui">Chạy kiểm tra</span>. App thử từng thứ (đăng nhập, hàm giá VCI, nguồn VNDirect, ghi tệp lịch sử trong máy, thông báo, ảnh chụp thị trường, dữ liệu và bộ máy định giá) và ghi <b>Đạt, Chú ý hoặc Lỗi</b> kèm lý do. Nút <span class="ui">Gửi thông báo thử</span> kiểm tra thông báo của Windows; <span class="ui">Sao chép báo cáo</span> tạo bản tóm tắt (không có mật khẩu hay email) để gửi khi cần hỗ trợ.</td></tr>
     <tr><td>Số liệu khác báo cáo công bố</td><td>Nguồn miễn phí có thể trễ hoặc chuẩn hoá khác. Đối chiếu báo cáo gốc trước khi quyết định.</td></tr>
     <tr><td>Muốn hiểu một phương pháp / chỉ báo</td><td>Valuation Bench → <span class="ui">Phương pháp</span>: mỗi mục có định nghĩa, công thức, khi nào dùng, giới hạn, cách đọc (Phụ lục B).</td></tr>
   </tbody>

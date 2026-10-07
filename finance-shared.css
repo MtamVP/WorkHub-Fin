@@ -749,6 +749,32 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .live-chip.bad { color: var(--warning-color); border-color: currentColor; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; animation: live-pulse 1.6s ease-in-out infinite; }
 .live-toggle[aria-pressed="true"] { border-color: var(--gold); }
+.live-chip.warn { color: var(--warning-color); border-color: currentColor; }
+.live-opt { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.live-opt select { font: inherit; padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg, transparent); color: inherit; }
+.live-alerts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.la-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.82rem; }
+.la-item.la-good { border-color: var(--success-color, #1f9d63); }
+.la-item.la-good > i { color: var(--success-color, #1f9d63); }
+.la-item.la-bad { border-color: var(--danger-color); }
+.la-item.la-bad > i { color: var(--danger-color); }
+.la-item time { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 0.74rem; }
+.la-clear { align-self: flex-start; }
+.live-series { margin: 8px 0 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; }
+.live-series[hidden], .live-alerts[hidden] { display: none; }
+.ls-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 0.82rem; margin-bottom: 6px; }
+.ls-meta { color: var(--text-muted); font-size: 0.74rem; }
+.live-series-svg { display: block; width: 100%; height: auto; }
+.live-series-svg .ls-zero { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 4; opacity: .6; }
+.live-series-svg .ls-line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.live-series-svg.ls-up .ls-line, .live-series-svg.ls-up .ls-end { stroke: var(--success-color, #1f9d63); }
+.live-series-svg.ls-up .ls-area { fill: var(--success-color, #1f9d63); }
+.live-series-svg.ls-down .ls-line, .live-series-svg.ls-down .ls-end { stroke: var(--danger-color); }
+.live-series-svg.ls-down .ls-area { fill: var(--danger-color); }
+.live-series-svg .ls-area { opacity: .12; stroke: none; }
+.live-series-svg .ls-end { fill: var(--card-bg, #fff); stroke-width: 2.5; }
+.live-series-svg .ls-hit { fill: transparent; }
+.live-series-svg .ls-tick, .live-series-svg .ls-lab { fill: var(--text-muted); font-size: 10px; font-family: var(--font-body, inherit); }
 @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 

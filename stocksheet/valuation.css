@@ -356,3 +356,40 @@
 .mk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 4px 0 10px; }
 .mk-toolbar progress { width: 140px; height: 8px; accent-color: var(--gold); }
 .mk-sort { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; }
+
+/* --- Bản đồ nhiệt ngành (Thị trường) --- */
+body.desk { --hm-3: 72%; --hm-2: 52%; --hm-1: 28%; --hm-text-strong: var(--text-primary); }
+:root[data-theme="dark"] body.desk { --hm-3: 56%; --hm-2: 40%; --hm-1: 27%; --hm-text-strong: #F4F1E8; }
+.hm-card .sc-presets { margin-bottom: 8px; }
+.hm-market { margin: 0 0 10px; font-size: 0.82rem; color: var(--text-secondary); }
+.hm-map { position: relative; width: 100%; height: clamp(300px, 36vw, 460px); border-radius: 10px; overflow: hidden; background: var(--card-bg); }
+.hm-tile { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; gap: 2px; margin: 0; padding: 6px 8px; border: 2px solid var(--card-bg); border-radius: 6px; font: inherit; text-align: left; overflow: hidden; cursor: pointer; color: var(--hm-text-strong); transition: filter var(--dur) var(--ease), outline-color var(--dur) var(--ease); }
+.hm-tile:hover { filter: brightness(1.08); }
+.hm-tile:focus-visible { outline: 3px solid var(--finance-accent); outline-offset: -3px; }
+.hm-tile:disabled { cursor: default; }
+.hm-tile.hm-sel { outline: 3px solid var(--finance-accent); outline-offset: -3px; }
+.hm-name { font-size: 0.78rem; font-weight: 700; line-height: 1.2; }
+.hm-chg { font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hm-sub { font-size: 0.68rem; opacity: 0.85; }
+.hm-bu3, .hm-bd3, .hm-bu2, .hm-bd2, .hm-bu1, .hm-bd1, .hm-b0, .hm-bn { background: var(--card-bg); }
+.hm-bu3 { background: color-mix(in srgb, var(--success-color) var(--hm-3), var(--card-bg)); }
+.hm-bu2 { background: color-mix(in srgb, var(--success-color) var(--hm-2), var(--card-bg)); }
+.hm-bu1 { background: color-mix(in srgb, var(--success-color) var(--hm-1), var(--card-bg)); }
+.hm-bd3 { background: color-mix(in srgb, var(--danger-color) var(--hm-3), var(--card-bg)); }
+.hm-bd2 { background: color-mix(in srgb, var(--danger-color) var(--hm-2), var(--card-bg)); }
+.hm-bd1 { background: color-mix(in srgb, var(--danger-color) var(--hm-1), var(--card-bg)); }
+.hm-b0 { background: color-mix(in srgb, var(--text-muted) 14%, var(--card-bg)); }
+.hm-bn { background: repeating-linear-gradient(45deg, var(--hover-bg), var(--hover-bg) 6px, var(--card-bg) 6px, var(--card-bg) 12px); color: var(--text-secondary); }
+.hm-legend { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 4px; }
+.hm-leg { flex: 1 1 56px; text-align: center; font-size: 0.7rem; font-weight: 600; padding: 3px 4px; border-radius: 4px; color: var(--hm-text-strong); font-variant-numeric: tabular-nums; }
+.hm-details { margin: 10px 0 6px; }
+.hm-details > summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); padding: 4px 0; }
+.hm-list { display: none; }
+.hm-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; width: 100%; margin: 0 0 4px; padding: 8px 12px; border: 2px solid var(--card-bg); border-radius: 8px; font: inherit; font-size: 0.86rem; text-align: left; cursor: pointer; color: var(--hm-text-strong); }
+.hm-row small { display: block; font-size: 0.7rem; opacity: 0.85; font-weight: 400; color: inherit; }
+.hm-row .hm-rname { font-weight: 700; }
+.hm-row b { font-variant-numeric: tabular-nums; }
+.hm-row:focus-visible { outline: 3px solid var(--finance-accent); outline-offset: -3px; }
+.hm-row.hm-sel { outline: 3px solid var(--finance-accent); outline-offset: -3px; }
+@media (max-width: 640px) { .hm-map { display: none; } .hm-list { display: block; } }
+@media (prefers-reduced-motion: reduce) { .hm-tile { transition: none; } }
