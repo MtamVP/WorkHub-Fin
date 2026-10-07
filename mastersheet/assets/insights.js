@@ -17,7 +17,9 @@ function onHoldingsLoaded(holdings) {
 
 function renderPriceAge(h) {
     const lab = FinCalc.priceAgeLabel(h.priceMeta);
-    return `<span class="price-age ${lab.cls}" title="${escapeAssetHtml(lab.title)}">${escapeAssetHtml(lab.text)}</span>`;
+    // Giá trực tiếp: kèm mức tăng/giảm trong ngày của mã (so với giá tham chiếu); dayPct do LiveQuotes.applyToHoldings / applyToWatchlist tính
+    const day = typeof h.dayPct === 'number' && isFinite(h.dayPct) ? `<span class="day-chip ${h.dayPct > 0 ? 'up' : (h.dayPct < 0 ? 'down' : 'flat')}" title="So với giá tham chiếu hôm nay">${h.dayPct > 0 ? '+' : (h.dayPct < 0 ? '−' : '')}${Math.abs(h.dayPct).toFixed(2).replace('.', ',')}% hôm nay</span>` : '';
+    return `<span class="price-age ${lab.cls}" title="${escapeAssetHtml(lab.title)}">${escapeAssetHtml(lab.text)}</span>${day}`;
 }
 
 // --- Dòng trạng thái bộ lấy giá tự động (phía trên bảng Danh Mục) ---

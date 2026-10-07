@@ -14,6 +14,7 @@ async function loadWatchlist() {
         lastWatchlist = resp.data || [];
         renderWatchlist();
         loadWatchSignals();
+        if (typeof LiveUI !== 'undefined') LiveUI.afterWatchlist(lastWatchlist);          // giá trực tiếp cho cả mã chờ mua
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
@@ -46,7 +47,8 @@ function renderWatchlist() {
         return;
     }
     const fmt = (n) => Number(n).toLocaleString('en-US');
-    tbody.innerHTML = lastWatchlist.map(w => {
+    const view = typeof LiveUI !== 'undefined' ? LiveUI.watchView(lastWatchlist) : lastWatchlist;     // đã áp giá trực tiếp khi đang bật (chỉ hiển thị)
+    tbody.innerHTML = view.map(w => {
         const sym = escapeAssetHtml(w.symbol);
         const sub = VN_NAMES[String(w.symbol || '').toUpperCase()];
         const age = typeof renderPriceAge === 'function' && w.price > 0 ? renderPriceAge(w) : '';
