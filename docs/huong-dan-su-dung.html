@@ -113,6 +113,7 @@
 </table>
 <p>Các nguồn miễn phí <b>không có cam kết dịch vụ</b>: có thể đổi định dạng hoặc chặn bất cứ lúc nào. Ứng dụng kiểm tra chất lượng dữ liệu hằng ngày và báo "nguồn lỗi" ở tab Dữ Liệu của Toàn Nhóm khi có vấn đề.</p>
 
+<div class="callout"><b class="t">Lịch sử ảnh chụp thị trường lưu trong máy (mới)</b><p>Mỗi ngày có dữ liệu mới, ứng dụng (bản desktop) tự lưu một tệp nén vào thư mục dữ liệu của app trên máy này, để sau này kiểm chứng các mẫu lọc bằng số liệu thật. Không ghi gì lên máy chủ. Xem số ngày đã lưu và thư mục ở <span class="ui">Sao lưu &amp; Phục hồi</span> (quản trị viên); nếu đã chọn thư mục mạng thì có thêm một bản ở đó. Ngày nào không mở ứng dụng sẽ không có tệp ngày đó.</p></div>
 <h1 id="s2">2. Bắt đầu nhanh trong 10 phút</h1>
 <p>Lộ trình ngắn nhất để thấy ứng dụng làm được gì:</p>
 <ol class="steps">
@@ -162,6 +163,14 @@
 <p>Trong <b>Chi tiết mã</b>, ngay dưới phần đầu trang có thẻ <span class="ui">Định giá chuyên môn</span> (mới 0.1.10): giá trị hợp lý, khoảng giá, biên an toàn <b>tính theo giá hiện tại</b>, vùng tích luỹ, mức vô hiệu hoá, điểm kỹ thuật, lý do và cờ cần soát, kèm nút mở hồ sơ đầy đủ ở Valuation Bench. Đánh giá "Lúc lưu" là kết luận tại thời điểm lưu; giá có thể đã đổi.</p>
 <figure><img src="img/chi-tiet-ma.jpg" alt="Chi tiết mã"><figcaption>Chi tiết mã: thẻ "Định giá chuyên môn" ngay dưới phần đầu trang.</figcaption></figure>
 <div class="callout"><b class="t">Chuyển sang Valuation Bench</b><p>Các chế độ <b>Bộ lọc</b>, <b>Thị trường</b> và <b>Bản đồ</b> (sàng lọc cả thị trường, mặt bằng định giá, lịch sử P/E-P/B) nay nằm ở Valuation Bench; đường dẫn cũ vẫn hoạt động. Trang <b>Định Giá CP</b> (nhập số liệu và định giá theo mẫu thủ công) vẫn còn nguyên.</p></div>
+<div class="callout"><b class="t">Bộ lọc thị trường: lọc, định giá hàng loạt, xuất, lưu (mới)</b>
+<ul>
+  <li><b>Tiêu chí:</b> vốn hoá theo khoảng (tối thiểu và tối đa), tăng trưởng lợi nhuận ròng 12 tháng, quý gần nhất và bình quân 3 năm, tăng trưởng lợi nhuận trước thuế, biến động giá <b>từ 1/1 đến nay</b> (tối thiểu và tối đa), giá 1, 3, 6 và 12 tháng, cùng các tiêu chí định giá, chất lượng, cổ tức, an toàn đã có.</li>
+  <li><b>Ngành và số mã:</b> chọn nhiều ngành cùng lúc; ô <i>Tối đa mỗi ngành</i> giữ các mã điểm cao nhất của từng ngành, ô <i>Tối đa tổng cộng</i> giữ N mã đầu. Mẫu <i>Dẫn đầu từng ngành</i> làm sẵn việc này.</li>
+  <li><b>Định giá cả danh sách:</b> chạy bộ máy Valuation Bench cho từng mã trong danh sách (tối đa 150 mã mỗi lần, khoảng vài phút) với giả định <b>mặc định</b>, rồi xếp theo biên an toàn. Kết quả chỉ để sàng, không được lưu: mở <i>Hồ sơ</i> để xem quy trình, chỉnh giả định và lưu bản chính thức.</li>
+  <li><b>Xuất CSV</b> (mở được bằng Excel) và <b>lưu bộ lọc có tên</b>: bộ lọc đã lưu nằm trong máy này, không lên máy chủ.</li>
+  <li>Số liệu tăng trưởng và giá mới có sau lần cập nhật dữ liệu ban đêm đầu tiên sau khi nâng cấp; trước đó các tiêu chí này báo "thiếu số liệu".</li>
+</ul></div>
 <h2>4.3 Toàn Nhóm</h2>
 <table>
   <thead><tr><th style="width:24%">Tab</th><th>Dùng để</th></tr></thead>
@@ -296,18 +305,18 @@
 <table>
   <thead><tr><th>Chỉ số</th><th class="n">Giá trị</th><th>Ý nghĩa</th></tr></thead>
   <tbody>
-    <tr><td>Phạm vi</td><td class="n">53 mã · 4.017 quan sát</td><td>Từ 05/2020 đến 10/2026; VN30 hiện tại cộng một số mã thanh khoản lớn.</td></tr>
-    <tr><td>IC 12 tháng</td><td class="n">+0,27</td><td>Khoảng tin cậy +0,24 đến +0,30: có tác dụng, ở mức tốt.</td></tr>
-    <tr><td>IC 6 tháng</td><td class="n">+0,17</td><td>Khoảng tin cậy +0,13 đến +0,20.</td></tr>
-    <tr><td>Ngoài mẫu (T sau 12/2023)</td><td class="n">+0,24</td><td>Nửa sau, không dùng để hiệu chỉnh.</td></tr>
-    <tr><td>Nhóm rẻ nhất so với đắt nhất</td><td class="n">+38 điểm %</td><td>Chênh lợi suất vượt VN-Index sau 12 tháng.</td></tr>
+    <tr><td>Phạm vi</td><td class="n">171 mã · 12.256 quan sát</td><td>Từ 05/2020 đến 10/2026; các mã đang niêm yết có vốn hoá từ 1.500 tỷ và thanh khoản từ 2 tỷ/ngày.</td></tr>
+    <tr><td>IC 12 tháng</td><td class="n">+0,28</td><td>Khoảng tin cậy +0,26 đến +0,30: có tác dụng, ở mức tốt.</td></tr>
+    <tr><td>IC 6 tháng</td><td class="n">+0,20</td><td>Khoảng tin cậy +0,17 đến +0,23.</td></tr>
+    <tr><td>Ngoài mẫu (T sau 12/2023)</td><td class="n">+0,28</td><td>Nửa sau (huấn luyện đến 2023: +0,25).</td></tr>
+    <tr><td>Nhóm rẻ nhất so với đắt nhất</td><td class="n">+40 điểm %</td><td>Chênh lợi suất vượt VN-Index sau 12 tháng.</td></tr>
   </tbody>
 </table>
 <div class="callout bad"><b class="t">Đọc kèm giới hạn</b><ul>
   <li>Chỉ <b>một chu kỳ thị trường</b> (2020–2026); tập mã là mã đã thành công (thiên lệch người sống sót và nhìn trước); giá đã điều chỉnh; các quan sát chồng lấn nên số mẫu độc lập ít hơn con số "mẫu" hiển thị nhiều.</li>
   <li>Không đo được phần so sánh với ngành, kỹ thuật và bối cảnh thị trường (không có thống kê ngành lịch sử).</li>
-  <li>Hiệu chỉnh vai trò phương pháp (10/2026) làm IC giai đoạn huấn luyện tăng từ +0,16 lên +0,27 nhưng <b>ngoài mẫu gần như không đổi</b> (+0,25 → +0,24): phần lớn mức tăng chỉ là khớp với dữ liệu đã dùng để chọn.</li>
-  <li>Các phương pháp lịch sử của chính cổ phiếu (P/E, P/B) gần như không dự báo được; ở nhóm cổ tức/tiện ích, các phương pháp giá trị dự báo <b>ngược</b>.</li></ul></div>
+  <li>Hiệu chỉnh vai trò phương pháp lần đầu (trên 53 mã) làm IC giai đoạn huấn luyện tăng từ +0,16 lên +0,27 nhưng <b>ngoài mẫu gần như không đổi</b> (+0,25 → +0,24): phần lớn mức tăng chỉ là khớp với dữ liệu đã dùng để chọn. Khi mở rộng lên 171 mã, một kết luận của lần hiệu chỉnh đó bị <b>bác bỏ</b>: nhóm cổ tức/tiện ích không dự báo ngược (EPV, số Graham, Lynch, DCF đều dương ở cả hai giai đoạn); vai trò đã được sửa và chỉ đổi khi cả hai giai đoạn cùng chiều.</li>
+  <li>Các phương pháp lịch sử của chính cổ phiếu (P/E, P/B) dự báo yếu và không ổn định giữa hai giai đoạn (IC từ 0 đến 0,3 tuỳ nhóm); nhóm phục hồi (lỗ hoặc lợi nhuận quanh 0) có ít mẫu và DCF ở nhóm này gần 0 hoặc âm.</li></ul></div>
 
 <h1 id="s12">12. Ví dụ làm từ đầu đến cuối</h1>
 <p class="small">Ví dụ minh hoạ với số liệu ngày 05/10/2026; con số thực sẽ khác khi bạn dùng. Mục đích là cho thấy cách đọc, không phải kết luận về FPT.</p>

@@ -62,4 +62,14 @@ const card = BT.scorecard(all, { generatedAt: new Date().toISOString().slice(0, 
 fs.writeFileSync(outFile, '// Tạo bởi scripts/vb-backtest-run.mjs: KHÔNG sửa tay. Xem lib/vb-backtest.js về cách tính và các giới hạn.\nwindow.VB_SCORECARD = ' + JSON.stringify(card) + ';\n');
 fs.writeFileSync(path.join(cacheDir, 'observations.json'), JSON.stringify(all));
 console.log('xong:', card.nObs, 'quan sát,', card.nSymbols, 'mã,', card.nDates, 'ngày; ghi', outFile);
+// Nhật ký các lần chạy (mỗi lần chạy lại hằng quý thêm một dòng; cùng ngày thì thay dòng cũ): để thấy độ chính xác có ổn định theo thời gian không
+const logFile = opt('log', path.join(path.dirname(outFile), 'vb-scorecard-log.json'));
+let log = []; try { log = JSON.parse(fs.readFileSync(logFile, 'utf8')); } catch (e) { /* chưa có nhật ký */ }
+const h12 = card.horizons.r12, h6 = card.horizons.r6, sp = card.splits;
+const q = (b) => (b && b.length ? { top: b[b.length - 1].avgExcess, bottom: b[0].avgExcess } : null);
+const entry = { generatedAt: card.generatedAt, symbols: card.nSymbols, obs: card.nObs, range: card.range, ic12: h12.overall.ic, ic12Lo: h12.overall.lo, ic12Hi: h12.overall.hi, ic6: h6.overall.ic, ic12Train: sp.train.r12.ic, ic12Test: sp.test.r12.ic, within20: h12.bias.within20,
+  spread12: q(h12.buckets) ? q(h12.buckets).top - q(h12.buckets).bottom : null, archetypes: Object.fromEntries((h12.archetypes || []).filter((a) => !a.insufficient).map((a) => [a.key, { n: a.n, symbols: a.symbols, ic: a.ic }])) };
+log = log.filter((x) => x.generatedAt !== entry.generatedAt).concat(entry);
+fs.writeFileSync(logFile, JSON.stringify(log, null, 1) + '\n');
+console.log('nhật ký:', logFile, '(' + log.length + ' lần chạy)');
 fs.rmSync(tmp, { recursive: true, force: true });
