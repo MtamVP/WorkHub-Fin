@@ -136,3 +136,25 @@ describe('stock-history: giá trung bình ngày (VWAP)', () => {
     expect(validateRequest({}).averages).toBe(false);
   });
 });
+
+describe('LỖI CŨ: sự kiện doanh nghiệp và lệnh CÙNG NGÀY (ngày không hưởng quyền)', () => {
+  // Giữ 1.000 cp, chia 2:1 có hiệu lực ngày 10/05, bán 2.000 cp đúng ngày 10/05. Sự kiện được GHI SAU lệnh bán (created_at muộn hơn).
+  const txns = [
+    { user_id: 'u1', symbol: 'FPT', type: 'buy', quantity: 1000, trade_date: '2026-03-02', created_at: '2026-03-02T03:00:00Z' },
+    { user_id: 'u1', symbol: 'FPT', type: 'sell', quantity: 2000, trade_date: '2026-05-10', created_at: '2026-05-10T03:00:00Z' },
+  ];
+  const actions = [{ user_id: 'u1', symbol: 'FPT', action_type: 'split', ratio: 2, ex_date: '2026-05-10', created_at: '2026-05-12T09:00:00Z' }];
+  it('NAV hằng đêm (fetch-stock-prices) và cảnh báo giá (send-price-alerts): bán hết, còn 0 cp (bản cũ còn 0 nhưng vì bán vượt rồi nhân đôi 0)', () => {
+    for (const held of [navHeld, alertsHeld]) {
+      const h = held(txns, actions);
+      expect(h.get('u1')?.get('FPT') ?? 0).toBe(0);
+    }
+  });
+  it('mua đúng ngày không hưởng quyền thì KHÔNG được nhân thêm', () => {
+    const t2 = [
+      { user_id: 'u1', symbol: 'FPT', type: 'buy', quantity: 1000, trade_date: '2026-03-02', created_at: '2026-03-02T03:00:00Z' },
+      { user_id: 'u1', symbol: 'FPT', type: 'buy', quantity: 500, trade_date: '2026-05-10', created_at: '2026-05-10T03:00:00Z' },
+    ];
+    for (const held of [navHeld, alertsHeld]) expect(held(t2, actions).get('u1').get('FPT')).toBe(2500);   // 1.000 x 2 + 500 (bản cũ: 3.000)
+  });
+});

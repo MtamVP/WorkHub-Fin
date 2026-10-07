@@ -26,7 +26,8 @@ export function heldQuantities(txns: Txn[], actions: Action[]): Map<string, Map<
   const events: Ev[] = [
     ...txns.map((t) => ({ kind: "txn" as const, date: t.trade_date, ts: t.created_at, row: t })),
     ...actions.map((a) => ({ kind: "action" as const, date: a.ex_date, ts: a.created_at, row: a })),
-  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.kind !== b.kind ? (a.kind === "action" ? -1 : 1) : a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+  // ^ cùng ngày: sự kiện doanh nghiệp trước lệnh (ngày không hưởng quyền: bán hôm đó là bán cổ phiếu đã điều chỉnh)
 
   const result = new Map<string, Map<string, number>>();
   const get = (u: string, s: string) => {

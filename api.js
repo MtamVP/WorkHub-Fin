@@ -1538,7 +1538,7 @@ const API = {
             const events = [
                 ...(txns || []).map(t => ({ ...t, _kind: 'txn', _date: t.trade_date, _ts: t.created_at })),
                 ...(actions || []).map(a => ({ ...a, _kind: 'action', _date: a.ex_date, _ts: a.created_at }))
-            ].sort((a, b) => (new Date(a._date) - new Date(b._date)) || (new Date(a._ts) - new Date(b._ts)));
+            ].sort((a, b) => (new Date(a._date) - new Date(b._date)) || ((a._kind === 'action' ? 0 : 1) - (b._kind === 'action' ? 0 : 1)) || (new Date(a._ts) - new Date(b._ts)));   // cùng ngày: sự kiện doanh nghiệp trước lệnh (xem lib/portfolio-calc.js sortEvents)
 
             const lotsBySymbol = {};
             const realizedPnlByTxnId = {};

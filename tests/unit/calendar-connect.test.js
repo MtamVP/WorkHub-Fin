@@ -27,7 +27,7 @@ function makeEnv() {
     escapeHtml: (x) => String(x),
     showToast: (msg, type) => log.toasts.push({ msg, type }),
     fetch: async (url, opts = {}) => {
-      log.fetches.push({ url: String(url), method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
+      log.fetches.push({ url: String(url), method: opts.method || 'GET', body: opts.body ? (() => { try { return JSON.parse(opts.body); } catch (e) { return String(opts.body); } })() : null });   // token gửi dạng form, không phải JSON
       const r = await fetchHandler(String(url), opts);
       return {
         ok: r.status >= 200 && r.status < 300, status: r.status,
@@ -309,5 +309,34 @@ describe('LỖI MẤT DỮ LIỆU CŨ: tải lịch lỗi không được dọn 
   it('sự kiện xuất hiện lại bên Google được ghi kèm deleted_at = null để hiện lại', () => {
     const row = env2(['primary'], () => ({ status: 200, body: { items: [] } })).sb.mapGoogleEventToRow(ev('z9'), 'toi@example.com', 'finance', 'primary');
     expect(row).toMatchObject({ id: 'GCAL_z9', google_event_id: 'z9', deleted_at: null });
+  });
+});
+
+describe('kết nối Google: tham số state (RFC 8252)', () => {
+  function connectEnv(redirect) {
+    const env = makeEnv();
+    env.sb.crypto = { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 37 + 11) & 255; return a; } };
+    let authUrl = null;
+    env.sb.window.OAuthLoopback = {
+      isTauri: () => true, OAUTH_CALLBACK_URL: 'http://127.0.0.1:43781/callback',
+      createPkcePair: async () => ({ codeVerifier: 'v', codeChallenge: 'c', method: 'S256' }),
+      awaitRedirect: async (u) => { authUrl = new URL(u); return redirect(authUrl.searchParams.get('state')); },
+      parseQueryString: (qs) => Object.fromEntries(new URLSearchParams(qs)),
+    };
+    env.onFetch(() => ({ status: 200, body: { access_token: 'a', expires_in: 3600, scope: 'x' } }));
+    env.onGas(() => null);
+    return { env, url: () => authUrl };
+  }
+  it('gửi state ngẫu nhiên và từ chối phản hồi mang state khác (không đổi mã lấy token)', async () => {
+    const { env, url } = connectEnv(() => 'code=ma-la&state=khac');
+    await env.sb.connectGoogleCalendar();
+    expect(url().searchParams.get('state')).toMatch(/^[0-9a-f]{48}$/);
+    expect(env.log.fetches.some((f) => f.url.includes('oauth2.googleapis.com/token'))).toBe(false);
+    expect(env.log.toasts.some((t) => t.type === 'error' && /không khớp/.test(t.msg))).toBe(true);
+  });
+  it('state khớp thì đổi mã lấy token như bình thường', async () => {
+    const { env } = connectEnv((st) => 'code=ma-dung&state=' + st);
+    await env.sb.connectGoogleCalendar();
+    expect(env.log.fetches.some((f) => f.url.includes('oauth2.googleapis.com/token'))).toBe(true);
   });
 });

@@ -275,6 +275,12 @@ function decodeIdTokenEmail(idToken) {
   }
 }
 
+function oauthRandomState() {
+  const arr = new Uint8Array(24);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function connectGoogleCalendar() {
   if (!GOOGLE_CLIENT_ID) { showToast('Chưa cấu hình GOOGLE_CLIENT_ID.', 'warning'); return; }
   if (!window.OAuthLoopback || !window.OAuthLoopback.isTauri()) {
@@ -292,6 +298,10 @@ async function connectGoogleCalendar() {
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', method);
     authUrl.searchParams.set('access_type', 'offline');
+    // state (RFC 8252 cho app desktop): chỉ nhận phản hồi của ĐÚNG lượt kết nối này -- chương trình khác trên máy không gửi được mã
+    // xác thực lạ vào cổng 127.0.0.1 trong lúc đang chờ (PKCE đã chặn phần lớn, state là lớp chặn chuẩn thứ hai).
+    const oauthState = oauthRandomState();
+    authUrl.searchParams.set('state', oauthState);
     // select_account: luôn hiện bộ chọn tài khoản (không âm thầm dùng tài khoản đang đăng nhập sẵn
     // trong trình duyệt). login_hint chỉ là GỢI Ý email đăng nhập WorkHub -- người dùng vẫn đổi được.
     authUrl.searchParams.set('prompt', 'select_account consent');
@@ -299,6 +309,7 @@ async function connectGoogleCalendar() {
 
     const queryString = await window.OAuthLoopback.awaitRedirect(authUrl.toString());
     const params = window.OAuthLoopback.parseQueryString(queryString);
+    if (params.state !== oauthState) throw new Error('Phản hồi đăng nhập không khớp lượt kết nối này. Hãy bấm Kết nối lại.');
     if (params.error) throw new Error(params.error);
     if (!params.code) throw new Error('Không nhận được mã xác thực từ Google.');
 

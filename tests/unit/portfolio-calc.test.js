@@ -220,3 +220,18 @@ describe('rebalancePlan', () => {
     expect(p.cashAfter).toBeLessThan(0.0001 + 0);              // dùng hết tiền mặt (còn trừ phí)
   });
 });
+
+describe('LỖI CŨ: sự kiện doanh nghiệp và lệnh cùng ngày không hưởng quyền', () => {
+  const buy = { id: 'b', symbol: 'FPT', type: 'buy', quantity: 1000, price: 100000, fee: 0, trade_date: '2026-03-02', created_at: '2026-03-02T03:00:00Z' };
+  const split = { symbol: 'FPT', action_type: 'split', ratio: 2, ex_date: '2026-05-10', created_at: '2026-05-12T09:00:00Z' };   // ghi SAU lệnh bán
+  it('chia 2:1 rồi bán 2.000 cp đúng ngày: giá vốn 50.000/cp, lãi gộp +4 triệu (bản cũ: lỗ -48 triệu)', () => {
+    const r = PortfolioCalc.replayLedger([buy, { id: 's', symbol: 'FPT', type: 'sell', quantity: 2000, price: 52000, fee: 0, trade_date: '2026-05-10', created_at: '2026-05-10T03:00:00Z' }], [split]);
+    expect(r.sales[0].costBasis).toBe(100000000);
+    expect(r.realizedGrossByTxnId.s).toBe(4000000);
+    expect(r.lotsBySymbol.FPT).toHaveLength(0);
+  });
+  it('mua đúng ngày không hưởng quyền thì lô mới không bị nhân đôi', () => {
+    const r = PortfolioCalc.replayLedger([buy, { id: 'b2', symbol: 'FPT', type: 'buy', quantity: 500, price: 51000, fee: 0, trade_date: '2026-05-10', created_at: '2026-05-10T03:00:00Z' }], [split]);
+    expect(r.lotsBySymbol.FPT.map((l) => [l.quantity, l.cost])).toEqual([[2000, 50000], [500, 51000]]);
+  });
+});

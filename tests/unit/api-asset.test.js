@@ -307,3 +307,14 @@ describe('API.personalSync.listFiles — thư mục đồng bộ vượt 1.000 f
     expect(list.some((f) => f.relative_path === 'da-xoa.txt')).toBe(false);
   });
 });
+
+describe('API.asset._replayFifo — sự kiện doanh nghiệp cùng ngày với lệnh', () => {
+  it('chia 2:1 ghi SAU lệnh bán cùng ngày: lãi đã chốt ghi vào sổ là +4 triệu, không phải lỗ', async () => {
+    const { API, fake } = boot({
+      finance_transactions: [T('b1', 'buy', 'FPT', 1000, 100000, '2026-03-02'), T('s1', 'sell', 'FPT', 2000, 52000, '2026-05-10', { created_at: '2026-05-10T03:00:00Z' })],
+      finance_corporate_actions: [{ id: 'a1', user_id: USER, symbol: 'FPT', action_type: 'split', ratio: 2, ex_date: '2026-05-10', created_at: '2026-05-12T09:00:00Z', deleted_at: null }],
+    });
+    await API.asset.recomputeRealizedPnl(USER);
+    expect(fake.table('finance_transactions').find((t) => t.id === 's1').realized_pnl).toBe(4000000);
+  });
+});

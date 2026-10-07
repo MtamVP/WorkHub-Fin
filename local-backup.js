@@ -42,10 +42,35 @@
         }
     }
 
+    // Khoá chính dùng để SẮP XẾP khi đọc theo trang: không có ORDER BY thì PostgREST không bảo đảm thứ tự giữa các trang => bảng trên
+    // 1.000 dòng có thể bị LẶP dòng này và THIẾU dòng khác trong bản sao lưu mà không báo gì. Bảng không có trong danh sách: khoá 'id'.
+    var ORDER_BY = {
+        app_settings: ['key'], finance_allocation_targets: ['user_id', 'symbol'], finance_event_dismissals: ['user_id', 'event_id'],
+        finance_holdings_price: ['user_id', 'symbol'], finance_idea_votes: ['idea_id', 'user_id'], finance_policy_weights: ['sector'],
+        finance_stocks: ['symbol'], lounge_players: ['email'], task_assignees: ['task_id', 'user_email'], user_status: ['uid']
+    };
+    function pageQuery(t, from, to, ordered) {
+        var q = window.supabaseClient.from(t).select('*');
+        if (ordered) (ORDER_BY[t] || ['id']).forEach(function (c) { q = q.order(c); });
+        return q.range(from, to);
+    }
+
+    async function hasSession() {
+        try {
+            var auth = window.supabaseClient && window.supabaseClient.auth;
+            if (!auth || !auth.getSession) return true;            // môi trường không có auth (kiểm thử): không chặn
+            var r = await auth.getSession();
+            return !!(r && r.data && r.data.session);
+        } catch (e) { return false; }
+    }
+
     async function runBackup() {
         if (!window.__TAURI__ || !window.__TAURI__.fs || !window.supabaseClient) return;
         var tables = window.WORKHUB_BACKUP_TABLES || [];
         if (!tables.length) return;
+        // Chưa đăng nhập (app đang ở màn đăng nhập): mọi bảng có RLS trả mảng RỖNG không lỗi. Bản cũ vẫn ghi "bản sao lưu" rỗng đó và
+        // xoá bản cũ nhất theo quy tắc giữ 14 bản => mở app ở màn đăng nhập 14 ngày là mất hết bản sao lưu tốt.
+        if (!(await hasSession())) return;
 
         var fs = window.__TAURI__.fs;
         var BaseDirectory = fs.BaseDirectory;
@@ -72,8 +97,13 @@
                 var allRows = [];
                 var pageError = null;
                 var truncated = false;
+                var ordered = true;
                 for (var p = 0; p < MAX_PAGES; p++) {
-                    var res = await window.supabaseClient.from(t).select('*').range(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1);
+                    var res = await pageQuery(t, p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1, ordered);
+                    if (res.error && ordered && p === 0 && /column|does not exist/i.test(res.error.message || '')) {
+                        ordered = false;                                     // cột khoá đổi tên/không còn: đọc như cũ còn hơn mất cả bảng
+                        res = await pageQuery(t, 0, PAGE_SIZE - 1, false);
+                    }
                     if (res.error) { pageError = res.error; break; }
                     var page = res.data || [];
                     allRows = allRows.concat(page);
@@ -104,6 +134,14 @@
             } catch (e) {
                 snapshot[t] = { error: String(e) };
             }
+        }
+
+        var totalRows = 0;
+        Object.keys(snapshot).forEach(function (k) { if (Array.isArray(snapshot[k])) totalRows += snapshot[k].length; });
+        if (totalRows === 0) {
+            // Không có dòng nào (mất phiên giữa chừng, lỗi quyền...): KHÔNG ghi và KHÔNG xoá bản cũ; lần kiểm sau (1 giờ) thử lại.
+            console.warn('[local-backup] bản sao lưu không có dữ liệu, bỏ qua và giữ nguyên các bản cũ');
+            return null;
         }
 
         var stamp = new Date().toISOString().replace(/[:.]/g, '-');
