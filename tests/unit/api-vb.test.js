@@ -125,6 +125,11 @@ describe('lấy dữ liệu một mã', () => {
     const r = await c.API.asset.vb.data('fpt');
     expect(r.symbol).toBe('FPT'); expect(r.vb.form).toBe('NON_FINANCE'); expect(r.history).toBeTruthy(); expect(r.errors.ohlc).toBe('x');
   });
+  it('chế độ lite (định giá hàng loạt): chỉ lấy dữ liệu Edge, không truy vấn bội số ngành và lịch sử định giá', async () => {
+    const c = boot(MEMBER, {}, edge);
+    const r = await c.API.asset.vb.data('fpt', { lite: true });
+    expect(r.symbol).toBe('FPT'); expect(r.vb.form).toBe('NON_FINANCE'); expect(r.peers).toBeNull(); expect(r.history).toBeNull(); expect(r.errors.ohlc).toBe('x');
+  });
   it('mã sai bị từ chối; Edge báo lỗi thì ném lỗi', async () => {
     const c = boot(MEMBER, {}, edge);
     await expect(c.API.asset.vb.data('a b')).rejects.toThrow(/không hợp lệ/);

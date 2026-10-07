@@ -5256,6 +5256,35 @@ function loadBackupRestorePanel() {
   if (confirmRow) confirmRow.style.display = 'none';
 
   loadLocalBackupsList();
+  loadMarketHistoryStatus();
+}
+
+// Lịch sử ảnh chụp thị trường lưu trong máy (market-history.js): tóm tắt số ngày đã lưu và vị trí thư mục.
+async function loadMarketHistoryStatus() {
+  const el = document.getElementById('market-history-status');
+  if (!el) return;
+  if (!window.WorkHubMarketHistory) { el.textContent = 'Chỉ dùng được trên bản desktop.'; return; }
+  const st = await window.WorkHubMarketHistory.refreshStatus();
+  const s = st.summary;
+  const fmt = (d) => d ? d.split('-').reverse().join('/') : '';
+  el.textContent = (s && s.count ? 'Đã lưu ' + s.count + ' ngày dữ liệu (từ ' + fmt(s.first) + ' đến ' + fmt(s.last) + (s.gaps ? ', thiếu ' + s.gaps + ' ngày làm việc vì app không mở' : '') + ').' : 'Chưa có ngày nào được lưu.')
+    + (st.dir ? ' Thư mục: ' + st.dir : '') + (st.error ? ' Lỗi gần nhất: ' + st.error : '');
+}
+
+async function runMarketHistoryNowAction() {
+  const btn = document.getElementById('market-history-now-btn');
+  if (btn) btn.disabled = true;
+  try {
+    if (!window.WorkHubMarketHistory) throw new Error('Chỉ dùng được trên bản desktop.');
+    const st = await window.WorkHubMarketHistory.runNow();
+    if (st.state === 'error' || st.state === 'skipped') throw new Error(st.error || 'Không lưu được.');
+    showToast(st.state === 'saved' ? 'Đã lưu ảnh chụp thị trường.' : 'Ngày dữ liệu mới nhất đã được lưu trước đó.', 'success');
+    await loadMarketHistoryStatus();
+  } catch (e) {
+    showToast('Không lưu được: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function runManualBackupAction() {

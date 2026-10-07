@@ -2950,6 +2950,8 @@ const API = {
                     if (!data || data.ok === false) throw new Error((data && data.error) || 'Không lấy được dữ liệu từ nguồn');
                     return data;
                 };
+                // lite: chỉ lấy báo cáo + giá (một lượt gọi), bỏ truy vấn bội số ngành và lịch sử định giá -- dùng cho định giá hàng loạt ở bộ lọc thị trường (bên gọi đã có sẵn thống kê ngành)
+                if (o.lite) { const d1 = await fn(); return { symbol: sym, vb: d1, peers: null, history: null, errors: d1.errors || {} }; }
                 const [d, peers, hist] = await Promise.allSettled([fn(), API.asset.market.peers(sym), API.asset.market.valuationHistory(6)]);
                 if (d.status !== 'fulfilled') throw d.reason;
                 if (peers.status !== 'fulfilled') errors.peers = String(peers.reason && peers.reason.message || peers.reason);
@@ -5217,7 +5219,7 @@ async function _dispatchAction(action, params = {}) {
             case 'listLimits': result = await API.asset.limits.list(); break;
             case 'saveLimit': result = await API.asset.limits.save(params.email, params.limit); break;
             case 'listRestricted': result = await API.asset.restricted.list(); break;
-            case 'getVbData': result = await API.asset.vb.data(params.symbol, { years: params.years, candleYears: params.candleYears }); break;
+            case 'getVbData': result = await API.asset.vb.data(params.symbol, { years: params.years, candleYears: params.candleYears, lite: params.lite }); break;
             case 'saveVbValuation': result = await API.asset.vb.save(params.email, params.record); break;
             case 'getVbById': result = await API.asset.vb.get(params.id); break;
             case 'getVbLatest': result = await API.asset.vb.latest(params.symbol); break;

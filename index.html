@@ -1647,6 +1647,11 @@
             </button>
             <span id="backup-network-path-label" class="small text-muted" style="align-self:center;"></span>
           </div>
+          <div class="small" style="margin-bottom:14px; padding:10px 12px; border:1px solid var(--border-color); border-radius:8px;">
+            <b>Lịch sử ảnh chụp thị trường</b> <span class="text-muted">(chỉ lưu trong máy này, không ghi lên Supabase)</span>
+            <div id="market-history-status" class="text-muted" style="margin:4px 0 8px;">Đang kiểm tra…</div>
+            <button type="button" class="btn btn-outline" id="market-history-now-btn" onclick="runMarketHistoryNowAction()"><i class="fa-solid fa-camera"></i> Lưu ảnh chụp hôm nay</button>
+          </div>
           <hr>
           <h5 class="mb-2">Khôi phục từ bản sao lưu</h5>
           <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
@@ -1874,6 +1879,8 @@
   <script src="notify-deadlines.js?v=1791700000000"></script>
   <script src="backup-config.js?v=3"></script>
   <script src="local-backup.js?v=1788532002219"></script>
+  <script src="lib/market-history.js?v=1791990000000"></script>
+  <script src="market-history.js?v=1791990000000"></script>
   <script src="updater.js?v=1788532002219"></script>
 </body>
 </html>

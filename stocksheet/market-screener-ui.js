@@ -3,12 +3,16 @@
    Số liệu: ảnh chụp thị trường hằng ngày từ VNDirect (finance_market_snapshot). Phép lọc/chấm điểm ở /lib/market-screener.js (có kiểm thử).
    Dùng global của script.js: state, call, showToast, openDetail, loadOverview, VU (ValuationUI), FinancialsSync. */
 
-const MK = { state: 'idle', error: '', rows: [], asOf: null, filters: { values: {}, icbs: [], perSector: 0, topN: 0 }, preset: null, limit: 50, busy: '' };
+const MK = { state: 'idle', error: '', rows: [], asOf: null, filters: { values: {}, icbs: [], perSector: 0, topN: 0 }, preset: null, limit: 50, busy: '', stats: {}, vals: {}, batch: null, sort: 'score', saved: [] };
+const MK_BATCH_MAX = 150;                                   // số mã tối đa mỗi lần định giá hàng loạt
+const MK_SAVED_KEY = 'wh.fin.marketscreener.saved.v1';
 const MK_KEY = 'wh.fin.marketscreener.v1';
 try {
     const saved = JSON.parse(localStorage.getItem(MK_KEY) || 'null');
     if (saved && saved.filters) { MK.filters = MarketScreener.normalizeFilters(saved.filters); MK.preset = saved.preset || null; }
 } catch (e) { /* không có localStorage: dùng mặc định */ }
+try { const sv = JSON.parse(localStorage.getItem(MK_SAVED_KEY) || '[]'); if (Array.isArray(sv)) MK.saved = sv.filter(x => x && typeof x.name === 'string' && x.filters).slice(0, 30); } catch (e) { /* không có localStorage */ }
+function mkSaveSaved() { try { localStorage.setItem(MK_SAVED_KEY, JSON.stringify(MK.saved)); } catch (e) { /* bỏ qua */ } }
 function mkSave() { try { localStorage.setItem(MK_KEY, JSON.stringify({ filters: MK.filters, preset: MK.preset })); } catch (e) { /* bỏ qua */ } }
 
 async function mkLoad(force) {
@@ -18,7 +22,7 @@ async function mkLoad(force) {
     try {
         const u = await call('getMarketUniverse', { force: !!force });
         MK.rows = MarketScreener.buildRows(u.snapshot || [], u.stats || {}, u.meta || {});
-        MK.asOf = u.asOf || null;
+        MK.asOf = u.asOf || null; MK.stats = u.stats || {}; if (force) MK.vals = {};
         MK.state = MK.rows.length ? 'ok' : 'empty';
     } catch (e) { MK.state = 'error'; MK.error = e.message || String(e); }
     renderMarketScreener();
@@ -59,6 +63,12 @@ function renderMarketScreener() {
         <div class="sc-presets" role="group" aria-label="Mẫu lọc có sẵn">
             ${MarketScreener.PRESETS.map(p => `<button type="button" class="vl-chip" aria-pressed="${MK.preset === p.key}" title="${VU.esc(p.desc)}" onclick="mkPreset('${p.key}')">${VU.esc(p.label)}</button>`).join('')}
         </div>
+        <div class="mk-saved">
+            <label class="sc-field mk-saved-pick"><span>Bộ lọc đã lưu <small>(chỉ trong máy này)</small></span><select id="mk-saved-sel" onchange="mkSavedUse(this.value)"><option value="">${MK.saved.length ? '— Chọn để dùng —' : '— Chưa có bộ lọc nào —'}</option>${MK.saved.map((x, i) => `<option value="${i}">${VU.esc(x.name)}</option>`).join('')}</select></label>
+            <label class="sc-field mk-saved-name"><span>Đặt tên để lưu bộ lọc hiện tại</span><input type="text" id="mk-saved-name" maxlength="40" placeholder="Ví dụ: Dẫn đầu ngành 2026"></label>
+            <button type="button" class="vl-link" onclick="mkSavedSave()">Lưu</button>
+            <button type="button" class="vl-link" onclick="mkSavedDelete()">Xoá bộ lọc đang chọn</button>
+        </div>
         ${MK.preset ? `<p class="vl-hint" style="margin-top:0">${VU.esc(MarketScreener.PRESETS.find(p => p.key === MK.preset).desc)} Bạn có thể chỉnh các ô bên dưới.</p>` : ''}
         <div class="sc-grid">${groups.map(g => `<fieldset class="sc-group"><legend>${VU.esc(g.name)}</legend>${g.items.map(mkField).join('')}</fieldset>`).join('')}
             <fieldset class="sc-group"><legend>Ngành và số mã lấy</legend>
@@ -74,7 +84,14 @@ function renderMarketScreener() {
     renderMkAlerts();
 }
 
-function mkRow(e, i) {
+function mkValCells(sym) {
+    const x = MK.vals[sym];
+    if (!x) return '<td class="num">—</td><td class="num">—</td><td>—</td>';
+    if (!x.ok) return `<td class="num" colspan="3"><small title="${VU.esc(x.reason || '')}">không định giá được: ${VU.esc((x.reason || '').slice(0, 40))}</small></td>`;
+    const cls = x.mos === null ? '' : (x.mos >= 0.2 ? 'vl-pill-cheap' : (x.mos <= -0.1 ? 'vl-pill-expensive' : 'vl-pill-fair'));
+    return `<td class="num">${VU.dec(x.fairBase, 0)}</td><td class="num">${x.mos === null ? '—' : `<span class="vl-pill ${cls}">${x.mos > 0 ? '+' : ''}${VU.dec(x.mos * 100, 0)}%</span>`}</td><td><small>${VU.esc(x.grade || '')}</small>${x.confidence ? `<small class="symbol-sub">${VU.esc(x.confidence)}</small>` : ''}${x.archetype ? `<small class="symbol-sub">${VU.esc(x.archetype)}</small>` : ''}</td>`;
+}
+function mkRow(e, i, showVal) {
     const r = e.row, m = r.m, inTable = state.items.some(x => x.symbol === r.symbol);
     const peHist = m.pe > 0 && m.pe5y > 0 ? m.pe / m.pe5y : null;
     return `<tr data-mk-symbol="${VU.esc(r.symbol)}"><td>${i + 1}</td>
@@ -85,8 +102,8 @@ function mkRow(e, i) {
         <td class="num">${mkX(m.pb, 2)}</td>
         <td class="num">${r.valuationPct === null ? '—' : `<span class="vl-pill ${r.valuationPct <= 30 ? 'vl-pill-cheap' : (r.valuationPct >= 70 ? 'vl-pill-expensive' : 'vl-pill-fair')}">${VU.dec(r.valuationPct, 0)}</span>`}</td>
         <td class="num">${mkP(m.roae)}</td><td class="num">${mkP(m.epsGrowthYoY, 0)}</td><td class="num">${mkP(m.netProfitGrowthYoY, 0)}</td><td class="num">${mkP(m.divYield)}</td>
-        <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>
-        <td>${inTable ? '<span class="vl-tag">Trong bảng</span>' : `<button type="button" class="vl-link" data-mk-add="${VU.esc(r.symbol)}">Thêm vào bảng</button>`}</td></tr>`;
+        <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>${showVal ? mkValCells(r.symbol) : ''}
+        <td><a class="vl-link" href="/valuation/#stock/${encodeURIComponent(r.symbol)}" title="Mở hồ sơ định giá chi tiết trong Valuation Bench">Hồ sơ</a> ${inTable ? '<span class="vl-tag">Trong bảng</span>' : `<button type="button" class="vl-link" data-mk-add="${VU.esc(r.symbol)}">Thêm vào bảng</button>`}</td></tr>`;
 }
 
 function renderMkResults() {
@@ -94,17 +111,27 @@ function renderMkResults() {
     if (!box) return;
     const res = MarketScreener.evaluate(MK.rows, MK.filters), c = res.counts;
     const miss = Object.keys(c.missing).map(k => ({ k, n: c.missing[k] })).sort((a, b) => b.n - a.n);
-    const shown = res.entries.slice(0, MK.limit);
-    const head = `<h3 class="vl-card-title"><i class="fa-solid fa-ranking-star"></i> ${c.active ? `${c.passed} mã đạt` : 'Chưa bật tiêu chí nào'}<span class="vl-muted">trong ${c.universe} mã${c.active ? ' · xếp theo điểm tổng hợp' : ''}${c.cut ? ` · đã cắt ${c.cut} mã theo giới hạn số mã (đạt ${c.matched})` : ''}</span></h3>`;
+    const hasVals = res.entries.some(e => MK.vals[e.row.symbol]);
+    const ordered = MK.sort === 'mos' && hasVals ? MarketBatch.rankByMos(res.entries, MK.vals) : res.entries;
+    const shown = ordered.slice(0, MK.limit), b = MK.batch, running = !!(b && b.running);
+    const nVal = Math.min(res.entries.length, MK_BATCH_MAX);
+    const toolbar = `<div class="mk-toolbar">
+        <button type="button" class="btn-save" onclick="mkValueAll()"${running ? ' disabled' : ''} title="Chạy bộ máy Valuation Bench với giả định mặc định cho từng mã trong danh sách (tối đa ${MK_BATCH_MAX} mã mỗi lần), rồi xếp theo biên an toàn. Không lưu gì lên máy chủ."><i class="fa-solid fa-scale-balanced"></i> Định giá cả danh sách (${nVal} mã)</button>
+        ${running ? `<button type="button" class="vl-link" onclick="mkValueCancel()">Dừng</button><span class="vl-muted">đang định giá ${b.done}/${b.total}${b.failed ? ` · ${b.failed} mã lỗi` : ''}…</span><progress max="${b.total}" value="${b.done}"></progress>` : ''}
+        ${hasVals ? `<label class="mk-sort"><input type="checkbox"${MK.sort === 'mos' ? ' checked' : ''} onchange="mkSortToggle(this.checked)"> Xếp theo biên an toàn</label>` : ''}
+        <button type="button" class="vl-link" onclick="mkExportCsv()"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+    </div>`;
+    const head =`<h3 class="vl-card-title"><i class="fa-solid fa-ranking-star"></i> ${c.active ? `${c.passed} mã đạt` : 'Chưa bật tiêu chí nào'}<span class="vl-muted">trong ${c.universe} mã${c.active ? ' · xếp theo điểm tổng hợp' : ''}${c.cut ? ` · đã cắt ${c.cut} mã theo giới hạn số mã (đạt ${c.matched})` : ''}</span></h3>`;
     if (!c.active) { box.innerHTML = `<div class="vl-card">${head}<div class="vl-empty">Chọn một mẫu lọc hoặc nhập ít nhất một tiêu chí ở trên.</div></div>`; return; }
     if (!c.passed) {
         const worst = Object.keys(c.failedBy).map(k => ({ k, n: c.failedBy[k] })).sort((a, b) => b.n - a.n)[0];
         box.innerHTML = `<div class="vl-card">${head}<div class="vl-empty">Không mã nào đạt mọi tiêu chí.${worst ? ` Tiêu chí loại nhiều nhất: <b>${VU.esc(MarketScreener.BY_KEY[worst.k].label)}</b> (${worst.n} mã). Thử nới tiêu chí này.` : ''}</div></div>`;
         return;
     }
-    box.innerHTML = `<div class="vl-card">${head}
-        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th><th></th></tr></thead>
-        <tbody>${shown.map(mkRow).join('')}</tbody></table></div>
+    box.innerHTML = `<div class="vl-card">${head}${toolbar}
+        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th>${hasVals ? '<th class="num" title="Giá trị hợp lý đồng thuận của Valuation Bench (giả định mặc định)">Giá trị hợp lý (đ)</th><th class="num" title="(Giá trị hợp lý - giá hiện tại) / giá trị hợp lý">Biên an toàn</th><th>Kết luận</th>' : ''}<th></th></tr></thead>
+        <tbody>${shown.map((e, i) => mkRow(e, i, hasVals)).join('')}</tbody></table></div>
+        ${hasVals ? '<p class="vl-hint">Cột định giá do bộ máy Valuation Bench tính tự động với giả định MẶC ĐỊNH (tự phân loại mô hình kinh doanh, không điều chỉnh khoản bất thường, chưa rà soát từng bước), không lưu. Dùng để sàng và xếp hạng; mở “Hồ sơ” để xem quy trình, chỉnh giả định và lưu bản định giá chính thức.</p>' : ''}
         ${res.entries.length > MK.limit ? `<p class="vl-hint"><button type="button" class="vl-link" onclick="mkMore()">Hiện thêm</button> (đang hiện ${MK.limit}/${res.entries.length})</p>` : ''}
         ${miss.length ? `<p class="vl-hint">Mã bị loại vì thiếu số liệu: ${miss.map(x => `${VU.esc(MarketScreener.BY_KEY[x.k].label)} (${x.n})`).join(', ')}. Mã thiếu số liệu cho tiêu chí đang bật không được tính là đạt.</p>` : ''}
         <p class="vl-hint">Điểm ghép định giá tương đối trong ngành (30%), chất lượng (30%), tăng trưởng (20%), cổ tức (10%), an toàn tài chính (10%); chỉ để xếp hạng. Nợ/vốn không áp dụng cho ngân hàng, bảo hiểm, dịch vụ tài chính. Số liệu là chỉ số công bố của VNDirect, chưa soát với báo cáo tài chính gốc: coi kết quả là danh sách để nghiên cứu tiếp, không phải khuyến nghị mua bán. Mã thêm vào bảng sẽ tự lấy số liệu tài chính để định giá chi tiết.</p></div>`;
@@ -131,6 +158,67 @@ function mkIcbAll(on) {
     mkOnInput();
 }
 function mkMore() { MK.limit += 50; renderMkResults(); }
+
+// ---------- bộ lọc đã lưu (chỉ trong máy này) ----------
+function mkSavedSave() {
+    const inp = document.getElementById('mk-saved-name'), name = inp ? inp.value.trim().slice(0, 40) : '';
+    const f = MK.filters;
+    if (!name) { showToast('Nhập tên cho bộ lọc trước khi lưu.', 'error'); return; }
+    if (!Object.keys(f.values).length && !f.icbs.length) { showToast('Bộ lọc đang trống: bật ít nhất một tiêu chí hoặc chọn ngành.', 'error'); return; }
+    const copy = JSON.parse(JSON.stringify(f)), at = MK.saved.findIndex(x => x.name === name);
+    if (at >= 0) MK.saved[at] = { name, filters: copy }; else if (MK.saved.length >= 30) { showToast('Tối đa 30 bộ lọc: hãy xoá bớt.', 'error'); return; } else MK.saved.push({ name, filters: copy });
+    mkSaveSaved(); renderMarketScreener();
+    showToast(at >= 0 ? `Đã cập nhật bộ lọc “${name}”.` : `Đã lưu bộ lọc “${name}”.`, 'success');
+}
+function mkSavedUse(i) {
+    const x = MK.saved[Number(i)]; if (!x) return;
+    MK.filters = MarketScreener.normalizeFilters(x.filters); MK.preset = null; MK.limit = 50; mkSave(); renderMarketScreener();
+    const sel = document.getElementById('mk-saved-sel'); if (sel) sel.value = String(i);
+}
+function mkSavedDelete() {
+    const sel = document.getElementById('mk-saved-sel'), x = sel && sel.value !== '' ? MK.saved[Number(sel.value)] : null;
+    if (!x) { showToast('Chọn một bộ lọc đã lưu để xoá.', 'error'); return; }
+    if (!window.confirm(`Xoá bộ lọc “${x.name}”?`)) return;
+    MK.saved.splice(Number(sel.value), 1); mkSaveSaved(); renderMarketScreener();
+}
+
+// ---------- định giá hàng loạt và xuất CSV ----------
+async function mkValueAll() {
+    if (MK.batch && MK.batch.running) return;
+    const res = MarketScreener.evaluate(MK.rows, MK.filters), rows = res.entries.slice(0, MK_BATCH_MAX).map(e => e.row);
+    const todo = rows.filter(r => !(MK.vals[r.symbol] && MK.vals[r.symbol].ok));
+    if (!rows.length) return;
+    if (!todo.length) { MK.sort = 'mos'; renderMkResults(); showToast('Cả danh sách đã được định giá.', 'success'); return; }
+    if (todo.length > 25 && !window.confirm(`Định giá ${todo.length} mã: khoảng ${Math.max(1, Math.round(todo.length * 4 / 3 / 60))} phút, mỗi mã cần một lượt gọi nguồn dữ liệu. Tiếp tục?`)) return;
+    if (!MK.hist) { try { MK.hist = await call('getValuationHistory', { years: 6 }); } catch (e) { MK.hist = { rows: [], bond10y: null }; } }
+    MK.batch = { running: true, done: 0, total: todo.length, failed: 0, cancel: false };
+    renderMkResults();
+    const scorecard = typeof VB_SCORECARD !== 'undefined' ? VB_SCORECARD : null;
+    try {
+        const out = await MarketBatch.run(todo, {
+            load: (sym) => call('getVbData', { symbol: sym, years: 6, candleYears: 2, lite: true }),
+            analyze: (b, row) => VBEngine.analyze(MarketBatch.buildCtx(b.vb, row, { stats: MK.stats }, MK.hist, { scorecard, sectorName: mkIcbName(row.icb2_code) })),
+            finish: (r) => MarketBatch.summarize(r, VBEngine),
+        }, { concurrency: 3, retries: 1, retryDelayMs: 800, shouldCancel: () => MK.batch.cancel, onProgress: (p) => { MK.vals[p.symbol] = p.result; MK.batch.done = p.done; if (!p.result.ok) MK.batch.failed++; renderMkResults(); } });
+        const failed = Object.keys(out.results).filter(k => !out.results[k].ok).length;
+        showToast(out.cancelled ? `Đã dừng sau ${out.done}/${out.total} mã.` : `Đã định giá ${out.done - failed}/${out.total} mã${failed ? `, ${failed} mã không định giá được` : ''}.`, failed && !out.cancelled ? 'error' : 'success');
+    } catch (e) { showToast('Lỗi khi định giá: ' + (e.message || e), 'error'); }
+    MK.batch.running = false; MK.sort = 'mos'; renderMkResults();
+}
+function mkValueCancel() { if (MK.batch) MK.batch.cancel = true; }
+function mkSortToggle(on) { MK.sort = on ? 'mos' : 'score'; renderMkResults(); }
+
+function mkExportCsv() {
+    const res = MarketScreener.evaluate(MK.rows, MK.filters);
+    if (!res.entries.length) { showToast('Chưa có kết quả để xuất.', 'error'); return; }
+    const hasVals = res.entries.some(e => MK.vals[e.row.symbol]);
+    const entries = MK.sort === 'mos' && hasVals ? MarketBatch.rankByMos(res.entries, MK.vals) : res.entries;
+    const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = `bo-loc-thi-truong-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}.csv`;
+    const bytes = new TextEncoder().encode(FinCalc.buildCsv(MarketBatch.csvRows(entries, MK.vals, mkIcbName)));
+    saveBytesToDisk(name, bytes, 'text/csv;charset=utf-8;')
+        .then(saved => { if (saved) showToast(`Đã xuất ${entries.length} mã: ${name}`, 'success'); })
+        .catch(e => showToast('Lỗi xuất file: ' + (e.message || e), 'error'));
+}
 
 async function mkAdd(symbol) {
     if (MK.busy) return;

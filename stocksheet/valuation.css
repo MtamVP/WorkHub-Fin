@@ -349,3 +349,10 @@
 .vbc-stance { margin: 4px 0 8px; font-size: 0.88rem; }
 .vbc-list { margin: 0 0 10px; padding-left: 18px; font-size: 0.82rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 3px; }
 .vbc-list.warn { list-style: none; padding-left: 0; color: var(--danger-color); }
+.mk-saved { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 10px 0 4px; }
+.mk-saved .sc-field { margin: 0; }
+.mk-saved-pick { min-width: 220px; }
+.mk-saved-name { min-width: 220px; }
+.mk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 4px 0 10px; }
+.mk-toolbar progress { width: 140px; height: 8px; accent-color: var(--gold); }
+.mk-sort { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; }
