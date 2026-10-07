@@ -100,7 +100,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
         q.filters.push({ op: 'or', val: String(expr).split(',').map(p => { const [col, , ...rest] = p.split('.'); return { col, val: rest.join('.') }; }) });
         return api;
       },
-      order(col, o) { q.order = { col, asc: !(o && o.ascending === false) }; return api; },
+      order(col, o) { (q.orders = q.orders || []).push({ col, asc: !(o && o.ascending === false) }); return api; },        // nhiều cột: cột trước ưu tiên hơn (như PostgREST)
       limit(n) { q.limit = n; return api; },
       range(from, to) { q.range = [from, to]; return api; },
       maybeSingle() { q.single = 'maybe'; return api; },
@@ -144,9 +144,11 @@ export function createFakeSupabase(seed = {}, opts = {}) {
       } else if (q.op === 'delete') {
         for (let i = rows.length - 1; i >= 0; i--) if (matchRow(rows[i], q.filters)) { result.push({ ...rows[i] }); rows.splice(i, 1); }
       }
-      if (q.order) result.sort((a, b) => ((a[q.order.col] > b[q.order.col]) - (a[q.order.col] < b[q.order.col])) * (q.order.asc ? 1 : -1));
+      if (q.orders) result.sort((a, b) => { for (const o of q.orders) { const d = ((a[o.col] > b[o.col]) - (a[o.col] < b[o.col])) * (o.asc ? 1 : -1); if (d) return d; } return 0; });
       if (q.range) result = result.slice(q.range[0], q.range[1] + 1);
       if (q.limit) result = result.slice(0, q.limit);
+      // opts.maxRows: mô phỏng giới hạn số dòng mỗi lần đọc của máy chủ (PostgREST mặc định 1.000) -- quá thì cắt im lặng như thật
+      if (q.op === 'select' && opts.maxRows && result.length > opts.maxRows) result = result.slice(0, opts.maxRows);
       if (error) return { data: null, error };
       if ((q.op === 'insert' || q.op === 'update' || q.op === 'upsert' || q.op === 'delete') && !q.returning) return { data: null, error: null };
       if (q.single === 'maybe') return { data: result[0] || null, error: null };

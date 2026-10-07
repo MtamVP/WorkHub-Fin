@@ -270,3 +270,44 @@ describe('khoá chống chạy chồng + đẩy có gộp', () => {
     expect(env.log.toasts.some(t => t.type === 'warning' && /Insufficient Permission/.test(t.msg))).toBe(true);
   });
 });
+
+describe('LỖI MẤT DỮ LIỆU CŨ: tải lịch lỗi không được dọn sự kiện của lịch đó', () => {
+  function env2(calendars, fetchFor) {
+    const env = makeEnv();
+    env.sb.__connection = Object.assign({}, env.sb.__connection, { synced_calendar_ids: calendars });
+    env.onGas((action) => {
+      if (action === 'getPersonalEventsForPush') return [];
+      if (action === 'getGoogleSyncState' || action === 'getEventsVersionsByGoogleId') return {};
+      return null;
+    });
+    env.onFetch(fetchFor);
+    return env;
+  }
+  const ev = (id) => ({ id, status: 'confirmed', summary: 'S ' + id, updated: '2026-10-05T00:00:00Z', start: { dateTime: '2026-10-06T09:00:00+07:00' }, end: { dateTime: '2026-10-06T10:00:00+07:00' } });
+
+  it('lịch phụ lỗi 503: lịch chính vẫn dọn bình thường, lịch lỗi KHÔNG bị dọn, kết quả và thông báo nêu rõ', async () => {
+    const env = env2(['primary', 'work@group'], (url) => (url.includes('work%40group') ? { status: 503, body: { error: { message: 'Backend Error' } } } : { status: 200, body: { items: [ev('a1')] } }));
+    const r = await env.sb.syncGoogleCalendarEvents();
+    const prunes = env.log.gas.filter(g => g.action === 'pruneGoogleEvents').map(g => g.params.calendarId);
+    expect(prunes).toEqual(['primary']);
+    expect(r.failedCalendars).toEqual([{ calendarId: 'work@group', message: 'Backend Error', status: 503 }]);
+    expect(env.log.gas.some(g => g.action === 'touchCalendarSync')).toBe(true);
+    expect(env.sb.calendarStatusLineHtml()).toContain('1 lịch chưa tải được');
+  });
+  it('lỗi ở trang 2 của một lịch cũng không dọn lịch đó (trang 1 không phải toàn bộ sự kiện)', async () => {
+    const env = env2(['primary'], (url) => (url.includes('pageToken=p2') ? { status: 500, body: { error: { message: 'Internal' } } } : { status: 200, body: { items: [ev('b1')], nextPageToken: 'p2' } }));
+    const r = await env.sb.syncGoogleCalendarEvents();
+    expect(env.log.gas.filter(g => g.action === 'pruneGoogleEvents')).toHaveLength(0);
+    expect(r.failedCalendars).toHaveLength(1);
+  });
+  it('MỌI lịch đều lỗi (vd bị thu hồi quyền): báo lỗi, không dọn, không ghi "đã đồng bộ"', async () => {
+    const env = env2(['primary'], () => ({ status: 401, body: { error: { message: 'Invalid Credentials' } } }));
+    await expect(env.sb.syncGoogleCalendarEvents()).rejects.toThrow(/Kết nối lại.*Invalid Credentials|Invalid Credentials/);
+    expect(env.log.gas.filter(g => g.action === 'pruneGoogleEvents' || g.action === 'touchCalendarSync')).toHaveLength(0);
+    expect(env.sb.calendarStatusLineHtml()).toMatch(/Kết nối lại/);
+  });
+  it('sự kiện xuất hiện lại bên Google được ghi kèm deleted_at = null để hiện lại', () => {
+    const row = env2(['primary'], () => ({ status: 200, body: { items: [] } })).sb.mapGoogleEventToRow(ev('z9'), 'toi@example.com', 'finance', 'primary');
+    expect(row).toMatchObject({ id: 'GCAL_z9', google_event_id: 'z9', deleted_at: null });
+  });
+});

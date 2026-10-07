@@ -110,6 +110,10 @@ function calendarStatusLineHtml() {
     lines.push(`<div class="whint-line whint-line-bad"><i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(calendarSyncState.lastError)}</div>`);
   }
   const r = calendarSyncState.lastResult;
+  if (r && r.failedCalendars && r.failedCalendars.length) {
+    const f = r.failedCalendars[0];
+    lines.push(`<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${r.failedCalendars.length} lịch chưa tải được từ Google (${escapeHtml(f.message)}); sự kiện của lịch đó được giữ nguyên, sẽ thử lại ở lần đồng bộ sau.</div>`);
+  }
   if (r && r.pushFailed && r.pushFailed.length) {
     const first = r.pushFailed[0];
     lines.push(`<div class="whint-line whint-line-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${r.pushFailed.length} sự kiện chưa đẩy lên Google được — “${escapeHtml(first.title)}”: ${escapeHtml(first.message)}. Sẽ tự thử lại ở lần đồng bộ sau.</div>`);
@@ -498,7 +502,10 @@ function mapGoogleEventToRow(ev, email, groupKey, calendarId) {
     attendees: attendees,
     google_event_id: qualifiedId,
     google_calendar_id: calendarId || 'primary',
-    source: 'google'
+    source: 'google',
+    // Sự kiện xuất hiện lại bên Google sau khi từng bị dọn (vd khôi phục từ thùng rác Google) phải hiện lại: upsert theo
+    // google_event_id ghi đè dòng cũ, nếu không xoá mốc deleted_at thì dòng đó bị ẩn mãi mãi.
+    deleted_at: null
   };
 }
 
@@ -714,6 +721,10 @@ async function runCalendarSyncOnce() {
   const fetchedItems = []; // { ev, calendarId, qualifiedId }
   const activeIdsByCalendar = {};
   let anyTruncated = false;
+  // Lịch tải lỗi (kể cả lỗi ở trang 2, 3...): KHÔNG được dọn lịch đó. Trước đây lỗi chỉ bị bỏ qua rồi bước dọn coi lịch là
+  // "không còn sự kiện nào" => đánh dấu xoá mọi sự kiện đã liên kết của lịch (cả sự kiện tạo trong WorkHub đã đẩy lên), rồi
+  // lượt đẩy kế tiếp xoá luôn chúng trên Google. Một lần Google trả lỗi tạm thời (401/403/5xx, rớt mạng) là đủ gây mất dữ liệu.
+  const failedCalendars = []; // { calendarId, message, status }
 
   for (const calendarId of calendarIds) {
     activeIdsByCalendar[calendarId] = [];
@@ -724,7 +735,8 @@ async function runCalendarSyncOnce() {
       try {
         page = await fetchGoogleEventsPage(accessToken, calendarId, windowStart, windowEnd, pageToken);
       } catch (err) {
-        console.warn('syncGoogleCalendarEvents: lỗi tải lịch ' + calendarId + ', bỏ qua lịch này', err);
+        console.warn('syncGoogleCalendarEvents: lỗi tải lịch ' + calendarId + ', bỏ qua lịch này (không dọn)', err);
+        failedCalendars.push({ calendarId, message: (err && err.message) || String(err), status: (err && err.status) || null });
         break; // không chặn các lịch khác vì 1 lịch lỗi (vd bị thu hồi quyền truy cập)
       }
       const items = page.items || [];
@@ -739,6 +751,11 @@ async function runCalendarSyncOnce() {
       pages += 1;
       if (pageToken && pages >= SYNC_MAX_PAGES) anyTruncated = true;
     } while (pageToken && pages < SYNC_MAX_PAGES);
+  }
+
+  if (failedCalendars.length === calendarIds.length && !fetchedItems.length) {   // không kéo được gì: báo lỗi thay vì báo "đã đồng bộ"
+    const f = failedCalendars[0];
+    throw new Error('Không tải được lịch Google' + (f.status === 401 || f.status === 403 ? ' (Google từ chối quyền truy cập — vào Không Gian Riêng → Tích hợp rồi bấm “Kết nối lại”)' : '') + ': ' + f.message);
   }
 
   // Bỏ qua các instance lẻ Google tự sinh (singleEvents=true) của 1 sự kiện lặp mà CHÍNH
@@ -805,7 +822,9 @@ async function runCalendarSyncOnce() {
   // nếu không, những sự kiện thật ở các trang chưa kéo sẽ bị hiểu nhầm là "đã xoá bên
   // Google" và bị xoá oan. Dọn theo TỪNG lịch riêng, không gộp activeIds của lịch khác.
   if (!anyTruncated) {
+    const failedSet = new Set(failedCalendars.map(f => f.calendarId));
     for (const calendarId of calendarIds) {
+      if (failedSet.has(calendarId)) continue; // lịch tải lỗi: không biết sự kiện nào còn sống, không dọn
       await callGASData('pruneGoogleEvents', {
         email, groupKey, calendarId,
         activeGoogleIds: activeIdsByCalendar[calendarId] || [],
@@ -817,7 +836,7 @@ async function runCalendarSyncOnce() {
   }
   await callGASData('touchCalendarSync', {});
 
-  return { count: newRows.length, updatedCount: pulledUpdates.length, pushedCount, pushFailed, truncated: anyTruncated };
+  return { count: newRows.length, updatedCount: pulledUpdates.length, pushedCount, pushFailed, truncated: anyTruncated, failedCalendars };
 }
 
 // Làm mới những gì đang hiển thị sau 1 lượt đồng bộ. redrawPanel: vẽ lại cả panel Tích hợp (chỉ khi người dùng vừa bấm tay /
@@ -841,6 +860,8 @@ async function syncGoogleCalendarNow() {
     const suffix = result.truncated ? ' (lịch quá nhiều sự kiện, có thể chưa dọn hết sự kiện cũ)' : '';
     if (result.pushFailed && result.pushFailed.length) {
       showToast(`Đã đồng bộ nhưng ${result.pushFailed.length} sự kiện chưa đẩy lên Google được: ${result.pushFailed[0].message}`, 'warning');
+    } else if (result.failedCalendars && result.failedCalendars.length) {
+      showToast(`Đã đồng bộ nhưng ${result.failedCalendars.length} lịch chưa tải được từ Google: ${result.failedCalendars[0].message}`, 'warning');
     } else {
       showToast(`Đã đồng bộ: ${describeCalendarResult(result)}.${suffix}`, 'success');
     }

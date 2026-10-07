@@ -46,17 +46,32 @@ async function financialsFor(symbol: string) {
   return buildFinancials((annual ?? []) as Row[], (quarter ?? []) as Row[], (events ?? []) as EventRow[]);
 }
 
+// PostgREST trả tối đa 1.000 dòng mỗi lần đọc; quá thì CẮT IM LẶNG. Đọc từng trang tới khi hết và ném lỗi thay vì trả mảng rỗng
+// (mảng rỗng do lỗi => NAV/cảnh báo tính như thể không có lệnh nào rồi ghi đè dữ liệu thật).
+async function fetchAll(build: () => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; ) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw new Error(error.message);
+    if (!data || !data.length) break;
+    out.push(...data);
+    from += data.length;
+  }
+  return out;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const now = new Date();
 
-  const { data: vals, error: vErr } = await supabase.from("finance_stock_valuations").select("symbol");
-  if (vErr) return json({ ok: false, error: vErr.message }, 500);
+  let vals: any[];
+  try { vals = await fetchAll(() => supabase.from("finance_stock_valuations").select("symbol").order("symbol").order("year")); }
+  catch (e) { return json({ ok: false, error: String((e as Error).message || e) }, 500); }
   const symbols = [...new Set((vals ?? []).map((v) => String(v.symbol).toUpperCase()))];
   if (!symbols.length) return json({ ok: true, symbols: 0, tried: 0, refreshed: 0, changed: 0, failed: 0 });
 
-  const { data: cacheRows } = await supabase.from("finance_financials_cache").select("symbol, fetched_at, fingerprint").in("symbol", symbols);
+  const cacheRows = await fetchAll(() => supabase.from("finance_financials_cache").select("symbol, fetched_at, fingerprint").in("symbol", symbols).order("symbol"));
   const cache = (cacheRows ?? []) as CacheMeta[];
   const todo = pickSymbols(symbols, cache, now);
   const prevFp = new Map(cache.map((c) => [c.symbol, c.fingerprint ?? null]));

@@ -139,7 +139,7 @@
 
         newNicknameInput.addEventListener('input', function() {
             let name = this.value || "User";
-            previewAvatar.src = 'https://ui-avatars.com/api/?name=' + name + '&background=random&size=128&bold=true';
+            previewAvatar.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=random&size=128&bold=true';
         });
 
         auth.onAuthStateChange((event, session) => {
@@ -162,7 +162,7 @@
                     await auth.updateUser({
                         data: {
                             display_name: newName,
-                            photo_url: 'https://ui-avatars.com/api/?name=' + newName + '&background=random&size=128&bold=true'
+                            photo_url: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(newName) + '&background=random&size=128&bold=true'
                         }
                     });
 

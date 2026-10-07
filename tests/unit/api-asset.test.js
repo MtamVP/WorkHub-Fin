@@ -273,3 +273,37 @@ describe('callGAS — các hành động mới đã được nối', () => {
       .forEach(a => expect(sandbox.MUTATING_ACTIONS.has(a)).toBe(false));
   });
 });
+
+describe('API.asset — sổ lệnh vượt 1.000 dòng (giới hạn mỗi lần đọc của máy chủ)', () => {
+  // 1.200 lệnh mua 10 cp FPT rồi 1 lệnh bán 5.000 cp: nếu chỉ đọc 1.000 dòng đầu thì giá vốn/khối lượng sai và lệnh bán bị coi là bán vượt.
+  const many = () => {
+    const out = [];
+    for (let i = 0; i < 1200; i++) {
+      const d = new Date(Date.UTC(2023, 0, 2) + i * 86400000).toISOString().slice(0, 10);
+      out.push(T('b' + String(i).padStart(4, '0'), 'buy', 'FPT', 10, 100000 + i, d));
+    }
+    out.push(T('s0001', 'sell', 'FPT', 5000, 200000, '2026-09-01'));
+    return out;
+  };
+  it('listTransactions và giá vốn FIFO tính trên ĐỦ 1.201 lệnh dù máy chủ chỉ trả 1.000 dòng mỗi lần', async () => {
+    const { API } = boot({ finance_transactions: many() }, { maxRows: 1000 });
+    expect((await API.asset.listTransactions(EMAIL)).length).toBe(1201);
+    await API.asset.recomputeRealizedPnl(USER);
+    const lots = await API.asset.computeLots(USER);
+    const fpt = (Array.isArray(lots) ? lots : Object.values(lots).flat()).filter((l) => !l.symbol || l.symbol === 'FPT');
+    const qty = fpt.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+    expect(qty).toBe(7000);                                  // 12.000 mua - 5.000 bán
+  });
+});
+
+describe('API.personalSync.listFiles — thư mục đồng bộ vượt 1.000 file', () => {
+  it('đọc đủ mọi file theo trang (bản cũ chỉ thấy 1.000 file đầu nên XOÁ KHỎI MÁY các file còn lại ở lượt đối chiếu)', async () => {
+    const files = Array.from({ length: 1500 }, (_, i) => ({ id: 'f' + i, user_id: USER, relative_path: 'tai-lieu/' + String(i).padStart(4, '0') + '.txt', content_hash: 'h' + i, size: 10, deleted: false }));
+    files.push({ id: 'gone', user_id: USER, relative_path: 'da-xoa.txt', content_hash: 'x', size: 1, deleted: true });
+    const { API } = boot({ personal_sync_files: files }, { maxRows: 1000 });
+    const list = await API.personalSync.listFiles();
+    expect(list.length).toBe(1500);
+    expect(new Set(list.map((f) => f.relative_path)).size).toBe(1500);
+    expect(list.some((f) => f.relative_path === 'da-xoa.txt')).toBe(false);
+  });
+});

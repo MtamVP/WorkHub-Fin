@@ -32,12 +32,21 @@ window.WorkHubSync = (function () {
         }
     }
 
+    // Khoá bộ nhớ đệm của 1 lệnh đọc = băm TOÀN BỘ tham số. Bản cũ lấy base64 của JSON rồi cắt còn 64 ký tự => tham số chỉ khác
+    // nhau sau khoảng 48 byte đầu (vd email dài rồi mới tới mã cổ phiếu) ra CÙNG khoá, và lúc mất mạng app trả dữ liệu của lệnh khác.
+    // cyrb53 (băm 53 bit, hai làn 32 bit) trên cả chuỗi JSON, kèm độ dài: trùng khoá gần như không thể với số lệnh của một người.
     function hash(params) {
-        try {
-            return btoa(unescape(encodeURIComponent(JSON.stringify(params || {})))).slice(0, 64);
-        } catch (e) {
-            return String(params && params.id || params && params.projectId || 'x');
+        var str;
+        try { str = JSON.stringify(params || {}); } catch (e) { str = String(params && params.id || params && params.projectId || 'x'); }
+        var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+        for (var i = 0; i < str.length; i++) {
+            var ch = str.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
         }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return 'v2_' + str.length + '_' + (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
     }
 
     function genTrace() {
@@ -113,7 +122,21 @@ window.WorkHubSync = (function () {
         return { status: 'success', data: params, message: 'Đã lưu ngoại tuyến — sẽ đồng bộ khi có mạng.' };
     }
 
-    async function flushQueue() {
+    // Lỗi do MẠNG (chưa ra được Internet dù trình duyệt báo 'online'): giữ thao tác trong hàng đợi để thử lại, KHÔNG coi là xung đột.
+    function isNetworkError(msg) {
+        return /failed to fetch|networkerror|network request failed|load failed|err_internet|err_network|timed? ?out|timeout|fetch.*abort|econn|enotfound|mất mạng/i.test(String(msg || ''));
+    }
+
+    // Khoá: sự kiện 'online' của trình duyệt và kênh Realtime báo SUBSCRIBED thường đến gần như cùng lúc. Bản cũ chạy 2 lượt song song,
+    // cả hai đọc cùng danh sách 'pending' => MỖI thao tác ghi ngoại tuyến bị gửi 2 lần (vd 1 lệnh mua thành 2 lệnh).
+    var flushing = null;
+    function flushQueue() {
+        if (flushing) return flushing;
+        flushing = flushQueueInner().finally(function () { flushing = null; });
+        return flushing;
+    }
+
+    async function flushQueueInner() {
         var d = await getDb();
         if (!d || !window._dispatchAction) return;
         var rows;
@@ -129,6 +152,11 @@ window.WorkHubSync = (function () {
                 if (result && result.status === 'error') throw new Error(result.message || 'Lỗi không rõ');
                 await d.execute('DELETE FROM sync_queue WHERE id = ?', [row.id]);
             } catch (err) {
+                if (isNetworkError(err && err.message || err)) {
+                    // Mạng chưa thông: dừng lượt này, giữ nguyên thao tác này và các thao tác sau (đúng thứ tự) cho lần có mạng kế tiếp.
+                    console.warn('[sync-engine] flushQueue: mạng chưa sẵn sàng, thử lại sau', err);
+                    return;
+                }
                 await d.execute('DELETE FROM sync_queue WHERE id = ?', [row.id]);
                 await d.execute(
                     'INSERT INTO sync_conflicts (id, original_queue_id, action, params_json, error_message, occurred_at) VALUES (?,?,?,?,?,?)',
@@ -139,10 +167,12 @@ window.WorkHubSync = (function () {
         }
     }
 
+    // Mỗi lần xác nhận CÓ MẠNG đều thử đẩy hàng đợi (có khoá nên không chạy chồng; hàng đợi trống thì chỉ tốn 1 câu SELECT). Bản cũ chỉ
+    // đẩy khi CHUYỂN từ mất mạng sang có mạng => thao tác ghi lúc ngoại tuyến ở phiên trước KHÔNG BAO GIỜ được gửi nếu lần mở app sau đã
+    // có mạng sẵn (không có lần "chuyển" nào), và thao tác dừng lại vì mạng chưa thông cũng không được thử lại.
     function setOnline(next) {
-        var was = online;
         online = next;
-        if (!was && online) flushQueue();
+        if (online) flushQueue();
         statusListeners.forEach(function (cb) { cb(online); });
     }
 
@@ -154,6 +184,8 @@ window.WorkHubSync = (function () {
 
     window.addEventListener('online', function () { setOnline(true); });
     window.addEventListener('offline', function () { setOnline(false); });
+    // Lúc mở app khi đang có mạng: đẩy những gì còn trong hàng đợi từ phiên trước (chờ đăng nhập xong)
+    if (window.__TAURI__ && online) setTimeout(function () { if (online) flushQueue(); }, 8000);
 
     async function discardConflict(conflictId) {
         var d = await getDb();
@@ -165,6 +197,7 @@ window.WorkHubSync = (function () {
         handle: handle,
         onRealtimeStatus: onRealtimeStatus,
         flushQueue: flushQueue,
+        _hash: hash,
         discardConflict: discardConflict,
         onStatusChange: function (cb) { statusListeners.push(cb); },
         get isOnline() { return online; },

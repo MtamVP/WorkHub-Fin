@@ -42,6 +42,20 @@ async function sendEmail(apiKey: string, from: string, to: string, subject: stri
   }
 }
 
+// PostgREST trả tối đa 1.000 dòng mỗi lần đọc; quá thì CẮT IM LẶNG. Đọc từng trang tới khi hết và ném lỗi thay vì trả mảng rỗng
+// (mảng rỗng do lỗi => NAV/cảnh báo tính như thể không có lệnh nào rồi ghi đè dữ liệu thật).
+async function fetchAll(build: () => any): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; ; ) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw new Error(error.message);
+    if (!data || !data.length) break;
+    out.push(...data);
+    from += data.length;
+  }
+  return out;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -80,19 +94,24 @@ Deno.serve(async (req: Request) => {
   if (!eligible.length) return json({ users: 0, alerts: 0, sent: 0, failed: 0 });
   const eligibleIds = eligible.map((u) => u.id as string);
 
-  const [{ data: txns }, { data: actions }, { data: priceRows }, { data: watchRows }] = await Promise.all([
-    supabase.from("finance_transactions").select("user_id, symbol, type, quantity, trade_date, created_at").in("user_id", eligibleIds).is("deleted_at", null),
-    supabase.from("finance_corporate_actions").select("user_id, symbol, action_type, ratio, ex_date, created_at").in("user_id", eligibleIds).is("deleted_at", null),
-    supabase.from("finance_holdings_price").select("user_id, symbol, market_price, locked, target_price, stop_loss, price_date, updated_at").in("user_id", eligibleIds),
-    supabase.from("finance_watchlist").select("user_id, symbol, buy_below").in("user_id", eligibleIds),
-  ]);
+  let txns: any[], actions: any[], priceRows: any[], watchRows: any[];
+  try {
+    [txns, actions, priceRows, watchRows] = await Promise.all([
+      fetchAll(() => supabase.from("finance_transactions").select("user_id, symbol, type, quantity, trade_date, created_at").in("user_id", eligibleIds).is("deleted_at", null).order("id")),
+      fetchAll(() => supabase.from("finance_corporate_actions").select("user_id, symbol, action_type, ratio, ex_date, created_at").in("user_id", eligibleIds).is("deleted_at", null).order("id")),
+      fetchAll(() => supabase.from("finance_holdings_price").select("user_id, symbol, market_price, locked, target_price, stop_loss, price_date, updated_at").in("user_id", eligibleIds).order("user_id").order("symbol")),
+      fetchAll(() => supabase.from("finance_watchlist").select("user_id, symbol, buy_below").in("user_id", eligibleIds).order("id")),
+    ]);
+  } catch (e) {
+    return json({ error: String((e as Error).message || e) }, 500);       // không gửi cảnh báo theo dữ liệu thiếu
+  }
   const held = heldQuantities((txns ?? []) as any, (actions ?? []) as any);
 
   // Định giá mới nhất theo mã (bảng dùng chung) -> giá mục tiêu mặc định khi người dùng không nhập tay
   const symbols = [...new Set((priceRows ?? []).map((r) => r.symbol as string))];
   const valuations = new Map<string, number>();
   if (symbols.length) {
-    const { data: vals } = await supabase.from("finance_stock_valuations").select("symbol, year, data").in("symbol", symbols).order("year", { ascending: false });
+    const vals = await fetchAll(() => supabase.from("finance_stock_valuations").select("symbol, year, data").in("symbol", symbols).order("year", { ascending: false }).order("symbol"));
     for (const v of vals ?? []) {
       if (valuations.has(v.symbol as string)) continue;
       const t = valuationTarget(v.data);

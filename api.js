@@ -31,10 +31,15 @@ const TOOLS_SUPABASE_URL = "https://jbibxrhorqmbbyjuxcgo.supabase.co";
 const TOOLS_SUPABASE_KEY = "sb_publishable_RgXnbjszBBJJUswXTzlpSA_ixYR3nJ-";
 
 const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-const toolsSbClient = window.supabase ? window.supabase.createClient(TOOLS_SUPABASE_URL, TOOLS_SUPABASE_KEY) : null;
+// Dự án Supabase "tools" (dùng chung với các công cụ khác): Fin hiện không gọi tới, nên chỉ tạo client khi có nơi đọc
+// window.toolsSupabaseClient lần đầu -- trước đây mỗi lần mở trang đều tạo thêm một client (thêm một bộ quản lý phiên chạy nền).
+let toolsSbClient = null;
+Object.defineProperty(window, 'toolsSupabaseClient', {
+    configurable: true,
+    get() { if (!toolsSbClient && window.supabase) toolsSbClient = window.supabase.createClient(TOOLS_SUPABASE_URL, TOOLS_SUPABASE_KEY); return toolsSbClient; }
+});
 
 window.supabaseClient = sbClient;
-window.toolsSupabaseClient = toolsSbClient;
 window.WORKHUB_CONFIG = {
     main: {
         url: SUPABASE_URL,
@@ -1510,11 +1515,10 @@ const API = {
         // --- Sổ lệnh (transaction ledger) — nguồn sự thật duy nhất cho khối lượng/giá vốn ---
         listTransactions: async (email) => {
             const userId = await getUserId(email);
-            const { data, error } = await sbClient.from('finance_transactions')
+            // Đọc theo trang: máy chủ trả tối đa 1.000 dòng mỗi lần, quá thì phần còn lại bị cắt im lặng. Thứ tự có thêm id để phân trang ổn định.
+            return API.asset._fetchAll(() => sbClient.from('finance_transactions')
                 .select('*').eq('user_id', userId).is('deleted_at', null)
-                .order('trade_date', { ascending: false }).order('created_at', { ascending: false });
-            if (error) throw error;
-            return data || [];
+                .order('trade_date', { ascending: false }).order('created_at', { ascending: false }).order('id'));
         },
         // Sổ lệnh FIFO chuẩn kế toán: lô cũ nhất bán trước. Hành động doanh nghiệp (tách/gộp,
         // cổ tức cổ phiếu) được replay xen kẽ theo đúng ex_date để điều chỉnh khối lượng/giá vốn hồi tố.
@@ -1523,12 +1527,13 @@ const API = {
         // created_at), để sửa/xóa lệnh cũ (thêm lệnh mua lùi ngày, xóa hành động doanh nghiệp, v.v.)
         // không để lại số liệu đã lưu bị lỗi thời ở các lệnh bán khác.
         _replayFifo: async (userId) => {
-            const { data: txns, error } = await sbClient.from('finance_transactions')
+            // Đọc ĐỦ sổ lệnh theo trang: đây là nguồn sự thật của khối lượng/giá vốn/lãi lỗ đã chốt; nếu bị cắt ở 1.000 dòng thì
+            // danh mục, NAV và lãi lỗ ghi ngược vào sổ đều sai mà không báo lỗi gì.
+            const txns = await API.asset._fetchAll(() => sbClient.from('finance_transactions')
                 .select('*').eq('user_id', userId).is('deleted_at', null)
-                .order('trade_date', { ascending: true }).order('created_at', { ascending: true });
-            if (error) throw error;
-            const { data: actions } = await sbClient.from('finance_corporate_actions')
-                .select('*').eq('user_id', userId).is('deleted_at', null);
+                .order('trade_date', { ascending: true }).order('created_at', { ascending: true }).order('id'));
+            const actions = await API.asset._fetchAll(() => sbClient.from('finance_corporate_actions')
+                .select('*').eq('user_id', userId).is('deleted_at', null).order('ex_date').order('id'));
 
             const events = [
                 ...(txns || []).map(t => ({ ...t, _kind: 'txn', _date: t.trade_date, _ts: t.created_at })),
@@ -2145,11 +2150,9 @@ const API = {
         cashFlow: {
             list: async (email) => {
                 const userId = await getUserId(email);
-                const { data, error } = await sbClient.from('finance_cash_flows')
+                return API.asset._fetchAll(() => sbClient.from('finance_cash_flows')
                     .select('*').eq('user_id', userId).is('deleted_at', null)
-                    .order('flow_date', { ascending: false }).order('created_at', { ascending: false });
-                if (error) throw error;
-                return data || [];
+                    .order('flow_date', { ascending: false }).order('created_at', { ascending: false }).order('id'));
             },
             add: async (email, flow) => {
                 const userId = await getUserId(email);
@@ -2927,15 +2930,14 @@ const API = {
         // --- Giá đóng cửa VN-Index/VN30: dữ liệu tham chiếu dùng chung, nhập tay bởi asset_manager ---
         benchmark: {
             list: async (indexCode, days) => {
-                let query = sbClient.from('finance_benchmark_prices').select('*').order('price_date', { ascending: true });
-                if (indexCode) query = query.eq('index_code', indexCode);
-                if (days) {
-                    const from = new Date(); from.setDate(from.getDate() - Number(days));
-                    query = query.gte('price_date', from.toISOString().slice(0, 10));
-                }
-                const { data, error } = await query;
-                if (error) throw error;
-                return data || [];
+                const from = days ? (() => { const d = new Date(); d.setDate(d.getDate() - Number(days)); return d.toISOString().slice(0, 10); })() : null;
+                // Đọc theo trang: nhiều năm x nhiều chỉ số vượt 1.000 dòng mỗi lần đọc của máy chủ (bị cắt im lặng => so sánh hiệu suất sai)
+                return API.asset._fetchAll(() => {
+                    let query = sbClient.from('finance_benchmark_prices').select('*').order('price_date', { ascending: true }).order('index_code');
+                    if (indexCode) query = query.eq('index_code', indexCode);
+                    if (from) query = query.gte('price_date', from);
+                    return query;
+                });
             },
             upsert: async (indexCode, priceDate, closeValue, email) => {
                 const value = Number(closeValue) || 0;
@@ -3518,9 +3520,9 @@ const API = {
 
             // Vốn ròng đã nạp lũy kế (nạp - rút, KHÔNG gồm cổ tức) — dùng để tách lợi nhuận đầu tư
             // thực khỏi tiền góp thêm khi tính các chỉ số rủi ro/hiệu suất.
-            const { data: flows } = await sbClient.from('finance_cash_flows')
+            const flows = await API.asset._fetchAll(() => sbClient.from('finance_cash_flows')
                 .select('flow_type, amount').eq('user_id', userId).is('deleted_at', null)
-                .in('flow_type', ['deposit', 'withdrawal']);
+                .in('flow_type', ['deposit', 'withdrawal']).order('id'));
             const netContributed = (flows || []).reduce((s, f) =>
                 s + (f.flow_type === 'withdrawal' ? -Number(f.amount) : Number(f.amount)), 0);
 
@@ -3536,14 +3538,13 @@ const API = {
         // --- Lịch sử NAV cho biểu đồ hiệu suất ---
         getNavHistory: async (email, days) => {
             const userId = await getUserId(email);
-            let query = sbClient.from('finance_nav_history').select('*').eq('user_id', userId).order('snapshot_date', { ascending: true });
-            if (days) {
-                const from = new Date(); from.setDate(from.getDate() - Number(days));
-                query = query.gte('snapshot_date', from.toISOString().slice(0, 10));
-            }
-            const { data, error } = await query;
-            if (error) throw error;
-            return data || [];
+            const from = days ? (() => { const d = new Date(); d.setDate(d.getDate() - Number(days)); return d.toISOString().slice(0, 10); })() : null;
+            // NAV chụp MỖI NGÀY: sau khoảng 2,7 năm vượt 1.000 dòng; không đọc theo trang thì hiệu suất (TWR) chỉ tính trên 1.000 ngày ĐẦU
+            return API.asset._fetchAll(() => {
+                let query = sbClient.from('finance_nav_history').select('*').eq('user_id', userId).order('snapshot_date', { ascending: true });
+                if (from) query = query.gte('snapshot_date', from);
+                return query;
+            });
         },
 
         // --- KPI tổng hợp cho tab Hiệu Suất ---
@@ -3551,8 +3552,8 @@ const API = {
             const userId = await getUserId(email);
             const holdings = await API.asset.getHoldingsView(email);
             const unrealizedPnl = holdings.reduce((s, h) => s + h.unrealizedPnl, 0);
-            const { data: sells } = await sbClient.from('finance_transactions')
-                .select('realized_pnl').eq('user_id', userId).eq('type', 'sell').is('deleted_at', null);
+            const sells = await API.asset._fetchAll(() => sbClient.from('finance_transactions')
+                .select('realized_pnl').eq('user_id', userId).eq('type', 'sell').is('deleted_at', null).order('id'));
             const realizedPnl = (sells || []).reduce((s, t) => s + (Number(t.realized_pnl) || 0), 0);
             const marketValue = holdings.reduce((s, h) => s + h.marketValue, 0);
             const { data: cd } = await sbClient.from('finance_assets').select('cash, debt, nav').eq('user_id', userId).maybeSingle();
@@ -3669,9 +3670,9 @@ const API = {
             const { data: members } = await sbClient.from('users').select('id').in('group_key', ['finance', 'admin']);
             const ids = (members || []).map(m => m.id);
             if (!ids.length) return [];
-            const { data, error } = await sbClient.from('finance_nav_history')
-                .select('snapshot_date, nav').in('user_id', ids).order('snapshot_date', { ascending: true });
-            if (error) throw error;
+            // Mọi thành viên x mọi ngày: 5 người x 250 ngày đã vượt 1.000 dòng mỗi lần đọc => NAV nhóm thiếu các ngày gần đây nếu không đọc theo trang
+            const data = await API.asset._fetchAll(() => sbClient.from('finance_nav_history')
+                .select('snapshot_date, nav, user_id').in('user_id', ids).order('snapshot_date', { ascending: true }).order('user_id'));
             const byDate = {};
             (data || []).forEach(r => { byDate[r.snapshot_date] = (byDate[r.snapshot_date] || 0) + (Number(r.nav) || 0); });
             return Object.keys(byDate).sort().map(d => ({ snapshot_date: d, nav: byDate[d] }));
@@ -3866,9 +3867,18 @@ const API = {
             return data && data.user ? data.user.id : null;
         },
         listFiles: async () => {
-            const { data, error } = await sbClient.from('personal_sync_files').select('*').eq('deleted', false);
-            if (error) throw error;
-            return data || [];
+            // Đọc theo trang tới khi hết: máy chủ trả tối đa 1.000 dòng mỗi lần. Nếu danh sách bị cắt, file nằm ngoài danh sách bị
+            // hiểu là "đã xoá trên đám mây" và bị XOÁ KHỎI MÁY ở lượt đối chiếu (chốt chặn xoá hàng loạt chỉ chặn khi quá nửa).
+            const out = [];
+            for (let from = 0; ; ) {
+                const { data, error } = await sbClient.from('personal_sync_files').select('*').eq('deleted', false)
+                    .order('relative_path').order('id').range(from, from + 999);
+                if (error) throw error;
+                if (!data || !data.length) break;
+                out.push(...data);
+                from += data.length;
+            }
+            return out;
         },
         getFile: async (relativePath) => {
             const { data, error } = await sbClient.from('personal_sync_files').select('*').eq('relative_path', relativePath).maybeSingle();
@@ -3922,7 +3932,7 @@ const API = {
     },
     stock: {
         getStockList: async () => {
-            const { data } = await sbClient.from('finance_stock_valuations').select('symbol').order('symbol');
+            const data = await API.asset._fetchAll(() => sbClient.from('finance_stock_valuations').select('symbol').order('symbol').order('year'));
             const seen = new Set(); const list = [];
             (data || []).forEach(d => { if (!seen.has(d.symbol)) { seen.add(d.symbol); list.push(d.symbol); } });
             return list;
@@ -4048,9 +4058,8 @@ const API = {
 
         // Mọi hồ sơ định giá (mỗi mã nhiều năm, năm mới trước). Chỉ số/kết luận do lib/valuation-calc.js tính ở trình duyệt.
         getAllValuations: async () => {
-            const { data, error } = await sbClient.from('finance_stock_valuations')
-                .select('symbol, year, data, updated_at, updated_by').order('symbol').order('year', { ascending: false });
-            if (error) throw error;
+            const data = await API.asset._fetchAll(() => sbClient.from('finance_stock_valuations')
+                .select('symbol, year, data, updated_at, updated_by').order('symbol').order('year', { ascending: false }));   // bảng tăng dần theo số mã x số năm
             return (data || []).slice().sort((a, b) => (a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0) || (b.year - a.year));
         },
 
@@ -4122,7 +4131,7 @@ const API = {
         // dữ liệu quý, và cờ đang nắm / đang theo dõi của người dùng.
         getOverview: async (email) => {
             const rows = await API.stock.getAllValuations();
-            const { data: qrows } = await sbClient.from('finance_stock_quarters').select('symbol, year, quarter, lnst, revenue');
+            const qrows = await API.asset._fetchAll(() => sbClient.from('finance_stock_quarters').select('symbol, year, quarter, lnst, revenue').order('symbol').order('year').order('quarter'));   // bảng đã gần 1.000 dòng
             const quartersBy = {};
             (qrows || []).forEach(q => { (quartersBy[q.symbol] = quartersBy[q.symbol] || []).push(q); });
             const latest = {};
