@@ -121,3 +121,15 @@ describe('monthEnds', () => {
     expect(monthEnds('abc', '2024-03')).toEqual([]);
   });
 });
+
+describe('buildSnapshot: giá từ đầu năm và tăng trưởng lợi nhuận ròng', () => {
+  it('đưa PRICE_CHG_PCT_CR_YD -> chgYtd, 1M/6M, lợi nhuận ròng TTM/quý/3 năm, trước thuế vào ảnh chụp và yêu cầu lấy đủ các mã này', async () => {
+    const { SNAP_DAILY, SNAP_QUARTER } = await import('../../supabase/functions/market-data-sync/peers.ts');
+    ['PRICE_CHG_PCT_CR_YD', 'PRICE_CHG_PCT_CR_1M', 'PRICE_CHG_PCT_CR_6M'].forEach((c) => expect(SNAP_DAILY).toContain(c));
+    ['PRETAX_PROFIT_TR_GRYOY', 'NET_PROFIT_TR_GRYOY', 'NET_PROFIT_QR_GRYOY', 'NET_PROFIT_TR_GR3YR'].forEach((c) => expect(SNAP_QUARTER).toContain(c));
+    const dly = { PRICE_CHG_PCT_CR_YD: d('PRICE_CHG_PCT_CR_YD', D, [['AAA', -0.297]]), MARKETCAP: d('MARKETCAP', D, [['AAA', 1000e9]]) };
+    const qtr = { NET_PROFIT_TR_GRYOY: d('NET_PROFIT_TR_GRYOY', '2026-06-30', [['AAA', 0.16]]), NET_PROFIT_QR_GRYOY: d('NET_PROFIT_QR_GRYOY', '2026-06-30', [['AAA', 0.137]]), NET_PROFIT_TR_GR3YR: d('NET_PROFIT_TR_GR3YR', '2026-06-30', [['AAA', 0.199]]), PRETAX_PROFIT_TR_GRYOY: d('PRETAX_PROFIT_TR_GRYOY', '2026-06-30', [['AAA', 0.046]]) };
+    const a = buildSnapshot(dly, qtr, () => null).find((r) => r.symbol === 'AAA');
+    expect(a.metrics).toMatchObject({ chgYtd: -0.297, netProfitGrowthYoY: 0.16, netProfitGrowthQ: 0.137, netProfitGrowth3y: 0.199, pretaxGrowthYoY: 0.046 });
+  });
+});

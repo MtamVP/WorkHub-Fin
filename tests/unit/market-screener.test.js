@@ -129,3 +129,53 @@ describe('matches (danh sách theo dõi)', () => {
     expect(MS.matches(null, ['GOOD'])).toEqual({});
   });
 });
+
+describe('tiêu chí mới: vốn hoá khoảng, lợi nhuận ròng, giá từ 1/1, nhiều ngành, giới hạn số mã', () => {
+  const mk2 = (symbol, icb, m) => ({ symbol, icb2_code: icb, metrics: Object.assign({ marketcap: 5000e9, advValue20: 20e9 }, m) });
+  const rows2 = MS.buildRows([
+    mk2('A1', '2700', { marketcap: 2000e9, netProfitGrowthYoY: 0.3, netProfitGrowthQ: 0.1, netProfitGrowth3y: 0.2, pretaxGrowthYoY: 0.25, chgYtd: 0.15, chg1m: 0.02, chg6m: 0.1, pe: 8, roae: 0.2 }),
+    mk2('A2', '2700', { marketcap: 20000e9, netProfitGrowthYoY: 0.05, chgYtd: -0.2, pe: 12, roae: 0.15 }),
+    mk2('A3', '2700', { marketcap: 800e9, netProfitGrowthYoY: 0.4, chgYtd: 0.5, pe: 6, roae: 0.25 }),
+    mk2('B1', '8300', { marketcap: 9000e9, netProfitGrowthYoY: 0.2, chgYtd: 0.05, pe: 7, roae: 0.2 }),
+    mk2('B2', '8300', { marketcap: 3000e9, netProfitGrowthYoY: 0.12, chgYtd: -0.05, pe: 9, roae: 0.18 }),
+    mk2('C1', '1700', { marketcap: 1500e9, pe: 10 }),                                  // thiếu tăng trưởng và giá YTD
+  ], STATS, {});
+  const ids = (r) => r.entries.map((e) => e.row.symbol).sort();
+  it('vốn hoá theo khoảng (min + max)', () => {
+    expect(ids(MS.evaluate(rows2, { values: { cap: 1000, capMax: 10000 } }))).toEqual(['A1', 'B1', 'B2', 'C1']);
+  });
+  it('tăng trưởng lợi nhuận ròng 12 tháng / quý / 3 năm / trước thuế: thiếu số liệu thì không đạt và được đếm', () => {
+    const r = MS.evaluate(rows2, { values: { netG: 10 } });
+    expect(ids(r)).toEqual(['A1', 'A3', 'B1', 'B2']);
+    expect(r.counts.missing.netG).toBe(1);
+    expect(ids(MS.evaluate(rows2, { values: { netGq: 5, net3y: 15, pretaxG: 20 } }))).toEqual(['A1']);
+  });
+  it('giá từ 1/1: tối thiểu, tối đa, và khoảng', () => {
+    expect(ids(MS.evaluate(rows2, { values: { ytd: 10 } }))).toEqual(['A1', 'A3']);
+    expect(ids(MS.evaluate(rows2, { values: { ytdMax: -10 } }))).toEqual(['A2']);
+    expect(ids(MS.evaluate(rows2, { values: { ytd: -10, ytdMax: 10 } }))).toEqual(['B1', 'B2']);
+    expect(ids(MS.evaluate(rows2, { values: { chg1m: 1, chg6m: 5 } }))).toEqual(['A1']);
+  });
+  it('chọn nhiều ngành, và nhận định dạng một ngành (icb) của bản cũ', () => {
+    expect(MS.evaluate(rows2, { values: { cap: 1 }, icbs: ['2700', '8300'] }).counts.universe).toBe(5);
+    expect(MS.evaluate(rows2, { values: {}, icb: '8300' }).counts.universe).toBe(2);
+    expect(MS.normalizeFilters({ icbs: ['2700', '2700', ''] }).icbs).toEqual(['2700']);
+  });
+  it('tối đa mỗi ngành và tối đa tổng cộng: cắt sau khi xếp điểm, báo số mã bị cắt', () => {
+    const base = MS.evaluate(rows2, { values: { cap: 1 } });
+    expect(base.counts.passed).toBe(6);
+    const per = MS.evaluate(rows2, { values: { cap: 1 }, perSector: 1 });
+    expect(per.entries.length).toBe(3); expect(new Set(per.entries.map((e) => e.row.icb2_code)).size).toBe(3);
+    expect(per.counts.matched).toBe(6); expect(per.counts.cut).toBe(3);
+    const bestOf = (icb) => base.entries.find((e) => e.row.icb2_code === icb).row.symbol;
+    expect(per.entries.map((e) => e.row.symbol)).toContain(bestOf('2700'));
+    const top = MS.evaluate(rows2, { values: { cap: 1 }, topN: 2 });
+    expect(top.entries.map((e) => e.row.symbol)).toEqual(base.entries.slice(0, 2).map((e) => e.row.symbol));
+    expect(MS.normalizeFilters({ perSector: 'x', topN: 0.5 })).toMatchObject({ perSector: 0, topN: 0 });
+  });
+  it('mẫu "Dẫn đầu từng ngành" có giới hạn mỗi ngành và dùng tiêu chí có thật', () => {
+    const p = MS.PRESETS.find((x) => x.key === 'bysector');
+    expect(p.perSector).toBeGreaterThan(0);
+    Object.keys(p.values).forEach((k) => expect(MS.BY_KEY[k]).toBeTruthy());
+  });
+});

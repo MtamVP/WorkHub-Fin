@@ -161,13 +161,13 @@ export const DAILY_MAP: Record<string, string> = {
   PRICE_HIGHEST_CR_52W: "high52", PRICE_LOWEST_CR_52W: "low52", NMVALUE_AVG_CR_20D: "advValue20", NMVOLUME_AVG_CR_20D: "advVol20",
   PRICE_TO_EARNINGS_AVG_CR_1Y: "pe1y", PRICE_TO_EARNINGS_AVG_CR_3Y: "pe3y", PRICE_TO_EARNINGS_AVG_CR_5Y: "pe5y",
   PRICE_TO_BOOK_AVG_CR_1Y: "pb1y", PRICE_TO_BOOK_AVG_CR_3Y: "pb3y", PRICE_TO_BOOK_AVG_CR_5Y: "pb5y",
-  PRICE_CHG_PCT_CR_1M: "chg1m", PRICE_CHG_PCT_CR_3M: "chg3m", PRICE_CHG_PCT_CR_6M: "chg6m", PRICE_CHG_PCT_CR_1Y: "chg1y",
+  PRICE_CHG_PCT_CR_1M: "chg1m", PRICE_CHG_PCT_CR_3M: "chg3m", PRICE_CHG_PCT_CR_6M: "chg6m", PRICE_CHG_PCT_CR_1Y: "chg1y", PRICE_CHG_PCT_CR_YD: "chgYtd",   // YD = từ đầu năm (1/1) đến nay
   DAILY_JDK_RS_CR: "jdkRs", DAILY_JDK_RS_MOMENTUM_CR: "jdkMom", FREEFLOAT: "freefloat",
 };
 export const QUARTER_MAP: Record<string, string> = {
   ROAE_TR_AVG5Q: "roae", ROAA_TR_AVG5Q: "roaa", ROIC_TR_AVG5Q: "roic", GROSS_MARGIN_TR: "grossMargin", NET_MARGIN_TR: "netMargin", OPERATING_EBIT_MARGIN_TR: "ebitMargin", DELTA_MARGIN_TR: "deltaMargin",
   CFO_TO_SALES_TR: "cfoToSales", INTEREST_COVERAGE_TR: "interestCoverage", DEBT_TO_EQUITY_AQ: "debtToEquity", CURRENT_RATIO_AQ: "currentRatio", EQUITY_TO_ASSET_AQ: "equityToAsset",
-  EPS_TR: "epsTtm", EPS_TR_GRYOY: "epsGrowthYoY", NET_SALES_TR_GRYOY: "salesGrowthYoY", PRETAX_PROFIT_TR_GRYOY: "pretaxGrowthYoY", DIVIDEND_PAYOUT_TR: "payoutTtm",
+  EPS_TR: "epsTtm", EPS_TR_GRYOY: "epsGrowthYoY", NET_SALES_TR_GRYOY: "salesGrowthYoY", PRETAX_PROFIT_TR_GRYOY: "pretaxGrowthYoY", NET_PROFIT_TR_GRYOY: "netProfitGrowthYoY", NET_PROFIT_QR_GRYOY: "netProfitGrowthQ", NET_PROFIT_TR_GR3YR: "netProfitGrowth3y", DIVIDEND_PAYOUT_TR: "payoutTtm",
   NET_PROFIT_TR: "netProfitTtm", NET_SALES_TR: "salesTtm", TOTAL_SHARES: "shares", POSITIVE_CFO_NUM_CR_2YR: "positiveCfo2y",
   OPERATING_EBITDA_TR: "ebitdaTtm", OWNERS_EQUITY_AQ: "equity", NET_CASH_TO_EQUITY_AQ: "netCashToEquity",
   NET_INTEREST_MARGIN_TR_AVG5Q: "nim", PROVISION_BAD_LOANS_AQ: "badDebtCoverage", FREEFLOAT: "freefloat",
