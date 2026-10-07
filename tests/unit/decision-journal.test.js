@@ -186,3 +186,11 @@ describe('ngày', () => {
     expect(J.dateDiffDays('2026-01-01', '2026-03-01')).toBe(59);
   });
 });
+
+describe('summarize: quyết định bắt đầu từ cảnh báo giá', () => {
+  it('đếm quyết định có thẻ "cảnh báo giá" (không phân biệt các thẻ khác)', () => {
+    const a = buy({ tags: ['cảnh báo giá', 'dài hạn'] }), b = buy({ tags: ['dài hạn'] }), c = buy({});
+    expect(J.summarize([a, b, c], []).alertDriven).toBe(1);
+    expect(J.summarize([], []).alertDriven).toBe(0);
+  });
+});

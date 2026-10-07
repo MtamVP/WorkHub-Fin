@@ -179,3 +179,37 @@ describe('tiêu chí mới: vốn hoá khoảng, lợi nhuận ròng, giá từ 
     Object.keys(p.values).forEach((k) => expect(MS.BY_KEY[k]).toBeTruthy());
   });
 });
+
+describe('EV/EBITDA', () => {
+  const ST = Object.assign({}, STATS, { '2700': { stats: Object.assign({}, STATS['2700'].stats, { evEbitda: { n: 30, median: 8, q: [] } }) }, '1700': { stats: { evEbitda: { n: 3, median: 5, q: [] } } } });
+  const SN = [
+    S('E1', '2700', { evEbitda: 5 }), S('E2', '2700', { evEbitda: 8 }), S('E3', '2700', { evEbitda: 14 }), S('E4', '2700', {}),
+    S('E5', '2700', { evEbitda: -3 }), S('B1', '8300', { evEbitda: 4 }), S('E6', '1700', { evEbitda: 4 }),
+  ];
+  const rs = MS.buildRows(SN, ST, {});
+  it('hàng có tỷ lệ so với trung vị ngành khi ngành có ít nhất 5 mã có số liệu; ngành quá ít mã thì null', () => {
+    expect(rs.find((r) => r.symbol === 'E1').evEbitdaRel).toBeCloseTo(0.625, 6);
+    expect(rs.find((r) => r.symbol === 'E3').evEbitdaRel).toBeCloseTo(1.75, 6);
+    expect(rs.find((r) => r.symbol === 'E6').evEbitdaRel).toBeNull();
+    expect(rs.find((r) => r.symbol === 'E4').evEbitdaRel).toBeNull();
+  });
+  it('EV/EBITDA tối đa: loại mã vượt ngưỡng, EV/EBITDA âm, đếm riêng mã thiếu số liệu và bỏ qua ngân hàng', () => {
+    const r = MS.evaluate(rs, { values: { evEbitda: 8 } });
+    expect(r.entries.map((e) => e.row.symbol).sort()).toEqual(['B1', 'E1', 'E2', 'E6']);
+    expect(r.counts.missing.evEbitda).toBe(1);
+    expect(r.counts.failedBy.evEbitda).toBe(2);
+  });
+  it('so với trung vị ngành tối đa 80%: chỉ mã rẻ hơn ngành từ 20% theo EV/EBITDA', () => {
+    const r = MS.evaluate(rs, { values: { evRel: 80 } });
+    expect(r.entries.map((e) => e.row.symbol).sort()).toEqual(['B1', 'E1']);      // B1 là ngân hàng: tiêu chí không áp dụng nên không loại (giống nợ/vốn chủ)
+  });
+  it('xuất CSV có cột EV/EBITDA, để trống với ngân hàng', () => {
+    const MB = require('../../lib/market-batch.js');
+    const ent = MS.evaluate(rs, { values: {} }).entries.filter((e) => ['E1', 'B1'].includes(e.row.symbol));
+    const out = MB.csvRows(ent, {}, () => '');
+    const i = out[0].indexOf('EV/EBITDA');
+    expect(i).toBeGreaterThan(0);
+    expect(out.find((r) => r[0] === 'E1')[i]).toBe('5.0');
+    expect(out.find((r) => r[0] === 'B1')[i]).toBe('');
+  });
+});

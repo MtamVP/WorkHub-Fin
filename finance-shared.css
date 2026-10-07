@@ -787,6 +787,10 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .la-item.la-bad > i { color: var(--danger-color); }
 .la-item time { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 0.74rem; }
 .la-clear { align-self: flex-start; }
+.la-decide { margin-left: 6px; padding: 1px 8px; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.74rem; cursor: pointer; white-space: nowrap; }
+.la-decide:hover, .la-decide:focus-visible { border-color: var(--gold, currentColor); color: var(--text-primary); }
+.ar-note { font-size: 0.78rem; min-width: 220px; }
+.ar-decide { padding: 2px 8px; font-size: 0.74rem; white-space: nowrap; }
 .live-series { margin: 8px 0 10px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; }
 .live-series[hidden], .live-alerts[hidden] { display: none; }
 .ls-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 0.82rem; margin-bottom: 6px; }

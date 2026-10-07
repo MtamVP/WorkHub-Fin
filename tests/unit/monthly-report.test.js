@@ -277,7 +277,7 @@ describe('compute — nhật ký quyết định', () => {
     expect(p['Journal coverage'].current).toBeCloseTo(2 / 3 * 100, 1);          // 2 trên 3 lệnh trong tháng
     expect(p['Full-plan rate'].current).toBeCloseTo(2 / 3 * 100, 1);            // j2 mua nhưng thiếu cắt lỗ -> chưa đủ; j và j3 đủ
     expect(p['Target-hit rate'].current).toBe(50);                               // 1 trong 2 lệnh mua đã đánh giá
-    expect(r.kpi).toMatchObject({ journalCount: 3, journalTargetHit: 1, journalStopHit: 0 });
+    expect(r.kpi).toMatchObject({ journalCount: 3, journalTargetHit: 1, journalStopHit: 0 }); expect(r.kpi.journalAlertDriven).toBe(0);
   });
   it('phân tích sâu dùng kỳ vọng ghi lúc quyết định thay vì giá mục tiêu hiện tại', () => {
     expect(r.deepDive.expectationSource).toBe('journal');

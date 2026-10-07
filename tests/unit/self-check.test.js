@@ -122,3 +122,24 @@ describe('self-check.js: các sự cố điển hình', () => {
     const t2 = boot({ tauri: false }); expect((await t2.api.testNotification()).ok).toBe(false);
   });
 });
+
+describe('holidayOutlook (lịch nghỉ lễ năm sau)', () => {
+  const SC = require('../../lib/self-check.js');
+  const cov = (map) => (iso) => map[iso.slice(0, 4)] || 'none';
+  it('thiếu lịch năm nay: chú ý', () => {
+    expect(SC.holidayOutlook('2027-03-10', cov({ 2027: 'partial' })).status).toBe('warn');
+  });
+  it('đủ lịch năm nay và năm sau: đạt', () => {
+    const r = SC.holidayOutlook('2026-10-07', cov({ 2026: 'complete', 2027: 'complete' }));
+    expect(r.status).toBe('ok'); expect(r.detail).toContain('2026 và 2027');
+  });
+  it('trước tháng 11 lịch năm sau chưa đủ: vẫn đạt nhưng có ghi chú; từ tháng 11: chú ý', () => {
+    const c = cov({ 2026: 'complete', 2027: 'partial' });
+    const a = SC.holidayOutlook('2026-10-31', c); expect(a.status).toBe('ok'); expect(a.detail).toContain('2027');
+    const b = SC.holidayOutlook('2026-11-01', c); expect(b.status).toBe('warn'); expect(b.detail).toContain('2027');
+  });
+  it('nêu tên ngày nghỉ lễ hôm nay', () => {
+    const r = SC.holidayOutlook('2026-09-02', cov({ 2026: 'complete', 2027: 'complete' }), { holidayName: 'Quốc khánh' });
+    expect(r.detail).toContain('Quốc khánh');
+  });
+});

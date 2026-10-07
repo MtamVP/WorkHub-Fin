@@ -64,10 +64,8 @@
             return { status: 'ok', detail: 'FPT ' + fmtVnd(Number(row.close) * 1000) + ' ngày ' + fmtDate(latest) + (row.time ? ' lúc ' + String(row.time).slice(0, 8) : '') + '.' };
         } },
         { id: 'holidays', label: 'Lịch nghỉ lễ của sàn', run: async function () {
-            var d = today(), cov = VnHolidays.coverage(d), name = VnHolidays.name(d), yr = d.slice(0, 4);
-            var next = VnHolidays.nextTradingDay(d);
-            if (cov === 'complete') return { status: 'ok', detail: 'Có đủ lịch năm ' + yr + (name ? '. Hôm nay nghỉ lễ: ' + name + '.' : '.') };
-            return { status: 'warn', detail: 'Lịch nghỉ lễ năm ' + yr + ' chưa đầy đủ (mới có Tết Dương lịch). Nếu gặp ngày nghỉ chưa có trong lịch, app vẫn tự nhận biết nhờ VNDirect không có giá hôm nay; nên cập nhật khi có thông báo mới. Ngày giao dịch kế tiếp: ' + fmtDate(next) + '.' };
+            var d = today();
+            return SelfCheck.holidayOutlook(d, function (iso) { return VnHolidays.coverage(iso); }, { holidayName: VnHolidays.name(d), nextTradingDay: fmtDate(VnHolidays.nextTradingDay(d)) });
         } },
         { id: 'fs-write', label: 'Ghi tệp trong máy (lịch sử ảnh chụp)', run: async function () {
             var t = T();

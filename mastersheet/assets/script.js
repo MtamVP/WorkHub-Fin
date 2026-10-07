@@ -178,6 +178,7 @@ function switchAssetTab(tab) {
     if (tab === 'performance' && !TAB_LOADED.performance) { loadPerformanceChart(); loadPerformanceMetrics(); TAB_LOADED.performance = true; }
     if (tab === 'performance' && typeof loadPerfPro === 'function') loadPerfPro();
     if (tab === 'performance' && typeof SessionUI !== 'undefined') SessionUI.render();                    // nhật ký phiên (lưu trong máy)
+    if (tab === 'performance' && typeof AlertReviewUI !== 'undefined') AlertReviewUI.render();            // ôn lại cảnh báo (lưu trong máy)
     if (tab === 'performance' && typeof loadAttribution === 'function') loadAttribution();
     if (tab === 'watchlist' && !TAB_LOADED.watchlist) { loadWatchlist(); TAB_LOADED.watchlist = true; }
     else if (tab === 'watchlist') loadWatchlist();   // giá thay đổi liên tục: mỗi lần mở lại đều tải mới

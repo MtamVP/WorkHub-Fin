@@ -403,5 +403,6 @@ body.desk { --hm-3: 72%; --hm-2: 52%; --hm-1: 28%; --hm-text-strong: var(--text-
 .mkw-chip { padding: 2px 9px; border-radius: var(--radius-pill); font-weight: 700; font-size: 0.76rem; text-decoration: none; border: 1px solid var(--border-color); }
 .mkw-chip.in { background: var(--success-bg); color: var(--success-color); }
 .mkw-chip.out { background: var(--danger-bg); color: var(--danger-color); }
+.mkv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; }
 .mkw-why { margin: 6px 0 0 96px; padding: 0; list-style: none; font-size: 0.74rem; color: var(--text-secondary); }
 @media (max-width: 640px) { .mkw-why { margin-left: 0; } }

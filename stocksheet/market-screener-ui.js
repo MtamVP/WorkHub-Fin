@@ -118,7 +118,43 @@ async function renderMkWatch() {
             ${it.entered.length ? `<div class="mkw-line"><span>Mới lọt vào</span>${chips(it.entered, 'in')}</div>` : ''}
             ${it.left.length ? `<div class="mkw-line"><span>Vừa rớt ra</span>${chips(it.left, 'out')}</div><ul class="mkw-why">${it.left.slice(0, 8).map(x => `<li><b>${VU.esc(x.symbol)}</b>: ${VU.esc(x.reason)}</li>`).join('')}${it.left.length > 8 ? `<li class="vl-muted">+${it.left.length - 8} mã khác</li>` : ''}</ul>` : ''}</div>`;
     }).join('');
-    box.innerHTML = `<div class="vl-card">${head}${rows}<p class="vl-hint" style="margin:8px 0 0">So kết quả của từng bộ lọc đã lưu trên ảnh chụp thị trường của hai ngày gần nhất lưu trong máy này. Mã "mới lọt vào" chưa phải khuyến nghị mua: mở hồ sơ để xem lý do. Khi mở app vào ngày có dữ liệu mới, nếu có mã mới lọt vào app gửi một thông báo.</p></div>`;
+    box.innerHTML = `<div class="vl-card">${head}${rows}<p class="vl-hint" style="margin:8px 0 0">So kết quả của từng bộ lọc đã lưu trên ảnh chụp thị trường của hai ngày gần nhất lưu trong máy này. Mã "mới lọt vào" chưa phải khuyến nghị mua: mở hồ sơ để xem lý do. Khi mở app vào ngày có dữ liệu mới, nếu có mã mới lọt vào app gửi một thông báo.</p></div><div id="mkv"></div>`;
+    renderMkValid();
+}
+
+// ---------- kiểm chứng bộ lọc bằng lịch sử ảnh chụp trong máy (lib/filter-validate.js): mã lọt vào bộ lọc 1/3/6 tháng sau so với trung vị thị trường ----------
+const MKV = { busy: false, progress: null, res: null };
+const mkPP = (v) => (v === null || v === undefined ? '—' : (v >= 0 ? '+' : '−') + VU.dec(Math.abs(v * 100), 1));
+function renderMkValid() {
+    const box = document.getElementById('mkv');
+    if (!box || typeof FilterValidate === 'undefined' || typeof WorkHubFilterWatch.validate !== 'function') return;
+    const r = MKV.res || WorkHubFilterWatch.lastValidation();
+    const title = '<h3 class="vl-card-title"><i class="fa-solid fa-flask" aria-hidden="true"></i> Kiểm chứng bộ lọc bằng lịch sử</h3>';
+    const btn = `<button type="button" class="btn-save" onclick="mkValidateRun()"${MKV.busy ? ' disabled' : ''}>${MKV.busy ? '<i class="fa-solid fa-spinner fa-spin"></i> Đang đọc lịch sử…' : '<i class="fa-solid fa-play"></i> ' + (r && r.state === 'ok' ? 'Tính lại' : 'Kiểm chứng ngay')}</button>`;
+    const prog = MKV.busy && MKV.progress ? `<span class="vl-muted">${MKV.progress.done}/${MKV.progress.total} ngày</span>` : '';
+    let body = '';
+    if (r && r.state === 'ok') {
+        const hdr = `<th>Bộ lọc</th><th class="num" title="Số mã lọt vào bộ lọc (mỗi mã tính một lần, rớt rồi vào lại trong 30 ngày không tính lại) và số ngày có mã mới lọt vào">Sự kiện</th>${FilterValidate.HORIZONS.map(h => `<th class="num" title="Chênh lệch trung vị của lợi suất ${h.label} sau khi lọt vào so với trung vị thị trường cùng kỳ; số % mã hơn thị trường; số sự kiện đã đủ thời gian">${h.label} sau</th>`).join('')}`;
+        const cell = (h) => {
+            if (!h.n) return `<td class="num"><span class="vl-muted">${h.pending ? 'chưa đủ thời gian' : 'chưa có số liệu'}</span></td>`;
+            const cls = h.medianExcess > 0 ? 'pnl-up-text' : (h.medianExcess < 0 ? 'pnl-down-text' : '');
+            return `<td class="num"><b class="${cls}">${mkPP(h.medianExcess)} điểm %</b><small>${VU.dec(h.beat * 100, 0)}% mã hơn · ${h.n} sự kiện / ${h.dates} ngày${h.enough ? '' : ' · mẫu nhỏ'}</small></td>`;
+        };
+        const rows = r.filters.map(f => f.events ? `<tr><td><b>${VU.esc(f.name)}</b></td><td class="num">${f.events}<small>${f.entryDates} ngày lọt vào</small></td>${f.horizons.map(cell).join('')}</tr>`
+            : `<tr><td><b>${VU.esc(f.name)}</b></td><td colspan="4"><span class="vl-muted">${VU.esc(f.note || 'Chưa có sự kiện nào.')}</span></td></tr>`).join('');
+        body = `<div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr>${hdr}</tr></thead><tbody>${rows}</tbody></table></div>
+            <p class="vl-hint" style="margin:6px 0 0">Tính lúc ${VU.esc(String(r.at || '').slice(0, 16).replace('T', ' '))} trên ${r.days} ngày lịch sử (${mkDm(r.first)} đến ${mkDm(r.last)})${r.skipped ? `, bỏ ${r.skipped} tệp không đọc được` : ''}. Số trong ô là chênh lệch trung vị so với thị trường: dương nghĩa là các mã này tăng hơn mã thường của thị trường sau khi lọt vào.</p>`;
+    } else if (r && r.state) body = `<p class="vl-hint" style="margin:0">${VU.esc(r.message || '')}</p>`;
+    else body = '<p class="vl-hint" style="margin:0">Chưa chạy. Bấm nút để đọc toàn bộ lịch sử ảnh chụp trong máy và đo xem các mã từng lọt vào bộ lọc đã lưu đi thế nào 1, 3, 6 tháng sau đó.</p>';
+    box.innerHTML = `<div class="vl-card">${title}<div class="mkv-bar">${btn}${prog}</div>${body}
+        <p class="vl-hint" style="margin:8px 0 0">Cách đo: lợi suất sau h tháng lấy từ biến động giá h tháng ghi trong ảnh chụp của ngày gần mốc đó nhất, so với trung vị của mọi mã cùng kỳ trong chính ảnh chụp ấy. Lưu ý: mã bị hủy niêm yết hoặc mất số liệu bị bỏ ra nên kết quả có thể đẹp hơn thực tế; các mã cùng ngày chịu chung nhịp thị trường nên số sự kiện lớn hơn số mẫu độc lập; lịch sử chỉ có những ngày bạn mở app. Dưới ${FilterValidate.MIN_EVENTS} sự kiện hoặc ${FilterValidate.MIN_DATES} ngày lọt vào thì chỉ để tham khảo. Đây là công cụ phân tích, không phải khuyến nghị đầu tư.</p></div>`;
+}
+async function mkValidateRun() {
+    if (MKV.busy) return;
+    MKV.busy = true; MKV.progress = null; renderMkValid();
+    try { MKV.res = await WorkHubFilterWatch.validate((p) => { MKV.progress = p; renderMkValid(); }); }
+    catch (e) { MKV.res = { state: 'error', message: String(e && e.message || e) }; }
+    MKV.busy = false; renderMkValid();
 }
 
 // ---------- bản đồ nhiệt ngành (lib/sector-heatmap.js) ----------
@@ -186,6 +222,7 @@ function mkRow(e, i, showVal) {
         <td class="num">${m.marketcap > 0 ? VU.dec(m.marketcap / 1e9, 0) : '—'}</td>
         <td class="num">${mkX(m.pe)}${peHist !== null ? `<small>${VU.dec(peHist * 100, 0)}% TB 5 năm</small>` : ''}</td>
         <td class="num">${mkX(m.pb, 2)}</td>
+        <td class="num">${r.financial ? 'n/a' : mkX(m.evEbitda)}${!r.financial && r.evEbitdaRel !== null && r.evEbitdaRel !== undefined ? `<small>${VU.dec(r.evEbitdaRel * 100, 0)}% trung vị ngành</small>` : ''}</td>
         <td class="num">${r.valuationPct === null ? '—' : `<span class="vl-pill ${r.valuationPct <= 30 ? 'vl-pill-cheap' : (r.valuationPct >= 70 ? 'vl-pill-expensive' : 'vl-pill-fair')}">${VU.dec(r.valuationPct, 0)}</span>`}</td>
         <td class="num">${mkP(m.roae)}</td><td class="num">${mkP(m.epsGrowthYoY, 0)}</td><td class="num">${mkP(m.netProfitGrowthYoY, 0)}</td><td class="num">${mkP(m.divYield)}</td>
         <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>${showVal ? mkValCells(r.symbol) : ''}
@@ -215,7 +252,7 @@ function renderMkResults() {
         return;
     }
     box.innerHTML = `<div class="vl-card">${head}${toolbar}
-        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th>${hasVals ? '<th class="num" title="Giá trị hợp lý đồng thuận của Valuation Bench (giả định mặc định)">Giá trị hợp lý (đ)</th><th class="num" title="(Giá trị hợp lý - giá hiện tại) / giá trị hợp lý">Biên an toàn</th><th>Kết luận</th>' : ''}<th></th></tr></thead>
+        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Giá trị doanh nghiệp / EBITDA hoạt động 4 quý; không áp dụng cho ngân hàng, bảo hiểm, chứng khoán">EV/EBITDA</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th>${hasVals ? '<th class="num" title="Giá trị hợp lý đồng thuận của Valuation Bench (giả định mặc định)">Giá trị hợp lý (đ)</th><th class="num" title="(Giá trị hợp lý - giá hiện tại) / giá trị hợp lý">Biên an toàn</th><th>Kết luận</th>' : ''}<th></th></tr></thead>
         <tbody>${shown.map((e, i) => mkRow(e, i, hasVals)).join('')}</tbody></table></div>
         ${hasVals ? '<p class="vl-hint">Cột định giá do bộ máy Valuation Bench tính tự động với giả định MẶC ĐỊNH (tự phân loại mô hình kinh doanh, không điều chỉnh khoản bất thường, chưa rà soát từng bước), không lưu. Dùng để sàng và xếp hạng; mở “Hồ sơ” để xem quy trình, chỉnh giả định và lưu bản định giá chính thức.</p>' : ''}
         ${res.entries.length > MK.limit ? `<p class="vl-hint"><button type="button" class="vl-link" onclick="mkMore()">Hiện thêm</button> (đang hiện ${MK.limit}/${res.entries.length})</p>` : ''}

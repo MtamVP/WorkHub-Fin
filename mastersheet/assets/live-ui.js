@@ -85,7 +85,8 @@ const LiveUI = (function () {
         if (!el) return;
         if (!S.alertLog.length) { el.hidden = true; el.innerHTML = ''; return; }
         el.hidden = false;
-        el.innerHTML = S.alertLog.slice(-5).reverse().map((a) => `<div class="la-item la-${a.level}"><i class="fa-solid ${a.level === 'bad' ? 'fa-triangle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i><span><b>${esc(a.title)}</b> ${esc(a.body)}</span><time>${esc(a.time)}</time></div>`).join('') +
+        const canDecide = (a) => typeof AlertReview !== 'undefined' && typeof openDecisionModal === 'function' && a.symbol && AlertReview.KINDS[a.kind] && a.price > 0;
+        el.innerHTML = S.alertLog.map((a, i) => ({ a: a, i: i })).slice(-5).reverse().map((x) => `<div class="la-item la-${x.a.level}"><i class="fa-solid ${x.a.level === 'bad' ? 'fa-triangle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i><span><b>${esc(x.a.title)}</b> ${esc(x.a.body)}${canDecide(x.a) ? ` <button type="button" class="la-decide" onclick="LiveUI.decide(${x.i})" title="Mở Nhật Ký Quyết Định với bối cảnh cảnh báo điền sẵn">Ghi quyết định</button>` : ''}</span><time>${esc(x.a.time)}</time></div>`).join('') +
             `<button type="button" class="btn-tool la-clear" onclick="LiveUI.clearAlerts()">Ẩn cảnh báo</button>`;
     }
     // Giới hạn đầu tư (listLimits + getLimitActor + getCashDebt): nạp nền, tối đa 5 phút một lần; lỗi thì bỏ qua (chỉ mất cảnh báo giới hạn)
@@ -123,7 +124,8 @@ const LiveUI = (function () {
         fresh.forEach((a) => {
             const m = LiveAlerts.message(a);
             fireOs(m.title, m.body);
-            S.alertLog.push({ time: hh, title: m.title, body: m.body, level: LiveAlerts.levelOf(a), key: a.key });
+            S.alertLog.push({ time: hh, title: m.title, body: m.body, level: LiveAlerts.levelOf(a), key: a.key, symbol: a.symbol, kind: a.kind, price: a.price, thr: a.threshold, pct: a.pct });
+            if (typeof AlertReviewUI !== 'undefined') AlertReviewUI.record(a);                 // ôn lại cảnh báo: ghi giá lúc báo, các lần mở sau so với giá phiên kế tiếp (lưu trong máy)
             set.add(a.key);
         });
         lsSet(nk, Array.from(set)); lsSet(ALERTS_KEY, { date: localDate(), items: S.alertLog.slice(-20) });
@@ -148,6 +150,7 @@ const LiveUI = (function () {
         const liveWatch = S.watch ? (S.on ? LiveQuotes.applyToWatchlist(S.watch, LiveQuotes.state.quotes) : S.watch) : null;
         if (S.on && t.liveCount) ensureLimits();
         recordSeries(t); checkAlerts(live, t, liveWatch); recordSession(live, t);
+        if (S.on && typeof AlertReviewUI !== 'undefined') AlertReviewUI.update(LiveQuotes.state.quotes);
         renderStatus(); renderSeries();
         if (liveWatch && typeof renderWatchlist === 'function') {         // tab Theo Dõi: vẽ lại khi có giá đổi (không khi đang gõ trong bảng)
             const wsig = liveWatch.map(w => w.symbol + ':' + w.price).join('|') + '|' + S.on, a = document.activeElement;
@@ -209,6 +212,7 @@ const LiveUI = (function () {
         setNav(v) { if (typeof LiveAlerts === 'undefined') return; S.navPct = LiveAlerts.normalizeNav(v); saveCfg(); renderStatus(); if (S.base) apply(false); },
         setMove(v) { if (typeof LiveAlerts === 'undefined') return; S.movePct = LiveAlerts.normalizeMove(v); saveCfg(); renderStatus(); if (S.base) apply(false); },
         toggleSeries() { S.showSeries = !S.showSeries; saveCfg(); renderStatus(); renderSeries(); },
+        decide(i) { const a = S.alertLog[i]; if (a && typeof AlertReviewUI !== 'undefined') AlertReviewUI.decideLive(a); },
         clearAlerts() { S.alertLog = []; lsSet(ALERTS_KEY, { date: localDate(), items: [] }); renderAlerts(); renderStatus(); },
         active() { return !!(hasLib() && S.on); },
         renderStatus: renderStatus,

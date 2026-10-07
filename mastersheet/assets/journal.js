@@ -133,6 +133,7 @@ function renderJournal() {
         ${kpi('Quyết định đã ghi', s.total, `${s.byAction.buy} mua · ${s.byAction.sell} bán · ${s.byAction.skip} bỏ qua · ${s.byAction.hold} giữ`)}
         ${kpi('Điểm kế hoạch TB', s.planAvg === null ? '—' : jnNum(s.planAvg), 'tối đa 100 · đo quy trình, không đo kết quả')}
         ${kpi('Kế hoạch đủ', s.fullPlanPct === null ? '—' : jnNum(s.fullPlanPct) + '%', `${s.fullPlanCount}/${s.total} quyết định`)}
+        ${s.alertDriven ? kpi('Từ cảnh báo giá', s.alertDriven, `${s.alertDriven}/${s.total} quyết định bắt đầu từ cảnh báo`) : ''}
         ${kpi('Mua đã chạm mục tiêu', s.targetHit, s.buyEvaluated ? `trên ${s.buyEvaluated} lệnh mua đã đánh giá` : 'chưa đủ dữ liệu giá', s.targetHit ? 'tl-up' : '')}
         ${kpi('Mua đã chạm cắt lỗ', s.stopHit, s.buyEvaluated ? `trên ${s.buyEvaluated} lệnh mua đã đánh giá` : '', s.stopHit ? 'tl-down' : '')}
         ${kpi('Alpha TB (mua)', s.avgAlphaPct === null ? '—' : jnPct(s.avgAlphaPct, true), 'so với VN-Index cùng kỳ', s.avgAlphaPct > 0 ? 'tl-up' : (s.avgAlphaPct < 0 ? 'tl-down' : ''))}
@@ -206,6 +207,8 @@ async function openDecisionModal(opts) {
         const e = JN.entries.find(x => x.id === o.id);
         if (!e) return;
         d = Object.assign({}, e);
+    } else if (o.prefill) {                                              // từ cảnh báo giá (alert-review-ui.js): điền sẵn bối cảnh, người dùng xem và sửa trước khi lưu
+        d = Object.assign(d, o.prefill, { tags: (o.prefill.tags || []).slice() });
     } else if (o.fromTxn) {
         const t = JN.unplanned.find(x => x.id === o.fromTxn);
         if (!t) return;

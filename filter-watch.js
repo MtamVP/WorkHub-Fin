@@ -4,7 +4,7 @@
 // Chỉ ĐỌC tệp trong thư mục dữ liệu của app (cần quyền fs:allow-read-file từ bản 0.1.13), không ghi gì lên Supabase. Bản web (không có Tauri) trả state 'web'.
 // Cần lib/market-history.js, lib/peer-valuation.js, lib/market-screener.js, lib/filter-watch.js nạp trước.
 (function () {
-    var DIR = 'market-history', SAVED_KEY = 'wh.fin.marketscreener.saved.v1', RESULT_KEY = 'wh.fin.filterwatch.v1';
+    var DIR = 'market-history', SAVED_KEY = 'wh.fin.marketscreener.saved.v1', RESULT_KEY = 'wh.fin.filterwatch.v1', VALID_KEY = 'wh.fin.filtervalid.v1';
 
     function tauri() { return window.__TAURI__ && window.__TAURI__.fs ? window.__TAURI__ : null; }
     function savedFilters() {
@@ -50,6 +50,34 @@
         }
     }
 
+    // KIỂM CHỨNG: đọc mọi ngày lịch sử trong máy, tính mã lọt vào từng bộ lọc đã lưu và lợi suất 1/3/6 tháng sau so với trung vị thị trường (lib/filter-validate.js). Nặng (đọc cả thư mục) nên chỉ chạy khi bấm;
+    // kết quả gọn cất ở localStorage (wh.fin.filtervalid.v1). onProgress({ done, total }) để vẽ tiến trình. Trả { state: 'ok'|'web'|'nosaved'|'nodata'|'error', ... }.
+    async function validate(onProgress) {
+        var T = tauri();
+        if (!T || typeof DecompressionStream === 'undefined' || typeof FilterValidate === 'undefined') return { state: 'web', message: 'Kiểm chứng chỉ có trên bản desktop (cần lịch sử ảnh chụp lưu trong máy).' };
+        var saved = savedFilters();
+        if (!saved.length) return { state: 'nosaved', message: 'Chưa có bộ lọc đã lưu để kiểm chứng.' };
+        try {
+            var dates = await listDates(T);
+            if (dates.length < 2) return { state: 'nodata', message: 'Mới có ' + dates.length + ' ngày lịch sử trong máy. Kiểm chứng cần ít nhất vài tuần, tốt nhất từ 3 tháng trở lên.' };
+            var days = [], skipped = 0;
+            for (var i = 0; i < dates.length; i++) {
+                if (onProgress) onProgress({ done: i, total: dates.length });
+                var d = null;
+                try { d = await loadDay(T, dates[i]); } catch (e) { d = null; }
+                if (d) { var ex = FilterValidate.extractDay(d.rows, saved); ex.date = d.asOf || dates[i]; days.push(ex); } else skipped++;
+                await new Promise(function (r) { setTimeout(r, 0); });                 // nhường giao diện giữa các tệp
+            }
+            var res = FilterValidate.analyze(days, saved);
+            var out = { state: 'ok', at: new Date().toISOString(), days: days.length, skipped: skipped, first: res.dates[0] || null, last: res.latest, filters: res.filters };
+            try { localStorage.setItem(VALID_KEY, JSON.stringify(out)); } catch (e) { /* quá dung lượng: vẫn trả kết quả */ }
+            return out;
+        } catch (e) {
+            return { state: 'error', message: String(e && e.message || e) };
+        }
+    }
+    function lastValidation() { try { return JSON.parse(localStorage.getItem(VALID_KEY) || 'null'); } catch (e) { return null; } }
+
     function fire(title, body) {
         try {
             if (window.__TAURI__ && window.__TAURI__.notification) window.__TAURI__.notification.sendNotification({ title: title, body: body });
@@ -78,5 +106,5 @@
         } catch (e) { return null; }
     }
 
-    window.WorkHubFilterWatch = { compute: compute, afterArchive: afterArchive, lastResult: lastResult, savedFilters: savedFilters };
+    window.WorkHubFilterWatch = { compute: compute, afterArchive: afterArchive, lastResult: lastResult, savedFilters: savedFilters, validate: validate, lastValidation: lastValidation };
 })();
