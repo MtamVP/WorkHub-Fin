@@ -257,6 +257,7 @@ async function loadKpis() {
         setKpi('kpi-realized', k.realizedPnl, true, true);
         setKpi('kpi-market-value', k.marketValue, true);
         updateHeroDelta(k);
+        if (typeof LiveUI !== 'undefined') LiveUI.afterKpis(k);                  // giá trực tiếp: ghi nhớ KPI lưu làm cơ sở
     } catch (e) {
         console.error('Lỗi loadKpis:', e);
     }
@@ -291,9 +292,26 @@ async function loadHoldings() {
             renderAllocationChart([]);
             renderHeroFoot(0);
             onHoldingsLoaded([]);
+            if (typeof LiveUI !== 'undefined') LiveUI.afterHoldings([]);
             return;
         }
 
+        renderHoldingsRows(holdings);
+        renderAllocationChart(holdings);
+        renderHeroFoot(holdings.length);
+        onHoldingsLoaded(holdings);
+        loadVbBadges(holdings);
+        if (typeof LiveUI !== 'undefined') LiveUI.afterHoldings(holdings);      // giá trực tiếp trong phiên (chỉ hiển thị)
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
+    }
+}
+
+// Vẽ các dòng bảng Danh Mục từ mảng holdings (giá lưu, hoặc đã ghi đè giá trực tiếp bởi LiveUI). Không gọi mạng.
+function renderHoldingsRows(holdings) {
+    const tbody = document.getElementById('holdings-body');
+    if (!tbody) return;
+    {
         const totalMv = holdings.reduce((s, h) => s + (Number(h.marketValue) || 0), 0);
 
         tbody.innerHTML = holdings.map((h, idx) => {
@@ -329,30 +347,30 @@ async function loadHoldings() {
                     <td class="text-right">${renderPnlStack(h.unrealizedPnl, h.unrealizedPct)}</td>
                 </tr>`;
         }).join('');
-
-        renderAllocationChart(holdings);
-        renderHeroFoot(holdings.length);
-        onHoldingsLoaded(holdings);
-        loadVbBadges(holdings);
-    } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
+    fillVbBadges(holdings);
 }
 
-// Huy hiệu "Định giá chuyên môn" dưới mã: bản mới nhất ở Valuation Bench; lỗi thì bỏ qua (không ảnh hưởng bảng Danh Mục)
+// Huy hiệu "Định giá chuyên môn" dưới mã: bản mới nhất ở Valuation Bench; lỗi thì bỏ qua (không ảnh hưởng bảng Danh Mục).
+// Bản ghi được nhớ lại để vẽ lại bảng (giá trực tiếp) không phải gọi máy chủ lần nữa.
+let vbBadgeRecs = null;
 async function loadVbBadges(holdings) {
     if (typeof VBCard === 'undefined') return;
     try {
         const resp = await callGAS('getVbLatestMany', { symbols: holdings.map(h => h.symbol) });
-        const recs = resp && resp.status === 'success' ? resp.data : null;
-        const byPrice = {};
-        holdings.forEach(h => { byPrice[String(h.symbol || '').toUpperCase()] = Number(h.marketPrice) || 0; });
-        const now = new Date();
-        document.querySelectorAll('#holdings-body .vbc-slot').forEach(el => {
-            const s = String(el.getAttribute('data-vbc') || '').toUpperCase();
-            if (recs && recs[s]) el.innerHTML = VBCard.badge(recs[s], byPrice[s], now);
-        });
+        vbBadgeRecs = resp && resp.status === 'success' ? resp.data : null;
+        fillVbBadges(holdings);
     } catch (e) { /* huy hiệu là phần phụ: bỏ qua */ }
+}
+function fillVbBadges(holdings) {
+    if (typeof VBCard === 'undefined' || !vbBadgeRecs) return;
+    const byPrice = {};
+    holdings.forEach(h => { byPrice[String(h.symbol || '').toUpperCase()] = Number(h.marketPrice) || 0; });
+    const now = new Date();
+    document.querySelectorAll('#holdings-body .vbc-slot').forEach(el => {
+        const s = String(el.getAttribute('data-vbc') || '').toUpperCase();
+        if (vbBadgeRecs[s]) el.innerHTML = VBCard.badge(vbBadgeRecs[s], byPrice[s], now);
+    });
 }
 
 // Ô "Mục tiêu / Cắt lỗ": 2 dòng, mỗi dòng 1 ô nhập + % cách giá hiện tại. Giá mục tiêu để trống thì
@@ -507,7 +525,9 @@ function updateHeroDelta(k) {
     const dir = unreal > 0 ? 'up' : (unreal < 0 ? 'down' : '');
     const arrow = unreal > 0 ? '<i class="fa-solid fa-arrow-up"></i>' : (unreal < 0 ? '<i class="fa-solid fa-arrow-down"></i>' : '');
     el.className = 'hero-delta ' + dir;
-    el.innerHTML = `${arrow} ${formatVnd(unreal)} · ${(pct > 0 ? '+' : '')}${pct.toFixed(1)}% so với giá vốn`;
+    // dayPnl/dayPct (chỉ có khi đang dùng giá trực tiếp): lãi lỗ hôm nay so với giá tham chiếu
+    const day = k.dayPnl !== undefined && k.dayPnl !== null ? ` · hôm nay ${k.dayPnl >= 0 ? '+' : '−'}${formatVnd(Math.abs(k.dayPnl))} (${k.dayPct >= 0 ? '+' : '−'}${Math.abs(k.dayPct).toFixed(2)}%)` : '';
+    el.innerHTML = `${arrow} ${formatVnd(unreal)} · ${(pct > 0 ? '+' : '')}${pct.toFixed(1)}% so với giá vốn${day}`;
 }
 
 async function loadHeroSpark() {

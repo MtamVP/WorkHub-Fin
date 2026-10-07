@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.9">
+    <link rel="stylesheet" href="/finance-shared.css?v=1791990000000.9">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
     <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
@@ -133,6 +133,7 @@
         <!-- Tab: Danh Mục -->
         <section id="tab-holdings" class="asset-tab-panel">
             <div class="holdings-toolbar">
+                <div id="live-status" class="live-status"></div>
                 <div id="price-status" class="price-status none"></div>
                 <div class="export-bar">
                     <button type="button" class="btn-tool" onclick="exportHoldingsCsv()" title="Tải danh mục dạng CSV (mở được bằng Excel)"><i class="fa-solid fa-file-csv"></i> Xuất Excel</button>
@@ -760,7 +761,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../api.js?v=1791900000000"></script>
-    <script src="../../lib/finance-calc.js?v=2"></script>
+    <script src="../../lib/finance-calc.js?v=1791990000000"></script>
     <script src="../../lib/sector-map.js?v=1791900000000"></script>
     <script src="../../lib/vn-market.js?v=1791900000000"></script>
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
@@ -786,9 +787,11 @@
     <script src="../../lib/decision-mirror.js?v=1791900000000"></script>
     <script src="../../lib/monthly-report.js?v=1791900000000"></script>
     <script src="../../lib/save-file.js?v=1791900000000"></script>
+    <script src="../../lib/live-quotes.js?v=1791990000000"></script>
     <script src="../../stocksheet/vb-card.js?v=1791900000000"></script>
-    <script src="script.js?v=1791900000000"></script>
-    <script src="insights.js?v=1791900000000"></script>
+    <script src="script.js?v=1791990000000"></script>
+    <script src="insights.js?v=1791990000000"></script>
+    <script src="live-ui.js?v=1791990000000"></script>
     <script src="ledger-tools.js?v=1791900000000"></script>
     <script src="watchlist.js?v=1791900000000"></script>
     <script src="journal.js?v=1791900000000"></script>

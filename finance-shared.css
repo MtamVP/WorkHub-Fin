@@ -741,6 +741,16 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .price-age { font-size: 0.66rem; font-weight: 500; font-family: var(--font-body); color: var(--text-muted); white-space: nowrap; }
 .price-age.stale { color: var(--warning-color); font-weight: 700; }
 .price-age.none { color: var(--danger-color); font-weight: 700; }
+.price-age.live { color: var(--success-color, #1f9d63); font-weight: 700; }
+.live-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; font-size: 0.78rem; }
+.live-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-secondary); }
+.live-chip.on { color: var(--success-color, #1f9d63); border-color: currentColor; }
+.live-chip.idle { color: var(--text-secondary); }
+.live-chip.bad { color: var(--warning-color); border-color: currentColor; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; animation: live-pulse 1.6s ease-in-out infinite; }
+.live-toggle[aria-pressed="true"] { border-color: var(--gold); }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
 .sector-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; }
 .sector-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
