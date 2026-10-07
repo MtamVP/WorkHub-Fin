@@ -44,6 +44,7 @@ async function loadCorpEvents(silent) {
     }
     renderCorpEventsBanner();
     renderCorpEvents();
+    if (typeof TodayUI !== 'undefined') TodayUI.onEvents();                  // thẻ "Hôm nay": có sự kiện mới thì tóm tắt lại
 }
 
 // ---------- thông báo ở tab Danh Mục + chấm trên tab Sổ Lệnh ----------

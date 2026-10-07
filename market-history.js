@@ -76,6 +76,7 @@
             status.lastSavedAt = new Date().toISOString(); status.state = 'saved';
             writeNetworkCopy(name, bytes);                       // best-effort
             await refreshStatus();
+            if (window.WorkHubFilterWatch) window.WorkHubFilterWatch.afterArchive(pack);   // bộ lọc đã lưu: so với ngày trước, báo mã mới lọt vào (best-effort)
         } catch (e) {
             status.state = 'error'; status.error = String(e && e.message || e);
             console.warn('[market-history]', e);

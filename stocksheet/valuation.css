@@ -393,3 +393,15 @@ body.desk { --hm-3: 72%; --hm-2: 52%; --hm-1: 28%; --hm-text-strong: var(--text-
 .hm-row.hm-sel { outline: 3px solid var(--finance-accent); outline-offset: -3px; }
 @media (max-width: 640px) { .hm-map { display: none; } .hm-list { display: block; } }
 @media (prefers-reduced-motion: reduce) { .hm-tile { transition: none; } }
+
+/* --- Theo dõi bộ lọc đã lưu --- */
+.mkw-item { padding: 8px 0; border-top: 1px solid var(--border-color); }
+.mkw-item:first-of-type { border-top: 0; }
+.mkw-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 0.84rem; }
+.mkw-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.78rem; }
+.mkw-line > span:first-child { min-width: 86px; color: var(--text-secondary); font-weight: 600; }
+.mkw-chip { padding: 2px 9px; border-radius: var(--radius-pill); font-weight: 700; font-size: 0.76rem; text-decoration: none; border: 1px solid var(--border-color); }
+.mkw-chip.in { background: var(--success-bg); color: var(--success-color); }
+.mkw-chip.out { background: var(--danger-bg); color: var(--danger-color); }
+.mkw-why { margin: 6px 0 0 96px; padding: 0; list-style: none; font-size: 0.74rem; color: var(--text-secondary); }
+@media (max-width: 640px) { .mkw-why { margin-left: 0; } }

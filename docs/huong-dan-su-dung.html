@@ -151,11 +151,17 @@
   <li>Không cần khoá hay tài khoản chứng khoán nào. Các nguồn công khai (VCI, VNDirect) không có cam kết dịch vụ nên có thể đổi hoặc ngừng bất cứ lúc nào.</li>
   <li>Ngày thường nghỉ lễ (Tết, Giỗ Tổ, 30/4 - 1/5, Quốc khánh...) dòng trạng thái ghi rõ "thị trường nghỉ lễ" và dùng giá lưu. Lịch lễ do app giữ; nếu một ngày nghỉ chưa có trong lịch, app vẫn tự nhận biết vì nguồn không có giá của hôm nay.</li>
 </ul></div>
+<div class="callout ok"><b class="t">Thẻ "Hôm nay" đầu Danh Mục (mới)</b>
+<ul>
+  <li>Đầu tab Danh Mục có bản <b>tóm tắt buổi sáng</b>: danh mục thay đổi bao nhiêu so với ngày trước, sự kiện doanh nghiệp tới hạn chưa ghi hoặc trong 14 ngày tới, giới hạn đầu tư đang vượt, mã Theo Dõi gần giá muốn mua, bộ lọc đã lưu có mã mới lọt vào, ngành mạnh yếu 1 tháng và cảnh báo của phiên trước. Dòng tiêu đề cho biết có bao nhiêu <b>việc cần xem</b>.</li>
+  <li>Phần nào chưa có số liệu thì <b>không hiện</b> (app không ghi "ổn" khi chưa biết). Bấm <span class="ui">Làm mới</span> để tải lại, <span class="ui">Thu gọn</span> để chỉ giữ dòng tiêu đề (nhớ theo ngày). Đây là số liệu lúc mở trang; giá trong phiên xem ở dòng trạng thái bên dưới.</li>
+</ul></div>
 <div class="callout"><b class="t">Cảnh báo theo giá trực tiếp và đường lãi/lỗ trong ngày (mới)</b>
 <ul>
   <li><b>Cảnh báo:</b> khi Danh Mục đang mở, app báo ngay khi một mã bạn nắm <b>chạm giá mục tiêu</b>, <b>thủng ngưỡng cắt lỗ</b> hoặc <b>tăng/giảm vượt ngưỡng</b> so với giá tham chiếu (chọn Tắt, 3%, 5% hoặc 7% ở ô <span class="ui">Báo biến động</span>, mặc định 5%). Cảnh báo hiện thành thông báo của Windows và thành dải màu phía trên bảng; mỗi mức chỉ báo <b>một lần mỗi ngày</b>. Bấm <span class="ui">Ẩn cảnh báo</span> để dọn dải.</li>
   <li>Tab <b>Theo Dõi</b> cũng nhận giá trực tiếp: giá, khoảng cách tới giá muốn mua và mục tiêu cập nhật theo phiên, và app báo <b>Tới giá muốn mua</b> cho mã chưa giữ khi giá chạm mức bạn đặt. Dưới giá của mỗi mã có mức tăng/giảm <b>hôm nay</b> so với giá tham chiếu.</li>
   <li>Dòng trạng thái hiện thêm <b>VN-Index trực tiếp</b> và danh mục của bạn hơn hay kém chỉ số bao nhiêu điểm phần trăm trong ngày (so sánh mức tăng/giảm trong ngày, không phải hiệu suất dài hạn).</li>
+  <li><b>Cảnh báo cấp danh mục:</b> ô <span class="ui">Báo NAV giảm</span> (Tắt, 1%, 2%, 3% hoặc 5%, mặc định 2%) báo khi NAV cả danh mục giảm vượt mức đó trong ngày so với NAV theo giá tham chiếu hôm qua (tiền mặt nằm trong mẫu số). App cũng báo khi một <b>giới hạn đầu tư bị vượt theo giá trong phiên</b>, ví dụ một mã tăng giá làm tỷ trọng vượt trần; mỗi mức chỉ báo một lần mỗi ngày.</li>
   <li>Cảnh báo chỉ chạy khi trang Danh Mục đang mở. Khi app đóng, email cảnh báo (nếu đã bật) vẫn do máy chủ gửi theo giá lưu 5 phút.</li>
   <li><b>Diễn biến hôm nay:</b> mỗi phút app ghi một điểm lãi/lỗ trong ngày <b>ngay trên máy này</b> (không gửi lên máy chủ, giữ 10 ngày) và vẽ thành đường: đường 0 nét đứt, điểm cuối được nhấn, kèm mức cao nhất và thấp nhất; di chuột vào đường để xem từng điểm. Chỉ có điểm cho những phút app đang mở; nếu bạn mua hoặc bán giữa phiên, đường đổi mức tương ứng.</li>
 </ul></div>
@@ -186,6 +192,11 @@
   <li><b>Định giá cả danh sách:</b> chạy bộ máy Valuation Bench cho từng mã trong danh sách (tối đa 150 mã mỗi lần, khoảng vài phút) với giả định <b>mặc định</b>, rồi xếp theo biên an toàn. Kết quả chỉ để sàng, không được lưu: mở <i>Hồ sơ</i> để xem quy trình, chỉnh giả định và lưu bản chính thức.</li>
   <li><b>Xuất CSV</b> (mở được bằng Excel) và <b>lưu bộ lọc có tên</b>: bộ lọc đã lưu nằm trong máy này, không lên máy chủ.</li>
   <li>Số liệu tăng trưởng và giá mới có sau lần cập nhật dữ liệu ban đêm đầu tiên sau khi nâng cấp; trước đó các tiêu chí này báo "thiếu số liệu".</li>
+</ul></div>
+<div class="callout ok"><b class="t">Theo dõi bộ lọc đã lưu: mã mới lọt vào / vừa rớt ra (mới)</b>
+<ul>
+  <li>Dưới bản đồ nhiệt có thẻ <b>Thay đổi của bộ lọc đã lưu</b>: app chạy lại từng bộ lọc bạn đã lưu trên ảnh chụp thị trường của hai ngày gần nhất lưu trong máy, rồi liệt kê <b>mã mới lọt vào</b> và <b>mã vừa rớt ra</b> kèm lý do (tiêu chí nào không còn đạt). Mỗi ngày có dữ liệu mới, nếu có mã mới lọt vào app gửi một thông báo.</li>
+  <li>Cần <b>ít nhất 2 ngày</b> đã lưu; bộ lọc dùng tiêu chí mà ngày cũ chưa có số liệu (ví dụ giá từ 1/1 trước khi cập nhật) sẽ ghi "chưa so sánh được" thay vì báo sai. Chỉ có trên bản desktop. "Mới lọt vào" không phải khuyến nghị mua: mở hồ sơ để xem lý do.</li>
 </ul></div>
 <div class="callout ok"><b class="t">Bản đồ nhiệt ngành (mới)</b>
 <ul>
@@ -386,6 +397,7 @@
     <tr><td>Huy hiệu định giá không hiện ở Danh Mục</td><td>Mã chưa có bản định giá lưu ở Valuation Bench, hoặc mất kết nối tạm thời (phần này bỏ qua lỗi và không ảnh hưởng bảng danh mục).</td></tr>
     <tr><td>Trang hiện "Không có bản lưu ngoại tuyến"</td><td>Mất mạng. Kiểm tra Internet rồi thử lại; từ 0.1.6 ứng dụng đã sửa lỗi hiện trang cũ.</td></tr>
     <tr><td>Không chắc giá trực tiếp, thông báo hay lịch sử ảnh chụp có chạy trên máy mình</td><td>Mở menu tài khoản (góc trên bên phải) → <span class="ui">Kiểm tra hệ thống</span> → <span class="ui">Chạy kiểm tra</span>. App thử từng thứ (đăng nhập, hàm giá VCI, nguồn VNDirect, ghi tệp lịch sử trong máy, thông báo, ảnh chụp thị trường, dữ liệu và bộ máy định giá) và ghi <b>Đạt, Chú ý hoặc Lỗi</b> kèm lý do. Nút <span class="ui">Gửi thông báo thử</span> kiểm tra thông báo của Windows; <span class="ui">Sao chép báo cáo</span> tạo bản tóm tắt (không có mật khẩu hay email) để gửi khi cần hỗ trợ.</td></tr>
+    <tr><td>Thẻ theo dõi bộ lọc báo "Mới có dữ liệu của một ngày" hoặc "Chưa so sánh được"</td><td>Cần ít nhất hai ngày lưu ảnh chụp trong máy (app tự lưu mỗi ngày mở app có dữ liệu mới). "Chưa so sánh được" nghĩa là ngày cũ chưa có số liệu cho một tiêu chí của bộ lọc; sẽ tự hết khi các ngày mới đã có đủ số liệu. Nếu thẻ báo lỗi đọc tệp, chạy <span class="ui">Kiểm tra hệ thống</span> và xem mục ghi tệp.</td></tr>
     <tr><td>Số liệu khác báo cáo công bố</td><td>Nguồn miễn phí có thể trễ hoặc chuẩn hoá khác. Đối chiếu báo cáo gốc trước khi quyết định.</td></tr>
     <tr><td>Muốn hiểu một phương pháp / chỉ báo</td><td>Valuation Bench → <span class="ui">Phương pháp</span>: mỗi mục có định nghĩa, công thức, khi nào dùng, giới hạn, cách đọc (Phụ lục B).</td></tr>
   </tbody>

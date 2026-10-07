@@ -5,7 +5,7 @@
 (function () {
     var running = false, last = null;
     var VB_SCRIPTS = ['lib/quant-calc.js', 'lib/vb-statements.js', 'lib/vb-fundamental.js', 'lib/vb-dcf.js', 'lib/vb-asset.js', 'lib/vb-multiples.js', 'lib/vb-technical.js', 'lib/vb-market.js', 'lib/vb-synthesis.js', 'lib/vb-normalize.js',
-        'lib/vb-process.js', 'lib/vb-engine.js', 'lib/peer-valuation.js', 'lib/market-screener.js', 'lib/market-batch.js', 'valuation/vb-scorecard.js'];
+        'lib/vb-process.js', 'lib/vb-engine.js', 'lib/market-batch.js', 'valuation/vb-scorecard.js'];   // peer-valuation và market-screener đã nạp sẵn ở trang gốc (theo dõi bộ lọc): nạp lại sẽ lỗi khai báo trùng
 
     function T() { return window.__TAURI__ || null; }
     function today() { return LiveQuotes.vnParts().date; }
@@ -76,13 +76,13 @@
             try {
                 if (!(await t.fs.exists(dir, { baseDir: base }))) await t.fs.mkdir(dir, { baseDir: base, recursive: true });
                 await t.fs.writeFile(name, new TextEncoder().encode(text), { baseDir: base });
-                var back = await t.fs.readTextFile(name, { baseDir: base });
+                var back = new TextDecoder().decode(await t.fs.readFile(name, { baseDir: base }));          // quyền đọc tệp nhị phân: cần cho theo dõi bộ lọc đã lưu (đọc ảnh chụp nén)
                 await t.fs.remove(name, { baseDir: base });
                 if (back !== text) return { status: 'fail', detail: 'Ghi được nhưng đọc lại không khớp.' };
-                return { status: 'ok', detail: 'Ghi, đọc lại và xoá tệp thử trong thư mục dữ liệu của app đều đạt.' };
+                return { status: 'ok', detail: 'Ghi, đọc lại và xoá tệp thử trong thư mục dữ liệu của app đều đạt (lịch sử ảnh chụp và theo dõi bộ lọc dùng được).' };
             } catch (e) {
                 var m = String(e && e.message || e);
-                throw new Error(/not allowed|permission|scope|forbidden/i.test(m) ? 'Chưa có quyền ghi tệp trong bản cài này: lịch sử ảnh chụp sẽ chưa lưu được (cần bản cài mới). Chi tiết: ' + m : m);
+                throw new Error(/not allowed|permission|scope|forbidden/i.test(m) ? 'Chưa có quyền ghi hoặc đọc tệp trong bản cài này: lịch sử ảnh chụp và theo dõi bộ lọc sẽ chưa chạy (cần bản cài mới). Chi tiết: ' + m : m);
             }
         } },
         { id: 'history', label: 'Lịch sử ảnh chụp thị trường lưu trong máy', run: async function () {

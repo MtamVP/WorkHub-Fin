@@ -5,18 +5,20 @@
    (2) ĐƯỜNG LÃI/LỖ TRONG NGÀY (lib/live-series.js): mỗi phút ghi một điểm vào bộ nhớ của MÁY NÀY (localStorage, không lên máy chủ) rồi vẽ.
    Mã đã khoá giá không bị ghi đè. Không cập nhật khi bạn đang gõ trong bảng. Dùng global của script.js / insights.js: loadHoldings, renderHoldingsRows, setKpi, updateHeroDelta, lastHoldings, escapeAssetHtml, formatVnd. */
 const LiveUI = (function () {
-    const KEY = 'wh.fin.live.v1', SERIES_KEY = 'wh.fin.liveseries.v1', ALERTS_KEY = 'wh.fin.livealerts.v1', NOTIFIED_PREFIX = 'wh_notified_price_alerts_', EVERY_MS = 20000, BREAK_EVERY_MS = 60000;
-    const S = { on: true, movePct: (typeof LiveAlerts !== 'undefined' ? LiveAlerts.DEFAULT_MOVE : 5), showSeries: true, base: null, watch: null, lastWatchSig: '', kpi: null, timer: null, busy: false, lastFetchAt: 0, closedFetched: false, lastSig: '', series: {}, alertLog: [] };
+    const KEY = 'wh.fin.live.v1', SERIES_KEY = 'wh.fin.liveseries.v1', ALERTS_KEY = 'wh.fin.livealerts.v1', ALERTS_PREV_KEY = 'wh.fin.livealerts.prev.v1', NOTIFIED_PREFIX = 'wh_notified_price_alerts_', EVERY_MS = 20000, BREAK_EVERY_MS = 60000;
+    const S = { on: true, movePct: (typeof LiveAlerts !== 'undefined' ? LiveAlerts.DEFAULT_MOVE : 5), navPct: (typeof LiveAlerts !== 'undefined' ? LiveAlerts.DEFAULT_NAV : 2), limits: { state: 'idle', rows: [], me: null, cash: 0, debt: 0, at: 0 }, showSeries: true, base: null, watch: null, lastWatchSig: '', kpi: null, timer: null, busy: false, lastFetchAt: 0, closedFetched: false, lastSig: '', series: {}, alertLog: [] };
     const hasLib = () => typeof LiveQuotes !== 'undefined';
     const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
     const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* bỏ qua: không có bộ nhớ thì chỉ mất lịch sử */ } };
-    const saveCfg = () => lsSet(KEY, { on: S.on, movePct: S.movePct, showSeries: S.showSeries });
+    const saveCfg = () => lsSet(KEY, { on: S.on, movePct: S.movePct, navPct: S.navPct, showSeries: S.showSeries });
     const localDate = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
     (function init() {
         const v = lsGet(KEY);
-        if (v) { if (v.on === false) S.on = false; if (v.showSeries === false) S.showSeries = false; if (typeof LiveAlerts !== 'undefined' && v.movePct !== undefined) S.movePct = LiveAlerts.normalizeMove(v.movePct); }
+        if (v) { if (v.on === false) S.on = false; if (v.showSeries === false) S.showSeries = false; if (typeof LiveAlerts !== 'undefined' && v.movePct !== undefined) S.movePct = LiveAlerts.normalizeMove(v.movePct); if (typeof LiveAlerts !== 'undefined' && v.navPct !== undefined) S.navPct = LiveAlerts.normalizeNav(v.navPct); }
         const sr = lsGet(SERIES_KEY); if (sr && typeof sr === 'object' && !Array.isArray(sr)) S.series = sr;
-        const al = lsGet(ALERTS_KEY); if (al && al.date === localDate() && Array.isArray(al.items)) S.alertLog = al.items.slice(-20);
+        const al = lsGet(ALERTS_KEY);
+        if (al && al.date === localDate() && Array.isArray(al.items)) S.alertLog = al.items.slice(-20);
+        else if (al && al.date && al.date < localDate() && Array.isArray(al.items) && al.items.length) lsSet(ALERTS_PREV_KEY, { date: al.date, items: al.items.map(x => ({ title: x.title, level: x.level })) });     // cảnh báo của phiên trước: để thẻ "Hôm nay" nhắc lại
     })();
 
     const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#holdings-body') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); };
@@ -27,10 +29,12 @@ const LiveUI = (function () {
         const btn = `<button type="button" class="btn-tool live-toggle" aria-pressed="${S.on}" onclick="LiveUI.toggle()" title="Bật/tắt giá trực tiếp trong phiên (chỉ để xem, không ghi vào sổ)"><i class="fa-solid fa-bolt"></i> Giá trực tiếp: ${S.on ? 'Bật' : 'Tắt'}</button>`;
         if (!S.on) return `<span class="live-chip off">Đang dùng giá lưu (cập nhật mỗi 5 phút trong phiên)</span>${btn}`;
         const opts = (typeof LiveAlerts !== 'undefined' ? LiveAlerts.MOVE_CHOICES : []).map((m) => `<option value="${m}"${m === S.movePct ? ' selected' : ''}>${m ? '±' + m + '%' : 'Tắt'}</option>`).join('');
+        const navOpts = (typeof LiveAlerts !== 'undefined' ? LiveAlerts.NAV_CHOICES : []).map((m) => `<option value="${m}"${m === S.navPct ? ' selected' : ''}>${m ? '−' + m + '%' : 'Tắt'}</option>`).join('');
+        const navSel = navOpts ? `<label class="live-opt" title="Báo khi NAV cả danh mục giảm vượt mức này trong ngày (so với NAV theo giá tham chiếu hôm qua, tính cả tiền mặt). Giới hạn đầu tư bị vượt theo giá trong phiên luôn được báo."><i class="fa-solid fa-gauge-high"></i> Báo NAV giảm <select onchange="LiveUI.setNav(this.value)" aria-label="Ngưỡng báo NAV giảm trong ngày">${navOpts}</select></label>` : '';
         const moveSel = opts ? `<label class="live-opt" title="Báo khi một mã trong danh mục tăng hoặc giảm vượt mức này so với giá tham chiếu. Giá mục tiêu và ngưỡng cắt lỗ luôn được báo."><i class="fa-solid fa-bell"></i> Báo biến động <select onchange="LiveUI.setMove(this.value)" aria-label="Ngưỡng báo biến động trong ngày">${opts}</select></label>` : '';
         const serSel = typeof LiveSeries !== 'undefined' ? `<button type="button" class="btn-tool" aria-pressed="${S.showSeries}" onclick="LiveUI.toggleSeries()" title="Hiện hoặc ẩn đường lãi/lỗ trong ngày (lưu trong máy này)"><i class="fa-solid fa-chart-line"></i> Diễn biến hôm nay</button>` : '';
         const alertChip = S.alertLog.length ? `<span class="live-chip warn" title="${esc(S.alertLog.map((a) => a.time + ' ' + a.title + ': ' + a.body).join('\n'))}"><i class="fa-solid fa-bell"></i> ${S.alertLog.length} cảnh báo hôm nay</span>` : '';
-        const tail = btn + moveSel + serSel;
+        const tail = btn + moveSel + navSel + serSel;
         const ix = st.index && st.index.date === LiveQuotes.vnParts().date ? st.index : null;
         if (st.error && !(t && t.liveCount)) return `<span class="live-chip bad" title="${esc(st.error)}"><i class="fa-solid fa-triangle-exclamation"></i> Không lấy được giá trực tiếp, đang dùng giá lưu</span>${tail}`;
         if (!t || !t.liveCount) {
@@ -84,9 +88,34 @@ const LiveUI = (function () {
         el.innerHTML = S.alertLog.slice(-5).reverse().map((a) => `<div class="la-item la-${a.level}"><i class="fa-solid ${a.level === 'bad' ? 'fa-triangle-exclamation' : 'fa-circle-check'}" aria-hidden="true"></i><span><b>${esc(a.title)}</b> ${esc(a.body)}</span><time>${esc(a.time)}</time></div>`).join('') +
             `<button type="button" class="btn-tool la-clear" onclick="LiveUI.clearAlerts()">Ẩn cảnh báo</button>`;
     }
+    // Giới hạn đầu tư (listLimits + getLimitActor + getCashDebt): nạp nền, tối đa 5 phút một lần; lỗi thì bỏ qua (chỉ mất cảnh báo giới hạn)
+    async function ensureLimits() {
+        const L = S.limits;
+        if (typeof LimitsCalc === 'undefined' || typeof callGAS !== 'function' || typeof targetEmail === 'undefined' || L.state === 'loading' || (L.state === 'ok' && Date.now() - L.at < 300000)) return;
+        L.state = 'loading';
+        try {
+            const call = async (a) => { const r = await callGAS(a, { email: targetEmail }); if (!r || r.status !== 'success') throw new Error((r && r.message) || a); return r.data; };
+            const [rows, actor, cd] = await Promise.all([call('listLimits'), call('getLimitActor').catch(() => ({})), call('getCashDebt').catch(() => ({}))]);
+            L.rows = rows || []; L.me = actor && actor.targetId || null; L.cash = Number(cd && cd.cash) || 0; L.debt = Number(cd && cd.debt) || 0; L.state = 'ok'; L.at = Date.now();
+        } catch (e) { L.state = 'error'; L.at = Date.now(); }
+    }
+    function portfolioAlerts(live, t) {
+        const out = [], L = S.limits;
+        if (S.kpi && t && t.liveCount && t.dayPnl !== null) {
+            const nav = (Number(S.kpi.nav) || 0) + (t.marketValue - (Number(S.kpi.marketValue) || 0));
+            out.push(...LiveAlerts.evaluatePortfolio({ dayPnl: t.dayPnl, nav: nav }, { navPct: S.navPct }));
+        }
+        if (L.state === 'ok' && typeof LimitsCalc !== 'undefined' && t && t.liveCount) {
+            try {
+                const ev = LimitsCalc.evaluate(LimitsCalc.applicable(L.rows, L.me, 'member'), { holdings: live.map(h => ({ symbol: h.symbol, value: h.marketValue })), cash: L.cash, debt: L.debt });
+                out.push(...LiveAlerts.evaluateLimits(ev.items, LimitsCalc.KINDS));
+            } catch (e) { /* giới hạn lỗi định dạng: bỏ qua */ }
+        }
+        return out;
+    }
     function checkAlerts(live, t, watch) {
         if (typeof LiveAlerts === 'undefined' || !S.on || !t) return;
-        const found = LiveAlerts.evaluate(live, { movePct: S.movePct }).concat(watch ? LiveAlerts.evaluateWatch(watch) : []);
+        const found = LiveAlerts.evaluate(live, { movePct: S.movePct }).concat(watch ? LiveAlerts.evaluateWatch(watch) : [], portfolioAlerts(live, t));
         if (!found.length) return;
         const nk = NOTIFIED_PREFIX + localDate(), set = new Set(lsGet(nk) || []), fresh = LiveAlerts.fresh(found, set);
         if (!fresh.length) return;
@@ -108,6 +137,7 @@ const LiveUI = (function () {
         const t = LiveQuotes.totals(live);
         const sig = live.map(h => h.symbol + ':' + h.marketPrice).join('|') + '|' + S.on;
         const liveWatch = S.watch ? (S.on ? LiveQuotes.applyToWatchlist(S.watch, LiveQuotes.state.quotes) : S.watch) : null;
+        if (S.on && t.liveCount) ensureLimits();
         recordSeries(t); checkAlerts(live, t, liveWatch);
         renderStatus(); renderSeries();
         if (liveWatch && typeof renderWatchlist === 'function') {         // tab Theo Dõi: vẽ lại khi có giá đổi (không khi đang gõ trong bảng)
@@ -167,6 +197,7 @@ const LiveUI = (function () {
             S.lastSig = ''; if (S.on) { tick(true); } else apply(true);
             renderStatus(); renderSeries();
         },
+        setNav(v) { if (typeof LiveAlerts === 'undefined') return; S.navPct = LiveAlerts.normalizeNav(v); saveCfg(); renderStatus(); if (S.base) apply(false); },
         setMove(v) { if (typeof LiveAlerts === 'undefined') return; S.movePct = LiveAlerts.normalizeMove(v); saveCfg(); renderStatus(); if (S.base) apply(false); },
         toggleSeries() { S.showSeries = !S.showSeries; saveCfg(); renderStatus(); renderSeries(); },
         clearAlerts() { S.alertLog = []; lsSet(ALERTS_KEY, { date: localDate(), items: [] }); renderAlerts(); renderStatus(); },

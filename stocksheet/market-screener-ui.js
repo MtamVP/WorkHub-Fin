@@ -61,6 +61,7 @@ function renderMarketScreener() {
     root.innerHTML = `
     <div id="mk-alerts"></div>
     <div id="mk-heat"></div>
+    <div id="mk-watch"></div>
     <div class="vl-card">
         <h3 class="vl-card-title"><i class="fa-solid fa-earth-asia" aria-hidden="true"></i> Sàng lọc toàn thị trường <span class="vl-muted">${MK.rows.length} mã niêm yết · số liệu ngày ${VU.esc(String(MK.asOf || '').slice(0, 10).split('-').reverse().join('/'))}
             <button type="button" class="vl-link" style="margin-left:10px" onclick="mkReset()">Đặt lại</button></span></h3>
@@ -87,6 +88,37 @@ function renderMarketScreener() {
     renderMkResults();
     renderMkAlerts();
     renderMkHeat();
+    renderMkWatch();
+}
+
+// ---------- theo dõi bộ lọc đã lưu: mã mới lọt vào / vừa rớt ra so với lần lưu trước (filter-watch.js, lịch sử ảnh chụp trong máy) ----------
+const MKW = { sig: '', res: null, busy: false };
+const mkDm = (d) => (d ? String(d).split('-').reverse().slice(0, 2).join('/') : '');
+async function renderMkWatch() {
+    const box = document.getElementById('mk-watch');
+    if (!box) return;
+    if (typeof WorkHubFilterWatch === 'undefined' || typeof FilterWatch === 'undefined') { box.innerHTML = ''; return; }
+    const sig = String(MK.asOf || '') + '|' + JSON.stringify(MK.saved);
+    if (MKW.sig !== sig && !MKW.busy) {
+        MKW.busy = true; box.innerHTML = '<div class="vl-card"><div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang so sánh bộ lọc đã lưu…</div></div>';
+        try { MKW.res = await WorkHubFilterWatch.compute({ currentRows: MK.rows, currentAsOf: MK.asOf }); } catch (e) { MKW.res = { state: 'error', message: String(e && e.message || e) }; }
+        MKW.sig = sig; MKW.busy = false;
+    }
+    const r = MKW.res;
+    if (!r) return;
+    const head = '<h3 class="vl-card-title"><i class="fa-solid fa-bell" aria-hidden="true"></i> Thay đổi của bộ lọc đã lưu' + (r.state === 'ok' ? ` <span class="vl-muted">${mkDm(r.asOf)} so với ${mkDm(r.prevAsOf)}</span>` : '') + '</h3>';
+    if (r.state !== 'ok') { box.innerHTML = r.state === 'web' ? '' : `<div class="vl-card">${head}<p class="vl-hint" style="margin:0">${VU.esc(r.message || '')}</p></div>`; return; }
+    const chips = (list, cls) => list.slice(0, 30).map(x => `<a class="mkw-chip ${cls}" href="/valuation/#stock/${encodeURIComponent(x.symbol)}" title="${VU.esc((x.name ? x.name + ' · ' : '') + (x.reason || ''))}">${VU.esc(x.symbol)}</a>`).join('') + (list.length > 30 ? `<span class="vl-muted">+${list.length - 30} mã khác</span>` : '');
+    const rows = r.items.map((it, i) => {
+        if (!it.comparable) return `<div class="mkw-item"><b>${VU.esc(it.name)}</b><p class="vl-hint" style="margin:2px 0 0">Chưa so sánh được: ${VU.esc(it.why || '')}</p></div>`;
+        const none = !it.entered.length && !it.left.length;
+        return `<div class="mkw-item"><div class="mkw-head"><b>${VU.esc(it.name)}</b><span class="vl-muted">${it.nowCount} mã hiện tại (trước ${it.beforeCount})</span>
+            ${none ? '<span class="vl-muted">không đổi</span>' : `<span class="pnl-up-text">+${it.entered.length} mới</span><span class="pnl-down-text">−${it.left.length} rớt</span>`}
+            <button type="button" class="vl-link" onclick="mkSavedUse(${i})">Áp bộ lọc này</button></div>
+            ${it.entered.length ? `<div class="mkw-line"><span>Mới lọt vào</span>${chips(it.entered, 'in')}</div>` : ''}
+            ${it.left.length ? `<div class="mkw-line"><span>Vừa rớt ra</span>${chips(it.left, 'out')}</div><ul class="mkw-why">${it.left.slice(0, 8).map(x => `<li><b>${VU.esc(x.symbol)}</b>: ${VU.esc(x.reason)}</li>`).join('')}${it.left.length > 8 ? `<li class="vl-muted">+${it.left.length - 8} mã khác</li>` : ''}</ul>` : ''}</div>`;
+    }).join('');
+    box.innerHTML = `<div class="vl-card">${head}${rows}<p class="vl-hint" style="margin:8px 0 0">So kết quả của từng bộ lọc đã lưu trên ảnh chụp thị trường của hai ngày gần nhất lưu trong máy này. Mã "mới lọt vào" chưa phải khuyến nghị mua: mở hồ sơ để xem lý do. Khi mở app vào ngày có dữ liệu mới, nếu có mã mới lọt vào app gửi một thông báo.</p></div>`;
 }
 
 // ---------- bản đồ nhiệt ngành (lib/sector-heatmap.js) ----------

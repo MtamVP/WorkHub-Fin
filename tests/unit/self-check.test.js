@@ -58,7 +58,7 @@ function boot(o = {}) {
   const files = new Map(), events = [];
   const fsApi = { BaseDirectory: { AppLocalData: 1 }, exists: async () => true, mkdir: async () => {},
     writeFile: async (p, b) => { if (opt.fsFail) throw new Error(opt.fsFail); files.set(p, Buffer.from(b).toString('utf8')); events.push('write'); },
-    readTextFile: async (p) => files.get(p), remove: async (p) => { files.delete(p); events.push('remove'); } };
+    readFile: async (p) => new TextEncoder().encode(files.get(p)), remove: async (p) => { files.delete(p); events.push('remove'); } };
   const win = { __TAURI__: opt.tauri ? { fs: fsApi, app: { getVersion: async () => '0.1.12' }, notification: { isPermissionGranted: async () => opt.notifGranted, requestPermission: async () => 'granted', sendNotification: (n) => events.push('notify:' + n.title) } } : undefined,
     supabaseClient: { auth: { getSession: async () => ({ data: { session: opt.session ? { expires_at: Math.floor(Date.now() / 1000) + 1800 } : null } }) } },
     WorkHubMarketHistory: { refreshStatus: async () => ({ summary: opt.history, error: null }) } };
@@ -70,10 +70,10 @@ function boot(o = {}) {
   const fetchFake = async () => (opt.vnd === 'ok' ? { ok: true, json: async () => ({ data: [{ code: 'FPT', date: todayVn(), time: '10:19:59', close: 60.3 }] }) } : { ok: false, status: 503, json: async () => ({}) });
   const store = new Map();
   const head = { appendChild: (s) => { const rel = s.src.split('?')[0]; setTimeout(() => { try { vm.runInContext(fs.readFileSync(REPO + '/' + rel, 'utf8'), ctx, { filename: rel }); s.onload(); } catch (e) { s.onerror(e); } }, 0); } };
-  const ctx = vm.createContext({ window: win, API, fetch: fetchFake, AbortController, TextEncoder, setTimeout, clearTimeout, Promise, Date, JSON, Math, console, process,
+  const ctx = vm.createContext({ window: win, API, fetch: fetchFake, AbortController, TextEncoder, TextDecoder, setTimeout, clearTimeout, Promise, Date, JSON, Math, console, process,
     document: { createElement: () => ({}), head }, localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
     Notification: undefined });
-  ['lib/self-check.js', 'lib/vn-holidays.js', 'lib/live-quotes.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
+  ['lib/self-check.js', 'lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/peer-valuation.js', 'lib/market-screener.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
   vm.runInContext(fs.readFileSync(REPO + '/self-check.js', 'utf8'), ctx, { filename: 'self-check.js' });
   return { api: win.WorkHubSelfCheck, win, events, files };
 }

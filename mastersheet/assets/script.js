@@ -258,6 +258,7 @@ async function loadKpis() {
         setKpi('kpi-market-value', k.marketValue, true);
         updateHeroDelta(k);
         if (typeof LiveUI !== 'undefined') LiveUI.afterKpis(k);                  // giá trực tiếp: ghi nhớ KPI lưu làm cơ sở
+        if (typeof TodayUI !== 'undefined') TodayUI.afterKpis(k);                // thẻ "Hôm nay"
     } catch (e) {
         console.error('Lỗi loadKpis:', e);
     }
@@ -302,6 +303,7 @@ async function loadHoldings() {
         onHoldingsLoaded(holdings);
         loadVbBadges(holdings);
         if (typeof LiveUI !== 'undefined') LiveUI.afterHoldings(holdings);      // giá trực tiếp trong phiên (chỉ hiển thị)
+        if (typeof TodayUI !== 'undefined') TodayUI.afterHoldings(holdings);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state text-danger">Lỗi: ${escapeAssetHtml(e.message)}</td></tr>`;
     }
