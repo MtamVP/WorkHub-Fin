@@ -22,7 +22,7 @@ const LiveUI = (function () {
         const last = Object.values(st.quotes).reduce((m, q) => (q.ts && q.ts > m ? q.ts : m), 0), time = last ? LiveQuotes.hhmmss(last) : '';
         const label = sess === 'open' ? 'Trực tiếp' : (sess === 'break' ? 'Nghỉ trưa' : 'Hết phiên');
         const day = t.dayPnl === null ? '' : ` · hôm nay <b class="${t.dayPnl >= 0 ? 'pnl-up-text' : 'pnl-down-text'}">${t.dayPnl >= 0 ? '+' : '−'}${formatVnd(Math.abs(t.dayPnl))}</b> (${t.dayPct >= 0 ? '+' : '−'}${Math.abs(t.dayPct).toFixed(2)}%)`;
-        return `<span class="live-chip ${sess === 'open' ? 'on' : 'idle'}" title="Giá khớp gần nhất của VNDirect, thường chậm khoảng 1 đến 2 phút so với sàn. Chỉ để xem: sổ và NAV lưu vẫn dùng giá cập nhật 5 phút/lần. Mã đã khoá giá không bị ghi đè."><span class="live-dot"></span> ${label} · giá lúc ${time} · ${t.liveCount}/${t.total} mã${day}</span>${btn}`;
+        return `<span class="live-chip ${sess === 'open' ? 'on' : 'idle'}" title="${escapeAssetHtml(st.source && st.source.indexOf('vci') === 0 ? 'Giá khớp từ bảng giá VCI, trễ vài giây.' : 'Giá khớp gần nhất của VNDirect, thường chậm khoảng 1 đến 2 phút (hàm giá VCI không dùng được' + (st.vciError ? ': ' + st.vciError : '') + ').')} Chỉ để xem: sổ và NAV lưu vẫn dùng giá cập nhật 5 phút/lần. Mã đã khoá giá không bị ghi đè."><span class="live-dot"></span> ${label} · giá lúc ${time} · ${t.liveCount}/${t.total} mã${day}</span>${btn}`;
     }
     function renderStatus() { const el = document.getElementById('live-status'); if (el && hasLib()) el.innerHTML = statusHtml(); }
 
@@ -57,7 +57,7 @@ const LiveUI = (function () {
         }
         S.busy = true;
         try {
-            await LiveQuotes.refresh(S.base.map(h => h.symbol), {});
+            await LiveQuotes.refresh(S.base.map(h => h.symbol), { invoke: (typeof API !== 'undefined' && API.asset && API.asset.market && API.asset.market.liveQuotes) ? (syms) => API.asset.market.liveQuotes(syms) : undefined });
             S.lastFetchAt = now; if (sess === 'closed' || sess === 'pre') S.closedFetched = true;
         } catch (e) { /* trạng thái lỗi nằm trong LiveQuotes.state */ }
         S.busy = false;

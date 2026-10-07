@@ -146,9 +146,9 @@
 <div class="callout"><b class="t">Giá trực tiếp trong phiên (mới 0.1.11)</b>
 <ul>
   <li>Khi sàn mở (9:00 đến 11:30 và 13:00 đến 14:50), app lấy giá khớp gần nhất của các mã bạn đang nắm từ VNDirect, <b>làm mới mỗi 20 giây</b>, rồi cập nhật tại chỗ bảng danh mục, NAV, lãi/lỗ chưa thực hiện và <b>lãi/lỗ trong ngày</b> (so với giá tham chiếu). Dòng trạng thái phía trên bảng cho biết giờ của giá, số mã đã có giá trực tiếp và có nút bật/tắt.</li>
-  <li>Giá của sàn thường <b>chậm khoảng 1 đến 2 phút</b>; đây là giá khớp gần nhất, không phải dữ liệu thời gian thực của công ty chứng khoán.</li>
+  <li>Giá lấy từ <b>bảng giá VCI</b> qua một hàm trên máy chủ của nhóm: trễ vài giây. Nếu hàm này lỗi, app tự dùng giá VNDirect, <b>trễ khoảng 1 đến 2 phút</b>, và dòng trạng thái cho biết đang dùng nguồn nào. Đây là giá khớp gần nhất của nguồn công khai, không phải dữ liệu chính thức của công ty chứng khoán.</li>
   <li><b>Chỉ để xem.</b> Sổ lệnh, NAV lưu và lịch sử hiệu suất vẫn dùng giá do máy chủ lưu mỗi 5 phút trong phiên. Mã đã <b>khoá giá</b> không bị ghi đè. App không cập nhật khi bạn đang gõ trong bảng. Ngoài giờ giao dịch app dùng giá lưu; nếu nguồn lỗi, dòng trạng thái báo và app quay về giá lưu.</li>
-  <li>Không cần khoá hay tài khoản nào; app gọi trực tiếp nguồn công khai của VNDirect (dự phòng: nến 1 phút cùng nguồn). Nguồn không có cam kết dịch vụ nên có thể đổi hoặc ngừng bất cứ lúc nào.</li>
+  <li>Không cần khoá hay tài khoản chứng khoán nào. Các nguồn công khai (VCI, VNDirect) không có cam kết dịch vụ nên có thể đổi hoặc ngừng bất cứ lúc nào.</li>
 </ul></div>
 <p>Trang chứa các tab sau (thanh tab ở đầu trang):</p>
 <table>

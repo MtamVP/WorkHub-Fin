@@ -2588,6 +2588,19 @@ const API = {
                 M._uniAt = Date.now();
                 return M._uni;
             },
+            // Giá khớp trực tiếp từ bảng giá VCI qua Edge Function live-quotes (chỉ đọc, không ghi CSDL). Trả { ok, quotes: {SYM: {price (đồng), ref, ceil, floor, ...}}, missing, asOf }; lỗi thì ném để bên gọi quay về nguồn VNDirect.
+            liveQuotes: async (symbols) => {
+                const list = [...new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 80);
+                if (!list.length) return { ok: true, quotes: {}, missing: [], asOf: new Date().toISOString() };
+                const { data, error } = await sbClient.functions.invoke('live-quotes', { body: { symbols: list } });
+                if (error) {
+                    let detail = error.message;
+                    try { const j = await error.context.json(); if (j && j.error) detail = j.error; } catch (e) { /* giữ message mặc định */ }
+                    throw new Error(detail);
+                }
+                if (!data || data.ok === false) throw new Error((data && data.error) || 'Không lấy được giá trực tiếp');
+                return data;
+            },
             // Lịch sử định giá thị trường + ngành (finance_valuation_history) trong `years` năm gần nhất, kèm lợi suất trái phiếu 10 năm mới nhất. Rỗng nếu bảng chưa có dữ liệu.
             valuationHistory: async (years) => {
                 const since = new Date(Date.now() - (Number(years) > 0 ? Number(years) : 6) * 366 * 86400000).toISOString().slice(0, 10);
