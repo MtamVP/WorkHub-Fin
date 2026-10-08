@@ -12,6 +12,7 @@ function initReportsTab() {
     loadRealizedReport();
     loadRebalance();
     initMonthlyReportControls();
+    if (typeof AccountingLinkUI !== 'undefined') AccountingLinkUI.init();
 }
 
 function signedMoney(v) {

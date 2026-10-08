@@ -705,6 +705,18 @@
                 </div>
                 <div id="rpt-month-result"></div>
             </div>
+
+            <div class="tl-card" id="rpt-accounting">
+                <div class="tl-card-head">
+                    <h3><i class="fa-solid fa-calculator"></i> Liên Kết Kế Toán</h3>
+                </div>
+                <div class="tl-month-grid">
+                    <label>Tháng<select id="rpt-acc-month" class="tl-select"></select></label>
+                    <label>Địa chỉ web kế toán<input id="rpt-acc-url" class="tl-select" type="url" spellcheck="false" onchange="AccountingLinkUI.saveUrl(this.value)"></label>
+                    <div><button type="button" class="btn-save" id="rpt-acc-btn" onclick="AccountingLinkUI.run()"><i class="fa-solid fa-list-check"></i> Xem bút toán đề xuất</button></div>
+                </div>
+                <div id="rpt-acc-result"></div>
+            </div>
         </section>
 
         <p class="guide-text">
@@ -773,6 +785,7 @@
     <script src="../../lib/sector-map.js?v=1791900000000"></script>
     <script src="../../lib/vn-market.js?v=1791900000000"></script>
     <script src="../../lib/portfolio-calc.js?v=1791900000000"></script>
+    <script src="../../lib/accounting-bridge.js?v=1792040000000"></script>
     <script src="../../lib/corporate-events.js?v=1791900000000"></script>
     <script src="../../lib/risk-calc.js?v=1791900000000"></script>
     <script src="../../lib/risk-models.js?v=1791900000000"></script>
@@ -828,7 +841,8 @@
     <script src="attribution.js?v=1791900000000"></script>
     <script src="brinson.js?v=1791900000000"></script>
     <script src="rebalance.js?v=1791900000000"></script>
-    <script src="reports.js?v=1791900000000"></script>
+    <script src="reports.js?v=1792040000000"></script>
+    <script src="accounting-link-ui.js?v=1792040000000"></script>
 
     <script src="/bench-nav.js?v=1791900000000"></script>
     <script>BenchNav.mount({ bench: 'investment', active: 'assets' });</script>
