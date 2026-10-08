@@ -80,6 +80,22 @@ describe('bán chứng khoán (giá vốn FIFO của Fin)', () => {
     expect(r.skipped).toHaveLength(1);
     expect(r.skipped[0].reason).toMatch(/vượt khối lượng/);
   });
+  it('lệnh mua giá 0 (cổ phiếu thưởng nhập tay) không phải lỗi: có ghi chú, không bút toán, giá vốn bình quân giảm', () => {
+    const r = AB.build({ txns: [buy('SSI', 1000, 30000, 0, '2026-03-01'), buy('SSI', 100, 0, 0, '2026-08-05')], period: '2026-08', prices: { SSI: 30000 }, books: { provision: 0 } });
+    expect(r.skipped).toEqual([]);
+    expect(r.vouchers.filter((v) => v.kind === 'buy')).toHaveLength(0);
+    expect(r.notes.join(' ')).toMatch(/SSI.*giá 0/);
+    expect(r.holdings[0]).toMatchObject({ quantity: 1100, cost: 30000000 });
+  });
+  it('lệnh mua giá 0 có phí: chỉ hạch toán phí', () => {
+    const r = AB.build({ txns: [buy('SSI', 100, 0, 5000, '2026-08-05')], period: '2026-08' });
+    expect(r.vouchers).toHaveLength(1);
+    expect(r.vouchers[0].lines).toEqual([{ account: '121', side: 'N', amount: 5000 }, { account: '1121', side: 'C', amount: 5000 }]);
+  });
+  it('lệnh bán giá 0 vẫn bị bỏ qua và báo lý do', () => {
+    const r = AB.build({ txns: [buy('SSI', 100, 1000, 0, '2026-07-01'), sell('SSI', 100, 0, 0, 0, '2026-08-05')], period: '2026-08' });
+    expect(r.skipped).toHaveLength(1);
+  });
   it('lệnh đã xoá mềm (deleted_at) không vào bút toán', () => {
     const r = AB.build({ txns: [buy('FPT', 100, 100000, 0, '2026-08-01', { deleted_at: '2026-08-02T00:00:00Z' })], period: '2026-08' });
     expect(r.vouchers).toHaveLength(0);
