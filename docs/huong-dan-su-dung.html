@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>WorkHub Fin 0.1.13 · Hướng dẫn sử dụng</title>
+<title>WorkHub Fin 0.1.14 · Hướng dẫn sử dụng</title>
 <style>
   :root { --navy: #27476E; --navy-deep: #1B3350; --ink: #1F2933; --muted: #5B6773; --rule: #D5DBE3; --wash: #F2F5F9; --ok: #12755A; --warn: #A15C00; --bad: #B3362E; --info: #2F5FA8; }
   @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
@@ -56,11 +56,11 @@
   <div class="top">
     <div class="kicker">WorkHub Finance · Tài liệu cho người dùng</div>
     <h1>WorkHub Fin<br>Hướng dẫn sử dụng</h1>
-    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.13</p>
+    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.14</p>
   </div>
   <div>
     <div class="callout warn"><b class="t">Đọc trước khi dùng</b><p>WorkHub Fin là công cụ phân tích nội bộ dùng dữ liệu miễn phí của thị trường Việt Nam. Mọi con số, nhận định và vùng giá đều là ước tính phụ thuộc vào giả định và số liệu đầu vào; <b>không phải khuyến nghị đầu tư</b>. Số liệu miễn phí có thể trễ hoặc khác báo cáo gốc: luôn đối chiếu trước khi ra quyết định.</p></div>
-    <div class="meta"><b>Phiên bản:</b> 0.1.13 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 08/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
+    <div class="meta"><b>Phiên bản:</b> 0.1.14 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 08/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
   </div>
 </section>
 
@@ -95,7 +95,7 @@
 
 <h2>1.1 Cài đặt và cập nhật</h2>
 <ol class="steps">
-  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.13_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
+  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.14_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
   <li>Mở <span class="ui">WorkHub-Fin</span> và đăng nhập bằng tài khoản WorkHub của bạn. Cần có Internet để lấy dữ liệu thị trường.</li>
   <li>Từ các bản sau, ứng dụng <b>tự kiểm tra và cập nhật</b>: khi có bản mới sẽ hỏi bạn; không cần cài lại thủ công.</li>
 </ol>
@@ -177,7 +177,7 @@
     <tr><td><span class="ui">Gương</span></td><td>Soi lại hành vi quyết định: hiệu chỉnh mức tự tin, thiên kiến chốt lời sớm / giữ lỗ lâu, mua đuổi, bán hoảng loạn; mọi nhận xét kèm cỡ mẫu để biết đáng tin đến đâu.</td></tr>
     <tr><td><span class="ui">Rủi Ro</span></td><td>Rủi ro danh mục (VaR/ES, kiểm thử căng thẳng, tập trung ngành và mã, thanh khoản khi bán).</td></tr>
     <tr><td><span class="ui">Lịch</span></td><td>Lịch cổ tức và sự kiện doanh nghiệp của các mã đang nắm.</td></tr>
-    <tr><td><span class="ui">Báo Cáo</span></td><td>Lãi/lỗ đã chốt theo năm, cân bằng danh mục về tỷ trọng mục tiêu, xuất số liệu báo cáo cuối tháng ra Excel (tệp để đưa cho AI điền mẫu PowerPoint).</td></tr>
+    <tr><td><span class="ui">Báo Cáo</span></td><td>Lãi/lỗ đã chốt theo năm, cân bằng danh mục về tỷ trọng mục tiêu, xuất số liệu báo cáo cuối tháng ra Excel (tệp để đưa cho AI điền mẫu PowerPoint), và thẻ <b>Liên Kết Kế Toán</b> (xem bên dưới).</td></tr>
   </tbody>
 </table>
 <div class="callout"><b class="t">Giá trực tiếp khi nhập lệnh (mới)</b>
@@ -189,6 +189,17 @@
 <ul>
   <li>Ở tab <span class="ui">Hiệu Suất</span> có thẻ <b>Nhật ký phiên</b>: mỗi phiên bạn mở app, app tóm tắt lãi/lỗ ngày, % ngày so với <b>VN-Index</b> (hơn hay kém bao nhiêu điểm phần trăm), số mã tăng/giảm, mã mạnh nhất và yếu nhất, số cảnh báo. Sau 14:50 bản tóm tắt được chốt; trong phiên chỉ có bản tạm. Thẻ có số phiên hơn chỉ số, hơn/kém trung bình, phiên tốt nhất và xấu nhất, và nút <span class="ui">Xuất CSV</span>.</li>
   <li>Dữ liệu <b>lưu trong máy này</b> (bộ nhớ của app và tệp <code>session-log/session-log.json</code> trong thư mục dữ liệu), không gửi lên máy chủ và không có nút xoá. % ngày tính trên cổ phiếu đang nắm (không gồm tiền mặt), nên không phải hiệu suất TWR của cả danh mục (xem <span class="ui">Hiệu Quả So Với Chuẩn</span>). Chỉ có những phiên bạn mở app. Thẻ <b>Hôm nay</b> nhắc lại phiên gần nhất.</li>
+</ul></div>
+<div class="callout ok"><b class="t">Ôn lại cảnh báo giá: đi tiếp hay quay đầu (mới)</b>
+<ul>
+  <li>Ở tab <span class="ui">Hiệu Suất</span> có thẻ <b>Ôn lại cảnh báo</b>: mỗi cảnh báo theo mã (chạm mục tiêu, cắt lỗ, tới giá muốn mua, biến động mạnh trong ngày) được ghi kèm <b>giá lúc báo</b>; những lần mở app sau, app so với giá phiên kế tiếp để cho biết giá <b>đi tiếp</b> hay <b>quay đầu</b> (chênh từ 1% trở lên tính theo chiều cảnh báo). Mỗi dòng có nút <span class="ui">Ghi quyết định</span> mở Nhật Ký Quyết Định với bối cảnh cảnh báo điền sẵn (thẻ "cảnh báo giá").</li>
+  <li>Dữ liệu <b>lưu trong máy này</b>. Dưới 10 cảnh báo mỗi loại app chỉ liệt kê, chưa nêu tỷ lệ vì mẫu quá nhỏ; chỉ ghi được cảnh báo khi app đang mở. Có nút <span class="ui">Xuất CSV</span>.</li>
+</ul></div>
+<div class="callout ok"><b class="t">Liên Kết Kế Toán: đưa số liệu đầu tư vào sổ kế toán (mới)</b>
+<ul>
+  <li>Ở tab <span class="ui">Báo Cáo</span> có thẻ <b>Liên Kết Kế Toán</b>: chọn tháng, app dựng <b>bút toán đề xuất theo Thông tư 200</b> từ sổ lệnh, cổ tức và nạp/rút của bạn: mua (Nợ 121), bán (Nợ tiền và 635 / Có 121 theo giá vốn FIFO và 515 nếu lãi), cổ tức tiền (Có 515), nạp/rút (đối ứng vốn góp 4111). Kèm lãi/lỗ bán ròng, cổ tức, phí và thuế, giá gốc đang nắm. Có thể tải CSV.</li>
+  <li>Nút <span class="ui">Mở web kế toán</span> đưa bạn tới mục <b>Đầu tư (WorkHub Fin)</b> của web kế toán OnyxLine, nơi gửi các bút toán thành <b>chứng từ nháp</b> vào hàng đợi duyệt (người lập khác người duyệt) và tính thêm <b>dự phòng giảm giá chứng khoán</b>, đối soát TK 121 với số dư sổ. Địa chỉ web kế toán sửa được ngay trong thẻ.</li>
+  <li>Đây là <b>đề xuất để kế toán soát lại</b>, không thay chứng từ gốc (sao kê công ty chứng khoán). Thuế bán 0,1% đang ghi vào chi phí tài chính và nạp/rút đối ứng vốn góp; kế toán chỉnh lại nếu thực tế khác. Thẻ chỉ đọc, không ghi gì lên máy chủ.</li>
 </ul></div>
 <h2>4.2 Nghiên Cứu</h2>
 <p>Trang nghiên cứu cổ phiếu. Các chế độ xem ở thanh trên cùng: <span class="ui">Bảng so sánh</span> (các mã bạn đã định giá, xếp Rẻ / Hợp lý / Đắt), <span class="ui">Ý tưởng</span> (đề xuất, bình luận, bỏ phiếu) và <span class="ui">Chi tiết mã</span>.</p>
@@ -202,6 +213,11 @@
   <li><b>Định giá cả danh sách:</b> chạy bộ máy Valuation Bench cho từng mã trong danh sách (tối đa 150 mã mỗi lần, khoảng vài phút) với giả định <b>mặc định</b>, rồi xếp theo biên an toàn. Kết quả chỉ để sàng, không được lưu: mở <i>Hồ sơ</i> để xem quy trình, chỉnh giả định và lưu bản chính thức.</li>
   <li><b>Xuất CSV</b> (mở được bằng Excel) và <b>lưu bộ lọc có tên</b>: bộ lọc đã lưu nằm trong máy này, không lên máy chủ.</li>
   <li>Số liệu tăng trưởng và giá mới có sau lần cập nhật dữ liệu ban đêm đầu tiên sau khi nâng cấp; trước đó các tiêu chí này báo "thiếu số liệu".</li>
+</ul></div>
+<div class="callout ok"><b class="t">EV/EBITDA và kiểm chứng bộ lọc bằng lịch sử (mới)</b>
+<ul>
+  <li><b>EV/EBITDA:</b> bộ lọc có thêm hai tiêu chí <i>EV/EBITDA tối đa</i> và <i>EV/EBITDA so với trung vị ngành tối đa</i> (chỉ áp cho doanh nghiệp phi tài chính; ngành cần từ 5 mã có số liệu mới tính được trung vị), và bảng kết quả có cột EV/EBITDA.</li>
+  <li><b>Kiểm chứng bộ lọc bằng lịch sử:</b> thẻ này lấy các ảnh chụp thị trường đã lưu trong máy và hỏi: những mã từng lọt vào bộ lọc của bạn, 1, 3 và 6 tháng sau tăng hơn hay kém <b>trung vị toàn thị trường</b> bao nhiêu? Cần đủ số sự kiện và số ngày lọt vào mới nêu kết luận, nếu không chỉ ghi "chưa đủ mẫu". Đây là kiểm tra thô trên vài tháng dữ liệu, không phải bằng chứng thống kê chắc chắn.</li>
 </ul></div>
 <div class="callout ok"><b class="t">Theo dõi bộ lọc đã lưu: mã mới lọt vào / vừa rớt ra (mới)</b>
 <ul>
