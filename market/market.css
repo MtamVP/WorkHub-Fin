@@ -130,3 +130,17 @@
   .mk-sec { grid-template-columns: minmax(90px, 1fr) minmax(0, 1.4fr) 56px; }
   .mk-chart svg { height: 200px; }
 }
+
+/* ---- thẻ hiệu suất, kỹ thuật, tác động ---- */
+.mk-block { margin-bottom: var(--mk-gap); }
+.mk-grid + .mk-grid, .mk-block + .mk-grid { margin-top: 0; }
+.mk-row-on td { background: var(--gold-dim); }
+.mk-place { margin: 0 0 8px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--bg-color-2); font-size: 0.84rem; font-weight: 600; color: var(--text-primary); }
+.mk-gauge { position: relative; height: 8px; border-radius: var(--radius-pill); margin: 12px 0 6px; background: var(--bg-color-2); display: flex; }
+.mk-gauge .z { display: block; height: 100%; }
+.mk-gauge .lo { width: 30%; background: color-mix(in srgb, var(--mk-floor) 40%, var(--bg-color-2)); border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
+.mk-gauge .hi { width: 30%; margin-left: 40%; background: color-mix(in srgb, var(--mk-ceil) 40%, var(--bg-color-2)); border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
+.mk-gauge i { position: absolute; top: -4px; width: 4px; height: 16px; border-radius: 2px; background: var(--text-primary); transform: translateX(-2px); box-shadow: 0 0 0 2px var(--card-bg); }
+.mk-subhead { margin: 12px 0 2px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.mk-contrib-sum { margin: 0 0 4px; font-size: 0.86rem; color: var(--text-secondary); }
+.mk-sec-name small { font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-left: 4px; }

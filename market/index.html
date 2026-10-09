@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thị Trường | Investment Workbench</title>
+    <title>Tổng Quan Thị Trường | Investment Workbench</title>
     <link rel="icon" type="image/png" href="../logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.10">
     <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
-    <link rel="stylesheet" href="/market/market.css?v=1792100000003">
+    <link rel="stylesheet" href="/market/market.css?v=1792100000011">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#B08D57">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -44,7 +44,7 @@
             </div>
             <nav class="desk-nav">
                 <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
-                <a href="/market/" class="active" aria-current="page"><i class="fa-solid fa-earth-asia"></i> Thị Trường</a>
+                <a href="/market/" class="active" aria-current="page"><i class="fa-solid fa-earth-asia"></i> Tổng Quan TT</a>
                 <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
                 <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
                 <a href="/valuation/"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
@@ -59,10 +59,10 @@
 
     <div class="asset-container desk mk-page">
         <div class="desk-byline">
-            <h1>Thị trường</h1>
+            <h1>Tổng quan thị trường</h1>
             <span class="desk-who">
                 <span class="av"><i class="fa-solid fa-earth-asia"></i></span>
-                <span>Chỉ số · độ rộng · thanh khoản · khối ngoại</span>
+                <span>Chỉ số · độ rộng · khối ngoại · xu hướng · ngành</span>
             </span>
             <div class="desk-byline-actions">
                 <span id="mk-session" class="mk-session" role="status"></span>
@@ -83,6 +83,13 @@
 
         <section id="mk-movers" class="tl-card" aria-live="polite"></section>
 
+        <section id="mk-perf" class="tl-card mk-block" aria-live="polite"></section>
+
+        <div class="mk-grid mk-grid-even">
+            <section id="mk-tech" class="tl-card" aria-live="polite"></section>
+            <section id="mk-contrib" class="tl-card" aria-live="polite"></section>
+        </div>
+
         <div class="mk-grid mk-grid-even">
             <section id="mk-sectors" class="tl-card" aria-live="polite"></section>
             <section id="mk-valuation" class="tl-card" aria-live="polite"></section>
@@ -98,8 +105,8 @@
     <script src="../lib/vn-holidays.js?v=1791900000000"></script>
     <script src="../lib/live-quotes.js?v=1791900000000"></script>
     <script src="../lib/valuation-history.js?v=1791900000000"></script>
-    <script src="../lib/market-overview.js?v=1792100000000"></script>
-    <script src="/bench-nav.js?v=1792100000000"></script>
-    <script src="market.js?v=1792100000002"></script>
+    <script src="../lib/market-overview.js?v=1792100000010"></script>
+    <script src="/bench-nav.js?v=1792100000010"></script>
+    <script src="market.js?v=1792100000011"></script>
 </body>
 </html>

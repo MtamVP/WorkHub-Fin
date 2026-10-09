@@ -210,6 +210,86 @@ describe('ngành trong ngày', () => {
   });
 });
 
+describe('hiệu suất nhiều kỳ và kỹ thuật (dữ liệu thật, số kỳ vọng từ Python)', () => {
+  const d = MO.parseDaily(FX.daily);
+  const cl = (arr) => arr.map((c, i) => ({ date: '2026-01-' + String(i + 1).padStart(2, '0'), o: c, h: c, l: c, c: c, v: 1 }));
+  it('returns: 1 phiên, 1 tuần, 1 tháng khớp; kỳ dài hơn dữ liệu là null (không đoán)', () => {
+    const r = MO.returns(d);
+    expect(r.d1).toBeCloseTo(-0.8224068803859952, 9);
+    expect(r.w1).toBeCloseTo(-0.5905219230549319, 9);
+    expect(r.m1).toBeCloseTo(-4.9971591529905375, 9);
+    expect(r.m3).toBe(null); expect(r.y1).toBe(null);
+  });
+  it('returns từ đầu năm lấy đóng cửa phiên cuối năm trước; chưa có phiên năm trước thì null', () => {
+    const rows = [{ date: '2025-12-30', c: 100 }, { date: '2025-12-31', c: 110 }, { date: '2026-01-02', c: 121 }, { date: '2026-01-05', c: 132 }].map((x) => Object.assign({ o: x.c, h: x.c, l: x.c, v: 1 }, x));
+    expect(MO.returns(rows).ytd).toBeCloseTo(20, 9);
+    expect(MO.returns(rows.slice(2)).ytd).toBe(null);
+    expect(MO.returns([]).d1).toBe(null);
+    expect(MO.returns(null).ytd).toBe(null);
+  });
+  it('RSI Wilder khớp tính độc lập và các trường hợp biên', () => {
+    expect(MO.rsi(d, 14)).toBeCloseTo(34.98088391891139, 9);
+    expect(MO.rsi(cl([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]), 14)).toBe(100);
+    expect(MO.rsi(cl(Array(20).fill(5)), 14)).toBe(50);
+    expect(MO.rsi(cl([20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]), 14)).toBe(0);
+    expect(MO.rsi(cl([1, 2, 3]), 14)).toBe(null);
+  });
+  it('technical: MA20, vùng 52 tuần, vị trí; thiếu MA200 thì không kết luận', () => {
+    const t = MO.technical(d);
+    expect(t.ma.ma20.value).toBeCloseTo(1782.013, 6);
+    expect(t.ma.ma20.vsPct).toBeCloseTo(-2.415414477896627, 9);
+    expect(t.ma.ma200.value).toBe(null);
+    expect(t.place).toBe(null);
+    expect(t.range52.high).toBe(1874.48); expect(t.range52.low).toBe(1726);
+    expect(t.range52.posPct).toBeCloseTo(8.735183189655189, 9);
+    expect(t.range52.fromHighPct).toBeCloseTo(-7.229204899492125, 9);
+    expect(t.rsiState).toBe('Trung tính');
+    expect(MO.technical([])).toBe(null);
+  });
+  it('technical với đủ 200 phiên: vị trí so với MA50/MA200 và giao cắt', () => {
+    const up = MO.technical(cl(Array.from({ length: 220 }, (_, i) => 100 + i)));
+    expect(up.place).toBe('Trên cả MA50 và MA200'); expect(up.ma50AboveMa200).toBe(true);
+    const dn = MO.technical(cl(Array.from({ length: 220 }, (_, i) => 400 - i)));
+    expect(dn.place).toBe('Dưới cả MA50 và MA200'); expect(dn.ma50AboveMa200).toBe(false);
+    const mid = MO.technical(cl(Array.from({ length: 220 }, (_, i) => (i < 150 ? 100 + i : 300 - (i - 150) * 3))));
+    expect(['Nằm giữa MA50 và MA200', 'Dưới cả MA50 và MA200', 'Trên cả MA50 và MA200']).toContain(mid.place);
+    expect(MO.technical(cl(Array.from({ length: 220 }, (_, i) => 100 + i))).rsiState).toBe('Vùng quá mua');
+    expect(MO.technical(cl(Array.from({ length: 220 }, (_, i) => 400 - i))).rsiState).toBe('Vùng quá bán');
+  });
+});
+
+describe('mức tác động lên chỉ số', () => {
+  const CAPS = { VIC: 1772387135520000, VHM: 558608032544000, VPB: 234000000000000, TCB: 228885565372200, HPG: 171814327982000, BSR: 158981765030500, HDB: 140648264676300, STB: 125932409828800, MSN: 115428321291200, MWG: 113480875213400, FPT: 112577940585600, SSI: 58975884984300, SHB: 52750801303200, PLX: 45995438907000, NVL: 32988400148800, VIX: 30101625836100 };
+  const uni = Object.keys(CAPS).map((s) => ({ symbol: s, metrics: { marketcap: CAPS[s] } }));
+  it('khớp số tính độc lập trên bảng giá thật (16 mã HOSE): tổng điểm, mã kéo xuống/lên nhiều nhất', () => {
+    const c = MO.contributions(rows, uni, 'HOSE', 1753.39);
+    expect(c.n).toBe(16);
+    expect(c.sumPoints).toBeCloseTo(-19.61415641563317, 2);          // Python dùng pctChange đã làm tròn 4 số của nguồn; thư viện tính từ giá nên chính xác hơn
+    expect(c.down[0].symbol).toBe('VHM'); expect(c.down[0].points).toBeCloseTo(-8.379588381424647, 2);
+    expect(c.down[1].symbol).toBe('VIC');
+    expect(c.up[0].symbol).toBe('PLX'); expect(c.up[0].points).toBeCloseTo(0.7889044471516269, 2);
+    expect(c.up.every((i) => i.points > 0) && c.down.every((i) => i.points < 0)).toBe(true);
+  });
+  it('trường hợp tính tay: điểm = chỉ số × vốn hoá × % / tổng vốn hoá; mã khác sàn, thiếu vốn hoá hoặc thiếu giá bị bỏ', () => {
+    const p = MO.parsePrices({ data: [
+      { code: 'A', type: 'STOCK', floor: 'HOSE', basicPrice: 10, close: 11, date: 'd' }, { code: 'B', type: 'STOCK', floor: 'HOSE', basicPrice: 10, close: 9, date: 'd' },
+      { code: 'H', type: 'STOCK', floor: 'HNX', basicPrice: 10, close: 12, date: 'd' }, { code: 'N', type: 'STOCK', floor: 'HOSE', basicPrice: 10, close: 12, date: 'd' } ] });
+    const u = [{ symbol: 'A', metrics: { marketcap: 300 } }, { symbol: 'B', metrics: { marketcap: 100 } }, { symbol: 'H', metrics: { marketcap: 500 } }, { symbol: 'N', metrics: {} }, { symbol: 'Z', metrics: { marketcap: 50 } }];
+    const c = MO.contributions(p, u, 'HOSE', 1000);
+    expect(c.n).toBe(2);
+    expect(c.items.find((i) => i.symbol === 'A').points).toBeCloseTo(1000 * 300 * 0.10 / 400, 9);       // +75
+    expect(c.items.find((i) => i.symbol === 'B').points).toBeCloseTo(1000 * 100 * -0.10 / 400, 9);      // -25
+    expect(c.sumPoints).toBeCloseTo(50, 9);
+    expect(c.coverage).toBeCloseTo(2 / 3, 9);                  // 2 trên 3 cổ phiếu HOSE có giá được ghép vốn hoá
+  });
+  it('thiếu dữ liệu trả rỗng, không ném', () => {
+    expect(MO.contributions([], uni, 'HOSE', 1700).n).toBe(0);
+    expect(MO.contributions(rows, [], 'HOSE', 1700).sumPoints).toBe(null);
+    expect(MO.contributions(rows, uni, 'HOSE', null).n).toBe(0);
+    expect(MO.contributions(null, null, 'HOSE', 1)).toEqual({ items: [], up: [], down: [], sumPoints: null, coverage: 0, n: 0 });
+  });
+});
+
 describe('hình học biểu đồ', () => {
   it('đường nằm trọn trong khung, điểm tăng ở trên điểm giảm, tham chiếu nằm giữa khi nằm giữa dữ liệu', () => {
     const g = MO.lineGeometry([{ x: 0, y: 10 }, { x: 1, y: 20 }, { x: 2, y: 15 }], 300, 100, { include: [15] });

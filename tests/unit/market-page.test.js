@@ -35,6 +35,7 @@ function boot(opts) {
   vm.runInContext('globalThis.MP = MarketPage;', ctx);
   return { MP: vm.runInContext('MP', ctx), els, store, urls, intervals, docHandlers, ctx };
 }
+const MAIN_D = /resolution=D&symbol=(VNINDEX|VN30|HNX|HNX30|UPCOM)&/;
 const text = (html) => String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 
 describe('trang Thị Trường (market.js): đường chạy chính với dữ liệu thật', () => {
@@ -185,7 +186,8 @@ describe('trang Thị Trường: nguồn lỗi không làm hỏng trang', () => 
     const t = boot();
     const a = t.MP.refresh(true), b = t.MP.refresh(true);
     await Promise.all([a, b]);
-    const dCalls = t.urls.filter((u) => /resolution=D/.test(u)).length;
+    await t.MP.S.morePromise;
+    const dCalls = t.urls.filter((u) => MAIN_D.test(u)).length;
     expect(dCalls).toBe(5);                                    // một lượt duy nhất: 5 chỉ số
   });
 });
@@ -222,9 +224,11 @@ describe('trang Thị Trường: tự làm mới', () => {
   it('lần làm mới thường chỉ lấy lại nến phút, không tải lại nến ngày (tiết kiệm)', async () => {
     const t = boot({ session: 'open' });
     await t.MP.refresh(true);
+    await t.MP.S.morePromise;
     const d1 = t.urls.filter((u) => /resolution=D/.test(u)).length;
     await t.MP.refresh(false);
-    expect(t.urls.filter((u) => /resolution=D/.test(u)).length).toBe(d1);
+    await t.MP.S.morePromise;
+    expect(t.urls.filter((u) => /resolution=D/.test(u)).length).toBe(d1);       // chỉ số chính, bổ sung và ngành đều còn mới: không gọi lại
     expect(t.urls.filter((u) => /resolution=1/.test(u)).length).toBe(10);
   });
   it('trạng thái phiên hiện đúng chữ', async () => {
@@ -262,19 +266,22 @@ describe('trang Thị Trường: ngành và định giá (cần đăng nhập)',
     const t = boot({ callGAS: async () => ({ status: 'error', message: 'Chưa đăng nhập' }) });
     await t.MP.refresh(true);
     await t.MP.loadOptional();
-    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Cần đăng nhập');
+    await t.MP.S.morePromise;
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Cần đăng nhập');
     expect(text(t.els['mk-valuation'].innerHTML)).toContain('Cần đăng nhập');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Tài chính');          // thẻ ngành tự rơi về chỉ số ngành HOSE (không cần đăng nhập)
     expect(text(t.els['mk-indices'].innerHTML)).toContain('1,738.97');
     const n = boot({});
     await n.MP.refresh(true);
     await n.MP.loadOptional();                                 // callGAS không tồn tại
-    expect(text(n.els['mk-sectors'].innerHTML)).toContain('Cần đăng nhập');
+    expect(text(n.els['mk-contrib'].innerHTML)).toContain('Cần đăng nhập');
   });
   it('ảnh chụp rỗng và lịch sử rỗng: báo chưa có, không ném', async () => {
     const t = boot({ callGAS: async (a) => (a === 'getMarketUniverse' ? { status: 'success', data: { snapshot: [] } } : { status: 'success', data: { rows: [] } }) });
     await t.MP.refresh(true);
     await t.MP.loadOptional();
-    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Chưa có ảnh chụp thị trường');
+    await t.MP.S.morePromise;
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Chưa có ảnh chụp thị trường');
     expect(text(t.els['mk-valuation'].innerHTML)).toContain('Chưa có lịch sử định giá');
   });
   it('lịch sử dưới 12 tháng: nói chưa đủ dữ liệu thay vì kết luận phân vị', async () => {
@@ -285,6 +292,79 @@ describe('trang Thị Trường: ngành và định giá (cần đăng nhập)',
     const v = text(t.els['mk-valuation'].innerHTML);
     expect(v).toContain('Chưa đủ 12 tháng');
     expect(v).not.toMatch(/phân vị \d+/);
+  });
+});
+
+describe('trang Thị Trường: chỉ số bổ sung (hiệu suất, kỹ thuật, tác động, chỉ số ngành)', () => {
+  const caps = { VIC: 1772387135520000, VHM: 558608032544000, VPB: 234000000000000, TCB: 228885565372200, HPG: 171814327982000, BSR: 158981765030500, HDB: 140648264676300, STB: 125932409828800, MSN: 115428321291200, MWG: 113480875213400, FPT: 112577940585600, SSI: 58975884984300, SHB: 52750801303200, PLX: 45995438907000, NVL: 32988400148800, VIX: 30101625836100 };
+  const snap = Object.keys(caps).map((k) => ({ symbol: k, icb2_code: '8600', metrics: { marketcap: caps[k] } }));
+  const good = async (a) => (a === 'getMarketUniverse' ? { status: 'success', data: { snapshot: snap, asOf: '2026-10-07' } } : { status: 'success', data: { rows: [] } });
+
+  it('bảng hiệu suất: 9 chỉ số, % khớp tính độc lập, kỳ chưa đủ lịch sử là —', async () => {
+    const t = boot();
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    const h = t.els['mk-perf'].innerHTML, x = text(h);
+    ['VN-Index', 'VN30', 'HNX-Index', 'HNX30', 'UPCoM-Index', 'VN100', 'VN Small Cap', 'VN Diamond', 'VN Fin Lead'].forEach((n) => expect(x).toContain(n));
+    expect(x).toContain('−0.82%');                              // 1 phiên của VN-Index mẫu
+    expect(x).toContain('−0.59%');                              // 1 tuần
+    expect(x).toContain('−5.00%');                              // 1 tháng (−4,997%)
+    expect(x).toContain('—');                                   // 3 tháng trở đi: mẫu chỉ có 26 phiên
+    expect(h).toContain('mk-row-on');
+  });
+  it('xu hướng kỹ thuật: MA20, RSI, vùng giá khớp số tính độc lập', async () => {
+    const t = boot();
+    await t.MP.refresh(true);
+    const x = text(t.els['mk-tech'].innerHTML);
+    expect(x).toContain('1,782.01');                            // MA20
+    expect(x).toContain('−2.42%');
+    expect(x).toContain('35');                                  // RSI 34,98
+    expect(x).toContain('Trung tính');
+    expect(x).toContain('9%');                                  // vị trí 8,7% trong vùng giá
+    expect(x).toContain('chưa đủ 200 phiên');                   // mẫu 26 phiên: không đoán MA200
+  });
+  it('tác động lên chỉ số: có điểm ước tính và thực tế, mã kéo xuống/lên đúng; chuyển sàn đổi tiêu đề', async () => {
+    const t = boot({ callGAS: good });
+    await t.MP.refresh(true);
+    await t.MP.loadOptional();
+    const h = t.els['mk-contrib'].innerHTML, x = text(h);
+    expect(x).toContain('Tác động lên VN-Index');
+    expect(x).toContain('−19.61');                              // ước tính trên 16 mã mẫu
+    expect(x).toContain('−14.42');                              // thực tế
+    expect(h.indexOf('>VHM<')).toBeGreaterThan(h.indexOf('Kéo chỉ số xuống'));
+    expect(h.indexOf('>PLX<')).toBeGreaterThan(-1);
+    expect(h.indexOf('>PLX<')).toBeLessThan(h.indexOf('Kéo chỉ số xuống'));
+    t.MP.setExchange('HNX');
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Tác động lên HNX-Index');
+    t.MP.setExchange('ALL');
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Tác động lên VN-Index');          // Tất cả quy về HOSE
+  });
+  it('thẻ ngành: có đăng nhập mặc định xem ICB; chuyển qua lại và lưu lựa chọn; không đăng nhập là chỉ số ngành', async () => {
+    const t = boot({ callGAS: good });
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    await t.MP.loadOptional();
+    expect(t.els['mk-sectors'].innerHTML).toContain('Bất động sản');                           // ICB 8600 của mẫu
+    t.MP.setSecMode('idx');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Tài chính');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Công nghệ thông tin');
+    expect(JSON.parse(t.store.get('wh.fin.market.v1')).secMode).toBe('idx');
+    t.MP.setSecMode('rác');
+    expect(t.MP.S.secMode).toBe('idx');
+    const n = boot({ callGAS: async () => ({ status: 'error' }) });
+    await n.MP.refresh(true); await n.MP.S.morePromise; await n.MP.loadOptional();
+    expect(text(n.els['mk-sectors'].innerHTML)).toContain('Tài chính');
+  });
+  it('chỉ số bổ sung lỗi: các thẻ khác vẫn đúng, bảng hiệu suất vẫn có 5 chỉ số chính', async () => {
+    const t = boot();
+    vm.runInContext("const _f = fetch; fetch = async (u) => (/symbol=(VN100|VNSML|VNDIAMOND|VNFINLEAD|VNFIN|VNREAL|VNIT|VNMAT|VNENE|VNCOND|VNCONS|VNHEAL|VNIND|VNUTI)&/.test(u) ? { ok: false, json: async () => ({}) } : _f(u));", t.ctx);
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    await t.MP.loadOptional();                                 // callGAS không có: thẻ ngành rơi về chỉ số ngành
+    const x = text(t.els['mk-perf'].innerHTML);
+    expect(x).toContain('VN-Index'); expect(x).not.toContain('VN100');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Không lấy được chỉ số ngành');
+    expect(text(t.els['mk-indices'].innerHTML)).toContain('1,738.97');
   });
 });
 

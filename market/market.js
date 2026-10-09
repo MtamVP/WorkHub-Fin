@@ -8,8 +8,8 @@ const MarketPage = (function () {
     const DCHART = 'https://dchart-api.vndirect.com.vn/dchart/history', FINFO = 'https://api-finfo.vndirect.com.vn/v4';
     const KEY = 'wh.fin.market.v1';
     const POLL_MS = 30000, DAILY_TTL = 10 * 60000, FOREIGN_TTL = 60000;
-    const S = { index: 'VNINDEX', exchange: 'HOSE', range: '1D', mover: 'gain',
-        daily: {}, dailyAt: 0, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
+    const S = { index: 'VNINDEX', exchange: 'HOSE', range: '1D', mover: 'gain', secMode: null,
+        daily: {}, dailyAt: 0, extraAt: 0, sectorAt: 0, sectorErr: false, morePromise: null, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
         busy: false, started: false, universe: null, uniState: 'idle', val: null, valState: 'idle', timer: null };
 
     // ---------- tiện ích ----------
@@ -30,8 +30,8 @@ const MarketPage = (function () {
     }
     const vol = (v) => (!isNum(v) ? '—' : (v >= 1e6 ? dec(v / 1e6, 1) + ' tr' : (v >= 1e3 ? dec(v / 1e3, 0) + ' k' : dec(v, 0))));
     const priceFmt = (dong) => dec(dong / 1000, 2);
-    function load() { try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o) { if (MO.INDICES.some((i) => i.code === o.index)) S.index = o.index; if (MO.EXCHANGES.indexOf(o.exchange) !== -1) S.exchange = o.exchange; if (MO.RANGES.some((r) => r.key === o.range)) S.range = o.range; if (MO.MOVER_KINDS.some((k) => k.key === o.mover)) S.mover = o.mover; } } catch (e) { /* mặc định */ } }
-    function save() { try { localStorage.setItem(KEY, JSON.stringify({ index: S.index, exchange: S.exchange, range: S.range, mover: S.mover })); } catch (e) { /* bỏ qua */ } }
+    function load() { try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o) { if (MO.INDICES.some((i) => i.code === o.index)) S.index = o.index; if (MO.EXCHANGES.indexOf(o.exchange) !== -1) S.exchange = o.exchange; if (MO.RANGES.some((r) => r.key === o.range)) S.range = o.range; if (MO.MOVER_KINDS.some((k) => k.key === o.mover)) S.mover = o.mover; if (o.secMode === 'icb' || o.secMode === 'idx') S.secMode = o.secMode; } } catch (e) { /* mặc định */ } }
+    function save() { try { localStorage.setItem(KEY, JSON.stringify({ index: S.index, exchange: S.exchange, range: S.range, mover: S.mover, secMode: S.secMode })); } catch (e) { /* bỏ qua */ } }
     const ixOf = (code) => MO.INDICES.filter((i) => i.code === code)[0] || MO.INDICES[0];
     const sessionState = () => (typeof LiveQuotes !== 'undefined' ? LiveQuotes.session() : 'closed');
 
@@ -43,7 +43,7 @@ const MarketPage = (function () {
     // ---------- dữ liệu ----------
     const merged = (code) => MO.mergeToday(S.daily[code], S.intraday[code], sessionState() === 'open' || sessionState() === 'break');
     async function loadIndices(force) {
-        const now = Math.floor(Date.now() / 1000), needDaily = force || !S.dailyAt || Date.now() - S.dailyAt > DAILY_TTL || Object.keys(S.daily).length < MO.INDICES.length;
+        const now = Math.floor(Date.now() / 1000), needDaily = force || !S.dailyAt || Date.now() - S.dailyAt > DAILY_TTL || MO.INDICES.some((ix) => !S.daily[ix.code]);
         let gotDaily = 0, got = 0;
         await Promise.all(MO.INDICES.map(async (ix) => {
             const [dj, ij] = await Promise.all([
@@ -79,6 +79,22 @@ const MarketPage = (function () {
         }
         S.fetchedAt = Date.now();
     }
+    // Nến ngày của các chỉ số bổ sung (VN100, VN Small Cap...) và chỉ số ngành HOSE. Tải sau phần chính để không làm chậm lần mở đầu; lỗi chỉ làm trống phần của nó.
+    async function fetchDaily(code, days) {
+        const now = Math.floor(Date.now() / 1000), j = await getJson(DCHART + '?resolution=D&symbol=' + code + '&from=' + (now - days * 86400) + '&to=' + (now + 600)), d = j ? MO.parseDaily(j) : [];
+        if (d.length) { S.daily[code] = d; return true; }
+        return false;
+    }
+    async function loadMore(force) {
+        const open = sessionState() === 'open';
+        const needExtra = force || !S.extraAt || Date.now() - S.extraAt > DAILY_TTL, needSec = force || !S.sectorAt || Date.now() - S.sectorAt > (open ? 60000 : DAILY_TTL);
+        const jobs = [];
+        if (needExtra) { S.extraAt = Date.now(); MO.EXTRA_INDICES.forEach((ix) => jobs.push(fetchDaily(ix.code, 400))); }
+        if (needSec) { S.sectorAt = Date.now(); MO.SECTOR_INDICES.forEach((ix) => jobs.push(fetchDaily(ix.code, 120))); }
+        if (jobs.length) await Promise.all(jobs);
+        if (needSec) S.sectorErr = !MO.SECTOR_INDICES.some((ix) => S.daily[ix.code]);        // không có chỉ số ngành nào (kể cả bản cũ): báo lỗi thay vì chờ mãi
+        renderPerf(); renderSectors();
+    }
     async function refresh(force) {
         if (S.busy) return;
         S.busy = true;
@@ -92,12 +108,13 @@ const MarketPage = (function () {
             S.busy = false;
             if (btn) { btn.disabled = false; btn.querySelector('i').classList.remove('fa-spin'); }
             renderAll();
+            S.morePromise = loadMore(!!force).catch(() => { /* phần bổ sung lỗi thì bỏ qua */ });
         }
     }
     async function loadOptional() {
         S.uniState = 'loading'; S.valState = 'loading'; renderSectors(); renderValuation();
         const call = async (action, params) => { if (typeof callGAS !== 'function') throw new Error('Chưa sẵn sàng'); const r = await callGAS(action, params || {}); if (!r || r.status !== 'success') throw new Error((r && r.message) || 'Không đọc được ' + action); return r.data; };
-        const u = call('getMarketUniverse', {}).then((d) => { S.universe = d && Array.isArray(d.snapshot) ? d : null; S.uniState = S.universe && S.universe.snapshot.length ? 'ok' : 'empty'; }, () => { S.uniState = 'unavailable'; }).then(renderSectors);
+        const u = call('getMarketUniverse', {}).then((d) => { S.universe = d && Array.isArray(d.snapshot) ? d : null; S.uniState = S.universe && S.universe.snapshot.length ? 'ok' : 'empty'; }, () => { S.uniState = 'unavailable'; }).then(() => { renderSectors(); renderContrib(); });
         const v = call('getValuationHistory', { years: 6 }).then((d) => { S.val = d || null; S.valState = d && d.rows && d.rows.length ? 'ok' : 'empty'; }, () => { S.valState = 'unavailable'; }).then(renderValuation);
         await Promise.all([u, v]);
     }
@@ -257,9 +274,24 @@ const MarketPage = (function () {
             '<p class="tl-hint">Giá tính bằng nghìn đồng. Tăng/giảm mạnh chỉ xét mã có giá trị giao dịch từ 1 tỷ đồng để loại mã gần như không giao dịch. Bấm mã để mở hồ sơ định giá.</p>';
     }
 
+    // Chế độ ngành: 'icb' (toàn thị trường theo ICB, cần đăng nhập) hoặc 'idx' (10 chỉ số ngành của HOSE, không cần đăng nhập). Chưa chọn thì tự lấy 'icb' khi có ảnh chụp, không thì 'idx'.
+    const secModeNow = () => S.secMode || (S.uniState === 'unavailable' || S.uniState === 'empty' ? 'idx' : 'icb');
+    function sectorHead(mode) {
+        const chip = (k, label) => '<button type="button" class="mk-chip" aria-pressed="' + (k === mode) + '" onclick="MarketPage.setSecMode(\'' + k + '\')">' + label + '</button>';
+        return '<div class="tl-card-head"><h3><i class="fa-solid fa-layer-group"></i> Ngành hôm nay</h3><div class="mk-chips" role="group" aria-label="Cách xem ngành">' + chip('icb', 'Toàn thị trường (ICB)') + chip('idx', 'Chỉ số ngành HOSE') + '</div></div>';
+    }
+    function renderSectorIdx(box, head) {
+        const list = MO.SECTOR_INDICES.map((s) => { const d = S.daily[s.code], r = d && d.length > 1 ? MO.returns(d) : null; return r ? { label: s.label, code: s.code, r: r, date: d[d.length - 1].date } : null; }).filter(Boolean);
+        if (!list.length) { box.innerHTML = head + (S.sectorErr ? '<div class="mk-empty"><i class="fa-solid fa-triangle-exclamation"></i>Không lấy được chỉ số ngành từ VNDirect.</div>' : '<div class="mk-skel" aria-hidden="true"></div>'); return; }
+        list.sort((a, b) => (b.r.d1 === null ? -99 : b.r.d1) - (a.r.d1 === null ? -99 : a.r.d1));
+        const span = Math.max(1, Math.ceil(Math.max.apply(null, list.map((s) => Math.abs(s.r.d1 || 0)))));
+        const row = (s) => { const v = s.r.d1, w = isNum(v) ? Math.min(50, Math.abs(v) / span * 50).toFixed(1) : 0; return '<div class="mk-sec" title="' + esc('1 tuần ' + sgn(s.r.w1, 2) + '% · 1 tháng ' + sgn(s.r.m1, 2) + '% · 3 tháng ' + sgn(s.r.m3, 2) + '%') + '"><span class="mk-sec-name">' + esc(s.label) + '</span><span class="mk-sec-bar"><i class="' + (v >= 0 ? 'p' : 'n') + '" style="width:' + w + '%"></i></span><b class="' + tone(v) + '">' + sgn(v, 2) + '%</b></div>'; };
+        box.innerHTML = head + list.map(row).join('') + '<p class="tl-hint">Mười chỉ số ngành của HOSE (VNFIN, VNREAL, VNIT...), biến động so với phiên trước; rê chuột để xem 1 tuần, 1 tháng, 3 tháng. Không cần đăng nhập.</p>';
+    }
     function renderSectors() {
         const box = $('mk-sectors'); if (!box) return;
-        const head = '<div class="tl-card-head"><h3><i class="fa-solid fa-layer-group"></i> Ngành hôm nay <span class="mk-card-sub">bình quân gia quyền vốn hoá</span></h3></div>';
+        const mode = secModeNow(), head = sectorHead(mode);
+        if (mode === 'idx') { renderSectorIdx(box, head); return; }
         if (S.uniState === 'loading' || S.uniState === 'idle') { box.innerHTML = head + '<div class="mk-skel" aria-hidden="true"></div>'; return; }
         if (S.uniState !== 'ok') { box.innerHTML = head + '<div class="mk-empty"><i class="fa-solid fa-lock"></i>' + (S.uniState === 'empty' ? 'Chưa có ảnh chụp thị trường để phân ngành.' : 'Cần đăng nhập WorkHub để xem ngành.') + '</div>'; return; }
         if (!S.rows) { box.innerHTML = head + '<div class="mk-skel" aria-hidden="true"></div>'; return; }
@@ -270,6 +302,61 @@ const MarketPage = (function () {
         const row = (s) => { const w = Math.min(50, Math.abs(s.pct) / span * 50).toFixed(1); return '<div class="mk-sec" title="' + esc(s.n + ' mã · ' + s.up + ' tăng · ' + s.down + ' giảm · ' + ty(s.value) + ' giao dịch') + '"><span class="mk-sec-name">' + esc(s.name) + '</span><span class="mk-sec-bar"><i class="' + (s.pct >= 0 ? 'p' : 'n') + '" style="width:' + w + '%"></i></span><b class="' + tone(s.pct) + '">' + sgn(s.pct, 2) + '%</b></div>'; };
         box.innerHTML = head + r.sectors.map(row).join('') +
             '<p class="tl-hint">Thị trường chung ' + '<b class="' + tone(r.market) + '">' + sgn(r.market, 2) + '%</b> theo cùng cách tính. Phủ ' + dec(r.coverage * 100, 0) + '% vốn hoá của ảnh chụp ngày ' + esc(dmy(S.universe.asOf) || '—') + '. Ngành chỉ có 1 mã bị ẩn.</p>';
+    }
+
+    // ----- hiệu suất nhiều kỳ -----
+    function renderPerf() {
+        const box = $('mk-perf'); if (!box) return;
+        const head = '<div class="tl-card-head"><h3><i class="fa-solid fa-table-cells"></i> Hiệu suất các chỉ số <span class="mk-card-sub">so với các phiên trước</span></h3></div>';
+        const mainRows = MO.INDICES.map((ix) => ({ ix: ix, d: merged(ix.code), main: true })), extraRows = MO.EXTRA_INDICES.map((ix) => ({ ix: ix, d: S.daily[ix.code] || null, main: false }));
+        const have = mainRows.concat(extraRows).filter((x) => x.d && x.d.length > 1);
+        if (!have.length) { box.innerHTML = head + '<div class="mk-skel" style="height:120px" aria-hidden="true"></div>'; return; }
+        const cell = (v) => '<td class="r mk-num ' + (isNum(v) ? tone(v) : '') + '">' + (isNum(v) ? sgn(v, 2) + '%' : '—') + '</td>';
+        const rows = have.map((x) => {
+            const r = MO.returns(x.d), last = x.d[x.d.length - 1].c;
+            const name = x.main ? '<button type="button" class="tl-link" style="font-weight:700;color:var(--text-primary);padding:0" onclick="MarketPage.selectIndex(\'' + x.ix.code + '\')" title="Xem biểu đồ">' + esc(x.ix.label) + '</button>' : '<span title="' + esc(x.ix.hint || '') + '" style="font-weight:700">' + esc(x.ix.label) + '</span>';
+            return '<tr' + (x.main && x.ix.code === S.index ? ' class="mk-row-on"' : '') + '><td>' + name + '</td><td class="r mk-num">' + dec(last, 2) + '</td>' + MO.PERIODS.map((p) => cell(r[p.key])).join('') + '</tr>';
+        }).join('');
+        box.innerHTML = head + '<div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Chỉ số</th><th class="r">Điểm</th>' + MO.PERIODS.map((p) => '<th class="r">' + esc(p.label) + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+            '<p class="tl-hint">Biến động % của phiên mới nhất so với đóng cửa cách đó 1 phiên, 1 tuần (5 phiên), 1 tháng (22), 3 tháng (64), 6 tháng (127), 1 năm (252) và so với phiên cuối năm trước. “—” là chưa đủ lịch sử.</p>';
+    }
+
+    // ----- xu hướng kỹ thuật của chỉ số đang chọn -----
+    function renderTech() {
+        const box = $('mk-tech'); if (!box) return;
+        const ix = ixOf(S.index), t = MO.technical(merged(S.index));
+        const head = '<div class="tl-card-head"><h3><i class="fa-solid fa-wave-square"></i> Xu hướng kỹ thuật <span class="mk-card-sub">' + esc(ix.label) + '</span></h3></div>';
+        if (!t) { box.innerHTML = head + '<div class="mk-skel" style="height:140px" aria-hidden="true"></div>'; return; }
+        const ma = (k, label) => { const m = t.ma[k]; return '<li><span>' + label + '</span><b>' + (m.value ? dec(m.value, 2) + ' <span class="' + tone(m.vsPct) + '">(' + sgn(m.vsPct, 2) + '%)</span>' : 'chưa đủ ' + m.n + ' phiên') + '</b></li>'; };
+        const gauge = isNum(t.rsi) ? '<div class="mk-gauge" role="img" aria-label="RSI ' + dec(t.rsi, 0) + '"><span class="z lo"></span><span class="z hi"></span><i style="left:' + Math.max(0, Math.min(100, t.rsi)).toFixed(1) + '%"></i></div><div class="mk-range-legend mk-num"><span>0</span><span>100</span></div>' : '';
+        const r = t.range52;
+        box.innerHTML = head +
+            (t.place ? '<p class="mk-place">' + esc(t.place) + (t.ma50AboveMa200 === null ? '' : ' · MA50 ' + (t.ma50AboveMa200 ? 'trên' : 'dưới') + ' MA200') + '</p>' : '') +
+            '<ul class="mk-rows">' + ma('ma20', 'MA20') + ma('ma50', 'MA50') + ma('ma200', 'MA200') + '</ul>' +
+            '<div class="mk-val-row" style="margin-top:14px"><div class="top"><span class="nm">RSI (14 phiên)</span><span class="big mk-num">' + (isNum(t.rsi) ? dec(t.rsi, 0) : '—') + '</span></div>' + gauge + (t.rsiState ? '<p class="tl-hint" style="margin-top:4px">' + esc(t.rsiState) + ' (dưới 30 là quá bán, trên 70 là quá mua)</p>' : '') + '</div>' +
+            (r ? '<div class="mk-val-row" style="margin-top:14px"><div class="top"><span class="nm">Vùng giá ' + r.n + ' phiên</span><span class="big mk-num">' + (isNum(r.posPct) ? dec(r.posPct, 0) + '%' : '—') + '</span></div><div class="mk-range" role="img" aria-label="Vị trí trong vùng giá"><i style="left:' + Math.max(0, Math.min(100, r.posPct || 0)).toFixed(1) + '%"></i></div><div class="mk-range-legend mk-num"><span>Đáy ' + dec(r.low, 0) + '</span><span class="' + tone(r.fromHighPct) + '">' + sgn(r.fromHighPct, 1) + '% so với đỉnh</span><span>Đỉnh ' + dec(r.high, 0) + '</span></div></div>' : '') +
+            '<p class="tl-hint">Mô tả hiện trạng từ nến ngày (MA = trung bình giá đóng cửa), không phải tín hiệu mua bán.</p>';
+    }
+
+    // ----- cổ phiếu tác động nhiều nhất lên chỉ số của sàn -----
+    const WHOLE = { HOSE: 'VNINDEX', HNX: 'HNX', UPCOM: 'UPCOM' };
+    function renderContrib() {
+        const box = $('mk-contrib'); if (!box) return;
+        const ex = S.exchange === 'ALL' ? 'HOSE' : S.exchange, ix = ixOf(WHOLE[ex]);
+        const head = '<div class="tl-card-head"><h3><i class="fa-solid fa-arrows-up-down"></i> Tác động lên ' + esc(ix.label) + ' <span class="mk-card-sub">ước tính</span></h3></div>';
+        if (S.uniState === 'loading' || S.uniState === 'idle') { box.innerHTML = head + '<div class="mk-skel" aria-hidden="true"></div>'; return; }
+        if (S.uniState !== 'ok') { box.innerHTML = head + '<div class="mk-empty"><i class="fa-solid fa-lock"></i>' + (S.uniState === 'empty' ? 'Chưa có ảnh chụp thị trường (cần vốn hoá từng mã).' : 'Cần đăng nhập WorkHub để xem.') + '</div>'; return; }
+        const q = MO.quote(merged(ix.code));
+        if (!S.rows || !q || !isNum(q.prev)) { box.innerHTML = head + '<div class="mk-skel" aria-hidden="true"></div>'; return; }
+        const c = MO.contributions(S.rows, S.universe.snapshot, ex, q.prev);
+        if (!c.n) { box.innerHTML = head + '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Không ghép được mã nào với vốn hoá.</div>'; return; }
+        const top = (list) => list.slice(0, 5), span = Math.max(0.01, Math.max.apply(null, top(c.up).concat(top(c.down)).map((i) => Math.abs(i.points))));
+        const row = (i) => '<div class="mk-sec"><span class="mk-sec-name"><a href="/valuation/#stock/' + encodeURIComponent(i.symbol) + '" style="color:var(--text-primary);font-weight:700;text-decoration:none">' + esc(i.symbol) + '</a> <small class="' + tone(i.pct) + '">' + sgn(i.pct, 2) + '%</small></span><span class="mk-sec-bar"><i class="' + (i.points >= 0 ? 'p' : 'n') + '" style="width:' + Math.min(50, Math.abs(i.points) / span * 50).toFixed(1) + '%"></i></span><b class="' + tone(i.points) + '">' + sgn(i.points, 2) + '</b></div>';
+        box.innerHTML = head +
+            '<p class="mk-contrib-sum mk-num">Ước tính <b class="' + tone(c.sumPoints) + '">' + sgn(c.sumPoints, 2) + '</b> điểm · thực tế <b class="' + tone(q.change) + '">' + sgn(q.change, 2) + '</b> điểm</p>' +
+            '<h4 class="mk-subhead mk-up">Kéo chỉ số lên</h4>' + (top(c.up).length ? top(c.up).map(row).join('') : '<p class="tl-hint">Không có mã nào.</p>') +
+            '<h4 class="mk-subhead mk-down">Kéo chỉ số xuống</h4>' + (top(c.down).length ? top(c.down).map(row).join('') : '<p class="tl-hint">Không có mã nào.</p>') +
+            '<p class="tl-hint">Điểm đóng góp ≈ chỉ số hôm trước × vốn hoá × % thay đổi ÷ tổng vốn hoá (cách tính của chỉ số toàn sàn). Dùng vốn hoá của ảnh chụp ngày ' + esc(dmy(S.universe.asOf) || '—') + ' và ' + c.n + ' cổ phiếu ghép được, nên chỉ là ước tính; không có ở VN30/HNX30 vì hai chỉ số này điều chỉnh theo tỷ lệ tự do chuyển nhượng.</p>';
     }
 
     function renderValuation() {
@@ -294,12 +381,13 @@ const MarketPage = (function () {
             '<p class="tl-hint">Tổng hợp theo vốn hoá, chỉ tính mã có lãi nên thấp hơn P/E của chỉ số khi nhiều doanh nghiệp lỗ. “Rẻ so với lịch sử” không có nghĩa là sẽ tăng.</p>';
     }
 
-    function renderAll() { renderStatus(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderSectors(); renderValuation(); }
+    function renderAll() { renderStatus(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderPerf(); renderTech(); renderContrib(); renderSectors(); renderValuation(); }
 
     // ---------- thao tác ----------
-    function selectIndex(code) { if (!MO.INDICES.some((i) => i.code === code)) return; S.index = code; S.exchange = ixOf(code).exchange; save(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderSectors(); }
+    function selectIndex(code) { if (!MO.INDICES.some((i) => i.code === code)) return; S.index = code; S.exchange = ixOf(code).exchange; save(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderPerf(); renderTech(); renderContrib(); renderSectors(); }
     function setRange(k) { if (!MO.RANGES.some((r) => r.key === k)) return; S.range = k; save(); renderDetail(); }
-    function setExchange(e) { if (MO.EXCHANGES.indexOf(e) === -1) return; S.exchange = e; save(); renderBreadth(); renderForeign(); renderMovers(); renderDetail(); }
+    function setExchange(e) { if (MO.EXCHANGES.indexOf(e) === -1) return; S.exchange = e; save(); renderBreadth(); renderForeign(); renderMovers(); renderDetail(); renderContrib(); }
+    function setSecMode(m) { if (m !== 'icb' && m !== 'idx') return; S.secMode = m; save(); renderSectors(); }
     function setMover(k) { if (!MO.MOVER_KINDS.some((x) => x.key === k)) return; S.mover = k; save(); renderMovers(); }
 
     function tick() {
@@ -315,7 +403,7 @@ const MarketPage = (function () {
         let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawChart, 150); });
     }
 
-    return { S, start, refresh, loadOptional, selectIndex, setRange, setExchange, setMover, renderAll, drawChart };
+    return { S, start, refresh, loadOptional, loadMore, selectIndex, setRange, setExchange, setMover, setSecMode, renderAll, drawChart };
 })();
 
 function applyThemeIcon() { const ic = document.getElementById('theme-ic'); if (ic) ic.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; }
