@@ -183,6 +183,51 @@ describe('simulate', () => {
   });
 });
 
+describe('sự kiện của bối cảnh', () => {
+  const SC = MS.eventScale(CTX.rm);
+  const sectorBook = { cash: 0, debt: 0, positions: [{ symbol: 'AAA', qty: 4000, price: last('AAA'), sector: 'Ngân hàng' }, { symbol: 'BBB', qty: 3000, price: last('BBB'), sector: 'Công nghệ' }] };
+  it('thang độ lớn = phân vị của |lợi suất 5 phiên| (nhỏ < vừa < lớn)', () => {
+    const r = Array.from(CTX.rm), a = []; for (let i = 0; i + 5 <= r.length; i++) a.push(Math.abs(r[i] + r[i + 1] + r[i + 2] + r[i + 3] + r[i + 4]));
+    a.sort((x, y) => x - y);
+    expect(SC.medium).toBeCloseTo(SM.quantileSorted(a, 0.85), 12);
+    expect(SC.small).toBeLessThan(SC.medium); expect(SC.medium).toBeLessThan(SC.large);
+  });
+  it('eventFromCard: khả năng thô -> xác suất, mức -> độ lớn, ngành nhân 1,5, thị trường lan 25%, ghi đè được, tắt -> null', () => {
+    const m = MS.eventFromCard({ id: 'm', likelihood: 'high', window: '1w', direction: 'down', magnitude: 'large', scope: 'market' }, SC);
+    expect(m).toMatchObject({ p: 0.6, win: 5, sign: -1, jS: 0 }); expect(m.jM).toBeCloseTo(Math.log(1 + SC.large), 12);
+    const s = MS.eventFromCard({ id: 's', likelihood: 'low', window: '3m', direction: 'up', magnitude: 'medium', scope: 'sector', sectors: ['Ngân hàng'] }, SC);
+    expect(s.p).toBe(0.15); expect(s.jM).toBeCloseTo(Math.log(1 + 0.25 * SC.medium), 12); expect(s.jS).toBeCloseTo(Math.log(1 + 1.5 * SC.medium), 12);
+    const o = MS.eventFromCard({ id: 'o', prob: 0.9, direction: 'mixed', magnitude: 'small', scope: 'market', marketMove: 0.08 }, SC);
+    expect(o.p).toBe(0.9); expect(o.sign).toBe(0); expect(o.jM).toBeCloseTo(Math.log(1.08), 12);
+    expect(MS.eventFromCard({ on: false, magnitude: 'large' }, SC)).toBeNull();
+    expect(MS.eventFromCard({ prob: 0, magnitude: 'large' }, SC)).toBeNull();
+    expect(MS.eventFromCard({ marketMove: 5, prob: 1 }, SC).jM).toBeCloseTo(Math.log(1.6), 12);    // chặn 60%
+  });
+  it('sự kiện xác suất 0 cho kết quả GIỐNG HỆT không có sự kiện (phần lịch sử không bị xáo trộn)', () => {
+    const ev = MS.eventFromCard({ id: 'z', prob: 1, magnitude: 'large', direction: 'down' }, SC); ev.p = 0;
+    const a = MS.simulate(CTX, sectorBook, [MS.PRESETS[0]], { paths: 600, seed: 4 }), b = MS.simulate(CTX, sectorBook, [MS.PRESETS[0]], { paths: 600, seed: 4, events: [ev] });
+    expect(b.byHorizon[2].policies[0].mean).toBe(a.byHorizon[2].policies[0].mean);
+  });
+  it('sự kiện chắc chắn giảm 10% kéo VN-Index xuống đúng mức đó (cùng bộ đường)', () => {
+    const ev = MS.eventFromCard({ id: 'd', prob: 1, window: '1w', direction: 'down', scope: 'market', marketMove: 0.1 }, SC);
+    const idx = { cash: 0, debt: 0, positions: [{ symbol: MS.INDEX, qty: 1, price: 1e8 }] };
+    const a = MS.simulate(CTX, idx, [MS.PRESETS[0]], { paths: 800, seed: 5, model: 'hmm' }), b = MS.simulate(CTX, idx, [MS.PRESETS[0]], { paths: 800, seed: 5, model: 'hmm', events: [ev] });
+    // với mô hình chế độ, cú sốc chỉ cộng vào lợi suất: tỷ lệ 1+R mới / 1+R cũ = 1/1,1 trên MỌI đường
+    expect((1 + b.byHorizon[2].index.median) / (1 + a.byHorizon[2].index.median)).toBeCloseTo(1 / 1.1, 6);
+    expect(b.events[0].byHorizon[0].share).toBe(1);
+  });
+  it('sự kiện ngành chỉ đánh riêng vào mã thuộc ngành; tỷ lệ đường xảy ra gần xác suất', () => {
+    const ev = MS.eventFromCard({ id: 'b', prob: 0.4, window: '1m', direction: 'down', magnitude: 'large', scope: 'sector', sectors: ['Ngân hàng'], marketMove: 0 }, SC);
+    expect(ev.jM).toBe(0);
+    const r = MS.simulate(CTX, sectorBook, [MS.PRESETS[0]], { paths: 3000, seed: 6, events: [ev] });
+    const e = r.events[0]; expect(e.exposed).toEqual(['AAA']);
+    expect(Math.abs(e.byHorizon[2].share - 0.4)).toBeLessThan(0.03);
+    expect(e.byHorizon[2].yes.port.mean).toBeLessThan(e.byHorizon[2].no.port.mean);
+    expect(e.byHorizon[2].yes.index.median).toBeCloseTo(e.byHorizon[2].no.index.median, 1);   // thị trường chung gần như không đổi
+    expect(e.byHorizon[0].share).toBeLessThan(e.byHorizon[1].share + 1e-12);                   // trước mốc 1 tuần xảy ra ít hơn trước mốc 1 tháng
+  });
+});
+
 describe('backtest', () => {
   it('dữ liệu sinh từ đúng mô hình -> độ phủ khoảng 90% gần danh nghĩa', () => {
     const r = MS.logRets(DATA.index);

@@ -2,7 +2,7 @@
    Luồng nền (Web Worker) của Market Simulation: ước lượng mô hình, chạy hàng chục nghìn đường mô phỏng và kiểm chứng ngược mà không làm đứng giao diện.
    Mọi phép tính nằm ở /lib/sim-models.js và /lib/market-sim.js (có kiểm thử); file này chỉ nhận lệnh và trả kết quả.
    Lệnh: { id, type: 'prepare', input, opts } -> mô tả mô hình; { id, type: 'simulate', book, policies, opts }; { id, type: 'backtest', opts }. */
-importScripts('../lib/sim-models.js?v=1792400000000', '../lib/market-sim.js?v=1792400000001');
+importScripts('../lib/sim-models.js?v=1792400000000', '../lib/market-sim.js?v=1792500000000');
 
 let ctx = null, lastIndex = null;
 self.onmessage = function (e) {

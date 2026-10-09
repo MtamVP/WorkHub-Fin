@@ -184,3 +184,29 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 }
 .sim-table td:first-child b { white-space: nowrap; }
 .sim-table td:first-child { min-width: 170px; }
+
+/* bối cảnh: thẻ sự kiện */
+.sim-ctx-summary { margin: 0 0 6px; font-family: 'Lora', Georgia, serif; font-size: 1.05rem; line-height: 1.5; color: var(--text-primary); max-width: 80ch; }
+.sim-evs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-bottom: 18px; align-items: start; }
+@media (max-width: 640px) { .sim-evs { grid-template-columns: 1fr; } }
+.sim-ev { position: relative; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px 14px 19px; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.sim-ev::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--sim-flat); }
+.sim-ev.d-down::before { background: var(--sim-down); } .sim-ev.d-up::before { background: var(--sim-up); }
+.sim-ev.off { opacity: 0.55; }
+.sim-ev-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sim-ev-top .sim-tag { margin-left: 0; }
+.sim-ev-on { margin-left: auto; font-size: 0.76rem; }
+.sim-ev h4 { margin: 0; font-size: 0.98rem; line-height: 1.35; color: var(--text-primary); text-wrap: balance; }
+.sim-ev-title-in { width: 100%; font-weight: 700; }
+.sim-ev-why { margin: 0; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; }
+.sim-ev-refs { display: flex; flex-direction: column; gap: 3px; }
+.sim-ev-refs a { font-size: 0.74rem; color: var(--finance-accent); text-decoration: none; line-height: 1.4; }
+.sim-ev-refs a:hover { text-decoration: underline; }
+.sim-ev-signs .k { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.sim-ev-signs ul { margin: 3px 0 0; padding-left: 1.1em; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
+.sim-ev-form { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 10px; }
+.sim-ev-sectors > summary { cursor: pointer; font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
+.sim-ev-sectors .sim-chips { margin-top: 8px; gap: 6px 12px; }
+.sim-ev-sectors .sim-check { font-size: 0.76rem; }
+.sim-ev-effect { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--finance-accent-subtle); font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary); }
+.sim-ev-effect b { color: var(--text-primary); }

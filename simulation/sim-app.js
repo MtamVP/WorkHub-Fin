@@ -49,7 +49,7 @@ const SimWorker = (function () {
     function ensure() {
         if (w || broken) return w;
         try {
-            w = new Worker('sim-worker.js?v=1792400000001');
+            w = new Worker('sim-worker.js?v=1792500000000');
             w.onmessage = function (e) { const d = e.data || {}, p = pending[d.id]; if (!p) return; delete pending[d.id]; if (d.ok) p.res(d.data); else p.rej(new Error(d.error || 'Lỗi mô phỏng')); };
             w.onerror = function (e) { if (e && e.preventDefault) e.preventDefault(); fail(); };
         } catch (e) { broken = true; w = null; }
@@ -95,20 +95,21 @@ function simOpts(extra) {
 }
 
 // ---------- định tuyến ----------
-const SIM_VIEWS = ['outlook', 'portfolio', 'tree', 'validate', 'method'];
+const SIM_VIEWS = ['outlook', 'context', 'portfolio', 'tree', 'validate', 'method'];
 function route() {
     const h = String(location.hash || '').replace(/^#/, '').split('/')[0];
     SIM.view = SIM_VIEWS.indexOf(h) !== -1 ? h : 'outlook';
     if (typeof BenchNav !== 'undefined') BenchNav.setActive(SIM.view);
     const title = document.getElementById('sim-title');
-    if (title) title.textContent = { outlook: 'Market Simulation', portfolio: 'Mô phỏng & quyết định', tree: 'Cây kịch bản', validate: 'Kiểm chứng mô hình', method: 'Phương pháp' }[SIM.view];
+    if (title) title.textContent = { outlook: 'Market Simulation', context: 'Bối cảnh thị trường', portfolio: 'Mô phỏng & quyết định', tree: 'Cây kịch bản', validate: 'Kiểm chứng mô hình', method: 'Phương pháp' }[SIM.view];
     if (SIM.view === 'portfolio' && SIM.bookState === 'idle') simLoadBook();
+    if ((SIM.view === 'outlook' || SIM.view === 'context') && SIM.market.state === 'ok' && ctxEvents().length && SIM.market.ctxKey !== ctxKey()) ctxRefreshOutlook();
     render();
 }
 function render() {
     const root = document.getElementById('sim-root'); if (!root) return;
     const v = SIM.view;
-    root.innerHTML = v === 'portfolio' ? renderPortfolioView() : v === 'tree' ? renderTreeView() : v === 'validate' ? renderValidateView() : v === 'method' ? renderMethodView() : renderOutlookView();
+    root.innerHTML = v === 'context' ? renderContextView() : v === 'portfolio' ? renderPortfolioView() : v === 'tree' ? renderTreeView() : v === 'validate' ? renderValidateView() : v === 'method' ? renderMethodView() : renderOutlookView();
     if (v === 'outlook') mountOutlookCharts();
     if (v === 'portfolio') mountPortfolioCharts();
 }
@@ -153,12 +154,13 @@ async function simLoadMarket(force) {
         });
         const p = out.p, result = out.result;
         if (!result || !result.ok) throw new Error('Mô phỏng không chạy được.');
-        SIM.market = { state: 'ok', model: p.model, result: result, error: '' };
+        SIM.market = { state: 'ok', model: p.model, result: result, error: '', ctxResult: null, ctxKey: null };
+        if (ctxEvents().length) ctxRefreshOutlook();
         setStatus('<i class="fa-solid fa-circle-check" style="color:var(--success-color)"></i> Số liệu tới ' + sE(fmtDate(p.model.lastDate)) + (SimWorker.isInline() ? ' · chạy trên trang' : ''));
     } catch (e) {
         SIM.market = { state: 'error', error: e.message || String(e) }; setStatus('');
     }
-    if (SIM.view === 'outlook' || SIM.view === 'tree' || SIM.view === 'validate') render();
+    if (SIM.view === 'outlook' || SIM.view === 'tree' || SIM.view === 'validate' || SIM.view === 'context') render();
 }
 
 // ---------- đối tượng mô phỏng ----------
@@ -296,7 +298,10 @@ async function simRun() {
         }
         SIM.run.step = 'Đang mô phỏng ' + Number(SIM.settings.paths).toLocaleString('vi-VN') + ' đường × ' + SIM.selected.length + ' cách xử lý…'; render();
         const all = MarketSim.PRESETS.concat(SIM.customPolicies), pols = SIM.selected.map((id) => all.find((x) => x.id === id)).filter(Boolean);
-        const result = await withModel(syms, () => SimWorker.call('simulate', { book: { cash: book.cash, debt: book.debt, positions: book.positions }, policies: pols, opts: simOpts({ expected: expected }) }));
+        const evs = ctxEvents(), key = ctxKey();
+        // ngành của từng mã (cho sự kiện theo ngành) lấy SAU khi getSimInputs đã nạp bảng ngành
+        const result = await withModel(syms, () => SimWorker.call('simulate', { book: { cash: book.cash, debt: book.debt, positions: book.positions.map((x) => Object.assign({}, x, { sector: x.symbol === MarketSim.INDEX || typeof FinCalc === 'undefined' ? null : FinCalc.sectorOf(x.symbol) })) }, policies: pols, opts: simOpts({ expected: expected, events: evs }) }));
+        if (result) result.ctxKey = key;
         if (!result || !result.ok) throw new Error(result && result.reason === 'nav' ? 'Giá trị ròng của danh mục không dương: không mô phỏng được.' : 'Mô phỏng không chạy được.');
         result.expectedUsed = expected ? Object.keys(expected).length : 0;
         SIM.run = Object.assign({}, SIM.run, { state: 'ok', result: result, error: '', ms: Date.now() - t0, sel: SIM.run.sel });
@@ -326,6 +331,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     applyThemeIcon();
     if (typeof BenchNav !== 'undefined') BenchNav.mount({ bench: 'simulation', active: 'outlook' });
     simRestore();
+    ctxRestore();
     window.addEventListener('hashchange', route);
     if (typeof sbClient !== 'undefined' && sbClient) {
         try { await sbClient.auth.getSession(); const { data } = await sbClient.auth.getUser(); SIM.email = data && data.user ? data.user.email : null; } catch (e) { /* chưa đăng nhập: dải báo phiên của api.js lo */ }

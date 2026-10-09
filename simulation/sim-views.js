@@ -33,11 +33,11 @@ function renderOutlookView() {
     const M = SIM.market;
     if (M.state === 'loading' || M.state === 'idle') return loadingHtml(M.step || 'Đang lấy 7 năm lịch sử VN-Index và ước lượng mô hình…');
     if (M.state === 'error') return errorHtml('Không dựng được mô hình thị trường: ' + M.error, 'simLoadMarket(true)');
-    const D = M.model, R = M.result, last = R.byHorizon[R.byHorizon.length - 1], h1 = R.byHorizon[0];
+    const D = M.model, withCtx = !!(SIM.ctx && SIM.ctx.use && M.ctxResult && ctxEvents().length), R = withCtx ? M.ctxResult : M.result, last = R.byHorizon[R.byHorizon.length - 1];
     const K = D.hmm.K, cur = D.hmm.current, top = cur.indexOf(Math.max.apply(null, cur));
     const pDown3 = last.index.pLoss10;
     const l1 = R.tree.filter((n) => n.depth === 1);
-    const thesis = '<section class="sim-thesis"><div><div class="eyebrow">Triển vọng VN-Index · ' + sE(fmtDate(D.lastDate)) + '</div>' +
+    const thesis = '<section class="sim-thesis"><div><div class="eyebrow">Triển vọng VN-Index · ' + sE(fmtDate(D.lastDate)) + (withCtx ? ' · có bối cảnh (' + ctxEvents().length + ' sự kiện)' : ' · chỉ lịch sử') + '</div>' +
         '<h2>Trong 3 tháng tới, 90% số kịch bản mô phỏng đưa VN-Index về khoảng ' + sNum(D.indexLevel * (1 + last.index.q05)) + ' – ' + sNum(D.indexLevel * (1 + last.index.q95)) + ' điểm.</h2>' +
         '<p>Thị trường đang ở chế độ <b>' + sE(regimeName(top, K)) + '</b> (xác suất ' + sProb(cur[top]) + '). Biến động hiện tại ' + sPct(D.garch.volNowAnn, 0) + '/năm so với trung bình dài hạn ' + sPct(D.garch.volLongAnn, 0) + '. ' +
         'Xác suất giảm hơn 10% trong 3 tháng: <b>' + sProb(pDown3) + '</b>; tăng hơn 10%: <b>' + sProb(last.index.pGain10) + '</b>.</p></div>' +
@@ -66,12 +66,14 @@ function renderOutlookView() {
         '<div class="tl-kpi"><span class="k">Hiệu ứng đòn bẩy</span><span class="v">' + sNum(D.garch.gamma / Math.max(1e-9, D.garch.alpha), 1) + '×</span><span class="s">cú giảm làm biến động tăng mạnh hơn cú tăng</span></div>' +
         '<div class="tl-kpi"><span class="k">Kỳ vọng dài hạn</span><span class="v">' + sPct(D.driftAnnual, 0) + '/năm</span><span class="s">neo lợi suất, chỉnh ở mục Mô phỏng</span></div></div>' +
         '<p class="tl-hint">Kết hợp hai mô hình (mỗi mô hình một nửa số đường): GJR-GARCH lấy mẫu lại phần dư thật, và chuyển chế độ Markov lấy mẫu lại lợi suất thật của những ngày cùng chế độ. Chi tiết ở mục Phương pháp.</p></section>';
-    return thesis + '<div class="sim-grid"><div class="sim-stack">' + fanCard + stressCard + '</div><div class="sim-stack">' + branchCard + regimeCard + modelCard + '</div></div>';
+    const ctxNote = withCtx ? ctxCompareHtml() : (SIM.ctx && SIM.ctx.use && ctxEvents().length ? '' : '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Đưa bối cảnh vào</h3><div class="tl-card-tools"><a class="sim-btn ghost sm" href="#context">Mở Bối cảnh <i class="fa-solid fa-arrow-right"></i></a></div></div><p class="tl-hint" style="margin:0">Triển vọng trên chỉ dựa vào lịch sử giá. Ở mục Bối cảnh, AI đọc tin mới nhất và đề xuất các sự kiện (bạn chỉnh được) để cộng vào mô phỏng.</p></section>');
+    return thesis + ctxNote + '<div class="sim-grid"><div class="sim-stack">' + fanCard + stressCard + '</div><div class="sim-stack">' + branchCard + regimeCard + modelCard + '</div></div>';
 }
 function mountOutlookCharts() {
     const M = SIM.market; if (M.state !== 'ok') return;
+    const withCtx = !!(SIM.ctx && SIM.ctx.use && M.ctxResult && ctxEvents().length), R = withCtx ? M.ctxResult : M.result;
     const c = document.getElementById('sim-fan-index');
-    if (c) SimCharts.fan(c, { bands: M.result.fan.index, base: M.model.indexLevel, fmt: (v) => sNum(v), markers: M.result.horizons, labels: HZ_LABEL, height: 290 });
+    if (c) SimCharts.fan(c, { bands: R.fan.index, base: M.model.indexLevel, fmt: (v) => sNum(v), markers: R.horizons, labels: HZ_LABEL, height: 290, overlay: withCtx ? { data: M.result.fan.index.q50, label: 'Chỉ lịch sử' } : null });
     const r = document.getElementById('sim-regime-hist');
     if (r) { const h = M.model.stressHist, from = Math.max(0, h.dates.length - 750); SimCharts.regime(r, { dates: h.dates.slice(from), p: h.p.slice(from), line: h.index ? h.index.slice(from) : null, height: 170 }); }
 }
@@ -189,7 +191,9 @@ function resultsHtml(res) {
     if (res.skipped && res.skipped.length) notes.push('Không đủ lịch sử giá để mô phỏng (giữ nguyên giá trị): ' + res.skipped.join(', ') + '.');
     if (res.stuckSessions > 0.05) notes.push('Trung bình mỗi đường có ' + sNum(res.stuckSessions, 1) + ' phiên muốn bán nhưng cổ phiếu nằm sàn không bán được: kết quả cắt lỗ đã tính điều này.');
     notes.push('Chi phí: phí ' + sPct(res.costs.fee, 2) + ', thuế bán ' + sPct(res.costs.tax, 2) + ', chi phí tác động giá theo thanh khoản, tối đa ' + sPct(res.costs.participation, 0) + ' thanh khoản mỗi phiên; lệnh quyết định theo giá đóng cửa được khớp ở phiên sau; cổ phiếu mua T+2 mới bán được.');
-    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + '<div class="sim-grid even">' + truth + sens + '</div>';
+    const stale = typeof ctxKey === 'function' && res.ctxKey !== undefined && res.ctxKey !== ctxKey() ? '<p class="tl-hint"><b class="sim-down">Bối cảnh đã thay đổi sau lần chạy này: bấm Chạy mô phỏng để tính lại.</b></p>' : '';
+    const evInfo = res.events && res.events.length ? '<p class="tl-hint" style="margin-top:0">Đã tính ' + res.events.length + ' sự kiện của bối cảnh (mục Bối cảnh).</p>' : '';
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + stale + evInfo + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + (typeof eventImpactHtml === 'function' ? eventImpactHtml(res, hk) : '') + '<div class="sim-grid even">' + truth + sens + '</div>';
 }
 function mountPortfolioCharts() {
     const R = SIM.run; if (R.state !== 'ok' || !R.result) return;
@@ -280,7 +284,11 @@ function renderMethodView() {
         '<li><b>Tương đương chắc chắn</b>: lợi suất chắc chắn mà bạn thấy ngang giá với phân phối rủi ro đó, theo khẩu vị rủi ro (hàm lợi ích CRRA). Đây là tiêu chí chính để xếp hạng.</li>' +
         '<li><b>Hối tiếc</b>: trên mỗi đường giá, chênh lệch so với cách xử lý tốt nhất trên chính đường đó. Cách ít hối tiếc là cách bền vững qua mọi kịch bản.</li>' +
         '<li><b>Cây kịch bản</b>: nhóm các đường theo cách VN-Index đi ở từng giai đoạn. So sánh cách xử lý trong một nhánh cho biết quyết định nào bền với nhánh đó; muốn quyết định SAU khi biết nhánh, dùng kế hoạch có điều kiện.</li></ul>' +
-        '<h3>Giới hạn</h3><ul><li>Mô hình học từ 7 năm lịch sử (gồm 2020 và 2022): sự kiện chưa từng có trong lịch sử (thay đổi chính sách lớn, nâng hạng thị trường) không được mô hình biết. Bước sau của Market Simulation sẽ đưa bối cảnh tin tức vào qua AI.</li>' +
+        '<h3>Bối cảnh (AI)</h3><ul><li>AI (Gemini, qua máy chủ) đọc tiêu đề và mô tả ngắn của khoảng 60 tin mới nhất cùng trạng thái thị trường dạng SỐ, rồi liệt kê sự kiện có thể làm thị trường đổi hướng trong 3 tháng. Mỗi sự kiện phải dẫn tin làm căn cứ; liên kết lấy từ danh sách tin chứ không từ lời AI; nội dung tin được coi là dữ liệu (AI được dặn bỏ qua mọi chỉ dẫn trong tin).</li>' +
+        '<li>AI <b>chỉ</b> đưa mức thô (khả năng thấp/vừa/cao, tác động nhỏ/vừa/lớn, hướng, thời điểm, ngành). Bộ máy quy đổi: khả năng thấp 15%, vừa 35%, cao 60%; độ lớn theo phân vị của các nhịp 5 phiên trong lịch sử VN-Index (nhỏ = trung vị, vừa = 85%, lớn = 97%); sự kiện theo ngành tác động thêm 1,5 lần lên cổ phiếu trong ngành và 25% lên thị trường chung. Bạn chỉnh mọi con số trên thẻ.</li>' +
+        '<li>Trong mỗi đường mô phỏng, một sự kiện xảy ra với xác suất của nó, vào một phiên ngẫu nhiên trong cửa sổ thời gian, thành một cú sốc cộng vào lợi suất (với GARCH, cú sốc làm biến động các phiên sau tăng theo). Sự kiện "chưa rõ chiều" là 50/50 tăng hoặc giảm. Lịch sự kiện bốc bằng bộ số ngẫu nhiên riêng nên bật/tắt một sự kiện không làm xáo trộn phần lịch sử: so sánh có và không có bối cảnh là công bằng.</li>' +
+        '<li>Sự kiện là <b>quan điểm cộng thêm</b> trên mô hình lịch sử (giống quan điểm trong Black-Litterman): lịch sử đã chứa những biến cố thường gặp, nên chỉ bật sự kiện bạn tin là đặc biệt của giai đoạn này. Phần Kiểm chứng chỉ chấm mô hình lịch sử (không chấm được bối cảnh AI trong quá khứ); việc chấm điểm các lần dùng bối cảnh sẽ có ở đợt sau.</li></ul>' +
+        '<h3>Giới hạn</h3><ul><li>Mô hình học từ 7 năm lịch sử (gồm 2020 và 2022): sự kiện chưa từng có trong lịch sử chỉ được đưa vào qua thẻ bối cảnh, và độ chính xác phụ thuộc vào đánh giá của bạn và của AI.</li>' +
         '<li>Tin xấu riêng của một doanh nghiệp chỉ được mô phỏng ở mức đã từng xảy ra với chính mã đó.</li><li>Lãi vay ký quỹ không được tính; tiền mặt không sinh lãi.</li></ul>' +
         '</div></section>';
 }

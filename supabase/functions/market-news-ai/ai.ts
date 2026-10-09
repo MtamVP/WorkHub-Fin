@@ -209,12 +209,12 @@ export async function summarizeWithFallback(o: { models: string[]; cooldown: Ret
 
 // Cổng chi phí: dùng lại kết quả 30 phút (mọi người cùng lúc dùng chung), gộp các yêu cầu đồng thời thành một, nhớ lỗi 2 phút để không gọi dồn, và trần số lượt mỗi ngày (giờ UTC).
 // Bộ nhớ nằm trong từng phiên bản chạy của hàm nên trần là nỗ lực tốt nhất; hạn mức chi tiêu đặt ở tài khoản Anthropic mới là chốt chặn cuối.
-export function createGate(o: { now: () => number; cacheMs?: number; failMs?: number; cap?: number }) {
+export function createGate<V = Summary>(o: { now: () => number; cacheMs?: number; failMs?: number; cap?: number }) {
   const cacheMs = o.cacheMs ?? CACHE_MS, failMs = o.failMs ?? FAIL_MS, cap = o.cap ?? DAILY_CAP_DEFAULT;
-  let cache: { at: number; value: Summary } | null = null, failed: { at: number; f: Fail } | null = null, inflight: Promise<any> | null = null, day = "", count = 0;
+  let cache: { at: number; value: V } | null = null, failed: { at: number; f: Fail } | null = null, inflight: Promise<any> | null = null, day = "", count = 0;
   return {
     stats: () => ({ count, day }),
-    async run(producer: () => Promise<{ ok: true; value: Summary } | Fail>): Promise<{ ok: true; value: Summary; cached: boolean; ageSec: number } | Fail> {
+    async run(producer: () => Promise<{ ok: true; value: V } | Fail>): Promise<{ ok: true; value: V; cached: boolean; ageSec: number } | Fail> {
       const t = o.now();
       if (cache && t - cache.at < cacheMs) return { ok: true, value: cache.value, cached: true, ageSec: Math.floor((t - cache.at) / 1000) };
       if (failed && t - failed.at < failMs) return failed.f;

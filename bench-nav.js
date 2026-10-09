@@ -21,6 +21,7 @@ const BenchNav = (function () {
       brand: 'Market Simulation',
       items: [
         { key: 'outlook', href: '/simulation/', icon: 'fa-chart-area', label: 'Triển vọng', title: 'Quạt xác suất VN-Index, chế độ thị trường hiện tại' },
+        { key: 'context', href: '/simulation/#context', icon: 'fa-wand-magic-sparkles', label: 'Bối cảnh', title: 'Bối cảnh tin tức bằng AI: thẻ sự kiện đưa vào mô phỏng' },
         { key: 'portfolio', href: '/simulation/#portfolio', icon: 'fa-flask', label: 'Mô phỏng', title: 'Mô phỏng danh mục và so sánh các cách xử lý' },
         { key: 'tree', href: '/simulation/#tree', icon: 'fa-code-branch', label: 'Cây kịch bản' },
         { key: 'validate', href: '/simulation/#validate', icon: 'fa-bullseye', label: 'Kiểm chứng', title: 'Mô hình đã dự báo đúng đến đâu trong quá khứ' },
