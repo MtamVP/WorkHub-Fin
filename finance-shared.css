@@ -953,4 +953,11 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
   table[data-m-cards] td:first-child, table[data-m-cards] td:has(.price-wrap), table[data-m-cards] td:has(.levels-cell), table[data-m-cards] td[colspan] { grid-column: 1 / -1; }
   table[data-m-cards] td:first-child::before, table[data-m-cards] td[colspan]::before { display: none; }
   table[data-m-cards] .price-wrap, table[data-m-cards] .levels-cell { align-items: flex-start; }
+  /* nền tô theo ô (vd. hàng "Tới giá mua") thành từng mảng rời trong thẻ: bỏ nền ô, tô cả thẻ */
+  table[data-m-cards] td { background: transparent !important; }
+  table[data-m-cards] tr.tl-row-signal { background: color-mix(in srgb, var(--success-color) 9%, var(--card-bg)); border-color: color-mix(in srgb, var(--success-color) 45%, var(--border-color)); }
+  /* ô không có tiêu đề cột (nút thao tác): chiếm cả hàng, các nút nằm ngang */
+  table[data-m-cards] td:not([data-label]):not(:first-child):not([colspan]) { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table[data-m-cards] td:not([data-label])::before { display: none; }
+  table[data-m-cards] td input:not([type=checkbox]) { max-width: 100%; }
 }

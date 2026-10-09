@@ -160,7 +160,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
 
   const client = {
     from: builder,
-    auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }), getUser: async () => ({ data: { user: opts.authUser || null } }) },
+    auth: { getSession: async () => ({ data: { session: opts.authUser ? { access_token: "fake", user: opts.authUser } : null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }), getUser: async () => ({ data: { user: opts.authUser || null } }) },
     functions: {
       invoke: async (name, o) => {
         functionCalls.push({ name, body: o && o.body });

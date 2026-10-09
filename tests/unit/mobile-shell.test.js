@@ -77,6 +77,13 @@ describe('CSS giao diện điện thoại (finance-shared.css)', () => {
     });
     const assets = fs.readFileSync(path.join(ROOT, 'mastersheet/assets/index.html'), 'utf8');
     expect(assets).toContain('data-m-cards');
+    // Danh Mục, Theo Dõi, Sổ Lệnh: ba bảng thao tác hằng ngày thành thẻ trên điện thoại
+    ['holdings-table', 'watch-table', 'ledger-table'].forEach((id) => expect(assets).toMatch(new RegExp(`<table[^>]*id="${id}"[^>]*data-m-cards`)));
+    const css = fs.readFileSync(path.join(ROOT, 'finance-shared.css'), 'utf8');
+    const mob = css.slice(css.indexOf('MOBILE PAGES'));
+    expect(mob).toMatch(/table\[data-m-cards\] td \{ background: transparent !important; \}/);           // nền theo ô không thành mảng rời
+    expect(mob).toMatch(/table\[data-m-cards\] tr\.tl-row-signal \{ background:/);                     // hàng "Tới giá mua" tô cả thẻ
+    expect(mob).toMatch(/td:not\(\[data-label\]\):not\(:first-child\):not\(\[colspan\]\) \{ grid-column: 1 \/ -1; flex-direction: row;/);
     expect(assets).toContain('MobileCards.mount()');
     expect(assets.indexOf('/mobile-cards.js')).toBeLessThan(assets.indexOf('MobileCards.mount()'));
   });

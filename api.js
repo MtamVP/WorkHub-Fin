@@ -30,7 +30,59 @@ const SUPABASE_KEY = "sb_publishable_sl9uOpcIzfzN9NZ5D_ZdsQ_FQZchyUR";
 const TOOLS_SUPABASE_URL = "https://jbibxrhorqmbbyjuxcgo.supabase.co";
 const TOOLS_SUPABASE_KEY = "sb_publishable_RgXnbjszBBJJUswXTzlpSA_ixYR3nJ-";
 
-const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// fetch của client được bọc để nhận ra lỗi 401 (phiên hết hạn) -- xem whSessionGuard bên dưới
+const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    global: { fetch: (...args) => fetch(...args).then(res => { if (res.status === 401 && window.whSessionGuard) window.whSessionGuard.on401(); return res; }) }
+}) : null;
+
+// Trang con (Danh Mục, Thị Trường, Valuation Bench...) không có màn đăng nhập riêng: khi chưa đăng nhập hoặc phiên hết hạn
+// (mã làm mới bị từ chối), trước đây trang vẫn chạy và gửi hàng loạt yêu cầu bị từ chối 401 (đo 09/10: 101 lượt trong 3 phút),
+// người dùng chỉ thấy bảng trống. Nay hiện một dải báo rõ kèm nút về trang đăng nhập. Lỗi mạng (ngoại tuyến) KHÔNG tính là hết phiên.
+window.whSessionGuard = (function () {
+    const path = (typeof location !== 'undefined' && location.pathname) ? location.pathname.replace(/index\.html$/, '') : '/';
+    const exempt = path === '/' || /^\/(forgot|reset|change_nickname)\//.test(path) || /quick-capture/.test(path);
+    let shown = false, lastCheck = 0;
+    function show() {
+        if (shown || typeof document === 'undefined' || !document.body) return;
+        if (document.getElementById('auth-modal')) return;   // trang có màn đăng nhập riêng (trang chính), kể cả khi không nằm ở gốc tên miền
+        shown = true;
+        const bar = document.createElement('div');
+        bar.id = 'wh-session-banner';
+        bar.setAttribute('role', 'alert');
+        bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:10000;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 24px);padding:10px 14px;border-radius:10px;font:500 13px/1.4 system-ui,sans-serif;background:var(--card-bg,#fff);color:var(--text-primary,#1b1b1b);border:1px solid var(--danger-color,#c0392b);box-shadow:0 6px 24px rgba(0,0,0,.18)';
+        const msg = document.createElement('span');
+        msg.textContent = 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn: phần số liệu cần đăng nhập sẽ không tải được.';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Đăng nhập lại';
+        btn.style.cssText = 'cursor:pointer;border:0;border-radius:8px;padding:6px 12px;font:600 13px system-ui,sans-serif;background:var(--danger-color,#c0392b);color:#fff';
+        btn.onclick = () => { location.href = '/'; };
+        bar.append(msg, btn);
+        document.body.appendChild(bar);
+    }
+    async function check(tryRefresh) {
+        if (exempt || shown || !sbClient) return;
+        if (tryRefresh) {
+            const now = Date.now();
+            if (now - lastCheck < 60000) return;                 // nhiều lỗi 401 cùng lúc chỉ kiểm một lần mỗi phút
+            lastCheck = now;
+        }
+        try {
+            const { data, error } = await sbClient.auth.getSession();
+            if (error) return;                                   // lỗi mạng: không kết luận
+            if (!data || !data.session) return show();
+            if (!tryRefresh) return;
+            const r = await sbClient.auth.refreshSession();      // có phiên mà máy chủ vẫn từ chối: thử làm mới, bị từ chối hẳn (4xx) mới báo
+            if (r && r.error && r.error.status >= 400 && r.error.status < 500) show();
+        } catch (e) { /* bỏ qua: không chắc chắn thì không báo */ }
+    }
+    if (!exempt && sbClient) {
+        const start = () => check(false);
+        if (typeof document !== 'undefined' && document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
+        sbClient.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') show(); });
+    }
+    return { on401: () => { check(true); }, check, isExempt: () => exempt, isShown: () => shown };
+})();
 // Dự án Supabase "tools" (dùng chung với các công cụ khác): Fin hiện không gọi tới, nên chỉ tạo client khi có nơi đọc
 // window.toolsSupabaseClient lần đầu -- trước đây mỗi lần mở trang đều tạo thêm một client (thêm một bộ quản lý phiên chạy nền).
 let toolsSbClient = null;
@@ -4344,15 +4396,28 @@ const API = {
         getColors: async () => ({})
     },
     system: {
+        // Nhóm của người đang đăng nhập (hỏi máy chủ một lần rồi nhớ). Chính sách ghi system_logs chỉ nhận group_key = nhóm của mình
+        // (hoặc người dùng admin), nên lời gọi không truyền groupKey mà ghi 'general' bị từ chối 403 với người dùng nhóm finance.
+        _myGroup: null,
+        myGroup: () => {
+            if (!API.system._myGroup) {
+                API.system._myGroup = Promise.resolve(sbClient && sbClient.rpc ? sbClient.rpc('current_user_group') : null)
+                    .then(r => (r && !r.error && typeof r.data === 'string' && r.data) ? r.data : null)
+                    .catch(() => null)
+                    .then(g => { if (!g) API.system._myGroup = null; return g; });   // chưa có phiên/lỗi mạng: lần sau hỏi lại
+            }
+            return API.system._myGroup;
+        },
         logAction: async (traceId, action, details, status, email, groupKey, entityId) => {
             if (!sbClient) return;
+            const group = (groupKey && groupKey !== 'all') ? groupKey : ((await API.system.myGroup()) || 'general');
             const { error } = await sbClient.from('system_logs').insert({
                 trace_id: traceId,
                 action: action,
                 details: typeof details === 'object' ? JSON.stringify(details) : details,
                 status: status,
                 user_email: email || 'unknown',
-                group_key: groupKey || 'general',
+                group_key: group,
                 entity_id: entityId || null
             });
             if (error) console.error("System Log Error", error);
@@ -5397,7 +5462,8 @@ async function _dispatchAction(action, params = {}) {
             window.scheduleGoogleCalendarPush();
         }
 
-        if (action !== 'getNotifications' && action !== 'syncLounge' && !action.startsWith('get')) {
+        // Chỉ ghi nhật ký hệ thống cho thao tác THAY ĐỔI dữ liệu; lượt đọc (list.../load... chạy theo chu kỳ) từng ghi ~200 dòng "OK" mỗi ngày
+        if (MUTATING_ACTIONS.has(action)) {
             API.system.logAction(traceId, action, finalMessage, 'success', params.email, params.groupKey, entityId);
         }
 

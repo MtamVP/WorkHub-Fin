@@ -24,7 +24,7 @@
       })();
     </script>
     <link rel="stylesheet" href="/style.css?v=1788630490059">
-    <link rel="stylesheet" href="/finance-shared.css?v=2.13">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.14">
     <link rel="stylesheet" href="/mastersheet/assets/style.css?v=1789060000000">
     <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
     <link rel="manifest" href="/manifest.json">
@@ -206,7 +206,7 @@
                 * <b>Cách dùng:</b> thêm mã bạn chưa mua và đặt <b>giá muốn mua</b>. Giá thị trường tự cập nhật như mã đang giữ; khi giá chạm mức đó, hàng được tô sáng và (nếu bạn bật “Gửi email khi giá chạm mục tiêu / cắt lỗ” ở tab Danh Mục) app gửi email cả khi đã tắt app. Mua rồi thì cảnh báo tự dừng.
             </p>
             <div class="spreadsheet-wrapper">
-                <table class="excel-table asset-table" id="watch-table">
+                <table class="excel-table asset-table" id="watch-table" data-m-cards>
                     <thead>
                         <tr>
                             <th>Mã</th><th class="text-right">Giá TT</th><th class="text-right">Giá muốn mua</th>
@@ -321,7 +321,7 @@
                     <button type="button" class="btn-tool" onclick="printCurrentTab()" title="In hoặc lưu thành PDF"><i class="fa-solid fa-print"></i> In / PDF</button>
                 </div>
                 <div class="spreadsheet-wrapper">
-                    <table class="excel-table asset-table" id="ledger-table">
+                    <table class="excel-table asset-table" id="ledger-table" data-m-cards>
                         <thead>
                             <tr>
                                 <th>Ngày</th><th>Loại</th><th>Mã</th><th class="text-right">KL</th>
@@ -780,7 +780,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../../api.js?v=1791900000000"></script>
+    <script src="../../api.js?v=1792200000000"></script>
     <script src="../../lib/finance-calc.js?v=1791990000000"></script>
     <script src="../../lib/sector-map.js?v=1791900000000"></script>
     <script src="../../lib/vn-market.js?v=1791900000000"></script>
