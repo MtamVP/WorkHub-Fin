@@ -10,7 +10,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, '..'), require = createRequire(import.meta.url);
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
-const outPdf = opt('out', path.join(root, 'docs', 'HuongDan-WorkHub-Fin-0.1.16.pdf'));
+const outPdf = opt('out', path.join(root, 'docs', 'HuongDan-WorkHub-Fin-0.1.17.pdf'));
 const candidates = [opt('browser', ''), 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].filter(Boolean);
 const browser = candidates.find((p) => fs.existsSync(p));
 if (!browser) { console.error('Không tìm thấy Edge/Chrome. Dùng --browser <đường dẫn>.'); process.exit(1); }
@@ -56,7 +56,7 @@ try {
   await send('Page.navigate', { url: pathToFileURL(tmpHtml).href }); await sleep(2500);
   await send('Runtime.enable');
   await send('Runtime.evaluate', { expression: 'document.fonts.ready.then(() => Promise.all([...document.images].map((i) => i.decode().catch(() => {}))))', awaitPromise: true });
-  const foot = '<div style="width:100%;font-size:8px;color:#5B6773;font-family:Segoe UI,Arial,sans-serif;display:flex;justify-content:space-between;padding:0 17mm"><span>WorkHub Fin 0.1.16 · Hướng dẫn sử dụng</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>';
+  const foot = '<div style="width:100%;font-size:8px;color:#5B6773;font-family:Segoe UI,Arial,sans-serif;display:flex;justify-content:space-between;padding:0 17mm"><span>WorkHub Fin 0.1.17 · Hướng dẫn sử dụng</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>';
   const r = await send('Page.printToPDF', { printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: '<div></div>', footerTemplate: foot, marginTop: 0.75, marginBottom: 0.8, marginLeft: 0.65, marginRight: 0.65 });
   fs.writeFileSync(outPdf, Buffer.from(r.data, 'base64'));
   console.log('Đã ghi', outPdf, Math.round(fs.statSync(outPdf).size / 1024) + ' KB');

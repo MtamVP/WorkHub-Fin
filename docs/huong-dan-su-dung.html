@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>WorkHub Fin 0.1.16 · Hướng dẫn sử dụng</title>
+<title>WorkHub Fin 0.1.17 · Hướng dẫn sử dụng</title>
 <style>
   :root { --navy: #27476E; --navy-deep: #1B3350; --ink: #1F2933; --muted: #5B6773; --rule: #D5DBE3; --wash: #F2F5F9; --ok: #12755A; --warn: #A15C00; --bad: #B3362E; --info: #2F5FA8; }
   @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
@@ -56,11 +56,11 @@
   <div class="top">
     <div class="kicker">WorkHub Finance · Tài liệu cho người dùng</div>
     <h1>WorkHub Fin<br>Hướng dẫn sử dụng</h1>
-    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.16</p>
+    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.17</p>
   </div>
   <div>
     <div class="callout warn"><b class="t">Đọc trước khi dùng</b><p>WorkHub Fin là công cụ phân tích nội bộ dùng dữ liệu miễn phí của thị trường Việt Nam. Mọi con số, nhận định và vùng giá đều là ước tính phụ thuộc vào giả định và số liệu đầu vào; <b>không phải khuyến nghị đầu tư</b>. Số liệu miễn phí có thể trễ hoặc khác báo cáo gốc: luôn đối chiếu trước khi ra quyết định.</p></div>
-    <div class="meta"><b>Phiên bản:</b> 0.1.16 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 09/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
+    <div class="meta"><b>Phiên bản:</b> 0.1.17 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 09/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
   </div>
 </section>
 
@@ -95,7 +95,7 @@
 
 <h2>1.1 Cài đặt và cập nhật</h2>
 <ol class="steps">
-  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.16_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
+  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.17_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
   <li>Mở <span class="ui">WorkHub-Fin</span> và đăng nhập bằng tài khoản WorkHub của bạn. Cần có Internet để lấy dữ liệu thị trường.</li>
   <li>Từ các bản sau, ứng dụng <b>tự kiểm tra và cập nhật</b>: khi có bản mới sẽ hỏi bạn; không cần cài lại thủ công.</li>
 </ol>
@@ -189,11 +189,19 @@
     <tr><td><span class="ui">Nhật Ký</span></td><td>Nhật ký quyết định: ghi lý do và kỳ vọng lúc ra quyết định, đối chiếu với giá thực tế và VN-Index, đánh giá lại.</td></tr>
     <tr><td><span class="ui">Hiệu Suất</span></td><td>Hiệu quả so với VN-Index (alpha, beta, Sharpe, sụt giảm tối đa), phân tích đóng góp theo mã và ngành, phân rã Brinson so với danh mục chuẩn của chiến lược.</td></tr>
     <tr><td><span class="ui">Gương</span></td><td>Soi lại hành vi quyết định: hiệu chỉnh mức tự tin, thiên kiến chốt lời sớm / giữ lỗ lâu, mua đuổi, bán hoảng loạn; mọi nhận xét kèm cỡ mẫu để biết đáng tin đến đâu.</td></tr>
-    <tr><td><span class="ui">Rủi Ro</span></td><td>Rủi ro danh mục (VaR/ES, kiểm thử căng thẳng, tập trung ngành và mã, thanh khoản khi bán).</td></tr>
+    <tr><td><span class="ui">Rủi Ro</span></td><td>Rủi ro danh mục (VaR/ES, kiểm thử căng thẳng, tập trung ngành và mã, thanh khoản khi bán). <b>Mới 0.1.17:</b> thẻ <b>Tối ưu hoá tỷ trọng</b> (xem bên dưới).</td></tr>
     <tr><td><span class="ui">Lịch</span></td><td>Lịch cổ tức và sự kiện doanh nghiệp của các mã đang nắm.</td></tr>
     <tr><td><span class="ui">Báo Cáo</span></td><td>Lãi/lỗ đã chốt theo năm, cân bằng danh mục về tỷ trọng mục tiêu, xuất số liệu báo cáo cuối tháng ra Excel (tệp để đưa cho AI điền mẫu PowerPoint), và thẻ <b>Liên Kết Kế Toán</b> (xem bên dưới).</td></tr>
   </tbody>
 </table>
+<div class="callout ok"><b class="t">Tối ưu hoá tỷ trọng (mới 0.1.17)</b>
+<ul>
+  <li>Ở tab <span class="ui">Rủi Ro</span>, thẻ <b>Tối ưu hoá tỷ trọng</b> gợi ý phân bổ lại giữa các mã <b>đang nắm</b>, giữ nguyên tổng giá trị cổ phiếu và tiền mặt. Có ba cách: <b>Phương sai nhỏ nhất</b> (ít biến động nhất, không cần dự báo lợi nhuận), <b>Cân bằng rủi ro</b> (mỗi mã đóng góp rủi ro như nhau) và <b>Sharpe tối đa</b> (lợi nhuận kỳ vọng trên mỗi đơn vị rủi ro).</li>
+  <li>Đặt <b>tỷ trọng tối đa và tối thiểu mỗi mã</b> theo % NAV; mặc định lấy theo giới hạn "Một mã tối đa" của bạn, không có thì 35%. Đặt tối thiểu lớn hơn 0 nếu không muốn bán hẳn mã nào.</li>
+  <li>Sharpe tối đa lấy lợi nhuận kỳ vọng từ <b>giá trị hợp lý đã lưu ở Valuation Bench</b>: khoảng cách tới giá trị hợp lý thu hẹp dần trong số năm bạn chọn (mặc định 2), co một nửa về mức chung của thị trường và chặn trong khoảng −30% đến +40%/năm. Mã chưa có định giá dùng mức chung. Cách này rất nhạy với định giá, nên đặt cận chặt.</li>
+  <li>Thẻ cho biết biến động năm (và lợi nhuận kỳ vọng, Sharpe nếu có) <b>hiện tại so với đề xuất</b>, tỷ lệ phải đổi, phí và thuế ước tính, đóng góp rủi ro từng mã trước và sau, và khối lượng mua/bán theo lô 100.</li>
+  <li>Đây là <b>gợi ý định lượng dựa trên lịch sử giá</b> (hiệp phương sai co Ledoit-Wolf, thuật toán đã đối chiếu với thư viện khoa học scipy). Chưa xét thanh khoản, giới hạn ngành hay luận điểm đầu tư: kiểm tra lại bằng <span class="ui">Kiểm tra trước lệnh</span> trước khi đặt lệnh.</li>
+</ul></div>
 <div class="callout"><b class="t">Giá trực tiếp khi nhập lệnh (mới)</b>
 <ul>
   <li>Ở <span class="ui">Sổ Lệnh</span> &gt; thêm lệnh giao dịch, khi bạn gõ mã, app <b>tự điền giá hiện tại</b> vào ô Giá (nếu ô còn trống) và hiện dòng giá thị trường ngay dưới ô: giá, giá tham chiếu, <b>trần và sàn</b>, giờ lấy giá. Giá bạn đã tự gõ <b>không bao giờ bị ghi đè</b>; mục <span class="ui">Kiểm tra trước lệnh</span> có nút <span class="ui">Dùng giá này</span>.</li>
@@ -227,6 +235,23 @@
   <li><b>Định giá cả danh sách:</b> chạy bộ máy Valuation Bench cho từng mã trong danh sách (tối đa 150 mã mỗi lần, khoảng vài phút) với giả định <b>mặc định</b>, rồi xếp theo biên an toàn. Kết quả chỉ để sàng, không được lưu: mở <i>Hồ sơ</i> để xem quy trình, chỉnh giả định và lưu bản chính thức.</li>
   <li><b>Xuất CSV</b> (mở được bằng Excel) và <b>lưu bộ lọc có tên</b>: bộ lọc đã lưu nằm trong máy này, không lên máy chủ.</li>
   <li>Số liệu tăng trưởng và giá mới có sau lần cập nhật dữ liệu ban đêm đầu tiên sau khi nâng cấp; trước đó các tiêu chí này báo "thiếu số liệu".</li>
+</ul></div>
+<div class="callout ok"><b class="t">Bộ lọc thị trường nâng cấp (mới 0.1.17)</b>
+<ul>
+  <li><b>Hơn 20 tiêu chí mới</b>, gom thành các nhóm bấm để mở/thu gọn (nhóm đang có tiêu chí bật tự mở):
+    <ul>
+      <li><b>Chất lượng:</b> ROIC, ROA, biên lợi nhuận gộp và EBIT, biên đang cải thiện hay giảm.</li>
+      <li><b>An toàn và dòng tiền:</b> dòng tiền kinh doanh trên doanh thu, số năm có dòng tiền dương, khả năng trả lãi vay, thanh toán hiện hành, tiền mặt ròng, beta.</li>
+      <li><b>Định giá:</b> P/S, EV/Doanh thu, P/B so với 5 năm.</li>
+      <li><b>Giá:</b> cách đỉnh 52 tuần, giảm từ đỉnh, cao hơn đáy.</li>
+      <li><b>Cổ đông:</b> tỷ lệ chi trả cổ tức, cổ phiếu tự do chuyển nhượng.</li>
+      <li><b>Riêng ngân hàng:</b> NIM, dự phòng trên nợ xấu, vốn chủ trên tổng tài sản. Bật tiêu chí ngân hàng thì kết quả chỉ còn ngân hàng.</li>
+    </ul></li>
+  <li><b>Điểm sức khoẻ tài chính (0-9)</b> kiểu Piotroski cho cả thị trường: lãi, dòng tiền, lợi nhuận có tiền đi kèm, tăng trưởng, biên, trả lãi, thanh khoản, đòn bẩy; ngân hàng dùng 6 dấu hiệu riêng. Cột <i>Sức khoẻ</i> trong kết quả, rê chuột để xem từng dấu hiệu. Từ 8 trở lên là tốt (khoảng 31% doanh nghiệp đạt). Đây là bản rút gọn dùng mức hiện tại, không phải thay đổi qua từng năm như điểm Piotroski gốc ở hồ sơ từng mã.</li>
+  <li><b>Mẫu lọc mới:</b> Chất lượng cao theo ROIC, Sức khoẻ tài chính tốt và giá hợp lý, Gần đỉnh 52 tuần mà chưa đắt, Ngân hàng tốt.</li>
+  <li><b>Trọng số điểm xếp hạng tự chỉnh:</b> nhóm <i>Trọng số điểm xếp hạng</i> cho đặt lại tỷ lệ định giá, chất lượng, tăng trưởng, cổ tức, an toàn và nhóm mới <b>động lượng giá</b> (sức mạnh tương đối và vị trí so với đỉnh 52 tuần); trọng số lưu cùng bộ lọc.</li>
+  <li>Bảng kết quả tự thêm <b>cột cho mỗi tiêu chí đang bật</b> chưa có cột riêng; CSV thêm sức khoẻ, ROIC, dòng tiền, cách đỉnh 52 tuần. Cờ cảnh báo mới: có lãi mà dòng tiền âm, trả lãi yếu, trả cổ tức nhiều hơn lợi nhuận.</li>
+  <li><b>Số liệu mới hơn một phiên:</b> VNDirect chỉ có chỉ số của một ngày sau 18 giờ tối hôm đó, nên trước đây bộ lọc luôn chậm một phiên; nay máy chủ lấy thêm một lượt lúc 8 giờ 15 sáng.</li>
 </ul></div>
 <div class="callout ok"><b class="t">EV/EBITDA và kiểm chứng bộ lọc bằng lịch sử (mới)</b>
 <ul>
@@ -424,6 +449,7 @@
   <li>Hiệu chỉnh vai trò phương pháp lần đầu (trên 53 mã) làm IC giai đoạn huấn luyện tăng từ +0,16 lên +0,27 nhưng <b>ngoài mẫu gần như không đổi</b> (+0,25 → +0,24): phần lớn mức tăng chỉ là khớp với dữ liệu đã dùng để chọn. Khi mở rộng lên 171 mã, một kết luận của lần hiệu chỉnh đó bị <b>bác bỏ</b>: nhóm cổ tức/tiện ích không dự báo ngược (EPV, số Graham, Lynch, DCF đều dương ở cả hai giai đoạn); vai trò đã được sửa và chỉ đổi khi cả hai giai đoạn cùng chiều.</li>
   <li>Các phương pháp lịch sử của chính cổ phiếu (P/E, P/B) dự báo yếu và không ổn định giữa hai giai đoạn (IC từ 0 đến 0,3 tuỳ nhóm); nhóm phục hồi (lỗ hoặc lợi nhuận quanh 0) có ít mẫu và DCF ở nhóm này gần 0 hoặc âm.</li></ul></div>
 
+<div class="callout"><b class="t">Đã thử học trọng số theo nhóm ngành (09/10/2026)</b><p>Đặt trọng số từng phương pháp theo chính độ dự báo của nó trong từng mô hình kinh doanh, học trên giai đoạn cũ rồi đo trên giai đoạn sau, với ba mốc tách dữ liệu và hai kỳ hạn (6 và 12 tháng). IC ngoài mẫu chênh với trọng số hiện tại chỉ từ −0,015 đến +0,01, nhỏ hơn nhiều so với sai số đo (khoảng ±0,03), ở kỳ hạn 6 tháng còn kém hơn. Vì vậy trọng số được <b>giữ nguyên</b>: học thêm từ một chu kỳ dữ liệu chủ yếu khớp nhiễu của quá khứ. Chi tiết ở trang <span class="ui">Độ chính xác</span>.</p></div>
 <h1 id="s12">12. Ví dụ làm từ đầu đến cuối</h1>
 <p class="small">Ví dụ minh hoạ với số liệu ngày 05/10/2026; con số thực sẽ khác khi bạn dùng. Mục đích là cho thấy cách đọc, không phải kết luận về FPT.</p>
 <ol class="steps">
