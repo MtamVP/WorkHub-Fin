@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>WorkHub Fin 0.1.14 · Hướng dẫn sử dụng</title>
+<title>WorkHub Fin 0.1.15 · Hướng dẫn sử dụng</title>
 <style>
   :root { --navy: #27476E; --navy-deep: #1B3350; --ink: #1F2933; --muted: #5B6773; --rule: #D5DBE3; --wash: #F2F5F9; --ok: #12755A; --warn: #A15C00; --bad: #B3362E; --info: #2F5FA8; }
   @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
@@ -56,11 +56,11 @@
   <div class="top">
     <div class="kicker">WorkHub Finance · Tài liệu cho người dùng</div>
     <h1>WorkHub Fin<br>Hướng dẫn sử dụng</h1>
-    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.14</p>
+    <p class="sub">Investment Workbench và Valuation Bench<br>phiên bản 0.1.15</p>
   </div>
   <div>
     <div class="callout warn"><b class="t">Đọc trước khi dùng</b><p>WorkHub Fin là công cụ phân tích nội bộ dùng dữ liệu miễn phí của thị trường Việt Nam. Mọi con số, nhận định và vùng giá đều là ước tính phụ thuộc vào giả định và số liệu đầu vào; <b>không phải khuyến nghị đầu tư</b>. Số liệu miễn phí có thể trễ hoặc khác báo cáo gốc: luôn đối chiếu trước khi ra quyết định.</p></div>
-    <div class="meta"><b>Phiên bản:</b> 0.1.14 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 08/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
+    <div class="meta"><b>Phiên bản:</b> 0.1.15 &nbsp;·&nbsp; <b>Ngày phát hành:</b> 09/10/2026 &nbsp;·&nbsp; <b>Nền tảng:</b> Windows 10/11 (ứng dụng WorkHub-Fin) &nbsp;·&nbsp; <b>Dành cho:</b> thành viên nhóm tài chính và quản lý tài sản</div>
   </div>
 </section>
 
@@ -95,7 +95,7 @@
 
 <h2>1.1 Cài đặt và cập nhật</h2>
 <ol class="steps">
-  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.14_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
+  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.15_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
   <li>Mở <span class="ui">WorkHub-Fin</span> và đăng nhập bằng tài khoản WorkHub của bạn. Cần có Internet để lấy dữ liệu thị trường.</li>
   <li>Từ các bản sau, ứng dụng <b>tự kiểm tra và cập nhật</b>: khi có bản mới sẽ hỏi bạn; không cần cài lại thủ công.</li>
 </ol>
@@ -132,7 +132,7 @@
 <table>
   <thead><tr><th>Khu</th><th>Thanh điều hướng</th></tr></thead>
   <tbody>
-    <tr><td>Investment Workbench</td><td>Toàn Nhóm · Danh Mục · Nghiên Cứu · Valuation Bench</td></tr>
+    <tr><td>Investment Workbench</td><td>Toàn Nhóm · Tổng Quan TT · Danh Mục · Nghiên Cứu · Valuation Bench</td></tr>
     <tr><td>Valuation Bench</td><td>Tổng quan · Hồ sơ cổ phiếu · Bộ lọc · Thị trường · Bản đồ · Định Giá CP · Phương pháp · Độ chính xác · Investment</td></tr>
   </tbody>
 </table>
@@ -248,6 +248,33 @@
 <ul>
   <li>Ở <span class="ui">Toàn Nhóm</span> &gt; <span class="ui">Dữ Liệu</span> có bảng <b>Nguồn giá trực tiếp</b>: hàm <code>source-watch</code> trên máy chủ gọi thử ba nguồn mà giá trực tiếp phụ thuộc (bảng giá VCI, VNDirect finfo, VNDirect dchart) <b>mỗi 30 phút trong giờ giao dịch</b>, hiện kết quả hôm nay, tỷ lệ 7 ngày, lần gần nhất và độ trễ trung bình. Mỗi tối 18:50 hàm kiểm ảnh chụp thị trường đã cập nhật chưa.</li>
   <li>Một nguồn lỗi 4 lần liền: có <b>cảnh báo</b> trong bảng bên dưới (không email). Lỗi quá nửa số lần thăm dò trong <b>hai ngày giao dịch liên tiếp</b>, hoặc ảnh chụp thị trường chậm từ 2 ngày giao dịch: mức <b>lỗi</b> và <b>email quản lý</b> (nếu đã bật email cảnh báo), mỗi sự cố một lần mỗi ngày. Khi bảng giá VCI hỏng, app tự dùng giá VNDirect (trễ 1 đến 2 phút). Ngày lễ và cuối tuần không thăm dò.</li>
+</ul></div>
+<h2>4.4 Tổng Quan TT (mới)</h2>
+<p>Trang xem nhanh thị trường chung ngay cạnh Toàn Nhóm, để theo dõi trong ngày mà không phải mở từng mã. Tên <span class="ui">Tổng Quan TT</span> để khỏi nhầm với mục <span class="ui">Thị trường</span> (bộ lọc cổ phiếu) trong Valuation Bench.</p>
+<table>
+  <thead><tr><th style="width:26%">Thẻ</th><th>Cho biết</th></tr></thead>
+  <tbody>
+    <tr><td>Năm chỉ số và biểu đồ</td><td>VN-Index, VN30, HNX-Index, HNX30, UPCoM-Index: điểm, thay đổi so với hôm trước, đường 30 phiên. Bấm một chỉ số để xem biểu đồ trong ngày, 1, 3, 6 tháng hoặc 1 năm.</td></tr>
+    <tr><td>Độ rộng và thanh khoản</td><td>Số mã tăng, đứng giá, giảm, trần, sàn; giá trị giao dịch (có phần thỏa thuận) theo từng sàn.</td></tr>
+    <tr><td>Khối ngoại</td><td>Mua, bán và mua/bán ròng theo sàn (cổ phiếu và ETF, không gồm chứng quyền).</td></tr>
+    <tr><td>Cổ phiếu nổi bật</td><td>Tăng mạnh, giảm mạnh, giá trị giao dịch, nước ngoài mua/bán ròng; bấm mã để mở hồ sơ ở Valuation Bench.</td></tr>
+    <tr><td>Hiệu suất, xu hướng kỹ thuật</td><td>Hiệu suất 9 chỉ số từ 1 phiên đến 1 năm; đường trung bình 20/50/200 phiên, RSI 14 và vị trí trong vùng 52 tuần của chỉ số đang chọn.</td></tr>
+    <tr><td>Tác động lên chỉ số</td><td><b>Ước tính</b> số điểm mỗi mã kéo lên hoặc kéo xuống chỉ số, theo vốn hóa. Là số tính lại, không phải số chính thức của sàn.</td></tr>
+    <tr><td>Ngành, định giá thị trường</td><td>Ngành hôm nay (ICB toàn thị trường hoặc 10 chỉ số ngành HOSE) và P/E, P/B tổng hợp so với 5 năm của chính nó.</td></tr>
+    <tr><td>Tin thị trường</td><td>Tiêu đề và mô tả ngắn từ 5 báo tài chính, lọc theo chủ đề, theo mã, hoặc theo "mã của tôi" (danh mục và theo dõi); mở tin gốc ở báo.</td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><b class="t">Đọc dòng giờ cập nhật ở cuối mỗi thẻ</b>
+<ul>
+  <li>Mỗi thẻ ghi <b>số liệu của lúc nào</b>, từ nguồn nào, trễ bao lâu (ví dụ "Số liệu lúc 09:09 · trễ 1 phút"). Giờ lấy từ chính dữ liệu, không phải giờ bạn bấm làm mới. Trong phiên, chữ <b>vàng</b> là trễ từ 4 phút, <b>đỏ</b> là trễ hơn 10 phút hoặc số liệu đã cũ.</li>
+  <li>Trang <b>không phải realtime từng lệnh</b>. Chỉ số theo nến 1 phút; bảng giá (độ rộng, nổi bật, ngành) đo thực tế trễ khoảng 1 đến 5 phút. Khối ngoại, chỉ số ngành và định giá không ghi giờ nên chỉ hiện ngày và lúc ứng dụng tải xong. Đầu phiên (khớp định kỳ) chưa có nến 1 phút: trang nói rõ và dùng nến ngày. Trong phiên trang tự làm mới mỗi 30 giây; nút <span class="ui">Làm mới</span> lấy ngay.</li>
+  <li>Để ra quyết định mua bán hãy đối chiếu với bảng giá của công ty chứng khoán.</li>
+</ul></div>
+<div class="callout"><b class="t">Tóm tắt tin bằng AI</b>
+<ul>
+  <li>Trong thẻ tin có nút <span class="ui">Tóm tắt tin hôm nay</span>: AI đọc tiêu đề và mô tả ngắn của khoảng 60 tin mới nhất rồi nêu vài ý chính, mỗi ý kèm số tin làm căn cứ để bấm mở tin gốc kiểm lại. Chỉ chạy khi bạn bấm; kết quả dùng chung 30 phút.</li>
+  <li><b>AI có thể sai hoặc thiếu</b> vì không đọc toàn văn bài; thẻ luôn ghi "Do AI tóm tắt" kèm tên mô hình. Chỉ gửi nội dung tin công khai, không gửi dữ liệu danh mục. Cần quản trị nhóm đặt khoá API của Gemini (hoặc Claude) trong Supabase; chưa đặt thì thẻ hiện hướng dẫn. Hệ thống thử mô hình mới nhất trước và tự chuyển xuống mô hình thấp hơn khi hết hạn mức hoặc quá tải, nên đôi khi lần bấm đầu mất khoảng 20 giây.</li>
+  <li>Ngành ICB, tác động lên chỉ số, định giá và "mã của tôi" cần đăng nhập; phần còn lại xem được không cần đăng nhập, và ngành tự chuyển sang 10 chỉ số ngành khi chưa đăng nhập.</li>
 </ul></div>
 <h1 id="s5">5. Valuation Bench: tổng quan</h1>
 <p>Valuation Bench là khu để <b>định giá chuyên môn một cổ phiếu</b>: kết hợp phân tích cơ bản, nhiều phương pháp định giá, phân tích kỹ thuật và bối cảnh thị trường thành một kết luận có giải thích, được tạo theo một quy trình có ghi vết.</p>
