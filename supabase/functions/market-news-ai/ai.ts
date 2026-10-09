@@ -1,10 +1,22 @@
-// Logic thuần của Edge Function market-news-ai: TÓM TẮT TIN THỊ TRƯỜNG BẰNG AI (Claude) cho thẻ "Tóm tắt bằng AI" của trang Tổng Quan TT. Không import Deno/Supabase để Vitest chạy được
+// Logic thuần của Edge Function market-news-ai: TÓM TẮT TIN THỊ TRƯỜNG BẰNG AI (Gemini hoặc Claude) cho thẻ "Tóm tắt bằng AI" của trang Tổng Quan TT. Không import Deno/Supabase để Vitest chạy được
 // (tests/unit/market-news-ai.test.js: dùng fetch giả, đồng hồ giả).
-// Nguyên tắc an toàn: (1) khoá API CHỈ đọc từ biến môi trường ANTHROPIC_API_KEY ở máy chủ, không bao giờ vào mã, nhật ký hay phản hồi; (2) nội dung tin từ báo là DỮ LIỆU KHÔNG TIN CẬY: đặt trong thẻ <news>,
+// Nguyên tắc an toàn: (1) khoá API (GEMINI_API_KEY hoặc ANTHROPIC_API_KEY) CHỈ đọc từ biến môi trường ở máy chủ, không bao giờ vào mã, nhật ký hay phản hồi; (2) nội dung tin từ báo là DỮ LIỆU KHÔNG TIN CẬY: đặt trong thẻ <news>,
 // đã bỏ ký tự "<", và lời nhắc hệ thống dặn bỏ qua mọi chỉ dẫn trong đó; (3) kết quả AI chỉ được nhận khi đúng khuôn JSON, mỗi ý PHẢI dẫn số thứ tự tin có thật, ý không có căn cứ bị bỏ, liên kết lấy từ
 // danh sách tin chứ không từ lời AI; (4) chi phí bị chặn bằng bộ nhớ đệm 30 phút dùng chung mọi người, trần số lượt mỗi ngày và chặn gọi dồn khi lỗi.
 
 export const MODEL_DEFAULT = "claude-haiku-4-5-20251001";
+export const MODEL_DEFAULTS: Record<string, string> = { claude: MODEL_DEFAULT, gemini: "gemini-3.1-flash-lite" };
+export const GEMINI_MAX_TOKENS = 4096;                 // mô hình Gemini 3.x có thể "suy nghĩ" và tính vào giới hạn đầu ra nên để rộng; JSON bị cắt dở sẽ bị bỏ ở bước đọc
+export type Provider = "claude" | "gemini";
+// Chọn nhà cung cấp AI: AI_PROVIDER ('gemini' hoặc 'claude') nếu đặt và có khoá tương ứng; không đặt thì tự chọn theo khoá có sẵn, ưu tiên Gemini (có gói miễn phí). Không có khoá phù hợp: null.
+export function pickProvider(env: { provider?: string; anthropicKey?: string; geminiKey?: string }): { provider: Provider; key: string } | null {
+  const g = (env.geminiKey || "").trim(), c = (env.anthropicKey || "").trim(), want = (env.provider || "").trim().toLowerCase();
+  if (want === "gemini") return g ? { provider: "gemini", key: g } : null;
+  if (want === "claude" || want === "anthropic") return c ? { provider: "claude", key: c } : null;
+  if (g) return { provider: "gemini", key: g };
+  if (c) return { provider: "claude", key: c };
+  return null;
+}
 export const MAX_ITEMS = 60;
 export const CACHE_MS = 30 * 60000;
 export const FAIL_MS = 2 * 60000;
@@ -74,9 +86,10 @@ export function resolveSummary(parsed: { headline: string; points: { topic: stri
 }
 
 const MSG: Record<string, string> = {
-  no_key: "Chưa cấu hình khoá ANTHROPIC_API_KEY trên máy chủ.",
+  no_key: "Chưa cấu hình khoá AI (GEMINI_API_KEY hoặc ANTHROPIC_API_KEY) trên máy chủ.",
   invalid_key: "Khoá API không hợp lệ hoặc đã bị thu hồi.",
-  billing: "Tài khoản Anthropic hết số dư hoặc chưa bật thanh toán.",
+  billing: "Tài khoản AI hết số dư hoặc chưa bật thanh toán.",
+  bad_model: "Tên mô hình AI không đúng hoặc không còn dùng được (đặt lại biến AI_MODEL).",
   rate_limited: "Nhà cung cấp AI đang giới hạn tốc độ, thử lại sau ít phút.",
   upstream: "Dịch vụ AI đang lỗi tạm thời, thử lại sau.",
   network: "Không kết nối được tới dịch vụ AI.",
@@ -109,6 +122,34 @@ export async function callClaude(o: { key: string; model: string; system: string
   try { j = await res.json(); } catch (_e) { return fail("upstream"); }
   const block = j && Array.isArray(j.content) ? j.content.find((c: any) => c && c.type === "text" && typeof c.text === "string") : null;
   return block ? { ok: true, text: block.text } : fail("bad_output");
+}
+
+// Gọi Gemini (generateContent, khoá ở tiêu đề x-goog-api-key chứ không ở địa chỉ để khỏi lọt vào nhật ký). Gemini báo khoá sai bằng mã 400 "API key not valid"; 404 là sai tên mô hình; 429 là hết hạn mức.
+export async function callGemini(o: { key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal }): Promise<{ ok: true; text: string } | Fail> {
+  let res: any;
+  try {
+    res = await o.fetchFn("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(o.model) + ":generateContent", {
+      method: "POST", signal: o.signal,
+      headers: { "x-goog-api-key": o.key, "content-type": "application/json" },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: o.system }] }, contents: [{ role: "user", parts: [{ text: o.user }] }], generationConfig: { temperature: 0.2, maxOutputTokens: GEMINI_MAX_TOKENS, responseMimeType: "application/json" } }),
+    });
+  } catch (_e) { return fail("network"); }
+  if (!res || !res.ok) {
+    const s = Number(res && res.status);
+    if (s === 401 || s === 403) return fail("invalid_key");
+    if (s === 404) return fail("bad_model");
+    if (s === 429) return fail("rate_limited");
+    if (s === 400) { let m = ""; try { m = JSON.stringify(await res.json()); } catch (_e) { /* bỏ */ } return /API key not valid|API_KEY_INVALID|expired/i.test(m) ? fail("invalid_key") : (/billing|quota exceeded/i.test(m) ? fail("billing") : fail("upstream")); }
+    return fail("upstream");
+  }
+  let j: any;
+  try { j = await res.json(); } catch (_e) { return fail("upstream"); }
+  const parts = j && Array.isArray(j.candidates) && j.candidates[0] && j.candidates[0].content && Array.isArray(j.candidates[0].content.parts) ? j.candidates[0].content.parts : [];
+  const text = parts.filter((p: any) => p && typeof p.text === "string" && !p.thought).map((p: any) => p.text).join("");
+  return text.trim() ? { ok: true, text } : fail("bad_output");     // không có ứng viên (bị chặn an toàn) hoặc rỗng
+}
+export function callAi(o: { provider: Provider; key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal }) {
+  return o.provider === "gemini" ? callGemini(o) : callClaude(o);
 }
 
 // Cổng chi phí: dùng lại kết quả 30 phút (mọi người cùng lúc dùng chung), gộp các yêu cầu đồng thời thành một, nhớ lỗi 2 phút để không gọi dồn, và trần số lượt mỗi ngày (giờ UTC).

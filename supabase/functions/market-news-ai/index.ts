@@ -1,9 +1,9 @@
-// Edge Function: market-news-ai -- TÓM TẮT TIN THỊ TRƯỜNG BẰNG AI (Claude) cho trang "Tổng Quan TT". Lấy tin từ hàm market-news (RSS 5 báo, đã chuẩn hoá và kiểm tên miền), gửi tiêu đề + mô tả ngắn của tối đa 60 tin
-// mới nhất cho Claude, nhận về một bản tóm tắt có dẫn số tin làm căn cứ. KHÔNG đụng cơ sở dữ liệu. Khoá API đọc từ biến môi trường ANTHROPIC_API_KEY (đặt trong Supabase > Edge Functions > Secrets), không bao giờ nằm trong mã.
-// Biến tuỳ chọn: AI_MODEL (mặc định claude-haiku-4-5-20251001), AI_DAILY_CAP (mặc định 60 lượt/ngày/phiên bản chạy).
+// Edge Function: market-news-ai -- TÓM TẮT TIN THỊ TRƯỜNG BẰNG AI (Gemini hoặc Claude) cho trang "Tổng Quan TT". Lấy tin từ hàm market-news (RSS 5 báo, đã chuẩn hoá và kiểm tên miền), gửi tiêu đề + mô tả ngắn của tối đa 60 tin
+// mới nhất cho mô hình AI (Gemini hoặc Claude), nhận về một bản tóm tắt có dẫn số tin làm căn cứ. KHÔNG đụng cơ sở dữ liệu. Khoá API đọc từ biến môi trường GEMINI_API_KEY hoặc ANTHROPIC_API_KEY (đặt trong Supabase > Edge Functions > Secrets), không bao giờ nằm trong mã.
+// Biến tuỳ chọn: AI_PROVIDER (gemini | claude; không đặt thì tự chọn theo khoá có sẵn, ưu tiên Gemini), AI_MODEL (mặc định gemini-3.1-flash-lite hoặc claude-haiku-4-5-20251001), AI_DAILY_CAP (mặc định 60 lượt/ngày/phiên bản chạy).
 // Vào: {} . Ra: { ok, headline, points: [{ topic, text, refs: [{ n, title, link, sourceName }] }], model, generatedAt, itemCount, cached, ageSec } hoặc { ok:false, code, error }.
-// Chưa có khoá: 503 code no_key (trang hiện hướng dẫn). verify_jwt = true. {"selftest":true} trả { ok, hasKey, model } (chỉ cho biết đã có khoá hay chưa, không lộ khoá), không gọi AI.
-import { MODEL_DEFAULT, DAILY_CAP_DEFAULT, buildPrompt, callClaude, createGate, fail, parseModel, resolveSummary, selectItems, statusFor } from "./ai.ts";
+// Chưa có khoá: 503 code no_key (trang hiện hướng dẫn). verify_jwt = true. {"selftest":true} trả { ok, hasKey, provider, model } (chỉ cho biết đã có khoá hay chưa, không lộ khoá), không gọi AI.
+import { MODEL_DEFAULTS, DAILY_CAP_DEFAULT, buildPrompt, callAi, createGate, fail, parseModel, pickProvider, resolveSummary, selectItems, statusFor } from "./ai.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,14 +34,15 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
-  const key = Deno.env.get("ANTHROPIC_API_KEY") || "", model = Deno.env.get("AI_MODEL") || MODEL_DEFAULT;
-  if (body && body.selftest === true) return json({ ok: true, hasKey: key.length > 0, model });
-  if (!key) { const f = fail("no_key"); return json(f, statusFor(f.code)); }
+  const pick = pickProvider({ provider: Deno.env.get("AI_PROVIDER") || "", geminiKey: Deno.env.get("GEMINI_API_KEY") || "", anthropicKey: Deno.env.get("ANTHROPIC_API_KEY") || "" });
+  const model = Deno.env.get("AI_MODEL") || MODEL_DEFAULTS[pick ? pick.provider : "gemini"];
+  if (body && body.selftest === true) return json({ ok: true, hasKey: !!pick, provider: pick ? pick.provider : null, model });
+  if (!pick) { const f = fail("no_key"); return json(f, statusFor(f.code)); }
   const r = await gate.run(async () => {
     const now = Date.now(), items = selectItems(await fetchNews(req), now);
     if (!items.length) return fail("no_news");
     const p = buildPrompt(items, now);
-    const c = await callClaude({ key, model, system: p.system, user: p.user, fetchFn: fetch, signal: AbortSignal.timeout(28000) });
+    const c = await callAi({ provider: pick.provider, key: pick.key, model, system: p.system, user: p.user, fetchFn: fetch, signal: AbortSignal.timeout(28000) });
     if (!c.ok) return c;
     const parsed = parseModel(c.text, items.length);
     if (!parsed) return fail("bad_output");

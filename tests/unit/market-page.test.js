@@ -596,10 +596,11 @@ describe('trang Thị Trường: Tóm tắt bằng AI', () => {
     expect(text(t.els['mk-news'].innerHTML)).toContain('dùng lại kết quả của 12 phút trước');
   });
   it('chưa đặt khoá (no_key): hướng dẫn quản trị đặt ANTHROPIC_API_KEY, không có nút thử lại', async () => {
-    const c = aiClient({ fail: { code: 'no_key', msg: 'Chưa cấu hình khoá ANTHROPIC_API_KEY trên máy chủ.' } }), t = boot({ sbClient: c });
+    const c = aiClient({ fail: { code: 'no_key', msg: 'Chưa cấu hình khoá AI (GEMINI_API_KEY hoặc ANTHROPIC_API_KEY) trên máy chủ.' } }), t = boot({ sbClient: c });
     await t.MP.refresh(true); await t.MP.loadNews(true);
     await t.MP.loadAi();
     const h = t.els['mk-news'].innerHTML, x = text(h);
+    expect(x).toContain('GEMINI_API_KEY');
     expect(x).toContain('ANTHROPIC_API_KEY');
     expect(x).toContain('RUNBOOK_VAN_HANH.md');
     expect(x).not.toContain('Thử lại');
