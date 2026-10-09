@@ -3,13 +3,14 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { FEEDS, parseRss } from '../../supabase/functions/market-news/parse.ts';
 
 const REPO = process.cwd().replace(/\\/g, '/');
 const FX = JSON.parse(fs.readFileSync(REPO + '/tests/fixtures/market-overview-sample.json', 'utf8'));
 
 function boot(opts) {
   const o = opts || {};
-  const els = {}, store = new Map(), urls = [], intervals = [], docHandlers = {};
+  const els = {}, store = new Map(), urls = [], intervals = [], docHandlers = {}, opened = [];
   const stub = () => ({ classList: { add() {}, remove() {}, contains: () => false }, addEventListener() {}, setAttribute() {}, getBoundingClientRect: () => ({ left: 0, width: 720 }), style: {}, textContent: '' });
   const el = (id) => els[id] || (els[id] = Object.assign(stub(), { id, innerHTML: '', className: '', clientWidth: 720, offsetWidth: 80, disabled: false, children: [],
     querySelector: () => stub(), querySelectorAll: () => [], appendChild(c) { this.children.push(c); } }));
@@ -28,12 +29,12 @@ function boot(opts) {
     localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
     setInterval: (f, ms) => { intervals.push({ f, ms }); return intervals.length; },
     fetch: async (url) => { urls.push(url); const j = route(url); return j === null ? { ok: false, json: async () => ({}) } : { ok: true, json: async () => j }; },
-    callGAS: o.callGAS,
+    callGAS: o.callGAS, sbClient: o.sbClient, openExternalUrl: (u) => opened.push(u),
   });
-  ['lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/sector-map.js', 'lib/valuation-history.js', 'lib/market-overview.js', 'market/market.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
+  ['lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/sector-map.js', 'lib/valuation-history.js', 'lib/market-overview.js', 'lib/market-news.js', 'market/market.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
   vm.runInContext("LiveQuotes.session = () => '" + (o.session || 'closed') + "';", ctx);
   vm.runInContext('globalThis.MP = MarketPage;', ctx);
-  return { MP: vm.runInContext('MP', ctx), els, store, urls, intervals, docHandlers, ctx };
+  return { MP: vm.runInContext('MP', ctx), els, store, urls, intervals, docHandlers, ctx, opened };
 }
 const MAIN_D = /resolution=D&symbol=(VNINDEX|VN30|HNX|HNX30|UPCOM)&/;
 const text = (html) => String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
@@ -365,6 +366,183 @@ describe('trang Thị Trường: chỉ số bổ sung (hiệu suất, kỹ thu�
     expect(x).toContain('VN-Index'); expect(x).not.toContain('VN100');
     expect(text(t.els['mk-sectors'].innerHTML)).toContain('Không lấy được chỉ số ngành');
     expect(text(t.els['mk-indices'].innerHTML)).toContain('1,738.97');
+  });
+});
+
+describe('trang Thị Trường: thẻ Tin thị trường', () => {
+  const NFX = JSON.parse(fs.readFileSync(REPO + '/tests/fixtures/news-feeds.json', 'utf8'));
+  // tin thật từ 5 báo, giờ đăng đặt lại theo đồng hồ máy (mỗi tin cách nhau 10 phút) để điểm tin 24 giờ không phụ thuộc ngày chạy test
+  const mkItems = () => FEEDS.flatMap((f) => parseRss(NFX[f.id].xml, f, Date.now())).map((x, i) => Object.assign({}, x, { ts: Date.now() - (i + 1) * 600000 }));
+  const SRC = FEEDS.map((f) => ({ id: f.id, name: f.name, ok: true, count: 4 }));
+  const client = (over) => {
+    const o = Object.assign({ items: mkItems(), sources: SRC, calls: 0, email: 'a@b.test' }, over || {});
+    return { o, functions: { invoke: async (name) => { o.calls++; o.name = name; if (o.fail) return { data: null, error: { message: o.fail, context: { json: async () => ({ error: o.detail || 'Không lấy được tin từ các báo.' }) } } }; return { data: { ok: true, items: o.items, sources: o.sources, asOf: new Date().toISOString() }, error: null }; } },
+      auth: { getSession: async () => ({ data: { session: o.email ? { user: { email: o.email } } : null } }) } };
+  };
+  const mine = async (a) => ({ status: 'success', data: a === 'getHoldingsView' ? [{ symbol: 'VPB' }] : [{ symbol: 'DIG' }] });
+
+  it('tải tin: gọi đúng hàm market-news, hiện điểm tin, chủ đề, mã được nhắc nhiều và 12 tin đầu', async () => {
+    const c = client(), t = boot({ sbClient: c });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    const h = t.els['mk-news'].innerHTML, x = text(h);
+    expect(c.o.name).toBe('market-news');
+    expect(x).toContain('Trong 24 giờ qua có 20 tin');
+    expect(x).toContain('Tất cả 20');
+    expect(x).toContain('Chứng khoán');
+    expect((h.match(/class="mk-news-item"/g) || []).length).toBe(12);
+    expect(x).toContain('Xem thêm (8 tin)');
+    expect(h).toContain('rel="noopener noreferrer"');
+    expect(h).toMatch(/Nguồn: .*CafeF.*VnExpress.*Vietstock.*VnEconomy.*Vietnambiz/);
+  });
+  it('mã được nhắc: nhận mã cổ phiếu thật trong tin khi đã có bảng giá (VPB trong tin tự doanh)', async () => {
+    const t = boot({ sbClient: client() });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    // bảng giá mẫu có VPB, SSI...; "Tự doanh tiếp tục mua ròng hơn trăm tỷ đồng VPB" phải có huy hiệu VPB
+    const all = t.MP.S.newsList;
+    const a = all.find((i) => i.title.startsWith('Tự doanh tiếp tục mua ròng'));
+    expect(a.tickers).toContain('VPB');
+    expect(t.els['mk-news'].innerHTML).toContain('class="mk-tk"');
+  });
+  it('lọc theo chủ đề và theo mã; bấm lần nữa bỏ lọc; giá trị lạ bị bỏ qua', async () => {
+    const t = boot({ sbClient: client() });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    t.MP.setNewsTopic('macro');
+    let h = t.els['mk-news'].innerHTML;
+    expect((h.match(/class="mk-news-item"/g) || []).length).toBe(t.MP.S.newsList.filter((i) => i.topic === 'macro').length);
+    expect(h).toContain('Doanh nghiệp muốn tham gia góp ý chính sách thuế');
+    t.MP.setNewsTopic('<script>');
+    expect(t.MP.S.newsTopic).toBe('macro');
+    t.MP.setNewsTopic('all');
+    t.MP.setNewsTicker('VPB');
+    h = t.els['mk-news'].innerHTML;
+    expect((h.match(/class="mk-news-item"/g) || []).length).toBe(t.MP.S.newsList.filter((i) => i.tickers.indexOf('VPB') !== -1).length);
+    t.MP.setNewsTicker('VPB');
+    expect(t.MP.S.newsTicker).toBe(null);
+    t.MP.setNewsTicker('<b>');
+    expect(t.MP.S.newsTicker).toBe(null);
+  });
+  it('xem thêm: mỗi lần thêm 12 tin; đổi bộ lọc đưa về 12', async () => {
+    const items = Array.from({ length: 30 }, (_, i) => ({ id: 'l' + i, title: 'Tin số ' + i, link: 'https://cafef.vn/t' + i + '.chn', source: 'cafef', sourceName: 'CafeF', ts: Date.now() - i * 60000, summary: '' }));
+    const t = boot({ sbClient: client({ items }) });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Xem thêm (18 tin)');
+    t.MP.moreNews();
+    expect((t.els['mk-news'].innerHTML.match(/class="mk-news-item"/g) || []).length).toBe(24);
+    t.MP.moreNews();
+    expect(text(t.els['mk-news'].innerHTML)).not.toContain('Xem thêm');
+    t.MP.setNewsTopic('all');
+    expect(t.MP.S.newsLimit).toBe(12);
+  });
+  it('mã của tôi: đăng nhập thì có nút lọc và huy hiệu nổi bật; không đăng nhập thì không có', async () => {
+    const t = boot({ sbClient: client(), callGAS: mine });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    await t.MP.loadMine();
+    expect([...t.MP.S.mine].sort()).toEqual(['DIG', 'VPB']);
+    let h = t.els['mk-news'].innerHTML;
+    expect(text(h)).toContain('Chỉ tin về mã của tôi');
+    t.MP.toggleNewsMine();
+    h = t.els['mk-news'].innerHTML;
+    expect(h).toContain('mk-tk mine');                          // tin về VPB/DIG nằm ngoài 12 tin đầu nên chỉ thấy khi bật lọc
+    const n = (h.match(/class="mk-news-item"/g) || []).length;
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBe(t.MP.S.newsList.filter((i) => i.tickers.some((s) => s === 'VPB' || s === 'DIG')).length);
+    const g = boot({ sbClient: client({ email: null }), callGAS: mine });
+    await g.MP.refresh(true); await g.MP.loadNews(true); await g.MP.loadMine();
+    expect(g.MP.S.mine).toBe(null);
+    expect(text(g.els['mk-news'].innerHTML)).not.toContain('Chỉ tin về mã của tôi');
+    const e = boot({ sbClient: client(), callGAS: async () => ({ status: 'error' }) });
+    await e.MP.refresh(true); await e.MP.loadNews(true); await e.MP.loadMine();
+    expect(e.MP.S.mine === null || e.MP.S.mine.size === 0).toBe(true);
+    expect(text(e.els['mk-news'].innerHTML)).not.toContain('Chỉ tin về mã của tôi');
+  });
+  it('hàm lỗi: báo lý do kèm nút thử lại; thử lại thành công thì hiện tin', async () => {
+    const c = client({ fail: 'Edge Function returned a non-2xx status code', detail: 'Không lấy được tin từ các báo.' }), t = boot({ sbClient: c });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Không lấy được tin: Không lấy được tin từ các báo.');
+    expect(t.els['mk-news'].innerHTML).toContain('Thử lại');
+    c.o.fail = null;
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Trong 24 giờ qua');
+  });
+  it('lỗi sau khi đã có tin: giữ tin cũ và nói rõ chưa cập nhật được', async () => {
+    const c = client(), t = boot({ sbClient: c });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    c.o.fail = 'timeout';
+    await t.MP.loadNews(true);
+    const x = text(t.els['mk-news'].innerHTML);
+    expect(x).toContain('Chưa cập nhật được');
+    expect(x).toContain('Trong 24 giờ qua');
+    expect((t.els['mk-news'].innerHTML.match(/class="mk-news-item"/g) || []).length).toBe(12);
+  });
+  it('một báo lỗi: hiện (lỗi) cạnh tên báo, các báo khác vẫn có tin', async () => {
+    const src = SRC.map((s) => (s.id === 'vietstock' ? { id: 'vietstock', name: 'Vietstock', ok: false, count: 0, error: 'HTTP 503' } : s));
+    const t = boot({ sbClient: client({ sources: src }) });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    const x = text(t.els['mk-news'].innerHTML);
+    expect(x).toContain('Vietstock (lỗi)');
+    expect(x).toContain('báo lỗi tạm thời không làm mất các báo còn lại');
+  });
+  it('không có sbClient (chưa sẵn sàng): báo lỗi, không ném', async () => {
+    const t = boot({});
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Không lấy được tin: Chưa sẵn sàng');
+  });
+  it('làm mới theo chu kỳ 5 phút: gọi lại khi tick đến hạn, không gọi sớm, không gọi khi tab ẩn', async () => {
+    const c = client(), t = boot({ sbClient: c, session: 'closed' });
+    t.MP.start();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(c.o.calls).toBe(1);
+    t.intervals[0].f();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(c.o.calls).toBe(1);                                 // chưa đủ 5 phút
+    t.MP.S.newsAt = Date.now() - 6 * 60000;
+    t.intervals[0].f();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(c.o.calls).toBe(2);                                 // kể cả ngoài giờ giao dịch (session closed)
+    const h = boot({ sbClient: client(), session: 'closed', hidden: true });
+    h.MP.start();
+    await new Promise((r) => setTimeout(r, 60));
+    h.MP.S.newsAt = Date.now() - 6 * 60000;
+    const stale = h.MP.S.newsAt;
+    h.intervals[0].f();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(h.MP.S.newsAt).toBe(stale);                         // tab ẩn: tick không làm mới tin
+  });
+  it('mở tin: gọi hàm mở link ngoài với đúng đường dẫn; chỉ số sai hoặc link lạ thì để trình duyệt xử lý', async () => {
+    const t = boot({ sbClient: client() });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    const ev = { prevented: false, preventDefault() { this.prevented = true; } };
+    expect(t.MP.openNews(ev, 0)).toBe(false);
+    expect(ev.prevented).toBe(true);
+    expect(t.opened).toEqual([t.MP.S.newsShown[0].link]);
+    expect(t.MP.openNews(ev, 999)).toBe(true);
+    t.MP.S.newsShown[1].link = 'javascript:alert(1)';
+    expect(t.MP.openNews(ev, 1)).toBe(true);
+    expect(t.opened.length).toBe(1);
+  });
+  it('an toàn HTML: tiêu đề/mô tả chứa thẻ bị escape; tin có link không phải http(s) bị bỏ', async () => {
+    const items = [
+      { id: 'a', title: '<img src=x onerror=alert(1)>Tin độc', link: 'https://cafef.vn/a.chn', source: 'cafef', sourceName: '<b>CafeF</b>', ts: Date.now() - 60000, summary: '<script>alert(2)</script>' },
+      { id: 'b', title: 'Tin link xấu', link: 'javascript:alert(3)', source: 'cafef', sourceName: 'CafeF', ts: Date.now() - 120000, summary: '' },
+    ];
+    const t = boot({ sbClient: client({ items, sources: [{ id: 'cafef', name: '<i>x</i>', ok: true, count: 2 }] }) });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    const h = t.els['mk-news'].innerHTML;
+    expect(h).not.toMatch(/<img|<script|<b>CafeF|<i>x/i);
+    expect(h).toContain('&lt;img src=x onerror=alert(1)&gt;Tin độc');
+    expect(h).not.toContain('javascript:alert(3)');
+    expect(h).not.toContain('Tin link xấu');
   });
 });
 

@@ -144,3 +144,25 @@
 .mk-subhead { margin: 12px 0 2px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .mk-contrib-sum { margin: 0 0 4px; font-size: 0.86rem; color: var(--text-secondary); }
 .mk-sec-name small { font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+/* ---- tin thị trường ---- */
+.mk-digest { margin: 0 0 10px; font-size: 0.86rem; color: var(--text-secondary); }
+.mk-digest b { color: var(--text-primary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mk-newsbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.mk-newsbar-k { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.mk-chip small { font-family: var(--font-mono); font-variant-numeric: tabular-nums; opacity: 0.75; }
+.mk-news { list-style: none; margin: 12px 0 0; padding: 0; display: grid; }
+.mk-news-item { padding: 12px 0; border-top: 1px solid var(--border-color); min-width: 0; }
+.mk-news-item:first-child { border-top: 0; }
+.mk-news-title { display: block; font-size: 0.95rem; font-weight: 700; line-height: 1.4; color: var(--text-primary); text-decoration: none; overflow-wrap: anywhere; }
+.mk-news-title:hover { color: var(--gold); text-decoration: underline; }
+.mk-news-title:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 2px; }
+.mk-news-sum { margin: 4px 0 0; font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mk-news-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); }
+.mk-news-meta .mk-src { font-weight: 700; color: var(--text-secondary); }
+.mk-news-meta .mk-topic { padding: 0 7px; border-radius: var(--radius-pill); border: 1px solid var(--border-color); }
+.mk-tk { padding: 0 6px; border-radius: 4px; font-family: var(--font-mono); font-weight: 700; font-size: 0.68rem; color: var(--text-secondary); background: var(--bg-color-2); border: 1px solid var(--border-color); }
+.mk-tk.mine { color: var(--text-primary); background: var(--gold-dim); border-color: var(--gold); }
+.mk-err { color: var(--danger-color); }
+.mk-chip { white-space: nowrap; }
+.mk-chip small { display: inline; margin-left: 4px; }

@@ -7,8 +7,9 @@ const MarketPage = (function () {
     const MO = MarketOverview;
     const DCHART = 'https://dchart-api.vndirect.com.vn/dchart/history', FINFO = 'https://api-finfo.vndirect.com.vn/v4';
     const KEY = 'wh.fin.market.v1';
-    const POLL_MS = 30000, DAILY_TTL = 10 * 60000, FOREIGN_TTL = 60000;
+    const POLL_MS = 30000, DAILY_TTL = 10 * 60000, FOREIGN_TTL = 60000, NEWS_TTL = 5 * 60000;
     const S = { index: 'VNINDEX', exchange: 'HOSE', range: '1D', mover: 'gain', secMode: null,
+        newsRaw: null, newsList: null, newsKey: '', newsState: 'idle', newsErr: null, newsSources: [], newsAsOf: null, newsAt: 0, newsBusy: false, newsTopic: 'all', newsTicker: null, newsMine: false, newsLimit: 12, newsShown: [], mine: null, mineCount: null,
         daily: {}, dailyAt: 0, extraAt: 0, sectorAt: 0, sectorErr: false, morePromise: null, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
         busy: false, started: false, universe: null, uniState: 'idle', val: null, valState: 'idle', timer: null };
 
@@ -359,6 +360,85 @@ const MarketPage = (function () {
             '<p class="tl-hint">Điểm đóng góp ≈ chỉ số hôm trước × vốn hoá × % thay đổi ÷ tổng vốn hoá (cách tính của chỉ số toàn sàn). Dùng vốn hoá của ảnh chụp ngày ' + esc(dmy(S.universe.asOf) || '—') + ' và ' + c.n + ' cổ phiếu ghép được, nên chỉ là ước tính; không có ở VN30/HNX30 vì hai chỉ số này điều chỉnh theo tỷ lệ tự do chuyển nhượng.</p>';
     }
 
+    // ----- tin thị trường (RSS các báo qua Edge Function market-news; không dùng AI) -----
+    // Tin chỉ có tiêu đề, đoạn mô tả ngắn và đường dẫn về báo gốc. Chủ đề và mã được nhắc do quy tắc tự động (lib/market-news.js). "Mã của tôi" = danh mục + theo dõi của người đăng nhập.
+    function enrichedNews() {
+        const key = (S.newsRaw ? S.newsRaw.length : 0) + '|' + (S.rows ? S.rows.length : 0);
+        if (S.newsKey !== key) {
+            const syms = new Set(); (S.rows || []).forEach((r) => { if (r.type === 'STOCK') syms.add(r.symbol); });
+            S.newsList = MarketNews.enrich((S.newsRaw || []).filter((x) => x && /^https?:\/\//i.test(String(x.link))), syms); S.newsKey = key;       // chỉ nhận tin có đường dẫn http(s)
+        }
+        return S.newsList || [];
+    }
+    async function loadNews(force) {
+        if (S.newsBusy || (!force && S.newsAt && Date.now() - S.newsAt < NEWS_TTL)) return;
+        S.newsBusy = true;
+        if (!S.newsRaw) { S.newsState = 'loading'; renderNews(); }
+        try {
+            if (typeof sbClient === 'undefined' || !sbClient) throw new Error('Chưa sẵn sàng');
+            const r = await sbClient.functions.invoke('market-news', { body: {} });
+            if (r.error) { let d = r.error.message; try { const j = await r.error.context.json(); if (j && j.error) d = j.error; } catch (e) { /* giữ message mặc định */ } throw new Error(d); }
+            const data = r.data;
+            if (!data || data.ok === false || !Array.isArray(data.items)) throw new Error((data && data.error) || 'Không lấy được tin');
+            S.newsRaw = data.items; S.newsSources = data.sources || []; S.newsAsOf = data.asOf || null; S.newsState = 'ok'; S.newsErr = null;
+        } catch (e) {
+            S.newsErr = String(e && e.message ? e.message : e).slice(0, 120);
+            S.newsState = S.newsRaw ? 'ok' : 'error';                         // đã có tin cũ thì giữ và báo "chưa cập nhật được"
+        } finally { S.newsAt = Date.now(); S.newsBusy = false; renderNews(); }
+    }
+    // Mã trong danh mục và danh sách theo dõi của người đang đăng nhập (đọc bằng phiên WorkHub); không đăng nhập thì bỏ qua
+    async function loadMine() {
+        try {
+            if (typeof sbClient === 'undefined' || !sbClient || typeof callGAS !== 'function') return;
+            const s = await sbClient.auth.getSession(), email = s && s.data && s.data.session && s.data.session.user ? s.data.session.user.email : null;
+            if (!email) return;
+            const get = async (a) => { const r = await callGAS(a, { email: email }); return r && r.status === 'success' && Array.isArray(r.data) ? r.data : []; };
+            const [h, w] = await Promise.all([get('getHoldingsView'), get('getWatchlist')]), set = new Set();
+            h.concat(w).forEach((x) => { const sym = String(x && x.symbol || '').toUpperCase(); if (sym) set.add(sym); });
+            S.mine = set; S.mineCount = { holdings: h.length, watch: w.length };
+        } catch (e) { S.mine = null; }
+        renderNews();
+    }
+    function renderNews() {
+        const box = $('mk-news'); if (!box) return;
+        const head = '<div class="tl-card-head"><h3><i class="fa-regular fa-newspaper"></i> Tin thị trường <span class="mk-card-sub">từ các báo tài chính</span></h3></div>';
+        if (S.newsState === 'loading' || S.newsState === 'idle') { box.innerHTML = head + '<div class="mk-skel" aria-hidden="true"></div>'; return; }
+        if (S.newsState === 'error') { box.innerHTML = head + '<div class="mk-empty"><i class="fa-solid fa-triangle-exclamation"></i>Không lấy được tin: ' + esc(S.newsErr || 'lỗi không rõ') + '<br><button type="button" class="btn-tool" style="margin-top:10px" onclick="MarketPage.loadNews(true)"><i class="fa-solid fa-rotate"></i> Thử lại</button></div>'; return; }
+        const all = enrichedNews(), now = Date.now(), dg = MarketNews.digest(all, { now: now }), mine = S.mine && S.mine.size ? S.mine : null;
+        const listFilter = { topic: S.newsTopic, mine: S.newsMine && mine ? mine : null };
+        let list = MarketNews.filter(all, listFilter);
+        if (S.newsTicker) list = list.filter((x) => x.tickers.indexOf(S.newsTicker) !== -1);
+        const mineCount = mine ? MarketNews.filter(all, { mine: mine }).length : 0;
+        const chip = (label, on, fn) => '<button type="button" class="mk-chip" aria-pressed="' + on + '" onclick="' + fn + '">' + label + '</button>';
+        const topicChips = chip('Tất cả ' + dg.total, S.newsTopic === 'all', "MarketPage.setNewsTopic('all')") + dg.topics.map((t) => chip(esc(t.label) + ' ' + t.count, S.newsTopic === t.key, "MarketPage.setNewsTopic('" + t.key + "')")).join('');
+        const tickerChips = dg.topTickers.length ? '<div class="mk-newsbar"><span class="mk-newsbar-k">Mã được nhắc nhiều</span><div class="mk-chips">' + dg.topTickers.map((t) => chip(esc(t.symbol) + ' <small>' + t.count + '</small>', S.newsTicker === t.symbol, "MarketPage.setNewsTicker('" + t.symbol + "')")).join('') + '</div></div>' : '';
+        const mineChip = mine ? '<div class="mk-newsbar"><span class="mk-newsbar-k">Danh mục của bạn</span><div class="mk-chips">' + chip('Chỉ tin về mã của tôi <small>' + mineCount + '</small>', S.newsMine, 'MarketPage.toggleNewsMine()') + '</div></div>' : '';
+        const shown = list.slice(0, S.newsLimit); S.newsShown = shown;
+        const items = shown.map((x, i) => {
+            const tk = x.tickers.slice(0, 4).map((s) => '<span class="mk-tk' + (mine && mine.has(s) ? ' mine' : '') + '" title="' + (mine && mine.has(s) ? 'Mã trong danh mục/theo dõi của bạn' : 'Mã được nhắc') + '">' + esc(s) + '</span>').join('');
+            return '<li class="mk-news-item"><a class="mk-news-title" href="' + esc(x.link) + '" target="_blank" rel="noopener noreferrer" onclick="return MarketPage.openNews(event,' + i + ')">' + esc(x.title) + '</a>' +
+                (x.summary ? '<p class="mk-news-sum">' + esc(x.summary) + '</p>' : '') +
+                '<div class="mk-news-meta"><span class="mk-src">' + esc(x.sourceName || x.source) + '</span>' + (x.ts ? '<span>' + esc(MarketNews.ago(x.ts, now)) + '</span>' : '') + '<span class="mk-topic">' + esc(MarketNews.labelOf(x.topic)) + '</span>' + tk + '</div></li>';
+        }).join('');
+        const bad = (S.newsSources || []).filter((s) => !s.ok), srcLine = (S.newsSources || []).map((s) => '<span class="' + (s.ok ? '' : 'mk-err') + '" title="' + esc(s.ok ? s.count + ' tin' : (s.error || 'lỗi')) + '">' + esc(s.name) + (s.ok ? '' : ' (lỗi)') + '</span>').join(' · ');
+        box.innerHTML = head +
+            '<p class="mk-digest">Trong ' + dg.hours + ' giờ qua có <b>' + dg.total + '</b> tin, trong đó <b>' + dg.recent3h + '</b> tin trong 3 giờ gần nhất.' + (S.newsErr ? ' <span class="mk-err">Chưa cập nhật được: ' + esc(S.newsErr) + '</span>' : '') + '</p>' +
+            '<div class="mk-chips" role="group" aria-label="Chủ đề tin">' + topicChips + '</div>' + tickerChips + mineChip +
+            (shown.length ? '<ul class="mk-news">' + items + '</ul>' : '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Không có tin nào phù hợp bộ lọc này.</div>') +
+            (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button type="button" class="btn-tool" onclick="MarketPage.moreNews()">Xem thêm (' + (list.length - shown.length) + ' tin)</button></div>' : '') +
+            '<p class="tl-hint">Nguồn: ' + srcLine + (bad.length ? ' — báo lỗi tạm thời không làm mất các báo còn lại' : '') + '. Chỉ hiện tiêu đề và đoạn mô tả ngắn; bấm tiêu đề để đọc đầy đủ trên báo gốc. Chủ đề và mã cổ phiếu được nhận bằng quy tắc tự động nên có thể chưa chuẩn (mã trùng tên thông dụng như VND, USD bị loại). Không phải khuyến nghị đầu tư.</p>';
+    }
+    function openNews(ev, i) {
+        const x = S.newsShown && S.newsShown[i];
+        if (!x || !/^https?:\/\//i.test(x.link)) return true;
+        if (typeof openExternalUrl === 'function') { if (ev && ev.preventDefault) ev.preventDefault(); openExternalUrl(x.link); return false; }
+        return true;                                           // không có hàm mở link ngoài: để trình duyệt tự mở theo href
+    }
+    function setNewsTopic(k) { if (k !== 'all' && !MarketNews.TOPICS.some((t) => t.key === k) && k !== 'other') return; S.newsTopic = k; S.newsLimit = 12; renderNews(); }
+    function setNewsTicker(sym) { S.newsTicker = S.newsTicker === sym ? null : (/^[A-Z0-9]{3,4}$/.test(String(sym)) ? sym : null); S.newsLimit = 12; renderNews(); }
+    function toggleNewsMine() { S.newsMine = !S.newsMine; S.newsLimit = 12; renderNews(); }
+    function moreNews() { S.newsLimit += 12; renderNews(); }
+
     function renderValuation() {
         const box = $('mk-valuation'); if (!box) return;
         const head = '<div class="tl-card-head"><h3><i class="fa-solid fa-scale-balanced"></i> Định giá thị trường <span class="mk-card-sub">so với 5 năm của chính nó</span></h3></div>';
@@ -381,7 +461,7 @@ const MarketPage = (function () {
             '<p class="tl-hint">Tổng hợp theo vốn hoá, chỉ tính mã có lãi nên thấp hơn P/E của chỉ số khi nhiều doanh nghiệp lỗ. “Rẻ so với lịch sử” không có nghĩa là sẽ tăng.</p>';
     }
 
-    function renderAll() { renderStatus(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderPerf(); renderTech(); renderContrib(); renderSectors(); renderValuation(); }
+    function renderAll() { renderStatus(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderNews(); renderPerf(); renderTech(); renderContrib(); renderSectors(); renderValuation(); }
 
     // ---------- thao tác ----------
     function selectIndex(code) { if (!MO.INDICES.some((i) => i.code === code)) return; S.index = code; S.exchange = ixOf(code).exchange; save(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderPerf(); renderTech(); renderContrib(); renderSectors(); }
@@ -392,18 +472,20 @@ const MarketPage = (function () {
 
     function tick() {
         if (typeof document !== 'undefined' && document.hidden) return;
+        loadNews(false);                                                          // tin làm mới mỗi 5 phút, kể cả ngoài giờ giao dịch
         if (sessionState() === 'open') refresh(false);
     }
     function start() {
         if (S.started) return; S.started = true;
         load(); renderAll();
-        refresh(true).then(loadOptional);
+        refresh(true).then(() => { loadOptional(); loadMine(); });
+        loadNews(true);
         S.timer = setInterval(tick, POLL_MS);
         document.addEventListener('visibilitychange', () => { if (!document.hidden && S.fetchedAt && Date.now() - S.fetchedAt > POLL_MS * 2 && (sessionState() === 'open' || sessionState() === 'break')) refresh(false); });
         let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawChart, 150); });
     }
 
-    return { S, start, refresh, loadOptional, loadMore, selectIndex, setRange, setExchange, setMover, setSecMode, renderAll, drawChart };
+    return { S, start, refresh, loadOptional, loadMore, loadNews, loadMine, openNews, setNewsTopic, setNewsTicker, toggleNewsMine, moreNews, selectIndex, setRange, setExchange, setMover, setSecMode, renderAll, drawChart };
 })();
 
 function applyThemeIcon() { const ic = document.getElementById('theme-ic'); if (ic) ic.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; }
