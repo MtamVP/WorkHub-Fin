@@ -5,7 +5,10 @@
 // danh sách tin chứ không từ lời AI; (4) chi phí bị chặn bằng bộ nhớ đệm 30 phút dùng chung mọi người, trần số lượt mỗi ngày và chặn gọi dồn khi lỗi.
 
 export const MODEL_DEFAULT = "claude-haiku-4-5-20251001";
-export const MODEL_DEFAULTS: Record<string, string> = { claude: MODEL_DEFAULT, gemini: "gemini-3.1-flash-lite" };
+// Chuỗi mô hình Gemini thử lần lượt từ tốt nhất xuống: mô hình đầu hết hạn mức (429) hoặc lỗi thì thử mô hình kế tiếp. Hạn mức của Gemini tính riêng từng mô hình nên các mô hình thấp hơn thường còn dư.
+// Tên theo trang mô hình của Google ngày 09/10/2026; đổi được bằng biến AI_MODEL (danh sách cách nhau bởi dấu phẩy, thử theo đúng thứ tự đó).
+export const GEMINI_CHAIN = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+export const MODEL_DEFAULTS: Record<string, string> = { claude: MODEL_DEFAULT, gemini: GEMINI_CHAIN[0] };
 export const GEMINI_MAX_TOKENS = 4096;                 // mô hình Gemini 3.x có thể "suy nghĩ" và tính vào giới hạn đầu ra nên để rộng; JSON bị cắt dở sẽ bị bỏ ở bước đọc
 export type Provider = "claude" | "gemini";
 // Chọn nhà cung cấp AI: AI_PROVIDER ('gemini' hoặc 'claude') nếu đặt và có khoá tương ứng; không đặt thì tự chọn theo khoá có sẵn, ưu tiên Gemini (có gói miễn phí). Không có khoá phù hợp: null.
@@ -26,8 +29,9 @@ export const MAX_TOKENS = 1200;
 export type NewsIn = { title: string; link: string; sourceName?: string; source?: string; ts?: number | null; summary?: string };
 export type Ref = { n: number; title: string; link: string; sourceName: string };
 export type Point = { topic: string; text: string; refs: Ref[] };
-export type Summary = { headline: string; points: Point[]; model: string; generatedAt: string; itemCount: number };
-export type Fail = { ok: false; code: string; error: string };
+export type Skipped = { model: string; code: string };
+export type Summary = { headline: string; points: Point[]; model: string; generatedAt: string; itemCount: number; skipped?: Skipped[] };
+export type Fail = { ok: false; code: string; error: string; status?: number; detail?: string };       // status và detail (đã bỏ khoá) chỉ để chẩn đoán nội bộ, không bao giờ trả cho người dùng cuối
 
 const stripMarkup = (s: unknown) => String(s ?? "").replace(/<[^>]*>/g, " ").replace(/https?:\/\/\S+/gi, "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
 export function clip(s: string, max: number): string {
@@ -125,22 +129,25 @@ export async function callClaude(o: { key: string; model: string; system: string
 }
 
 // Gọi Gemini (generateContent, khoá ở tiêu đề x-goog-api-key chứ không ở địa chỉ để khỏi lọt vào nhật ký). Gemini báo khoá sai bằng mã 400 "API key not valid"; 404 là sai tên mô hình; 429 là hết hạn mức.
-export async function callGemini(o: { key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal }): Promise<{ ok: true; text: string } | Fail> {
+export async function callGemini(o: { key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal; thinking?: string; maxTokens?: number }): Promise<{ ok: true; text: string } | Fail> {
   let res: any;
   try {
     res = await o.fetchFn("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(o.model) + ":generateContent", {
       method: "POST", signal: o.signal,
       headers: { "x-goog-api-key": o.key, "content-type": "application/json" },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: o.system }] }, contents: [{ role: "user", parts: [{ text: o.user }] }], generationConfig: { temperature: 0.2, maxOutputTokens: GEMINI_MAX_TOKENS, responseMimeType: "application/json" } }),
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: o.system }] }, contents: [{ role: "user", parts: [{ text: o.user }] }], generationConfig: Object.assign({ temperature: 0.2, maxOutputTokens: o.maxTokens ?? GEMINI_MAX_TOKENS, responseMimeType: "application/json" }, o.thinking ? { thinkingConfig: { thinkingLevel: o.thinking } } : {}) }),
     });
   } catch (_e) { return fail("network"); }
   if (!res || !res.ok) {
     const s = Number(res && res.status);
-    if (s === 401 || s === 403) return fail("invalid_key");
-    if (s === 404) return fail("bad_model");
-    if (s === 429) return fail("rate_limited");
-    if (s === 400) { let m = ""; try { m = JSON.stringify(await res.json()); } catch (_e) { /* bỏ */ } return /API key not valid|API_KEY_INVALID|expired/i.test(m) ? fail("invalid_key") : (/billing|quota exceeded/i.test(m) ? fail("billing") : fail("upstream")); }
-    return fail("upstream");
+    let m = "", msg = "";
+    try { const b = await res.json(); m = JSON.stringify(b); msg = String((b && b.error && b.error.message) || ""); } catch (_e) { /* không đọc được thân lỗi */ }
+    const withInfo = (f: Fail): Fail => Object.assign(f, { status: s, detail: clip(msg.split(o.key).join("[khoá]").replace(/\s+/g, " ").trim(), 160) });
+    if (s === 401 || s === 403) return withInfo(fail("invalid_key"));
+    if (s === 404) return withInfo(fail("bad_model"));
+    if (s === 429) return withInfo(fail("rate_limited"));
+    if (s === 400) return withInfo(/API key not valid|API_KEY_INVALID|expired/i.test(m) ? fail("invalid_key") : (/billing|quota exceeded/i.test(m) ? fail("billing") : fail("upstream")));
+    return withInfo(fail("upstream"));
   }
   let j: any;
   try { j = await res.json(); } catch (_e) { return fail("upstream"); }
@@ -148,8 +155,56 @@ export async function callGemini(o: { key: string; model: string; system: string
   const text = parts.filter((p: any) => p && typeof p.text === "string" && !p.thought).map((p: any) => p.text).join("");
   return text.trim() ? { ok: true, text } : fail("bad_output");     // không có ứng viên (bị chặn an toàn) hoặc rỗng
 }
-export function callAi(o: { provider: Provider; key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal }) {
+export function callAi(o: { provider: Provider; key: string; model: string; system: string; user: string; fetchFn: (url: string, init: any) => Promise<any>; signal?: AbortSignal; thinking?: string; maxTokens?: number }) {
   return o.provider === "gemini" ? callGemini(o) : callClaude(o);
+}
+
+// ---------- chuỗi mô hình dự phòng ----------
+// Danh sách mô hình từ biến AI_MODEL: cách nhau bằng dấu phẩy/khoảng trắng; chỉ nhận tên an toàn (chữ, số, . _ -), bỏ trùng, tối đa 10.
+export function parseModelList(s?: string): string[] {
+  const out: string[] = [];
+  for (const t of String(s ?? "").split(/[\s,;]+/)) if (/^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$/.test(t) && !out.includes(t)) out.push(t);
+  return out.slice(0, 10);
+}
+export function chainFor(provider: Provider, envModel?: string): string[] {
+  const own = parseModelList(envModel);
+  if (own.length) return own;
+  return provider === "gemini" ? GEMINI_CHAIN.slice() : [MODEL_DEFAULT];
+}
+// Nhớ mô hình nào vừa hết hạn mức, quá giờ hoặc lỗi máy chủ để khỏi tốn một lượt chờ vô ích mỗi lần: lần đầu 2 phút, liên tiếp thì 10, 30, 60 phút; sai tên mô hình thì bỏ qua 6 giờ. Thành công thì xoá nhớ. Sai khuôn (bad_output) không bị nhớ.
+export function createCooldown(now: () => number) {
+  const until = new Map<string, number>(), streak = new Map<string, number>(), STEPS = [2, 10, 30, 60].map((m) => m * 60000);
+  return {
+    isCool: (m: string) => (until.get(m) ?? 0) > now(),
+    mark(m: string, code: string) {
+      if (code === "bad_model") { until.set(m, now() + 6 * 3600000); return; }
+      if (code === "rate_limited" || code === "network" || code === "upstream") { const n = streak.get(m) ?? 0; streak.set(m, n + 1); until.set(m, now() + STEPS[Math.min(n, STEPS.length - 1)]); }       // hết hạn mức, quá giờ (mô hình quá chậm) hoặc lỗi máy chủ: cho nghỉ, tăng dần
+    },
+    ok(m: string) { streak.delete(m); until.delete(m); },
+    state: () => [...until.entries()].filter(([, t]) => t > now()).map(([m, t]) => ({ model: m, untilMs: t })),
+  };
+}
+const FALL_THROUGH = new Set(["rate_limited", "bad_model", "upstream", "bad_output", "network"]);       // lỗi của riêng mô hình/lượt gọi: thử mô hình kế tiếp
+// Thử lần lượt các mô hình: mô hình đang nghỉ (vừa hết hạn mức) bị bỏ qua; lỗi khoá sai hoặc hết tiền (dùng chung mọi mô hình) thì dừng ngay; quá ngân sách thời gian thì không thử thêm.
+// Trả { ok, model, parsed, skipped } (skipped = các mô hình tốt hơn đã bị bỏ qua hoặc lỗi, kèm lý do) hoặc lỗi cuối cùng (ưu tiên báo rate_limited nếu có mô hình hết hạn mức).
+export async function summarizeWithFallback(o: { models: string[]; cooldown: ReturnType<typeof createCooldown>; now: () => number; budgetMs?: number; attempt: (model: string) => Promise<{ ok: true; text: string } | Fail>; parse: (text: string) => any }): Promise<{ ok: true; model: string; parsed: any; skipped: Skipped[] } | (Fail & { skipped: Skipped[] })> {
+  const start = o.now(), budget = o.budgetMs ?? 50000, skipped: Skipped[] = [];
+  let last: Fail | null = null, rate = false, tried = 0;
+  for (const m of o.models) {
+    if (o.cooldown.isCool(m)) { skipped.push({ model: m, code: "cooldown" }); rate = true; continue; }
+    if (tried > 0 && o.now() - start > budget) { skipped.push({ model: m, code: "budget" }); continue; }
+    tried++;
+    const r = await o.attempt(m);
+    if (r.ok) {
+      const parsed = o.parse(r.text);
+      if (parsed) { o.cooldown.ok(m); return { ok: true, model: m, parsed, skipped }; }
+      last = fail("bad_output"); skipped.push({ model: m, code: "bad_output" }); continue;
+    }
+    last = r; skipped.push({ model: m, code: r.code }); o.cooldown.mark(m, r.code);
+    if (r.code === "rate_limited") rate = true;
+    if (!FALL_THROUGH.has(r.code)) return Object.assign({}, r, { skipped });
+  }
+  return Object.assign({}, rate ? fail("rate_limited") : (last ?? fail("rate_limited")), { skipped });
 }
 
 // Cổng chi phí: dùng lại kết quả 30 phút (mọi người cùng lúc dùng chung), gộp các yêu cầu đồng thời thành một, nhớ lỗi 2 phút để không gọi dồn, và trần số lượt mỗi ngày (giờ UTC).

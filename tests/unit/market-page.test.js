@@ -589,6 +589,17 @@ describe('trang Thị Trường: Tóm tắt bằng AI', () => {
     expect(x).toContain('Không phải khuyến nghị đầu tư');
     expect(h).toContain('Cập nhật');
   });
+  it('khi phải chuyển xuống mô hình thấp hơn: ghi rõ số mô hình tốt hơn bị bỏ qua (kèm lý do khi rê chuột), và không ghi gì nếu dùng mô hình đầu', async () => {
+    const c = aiClient({ ai: AI_OK({ model: 'gemini-3.6-flash', skipped: [{ model: 'gemini-3.8-flash', code: 'rate_limited' }, { model: 'gemini-3.7-flash', code: 'cooldown' }] }) }), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true); await t.MP.loadAi();
+    const h = t.els['mk-news'].innerHTML;
+    expect(text(h)).toContain('Đã chuyển xuống mô hình này vì 2 mô hình tốt hơn đang hết hạn mức hoặc lỗi');
+    expect(h).toContain('gemini-3.8-flash: rate_limited; gemini-3.7-flash: cooldown');
+    expect(text(h)).toContain('gemini-3.6-flash');
+    const t2 = boot({ sbClient: aiClient() });
+    await t2.MP.refresh(true); await t2.MP.loadNews(true); await t2.MP.loadAi();
+    expect(text(t2.els['mk-news'].innerHTML)).not.toContain('Đã chuyển xuống');
+  });
   it('kết quả dùng chung từ bộ nhớ đệm của máy chủ: ghi rõ đã dùng lại kết quả bao nhiêu phút trước', async () => {
     const c = aiClient({ ai: AI_OK({ cached: true, ageSec: 725 }) }), t = boot({ sbClient: c });
     await t.MP.refresh(true); await t.MP.loadNews(true);

@@ -23,7 +23,7 @@ describe('chọn nhà cung cấp theo khoá', () => {
     expect(pickProvider({ provider: 'khác', geminiKey: 'g' })).toEqual({ provider: 'gemini', key: 'g' });
   });
   it('mô hình mặc định cho từng nhà cung cấp', () => {
-    expect(MODEL_DEFAULTS.gemini).toBe('gemini-3.1-flash-lite');
+    expect(MODEL_DEFAULTS.gemini).toBe('gemini-3.8-flash');                // mô hình đầu chuỗi
     expect(MODEL_DEFAULTS.claude).toBe('claude-haiku-4-5-20251001');
   });
 });
@@ -83,6 +83,33 @@ describe('gọi Gemini (fetch giả)', () => {
   it('văn bản JSON do Gemini trả về đi qua cùng bộ kiểm khuôn: ý không căn cứ bị bỏ', async () => {
     const r = await callGemini(Object.assign({}, base, { fetchFn: async () => okRes([{ text: '```json\n' + JSON.stringify({ headline: 'h', points: [{ topic: 'A', text: 'Có căn cứ', refs: [1] }, { topic: 'B', text: 'Không căn cứ', refs: [] }] }) + '\n```' }]) }));
     expect(parseModel(r.text, 3).points.map((p) => p.topic)).toEqual(['A']);
+  });
+});
+
+describe('mức suy nghĩ và chẩn đoán lỗi của Gemini', () => {
+  it('có thinking thì gửi generationConfig.thinkingConfig.thinkingLevel; không có thì không gửi; maxTokens tuỳ chỉnh', async () => {
+    let body;
+    const f = async (u, init) => { body = JSON.parse(init.body); return okRes([{ text: 'a' }]); };
+    await callGemini(Object.assign({}, base, { fetchFn: f, thinking: 'low', maxTokens: 512 }));
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+    expect(body.generationConfig.maxOutputTokens).toBe(512);
+    await callGemini(Object.assign({}, base, { fetchFn: f }));
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
+    expect(body.generationConfig.maxOutputTokens).toBe(GEMINI_MAX_TOKENS);
+  });
+  it('lỗi kèm mã HTTP và lời báo ngắn của Google (đã bỏ khoá) để chẩn đoán: 503 nhu cầu cao', async () => {
+    const r = await callGemini(Object.assign({}, base, { fetchFn: async () => ({ ok: false, status: 503, json: async () => ({ error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary.' } }) }) }));
+    expect(r).toMatchObject({ ok: false, code: 'upstream', status: 503 });
+    expect(r.detail).toContain('high demand');
+    expect(r.detail.length).toBeLessThanOrEqual(160);
+  });
+  it('lời báo lỗi chứa khoá thì bị che; thân lỗi không đọc được thì vẫn có mã', async () => {
+    const r = await callGemini(Object.assign({}, base, { fetchFn: async () => ({ ok: false, status: 400, json: async () => ({ error: { message: 'bad request near AIza-KHONG-THAT in header' } }) }) }));
+    expect(r.detail).not.toContain('AIza-KHONG-THAT');
+    expect(r.detail).toContain('[khoá]');
+    const r2 = await callGemini(Object.assign({}, base, { fetchFn: async () => ({ ok: false, status: 502, json: async () => { throw new Error('x'); } }) }));
+    expect(r2).toMatchObject({ ok: false, code: 'upstream', status: 502 });
+    expect(r2.detail).toBe('');
   });
 });
 
