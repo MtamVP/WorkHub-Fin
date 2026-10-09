@@ -893,3 +893,64 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .alert-email-toggle input { width: 16px; height: 16px; accent-color: var(--finance-accent); cursor: pointer; }
 .alert-email-toggle i { color: var(--text-muted); margin-right: 3px; }
 .alert-email-toggle b { color: var(--text-primary); font-weight: 600; }
+
+/* =========================================================================
+   MOBILE SHELL (<= 768px): thanh điều hướng chuyển xuống đáy màn hình (tầm ngón cái), thanh trên chỉ còn tên và nút
+   Trước đây 5-9 mục nằm trong một dải cuộn ngang ở đầu trang nên mục cuối bị che và phải vuốt mới thấy. Cùng một phần tử .desk-nav, không đổi HTML.
+   ========================================================================= */
+@media (max-width: 768px) {
+  body.desk { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .desk-topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg-color); }     /* backdrop-filter biến thanh trên thành khối chứa của phần tử fixed bên trong: bỏ thì thanh điều hướng mới bám đáy màn hình */
+  .desk-topbar-inner { flex-wrap: nowrap; height: 52px; padding: 0 14px; gap: 10px; }
+  .desk-topbar-right { gap: 8px; }
+  .desk-iconbtn { width: 40px; height: 40px; }
+  .desk-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; order: 0; width: auto; gap: 0;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); border-width: 1px 0 0; border-radius: 0;
+    background: color-mix(in srgb, var(--bg-color) 93%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain;
+  }
+  .desk-nav::-webkit-scrollbar { display: none; }
+  .desk-nav a {
+    position: relative; flex: 1 0 20%; min-width: 0; min-height: 52px; flex-direction: column; justify-content: center; gap: 4px;
+    padding: 6px 2px; border-radius: 12px; font-size: 0.66rem; line-height: 1.15; text-align: center; white-space: normal; text-wrap: balance; scroll-snap-align: start;
+  }
+  .desk-nav a i { font-size: 1.05rem; }
+  .desk-nav a.active { background: transparent; box-shadow: none; color: var(--text-primary); }
+  .desk-nav a.active i { color: var(--finance-accent); }
+  .desk-nav a.active::after { content: ""; position: absolute; top: -6px; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--finance-accent); }
+  body[data-bench="valuation"] .desk-nav a { flex-basis: 23%; }                     /* Valuation Bench có 9 mục: thấy khoảng 4 mục rưỡi, vuốt ngang để xem tiếp */
+  .toast-notification { left: 12px; right: 12px; top: 12px; min-width: 0; }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .desk-nav a { transition: color 0.15s ease, background-color 0.15s ease; }
+}
+
+/* =========================================================================
+   MOBILE PAGES (<= 768px): bảng không còn bị cắt, Danh Mục thành thẻ, thanh công cụ xếp dọc, vùng chạm >= 40 px
+   ========================================================================= */
+@media (max-width: 768px) {
+  .spreadsheet-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }                  /* trước đây overflow: hidden cắt mất các cột bên phải, không cuộn được */
+  .holdings-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .live-status { width: 100%; }
+  .live-chip { display: block; border-radius: 14px; padding: 8px 12px; line-height: 1.55; }     /* chip chứa chữ, in đậm và span lẫn nhau: dạng flex làm mỗi mảnh thành một cột bị bóp */
+  .live-dot { margin-right: 6px; vertical-align: 1px; }
+  .export-bar { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .btn-tool { min-height: 40px; justify-content: center; }
+  .asset-tab-toggle { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .asset-tab-toggle::-webkit-scrollbar { display: none; }
+  .asset-tab-toggle .view-toggle-btn { flex: 0 0 auto; white-space: nowrap; padding: 12px 4px; }
+  .desk-byline { padding: 18px 0 14px; }
+  .desk-byline-actions { margin-left: 0; width: 100%; }
+
+  /* bảng đánh dấu data-m-cards (mobile-cards.js gán data-label cho từng ô): mỗi dòng là một thẻ, nhãn nhỏ phía trên giá trị */
+  .spreadsheet-wrapper:has(> table[data-m-cards]) { overflow: visible; background: transparent; border: 0; box-shadow: none; }
+  table[data-m-cards], table[data-m-cards] tbody { display: block; width: 100%; min-width: 0; }
+  table[data-m-cards] thead { display: none; }
+  table[data-m-cards] tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; padding: 14px; margin-bottom: 10px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+  table[data-m-cards] td { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 0 !important; border: 0 !important; text-align: left; min-width: 0; }
+  table[data-m-cards] td::before { content: attr(data-label); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  table[data-m-cards] td:first-child, table[data-m-cards] td:has(.price-wrap), table[data-m-cards] td:has(.levels-cell), table[data-m-cards] td[colspan] { grid-column: 1 / -1; }
+  table[data-m-cards] td:first-child::before, table[data-m-cards] td[colspan]::before { display: none; }
+  table[data-m-cards] .price-wrap, table[data-m-cards] .levels-cell { align-items: flex-start; }
+}

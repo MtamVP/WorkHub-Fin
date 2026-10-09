@@ -50,6 +50,17 @@ const BenchNav = (function () {
     return VALUATION_VIEWS.indexOf(p.get('view')) !== -1 ? 'valuation' : 'investment';     // đường dẫn cũ /stocksheet/?view=market vẫn hoạt động, nay thuộc Valuation Bench
   }
 
+  // Vị trí cuộn để mục đang mở nằm giữa thanh điều hướng cuộn ngang (thanh ở đáy màn hình trên điện thoại); không âm và không vượt quá phần cuộn được
+  function centerOffset(viewWidth, itemLeft, itemWidth, scrollWidth) {
+    const x = itemLeft - (viewWidth - itemWidth) / 2;
+    return Math.max(0, Math.min(x, Math.max(0, scrollWidth - viewWidth)));
+  }
+  function centerActive(nav) {
+    const a = nav && nav.querySelector ? nav.querySelector('a.active') : null;
+    if (!a || !(nav.scrollWidth > nav.clientWidth)) return;
+    nav.scrollLeft = centerOffset(nav.clientWidth, a.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft, a.offsetWidth, nav.scrollWidth);
+  }
+
   // opts: { bench, active, onView(view) -> true nếu trang tự xử lý đổi chế độ xem mà không tải lại }
   function mount(opts) {
     if (typeof document === 'undefined') return;
@@ -58,6 +69,7 @@ const BenchNav = (function () {
     if (sub) sub.textContent = '· ' + cfg(bench).brand;
     if (nav) {
       nav.innerHTML = navHtml(bench, o.active);
+      centerActive(nav);
       if (typeof o.onView === 'function') nav.addEventListener('click', function (e) {
         const a = e.target.closest ? e.target.closest('a[data-view]') : null;
         if (!a) return;
@@ -79,7 +91,7 @@ const BenchNav = (function () {
     });
   }
 
-  return { NAV, VALUATION_VIEWS, navHtml, benchFromSearch, mount, setActive };
+  return { NAV, VALUATION_VIEWS, navHtml, benchFromSearch, mount, setActive, centerOffset };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = BenchNav;
