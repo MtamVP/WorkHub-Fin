@@ -813,13 +813,13 @@ describe('trang Thị Trường: giờ cập nhật ở cuối từng thẻ', ()
     await t.MP.loadOptional();
     await t.MP.S.morePromise;
     t.MP.setSecMode('icb');
-    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect; ngành theo ảnh chụp của WorkHub');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect, tổng hợp từ từng mã; ngành theo ảnh chụp của WorkHub');
     t.MP.setSecMode('idx');
     expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu hôm nay · nguồn không ghi giờ, tải lúc 18:00 nến ngày của chỉ số ngành, VNDirect');
     t.MP.S.daily.VNFIN = t.MP.S.daily.VNFIN.slice(0, -1);               // một chỉ số ngành trễ một phiên: lấy ngày mới nhất của cả nhóm, không phải ngày cũ nhất
     t.MP.setSecMode('idx');
     expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu hôm nay · nguồn không ghi giờ');
-    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect; vốn hoá theo ảnh chụp ngày 08/10/2026');
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect, tổng hợp từ từng mã; vốn hoá theo ảnh chụp ngày 08/10/2026');
   });
   it('định giá: ghi ngày dữ liệu mới nhất, cũ quá 45 ngày thì báo, không nói "không ghi giờ"', async () => {
     const t = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-06-01')) });
@@ -873,5 +873,148 @@ describe('trang Thị Trường: giờ cập nhật ở cuối từng thẻ', ()
     const h = t.els['mk-contrib'].innerHTML;
     expect(h).toContain('mk-asof');
     expect(h).not.toContain('<u>');
+  });
+});
+
+describe('trang Thị Trường: bảng giá VCI trong phiên (gần realtime), VNDirect là dự phòng', () => {
+  const VCI_FX = JSON.parse(fs.readFileSync(REPO + '/tests/fixtures/vci-boards-sample.json', 'utf8'));
+  const vn = (date, hm) => { const [y, m, d] = date.split('-').map(Number), [h, mi] = hm.split(':').map(Number); return Date.UTC(y, m - 1, d, h - 7, mi, 30); };
+  const NOW = vn('2026-10-08', '13:40');
+  const vciClient = (now, over) => {
+    const o = Object.assign({ calls: 0, fail: null, data: null, bodies: [] }, over || {});
+    return { o, functions: { invoke: async (name, opt) => { o.calls++; o.name = name; o.bodies.push(opt && opt.body); if (o.fail) return { data: null, error: { message: o.fail } }; return { data: o.data || Object.assign({}, VCI_FX, { asOf: new Date(now).toISOString() }), error: null }; } } };
+  };
+  const bootVci = (over, bo) => { const c = vciClient(NOW, over), t = boot(Object.assign({ session: 'open', now: NOW, sbClient: c }, bo || {})); t.MP.S.vciMinRows = 50; return { c, t }; };
+
+  it('trong phiên: gọi hàm live-quotes xin cả bảng giá ba sàn và dùng nó; độ rộng khớp số tính độc lập', async () => {
+    const { c, t } = bootVci();
+    await t.MP.refresh(true);
+    expect(c.o.name).toBe('live-quotes');
+    expect(c.o.bodies[0]).toEqual({ boards: true });
+    expect(t.MP.S.boardSource).toBe('vci');
+    expect(t.MP.S.rows.length).toBe(86);
+    expect(t.urls.some((u) => u.indexOf('stock_prices') !== -1)).toBe(false);                 // không cần gọi bảng giá VNDirect
+    const h = text(t.els['mk-breadth'].innerHTML);
+    expect(h).toContain('14 Tăng');
+    expect(h).toContain('2 trần');
+    expect(h).toContain('9 Đứng giá');
+    expect(h).toContain('17 Giảm');
+    expect(h).toContain('2 sàn');
+    expect(h).toContain('Giá trị giao dịch 1.87 nghìn tỷ');
+    expect(h).toContain('Trong đó thỏa thuận 117 tỷ (6%)');
+    expect(h).toContain('KL khớp lệnh 97.3 tr');
+    expect(h).toContain('Mã có giao dịch 38 / 40');
+  });
+  it('đổi sang sàn khác dùng cùng bảng VCI (HNX: 4 tăng, 14 đứng giá, 4 giảm, 1 trần, 2 sàn)', async () => {
+    const { t } = bootVci();
+    await t.MP.refresh(true);
+    t.MP.setExchange('HNX');
+    const h = text(t.els['mk-breadth'].innerHTML);
+    expect(h).toContain('4 Tăng');
+    expect(h).toContain('14 Đứng giá');
+    expect(h).toContain('4 Giảm');
+    expect(h).toContain('1 trần');
+    expect(h).toContain('2 sàn');
+    expect(h).toContain('Mã có giao dịch 11 / 22');
+  });
+  it('cổ phiếu nổi bật lấy từ bảng VCI: tăng mạnh nhất IDI rồi NVL (sau khi lọc giá trị tối thiểu 1 tỷ)', async () => {
+    const { t } = bootVci();
+    await t.MP.refresh(true);
+    const m = text(t.els['mk-movers'].innerHTML);
+    expect(m.indexOf('IDI')).toBeGreaterThan(-1);
+    expect(m.indexOf('IDI')).toBeLessThan(m.indexOf('NVL'));
+    expect(m.indexOf('NVL')).toBeLessThan(m.indexOf('ANV'));
+  });
+  it('dòng giờ ghi rõ nguồn VCI: giờ là lúc máy chủ lấy bảng, mới cập nhật', async () => {
+    const { t } = bootVci();
+    await t.MP.refresh(true);
+    const b = text(t.els['mk-breadth'].innerHTML);
+    expect(b).toContain('Số liệu lúc 13:40 · mới cập nhật bảng giá VCI qua máy chủ WorkHub (giờ là lúc lấy bảng)');
+    expect(t.els['mk-breadth'].innerHTML).toContain('mk-asof mk-asof-ok');
+    expect(text(t.els['mk-movers'].innerHTML)).toContain('Số liệu lúc 13:40 · mới cập nhật bảng giá VCI');
+  });
+  it('khối ngoại vẫn lấy từ VNDirect foreigns (giá trị chính xác, đo cùng độ mới) khi bảng giá dùng VCI', async () => {
+    const { t } = bootVci();
+    await t.MP.refresh(true);
+    expect(t.urls.some((u) => u.indexOf('foreigns') !== -1)).toBe(true);
+    expect(t.MP.S.frows.length).toBeGreaterThan(0);
+    expect(text(t.els['mk-foreign'].innerHTML)).toContain('khối ngoại theo mã, VNDirect');
+  });
+  it('VCI lỗi: quay về bảng VNDirect ngay lượt đó và nghỉ 3 phút rồi mới thử VCI lại', async () => {
+    const { c, t } = bootVci({ fail: 'boom' });
+    await t.MP.refresh(true);
+    expect(t.MP.S.boardSource).toBe('vnd');
+    expect(t.MP.S.rows.length).toBeGreaterThan(30);
+    expect(c.o.calls).toBe(1);
+    expect(text(t.els['mk-breadth'].innerHTML)).toContain('bảng giá VNDirect, tổng hợp từ từng mã');
+    t.MP.S.busy = false;
+    await t.MP.refresh(false);
+    expect(c.o.calls).toBe(1);                                                                  // còn trong thời gian nghỉ
+    t.MP.S.vciFailAt = NOW - 181000;
+    await t.MP.refresh(false);
+    expect(c.o.calls).toBe(2);
+  });
+  it('VCI trả quá ít dòng (bảng hỏng) hoặc ok:false: không dùng, quay về VNDirect', async () => {
+    const few = bootVci({ data: { ok: true, boards: { HOSE: VCI_FX.boards.HOSE.slice(0, 5) }, failed: ['HNX', 'UPCOM'], asOf: new Date(NOW).toISOString() } });
+    await few.t.MP.refresh(true);
+    expect(few.t.MP.S.boardSource).toBe('vnd');
+    const bad = bootVci({ data: { ok: false, error: 'x' } });
+    await bad.t.MP.refresh(true);
+    expect(bad.t.MP.S.boardSource).toBe('vnd');
+  });
+  it('hàm báo lỗi (error có giá trị hoặc ok:false) thì bỏ cả khi kèm dữ liệu bảng: dùng VNDirect', async () => {
+    const full = Object.assign({}, VCI_FX, { asOf: new Date(NOW).toISOString() });
+    const a = bootVci({ data: Object.assign({}, full, { ok: false }) });
+    await a.t.MP.refresh(true);
+    expect(a.t.MP.S.boardSource).toBe('vnd');
+    const c = vciClient(NOW), t = boot({ session: 'open', now: NOW, sbClient: { functions: { invoke: async () => ({ data: full, error: { message: 'x' } }) } } });
+    t.MP.S.vciMinRows = 50;
+    await t.MP.refresh(true);
+    expect(t.MP.S.boardSource).toBe('vnd');
+    expect(c.o.calls).toBe(0);
+  });
+  it('ngoài khung 9:00-15:30 hoặc chưa có số liệu hôm nay: không gọi VCI, dùng VNDirect (số chốt, có thỏa thuận chính xác)', async () => {
+    const late = vciClient(vn('2026-10-08', '16:00'));
+    const a = boot({ session: 'closed', now: vn('2026-10-08', '16:00'), sbClient: late });
+    a.MP.S.vciMinRows = 50;
+    await a.MP.refresh(true);
+    expect(late.o.calls).toBe(0);
+    expect(a.MP.S.boardSource).toBe('vnd');
+    const early = vciClient(vn('2026-10-08', '08:30'));
+    const b = boot({ session: 'pre', now: vn('2026-10-08', '08:30'), sbClient: early });
+    await b.MP.refresh(true);
+    expect(early.o.calls).toBe(0);
+    const nextDay = vciClient(vn('2026-10-09', '09:30'));                                       // sàn mở nhưng nguồn mới chỉ có nến phiên hôm qua: VCI không ghi ngày nên không dám dùng
+    const c2 = boot({ session: 'open', now: vn('2026-10-09', '09:30'), sbClient: nextDay });
+    await c2.MP.refresh(true);
+    expect(nextDay.o.calls).toBe(0);
+    const hol = vciClient(NOW);
+    const d = boot({ session: 'holiday', now: NOW, sbClient: hol });
+    await d.MP.refresh(true);
+    expect(hol.o.calls).toBe(0);
+  });
+  it('vài phút sau đóng cửa (15:10) vẫn dùng VCI vì VNDirect chưa chốt', async () => {
+    const t0 = vn('2026-10-08', '15:10'), c = vciClient(t0), t = boot({ session: 'closed', now: t0, sbClient: c });
+    t.MP.S.vciMinRows = 50;
+    await t.MP.refresh(true);
+    expect(c.o.calls).toBe(1);
+    expect(t.MP.S.boardSource).toBe('vci');
+  });
+  it('không có sbClient (chưa sẵn sàng): bình thường dùng VNDirect, không lỗi', async () => {
+    const t = boot({ session: 'open', now: NOW });
+    await t.MP.refresh(true);
+    expect(t.MP.S.boardSource).toBe('vnd');
+    expect(t.MP.S.errors.board).toBeNull();
+  });
+  it('hàm không trả lời trong 15 giây thì bỏ, dùng VNDirect', async () => {
+    const hang = { functions: { invoke: () => new Promise(() => {}) } };
+    const t = boot({ session: 'open', now: NOW, sbClient: hang });
+    t.MP.S.vciMinRows = 50;
+    const real = global.setTimeout; let fired = 0;
+    // đồng hồ giả: vm dùng setTimeout của test; đẩy bộ hẹn giờ 15 giây chạy ngay
+    t.ctx.setTimeout = (f, ms) => { if (ms === 15000) { fired++; return real(f, 0); } return real(f, ms); };
+    await t.MP.refresh(true);
+    expect(fired).toBe(1);
+    expect(t.MP.S.boardSource).toBe('vnd');
   });
 });

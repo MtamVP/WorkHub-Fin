@@ -19,6 +19,34 @@ export function validateRequest(body: any): { symbols: string[] } | { error: str
   return { symbols };
 }
 
+// ---- Chế độ "cả bảng giá" cho trang Tổng Quan TT ({ boards: true | ["HOSE", ...] }): trả MỌI dòng của sàn (kể cả mã chưa khớp) với đúng các trường trang cần, đơn vị gốc của VCI:
+// c giá khớp gần nhất (đồng; 0 = chưa khớp), ref/cei/flo/op/h/l (đồng), vo khối lượng khớp, va giá trị khớp (TRIỆU đồng), ptv khối lượng thỏa thuận, pta giá trị thỏa thuận (đồng), st loại (STOCK | ETF | UNIT_TRUST ...).
+// Đo 09/10/2026 13:38: va tổng HOSE 10.329 tỷ, VNDirect finfo cùng lúc 9.877 tỷ (finfo chậm khoảng 5 phút); ptv/pta khớp finfo ptVolume/ptValue đến từng mã.
+export const BOARD_KEYS = ["s", "st", "c", "ref", "cei", "flo", "op", "h", "l", "vo", "va", "ptv", "pta"] as const;
+
+// body.boards: true -> cả ba sàn; mảng -> các sàn hợp lệ trong GROUPS (bỏ trùng, giữ thứ tự GROUPS); không có -> null (không phải yêu cầu cả bảng); sai hết -> { error }
+export function validateBoards(body: any): { groups: string[] } | { error: string } | null {
+  const b = body && body.boards;
+  if (b === undefined || b === null || b === false) return null;
+  if (b === true) return { groups: [...GROUPS] };
+  if (!Array.isArray(b)) return { error: "boards phải là true hoặc danh sách sàn." };
+  const groups = GROUPS.filter((g) => b.map((x: unknown) => String(x ?? "").trim().toUpperCase()).includes(g));
+  return groups.length ? { groups } : { error: "Không có sàn hợp lệ (HOSE, HNX, UPCOM)." };
+}
+
+// Các dòng bảng giá VCI -> dòng gọn (chỉ BOARD_KEYS): bỏ dòng không có mã hợp lệ; trường số không đọc được thành null; st/s giữ chuỗi
+export function compactRows(rows: any[]): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const s = String(r && r.s || "").trim().toUpperCase();
+    if (!SYM.test(s)) continue;
+    const o: Record<string, unknown> = { s, st: String(r.st || "").toUpperCase() };
+    for (const k of BOARD_KEYS) if (k !== "s" && k !== "st") o[k] = num(r[k]);
+    out.push(o);
+  }
+  return out;
+}
+
 export type Quote = { price: number; ref: number | null; ceil: number | null; floor: number | null; open: number | null; high: number | null; low: number | null; volume: number | null; bid: number | null; ask: number | null; exchange: string };
 
 // Một dòng bảng giá -> báo giá; null nếu chưa khớp lệnh nào (c = 0, ví dụ đang ATO hoặc mã không giao dịch hôm nay) hoặc giá ngoài biên trần/sàn (dữ liệu lỗi, dung sai 1%).

@@ -1,9 +1,9 @@
 // Edge Function: live-quotes -- GIÁ TRỰC TIẾP trong phiên cho Danh Mục, lấy từ bảng giá VCI (Vietcap). Chỉ ĐỌC từ nguồn ngoài, KHÔNG đụng cơ sở dữ liệu và không dùng khoá bí mật.
 // Vì sao qua máy chủ: bảng giá VCI chỉ cho phép gọi từ trang của chính họ (CORS), nên ứng dụng không gọi thẳng được. Hàm này gọi thay và giữ bộ nhớ đệm vài giây để nhiều người dùng cùng lúc chỉ tốn một lượt gọi VCI.
-// Vào: { symbols: ["FPT", ...] } (tối đa 80 mã). Ra: { ok, quotes: { SYM: {price, ref, ceil, floor, open, high, low, volume, bid, ask, exchange} } (giá tính bằng đồng), missing, failed, asOf (ISO), source: "vci" }.
+// Vào: { symbols: ["FPT", ...] } (tối đa 80 mã), hoặc { boards: true | ["HOSE","HNX","UPCOM"] } để lấy cả bảng giá (trang Tổng Quan TT; ra { ok, boards: { HOSE: [dòng gọn...] }, failed, asOf, source }). Ra: { ok, quotes: { SYM: {price, ref, ceil, floor, open, high, low, volume, bid, ask, exchange} } (giá tính bằng đồng), missing, failed, asOf (ISO), source: "vci" }.
 // verify_jwt = true: chỉ người đã đăng nhập (hoặc khoá publishable) gọi được. {"selftest":true} chạy không đụng mạng.
 // Nguồn không có cam kết dịch vụ: có thể đổi hoặc chặn bất cứ lúc nào; ứng dụng tự quay về giá VNDirect khi hàm này lỗi.
-import { collect, GROUPS, MAX_SYMBOLS, validateRequest } from "./parse.ts";
+import { collect, compactRows, GROUPS, MAX_SYMBOLS, validateBoards, validateRequest } from "./parse.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +45,17 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
-  if (body && body.selftest === true) return json({ ok: true, groups: GROUPS, max: MAX_SYMBOLS });
+  if (body && body.selftest === true) return json({ ok: true, groups: GROUPS, max: MAX_SYMBOLS, boards: true });
+  // Cả bảng giá theo sàn (trang Tổng Quan TT): các sàn tải song song, sàn lỗi ghi vào failed; chỉ lỗi 502 khi không sàn nào tải được
+  const vb = validateBoards(body);
+  if (vb) {
+    if ("error" in vb) return json({ ok: false, error: vb.error }, 400);
+    const got = await Promise.all(vb.groups.map(async (g) => [g, await loadBoard(g)] as const));
+    const boards: Record<string, unknown> = {}, failed: string[] = [];
+    for (const [g, rows] of got) { if (rows) boards[g] = compactRows(rows); else failed.push(g); }
+    if (!Object.keys(boards).length) return json({ ok: false, error: "Không lấy được bảng giá từ nguồn.", failed }, 502);
+    return json({ ok: true, boards, failed, asOf: new Date().toISOString(), source: "vci" });
+  }
   const v = validateRequest(body);
   if ("error" in v) return json({ ok: false, error: v.error }, 400);
   const r = await collect(v.symbols, loadBoard);

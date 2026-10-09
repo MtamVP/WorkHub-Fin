@@ -406,3 +406,76 @@ describe('giờ cập nhật của số liệu: freshness', () => {
     expect(r.text).toBe('hôm nay · nguồn không ghi giờ');
   });
 });
+
+// ---------- bảng giá VCI (Edge Function live-quotes, chế độ cả bảng) ----------
+// tests/fixtures/vci-boards-sample.json: 89 dòng THẬT trích từ bảng giá VCI ngày 09/10/2026 lúc 13:38 (HOSE 45, HNX 22, UPCoM 22; gồm ETF, chứng chỉ quỹ, mã chưa khớp, trần, sàn, thỏa thuận).
+// Số kỳ vọng tính ĐỘC LẬP bằng Python từ chính tệp đó (không dùng code của thư viện).
+const VCI_FX = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../fixtures/vci-boards-sample.json'), 'utf8'));
+const vrows = MO.parseVciBoards(VCI_FX, '2026-10-09');
+
+describe('parseVciBoards: bảng VCI -> dòng giá của trang', () => {
+  it('nhận cổ phiếu và ETF, bỏ chứng chỉ quỹ đóng (UNIT_TRUST): 89 dòng còn 86', () => {
+    expect(vrows.length).toBe(86);
+    expect(vrows.some((r) => r.symbol === 'FUCTVGF4')).toBe(false);
+    expect(vrows.filter((r) => r.type === 'ETF').map((r) => r.symbol).sort()).toEqual(['E1VFVN30', 'FUEVFVND']);
+    expect(vrows.filter((r) => r.exchange === 'HOSE').length).toBe(42);
+  });
+  it('độ rộng và thanh khoản khớp số tính độc lập bằng Python trên cùng dữ liệu (từng sàn và cả ba)', () => {
+    const want = {
+      HOSE: { total: 40, up: 14, down: 17, flat: 9, ceil: 2, floor: 2, traded: 38, nmVolume: 97327000, value: 1867948489510, ptValue: 117083419510 },
+      HNX: { total: 22, up: 4, down: 4, flat: 14, ceil: 1, floor: 2, traded: 11, nmVolume: 1643100, value: 22104420000, ptValue: 3790000000 },
+      UPCOM: { total: 22, up: 5, down: 9, flat: 8, ceil: 2, floor: 2, traded: 17, nmVolume: 2999400, value: 31063830000, ptValue: 0 },
+      ALL: { total: 84, up: 23, down: 30, flat: 31, ceil: 5, floor: 6, traded: 66, nmVolume: 101969500, value: 1921116739510, ptValue: 120873419510 },
+    };
+    Object.keys(want).forEach((ex) => {
+      const b = MO.breadth(vrows, ex), w = want[ex];
+      ['total', 'up', 'down', 'flat', 'ceil', 'floor', 'traded', 'nmVolume'].forEach((k) => expect(b[k], ex + '.' + k).toBe(w[k]));
+      expect(Math.round(b.value), ex + '.value').toBe(w.value);
+      expect(Math.round(b.ptValue), ex + '.ptValue').toBe(w.ptValue);
+    });
+  });
+  it('một dòng thật (VNM): giá, tham chiếu, thay đổi, khối lượng, giá trị (triệu đồng -> đồng), ngày do người gọi chỉ định, giờ là lúc máy chủ lấy bảng', () => {
+    const r = vrows.filter((x) => x.symbol === 'VNM')[0];
+    expect(r).toMatchObject({ exchange: 'HOSE', type: 'STOCK', price: 58200, ref: 57900, ceil: 61900, floor: 53900, open: 57800, high: 58300, low: 57600, nmVolume: 946800, ptVolume: 0, ptValue: 0, traded: true, date: '2026-10-09', time: '13:40:00' });
+    expect(r.change).toBe(300);
+    expect(r.pct).toBeCloseTo(0.51813, 4);
+    expect(r.nmValue).toBe(54852910000);
+    expect(r.value).toBe(54852910000);
+    expect(r.volume).toBe(946800);
+  });
+  it('mã chưa khớp giữ giá tham chiếu (đứng giá, chưa giao dịch)', () => {
+    const r = vrows.filter((x) => x.symbol === 'ABR')[0];
+    expect(r.price).toBe(r.ref);
+    expect(r.pct).toBe(0);
+    expect(r.change).toBe(0);
+    expect(r.traded).toBe(false);
+  });
+  it('thỏa thuận lấy đúng từ ptv/pta và cộng vào giá trị giao dịch', () => {
+    const raw = VCI_FX.boards.HOSE.filter((x) => x.s === 'ACB')[0], r = vrows.filter((x) => x.symbol === 'ACB')[0];
+    expect(raw.pta).toBeGreaterThan(0);
+    expect(r.ptValue).toBe(raw.pta);
+    expect(r.ptVolume).toBe(raw.ptv);
+    expect(r.value).toBeCloseTo(raw.va * 1e6 + raw.pta, 0);
+  });
+  it('cổ phiếu nổi bật từ bảng VCI khớp xếp hạng tính độc lập (tăng, giảm, giá trị)', () => {
+    expect(MO.movers(vrows, [], 'gain', 'HOSE', { n: 3 }).map((x) => x.symbol)).toEqual(['IDI', 'NVL', 'ANV']);
+    expect(MO.movers(vrows, [], 'loss', 'HOSE', { n: 3 }).map((x) => x.symbol)).toEqual(['KOS', 'APH', 'FPT']);
+    expect(MO.movers(vrows, [], 'value', 'HOSE', { n: 3 }).map((x) => x.symbol)).toEqual(['NVL', 'FPT', 'HPG']);
+  });
+  it('giá ngoài biên trần/sàn quá 1% là dữ liệu lỗi: coi như chưa khớp; trong biên thì nhận', () => {
+    const mk = (c) => ({ boards: { HOSE: [{ s: 'AAA', st: 'STOCK', c: c, ref: 10000, cei: 10700, flo: 9300, vo: 1000, va: 10, ptv: 0, pta: 0 }] }, asOf: '2026-10-09T03:00:00Z' });
+    expect(MO.parseVciBoards(mk(10800), 'D')[0].price).toBe(10800);                // 10.700 x 1,01 = 10.807 còn trong dung sai
+    expect(MO.parseVciBoards(mk(10900), 'D')[0].price).toBe(10000);
+    expect(MO.parseVciBoards(mk(9250), 'D')[0].price).toBe(9250);                  // 9.300 x 0,99 = 9.207: 9.250 còn trong dung sai
+    expect(MO.parseVciBoards(mk(9200), 'D')[0].price).toBe(10000);
+  });
+  it('dữ liệu hỏng không làm hỏng: thiếu bảng, mã sai, thiếu tham chiếu, thiếu giờ máy chủ', () => {
+    expect(MO.parseVciBoards(null, 'D')).toEqual([]);
+    expect(MO.parseVciBoards({ boards: null }, 'D')).toEqual([]);
+    expect(MO.parseVciBoards({ boards: { HOSE: 'x', HNX: [null, {}, { s: 'bad sym', st: 'STOCK', ref: 1, c: 1 }, { s: 'ABC', st: 'STOCK', ref: 0, c: 5 }, { s: 'DEF', st: 'STOCK', ref: 10000, c: 10100, vo: 5, va: 1 }] } }, 'D')).toHaveLength(1);
+    const one = MO.parseVciBoards({ boards: { HNX: [{ s: 'DEF', st: 'STOCK', ref: 10000, c: 10100, vo: 5, va: 1 }] } }, null)[0];
+    expect(one.time).toBeNull();
+    expect(one.date).toBeNull();
+    expect(one.exchange).toBe('HNX');
+  });
+});

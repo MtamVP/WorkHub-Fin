@@ -10,7 +10,7 @@ const MarketPage = (function () {
     const POLL_MS = 30000, DAILY_TTL = 10 * 60000, FOREIGN_TTL = 60000, NEWS_TTL = 5 * 60000;
     const S = { index: 'VNINDEX', exchange: 'HOSE', range: '1D', mover: 'gain', secMode: null,
         ai: { state: 'idle', data: null, code: null, err: null, cached: false, ageSec: 0 }, newsRaw: null, newsList: null, newsKey: '', newsState: 'idle', newsErr: null, newsSources: [], newsAsOf: null, newsAt: 0, newsBusy: false, newsTopic: 'all', newsTicker: null, newsMine: false, newsLimit: 12, newsShown: [], mine: null, mineCount: null,
-        daily: {}, dailyAt: 0, extraAt: 0, sectorAt: 0, sectorErr: false, morePromise: null, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
+        boardSource: null, vciFailAt: 0, vciMinRows: 200, daily: {}, dailyAt: 0, extraAt: 0, sectorAt: 0, sectorErr: false, morePromise: null, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
         busy: false, started: false, universe: null, uniState: 'idle', val: null, valState: 'idle', timer: null };
 
     // ---------- tiện ích ----------
@@ -64,16 +64,37 @@ const MarketPage = (function () {
         if (t && S.date === t && LiveQuotes.session() === 'holiday') LiveQuotes.state.holidayLiveDate = t;
     }
     function prevDate() { const d = merged('VNINDEX') || []; return d.length > 1 ? d[d.length - 2].date : null; }
+    // Bảng giá VCI qua Edge Function live-quotes (chế độ cả bảng): đo 09/10/2026 13:38 mới hơn VNDirect finfo khoảng 5 phút (giá trị khớp HOSE 10.329 tỷ so với 9.877 tỷ). Lỗi hay quá giờ thì trả null để dùng finfo.
+    async function loadVciBoard() {
+        if (typeof sbClient === 'undefined' || !sbClient || !sbClient.functions) return null;
+        let timer = null;
+        try {
+            const r = await Promise.race([sbClient.functions.invoke('live-quotes', { body: { boards: true } }), new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('quá giờ')), 15000); })]);
+            return r && !r.error && r.data && r.data.ok !== false && r.data.boards ? r.data : null;
+        } catch (e) { return null; } finally { if (timer) clearTimeout(timer); }
+    }
+    // VCI không ghi ngày nên chỉ dùng trong giờ giao dịch của ngày mà VNDirect đã có nến (9:00 đến 15:30, kể cả vài phút sau đóng cửa khi finfo chưa chốt); hỏng thì nghỉ 3 phút rồi mới thử lại
+    function vciWindow() {
+        const p = LiveQuotes.vnParts(Date.now());
+        return S.date === p.date && p.min >= 540 && p.min < 930 && sessionState() !== 'holiday' && Date.now() - S.vciFailAt > 180000 ? p : null;
+    }
     async function loadBoard(force) {
         if (!S.date) return;
-        const tryDates = [S.date].concat(prevDate() ? [prevDate()] : []);
-        let rows = null, used = null;
-        for (const d of tryDates) {
-            const pj = await getJson(FINFO + '/stock_prices?q=date:' + d + '&size=3000', 25000);
-            const r = pj ? MO.parsePrices(pj, d) : [];
-            if (r.length) { rows = r; used = d; break; }
+        let rows = null, used = null, source = 'vnd';
+        const win = vciWindow();
+        if (win) {
+            const data = await loadVciBoard(), v = data ? MO.parseVciBoards(data, win.date) : [];
+            if (v.length >= S.vciMinRows) { rows = v; used = win.date; source = 'vci'; S.vciFailAt = 0; } else S.vciFailAt = Date.now();
         }
-        if (rows) { S.rows = rows; S.boardDate = used; S.errors.board = null; } else S.errors.board = S.rows ? 'Không cập nhật được bảng giá — đang hiển thị số liệu cũ.' : 'Không lấy được bảng giá từ VNDirect.';
+        if (!rows) {
+            const tryDates = [S.date].concat(prevDate() ? [prevDate()] : []);
+            for (const d of tryDates) {
+                const pj = await getJson(FINFO + '/stock_prices?q=date:' + d + '&size=3000', 25000);
+                const r = pj ? MO.parsePrices(pj, d) : [];
+                if (r.length) { rows = r; used = d; break; }
+            }
+        }
+        if (rows) { S.rows = rows; S.boardDate = used; S.boardSource = source; S.errors.board = null; } else S.errors.board = S.rows ? 'Không cập nhật được bảng giá — đang hiển thị số liệu cũ.' : 'Không lấy được bảng giá từ VNDirect.';
         if (rows && (force || !S.frows || Date.now() - S.foreignAt > FOREIGN_TTL || S.foreignDate !== used)) {
             const fj = await getJson(FINFO + '/foreigns?q=tradingDate:' + used + '&size=3000', 25000);
             const f = fj ? MO.parseForeign(fj, used) : [];
@@ -514,6 +535,8 @@ const MarketPage = (function () {
         const pts = S.intraday[code], last = pts && pts.length ? pts[pts.length - 1] : null;
         return { date: q.date, time: last && last.date === q.date ? MO.hhmm(last.min) : null, untimedNote: 'chưa có nến 1 phút của phiên này, đang dùng nến ngày' };
     }
+    // Tên nguồn bảng giá đang dùng; giờ của VCI là lúc máy chủ WorkHub lấy bảng (VCI không ghi giờ khớp), còn VNDirect ghi giờ từng mã
+    const boardName = () => (S.boardSource === 'vci' ? 'bảng giá VCI qua máy chủ WorkHub (giờ là lúc lấy bảng)' : 'bảng giá VNDirect, tổng hợp từ từng mã');
     function boardStamp() { return S.rows && S.boardDate ? { date: S.boardDate, time: (MO.latestTime(S.rows, S.boardDate) || '').slice(0, 5) || null } : null; }
     function newsStamp() {
         if (!S.newsAt || !S.newsRaw) return null;
@@ -525,11 +548,11 @@ const MarketPage = (function () {
         switch (key) {
             case 'index': return { f: fr(indexStamp(S.index)), src: 'nến 1 phút của chỉ số, VNDirect' };
             case 'perf': return { f: fr(indexStamp('VNINDEX')), src: 'nến ngày và nến 1 phút của chỉ số, VNDirect' };
-            case 'board': return { f: fr(boardStamp()), src: 'bảng giá VNDirect, tổng hợp từ từng mã' };
+            case 'board': return { f: fr(boardStamp()), src: boardName() };
             case 'foreign': return { f: fr(S.frows && S.foreignDate ? { date: S.foreignDate, time: null, loadedMs: S.foreignAt } : null), src: 'khối ngoại theo mã, VNDirect' };
-            case 'contrib': return { f: fr(boardStamp()), src: 'bảng giá VNDirect; vốn hoá theo ảnh chụp ngày ' + (S.universe ? dmy(S.universe.asOf) : '—') };
+            case 'contrib': return { f: fr(boardStamp()), src: boardName() + '; vốn hoá theo ảnh chụp ngày ' + (S.universe ? dmy(S.universe.asOf) : '—') };
             case 'sectors': {
-                if (secModeNow() === 'icb') return { f: fr(boardStamp()), src: 'bảng giá VNDirect; ngành theo ảnh chụp của WorkHub' };
+                if (secModeNow() === 'icb') return { f: fr(boardStamp()), src: boardName() + '; ngành theo ảnh chụp của WorkHub' };
                 const dates = MO.SECTOR_INDICES.map((s) => (S.daily[s.code] && S.daily[s.code].length ? S.daily[s.code][S.daily[s.code].length - 1].date : null)).filter(Boolean).sort();
                 return { f: fr(dates.length ? { date: dates[dates.length - 1], time: null, loadedMs: S.sectorAt } : null), src: 'nến ngày của chỉ số ngành, VNDirect' };
             }
