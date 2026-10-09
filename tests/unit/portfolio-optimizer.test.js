@@ -113,3 +113,19 @@ describe('optimize + orders', () => {
     expect(a.side).toBe('sell');                                               // mã biến động mạnh nhất, đang 60% -> giảm
   });
 });
+
+describe('optimize dùng hiệp phương sai CO (Ledoit-Wolf), không phải mẫu', () => {
+  it('biến động đề xuất khớp tính lại độc lập bằng RiskModels.shrinkCov x 252', async () => {
+    const RM = (await import('../../lib/risk-models.js')).default;
+    const rnd = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647 - 0.5; }; };
+    const a = rnd(3), b = rnd(5), c = rnd(9), rets = { A: [], B: [], C: [] };
+    for (let t = 0; t < 70; t++) { const m = a() * 0.02; rets.A.push(m + a() * 0.04); rets.B.push(m + b() * 0.02); rets.C.push(c() * 0.03); }      // ít phiên: co mạnh
+    const r = PO.optimize({ symbols: ['A', 'B', 'C'], rets, values: { A: 1, B: 1, C: 1 }, method: 'minvar' });
+    const X = []; for (let t = 0; t < 70; t++) X.push([rets.A[t], rets.B[t], rets.C[t]]);
+    const sh = RM.shrinkCov(X), C = sh.cov.map((row) => row.map((v) => v * 252)), S = sh.sample.map((row) => row.map((v) => v * 252));
+    expect(sh.delta).toBeGreaterThan(0.05);
+    expect(r.next.vol).toBeCloseTo(PO.stats(r.weights, C).vol, 10);
+    expect(Math.abs(PO.stats(r.weights, S).vol - r.next.vol)).toBeGreaterThan(1e-6);
+    expect(r.shrink).toBeCloseTo(sh.delta, 12);
+  });
+});

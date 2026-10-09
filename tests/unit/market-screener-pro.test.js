@@ -155,3 +155,31 @@ describe('trọng số điểm do người dùng chỉnh', () => {
     expect(MS.score(g).parts.quality).toBeCloseTo((0.17 / 0.22 * 100 + 0.08 / 0.18 * 100 + 100) / 3, 6);
   });
 });
+
+describe('ngưỡng từng dấu hiệu và chặn giá (bổ sung sau kiểm thử đột biến)', () => {
+  const okOf = (r, label) => r.health.items.find((x) => x.label === label).ok;
+  it('giá vượt đỉnh 52 tuần quá 15% (số cổ phiếu cũ) thì bỏ', () => {
+    expect(MS.priceOf({ marketcap: 1500e9, shares: 10e6, high52: 100000, low52: 50000 })).toBeNull();     // 150.000 = 1,5 x đỉnh
+    expect(MS.priceOf({ marketcap: 1100e9, shares: 10e6, high52: 100000, low52: 50000 })).toBe(110000);   // 1,1 x đỉnh: chấp nhận
+  });
+  it('dòng tiền dương chỉ 1/2 năm và nợ/vốn 1,5 lần là dấu hiệu xấu', () => {
+    const [r] = rowsOf([S('A', '2700', Object.assign({}, GOOD, { positiveCfo2y: 1, debtToEquity: 1.5 }))]);
+    expect(okOf(r, 'Dòng tiền kinh doanh dương cả 2 năm')).toBe(false);
+    expect(okOf(r, 'Nợ vay / vốn chủ không quá 1')).toBe(false);
+    expect(r.health.score).toBe(7);
+  });
+  it('NIM 3% đạt mốc 2,5%; NIM 2% không đạt', () => {
+    const bank = { roae: 0.18, roaa: 0.017, nim: 0.03, badDebtCoverage: 0.9, equityToAsset: 0.09, netProfitGrowthYoY: 0.12 };
+    expect(okOf(rowsOf([S('B', '8300', bank)])[0], 'NIM từ 2,5%')).toBe(true);
+    expect(okOf(rowsOf([S('B', '8300', Object.assign({}, bank, { nim: 0.02 }))])[0], 'NIM từ 2,5%')).toBe(false);
+    expect(okOf(rowsOf([S('B', '8300', bank)])[0], 'Dự phòng từ 80% nợ xấu')).toBe(true);
+  });
+  it('doanh nghiệp thường chỉ có 6 dấu hiệu có số liệu thì chưa chấm (cần 7)', () => {
+    const six = { roaa: 0.08, cfoToSales: 0.15, positiveCfo2y: 2, netMargin: 0.1, netProfitGrowthYoY: 0.2, deltaMargin: 0.01 };      // 6 dấu hiệu (gồm "có tiền đi kèm")
+    expect(rowsOf([S('X', '2700', six)])[0].health).toBeNull();
+    expect(rowsOf([S('X', '2700', Object.assign({}, six, { currentRatio: 1.5 }))])[0].health.avail).toBe(7);
+  });
+  it('trọng số âm bị bỏ, trọng số hợp lệ còn lại được giữ', () => {
+    expect(MS.normalizeWeights({ value: -5, quality: 10 })).toEqual({ quality: 10 });
+  });
+});
