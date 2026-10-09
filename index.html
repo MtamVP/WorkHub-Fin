@@ -16,7 +16,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css?v=1788630490059">
+  <link rel="stylesheet" href="style.css?v=1792100000080">
   <link rel="stylesheet" href="integrations.css?v=1791700000000">
   <link rel="stylesheet" href="personal-hub.css?v=1791700000000">
   <link rel="stylesheet" href="pipeline/pipeline.css">
@@ -93,6 +93,7 @@
           <button class="dropdown-item" onclick="switchAccount()"><i class="fa-solid fa-user-gear"></i> Đổi tài khoản</button>
           <button class="dropdown-item" onclick="refreshFinanceSession()"><i class="fa-solid fa-rotate"></i> Làm mới quyền truy cập</button>
           <button class="dropdown-item" onclick="openSelfCheckModal()"><i class="fa-solid fa-stethoscope"></i> Kiểm tra hệ thống</button>
+          <button class="dropdown-item" onclick="openUpdateModal()"><i class="fa-solid fa-cloud-arrow-down"></i> Kiểm tra cập nhật <span class="dropdown-new" id="update-badge" style="display:none;">Mới</span></button>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item" onclick="window.location.href='/change_nickname/index.html'"><i class="fa-solid fa-address-card me-2"></i> Đổi Biệt
               danh</button>
@@ -1647,6 +1648,32 @@
     </div>
   </div>
 
+  <!-- Cập nhật ứng dụng: kiểm tra, xem ghi chú, tải và cài ngay trong app (updater.js); trên web chỉ báo chỉ có ở app desktop -->
+  <div class="modal-overlay" id="update-modal">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-cloud-arrow-down" style="color: var(--gold);"></i> Cập nhật ứng dụng</h3>
+        <button class="header-btn" onclick="closeAppModal('update-modal')" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted" style="margin:0 0 8px;">Phiên bản đang dùng: <b id="update-current">—</b></p>
+        <div id="update-status" style="font-weight:700; font-size:1.05rem; margin:4px 0;" aria-live="polite"></div>
+        <div id="update-detail" class="small text-muted"></div>
+        <div id="update-notes" class="small" style="display:none; margin:12px 0 0; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px; max-height:220px; overflow:auto; white-space:pre-wrap;"></div>
+        <div id="update-progress-wrap" style="display:none; margin:14px 0 0;">
+          <div style="height:8px; background:var(--border-color); border-radius:99px; overflow:hidden;"><div id="update-bar" style="height:100%; width:0; background:var(--gold); transition:width 0.2s ease;"></div></div>
+          <div id="update-progress-text" class="small text-muted" style="margin-top:6px;" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" id="update-check-btn" onclick="WorkHubUpdater.check()"><i class="fa-solid fa-rotate"></i> Kiểm tra lại</button>
+        <button type="button" class="btn btn-primary" id="update-install-btn" style="display:none;" onclick="WorkHubUpdater.install()"><i class="fa-solid fa-download"></i> Tải và cài đặt</button>
+        <button type="button" class="btn btn-primary" id="update-restart-btn" style="display:none;" onclick="WorkHubUpdater.restart()"><i class="fa-solid fa-power-off"></i> Khởi động lại ngay</button>
+        <button type="button" class="btn btn-secondary" onclick="closeAppModal('update-modal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Backup & Restore Modal (admin-only; the guard below is cosmetic — backups are
        scoped by whatever the logged-in user's own RLS can already see) -->
   <div class="modal-overlay" id="backup-restore-modal">
@@ -1913,6 +1940,7 @@
   <script src="lib/filter-watch.js?v=1792010000000"></script>
   <script src="filter-watch.js?v=1792010000000"></script>
   <script src="market-history.js?v=1792010000000"></script>
-  <script src="updater.js?v=1788532002219"></script>
+  <script src="lib/update-check.js?v=1792100000080"></script>
+  <script src="updater.js?v=1792100000080"></script>
 </body>
 </html>

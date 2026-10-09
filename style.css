@@ -1192,6 +1192,11 @@ body.app-locked .user-profile-wrapper {
   color: var(--gold);
 }
 
+/* Cập nhật ứng dụng: nhãn "Mới" cạnh mục menu và chấm nhỏ trên nút tài khoản khi có bản cập nhật chờ (updater.js) */
+.dropdown-new { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--gold); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; }
+.user-profile-badge { position: relative; }
+.user-profile-badge.has-update::after { content: ""; position: absolute; top: 1px; right: 1px; width: 9px; height: 9px; border-radius: 50%; background: var(--gold); border: 2px solid var(--card-bg, #fff); }
+
 .dropdown-item.item-danger:hover {
   background: var(--danger-bg);
   color: var(--danger-color);
