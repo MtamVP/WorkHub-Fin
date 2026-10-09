@@ -252,8 +252,98 @@ function rkxModelsHtml(scope, r) {
     return html;
 }
 
-// Gộp 3 phần, đặt cuối khối rủi ro. scope: 'rk' | 'grp'.
+// ---------- 6) Tối ưu hoá tỷ trọng (lib/portfolio-optimizer.js, đã đối chiếu scipy) -- chỉ danh mục cá nhân ----------
+// Cận đặt theo % NAV như giới hạn đầu tư; bộ tối ưu làm trên phần cổ phiếu nên đổi: cận phần cổ phiếu = cận NAV × NAV / tổng giá trị cổ phiếu.
+const RKO_METHODS = { minvar: 'Phương sai nhỏ nhất', riskparity: 'Cân bằng rủi ro', maxsharpe: 'Sharpe tối đa (cần định giá)' };
+function rkoState(scope) {
+    const st = rkxState(scope);
+    if (!st.opt) st.opt = { method: 'minvar', maxNav: null, minNav: 0, horizon: 2, mkt: 9, rf: 3, vb: null, vbLoading: false, vbError: '', key: '', res: null };
+    return st.opt;
+}
+function rkoSet(scope, field, v) {
+    const o = rkoState(scope);
+    if (field === 'method') o.method = RKO_METHODS[v] ? v : 'minvar';
+    else { const n = Number(v); o[field] = v === '' || !isFinite(n) ? (field === 'maxNav' ? null : o[field]) : n; }
+    if (o.method === 'maxsharpe' && !o.vb && !o.vbLoading) { rkoLoadVb(scope); return; }
+    const st = rkxState(scope); if (st.rerender) st.rerender();
+}
+async function rkoLoadVb(scope) {
+    const st = rkxState(scope), o = rkoState(scope);
+    o.vbLoading = true; o.vbError = ''; if (st.rerender) st.rerender();
+    try {
+        const r = await callGAS('getVbLatestMany', { symbols: st.holdings.map(h => h.symbol) });
+        if (!r || r.status !== 'success') throw new Error((r && r.message) || 'Lỗi không xác định');
+        o.vb = r.data || {};
+    } catch (e) { o.vbError = e.message || String(e); }
+    o.vbLoading = false; if (st.rerender) st.rerender();
+}
+function rkoLimitNav(scope) {
+    const caps = rkxLimitsFor(scope).filter(l => l.kind === 'max_symbol_pct' && !l.symbol && l.value > 0).map(l => Number(l.value));
+    return caps.length ? Math.min(...caps) : null;
+}
+function rkxOptimizerHtml(scope, r) {
+    if (scope !== 'rk' || typeof PortfolioOptimizer === 'undefined' || !r.model || !r.model.rets) return '';
+    const st = rkxState(scope), o = rkoState(scope), head = '<div class="ce-group-title">Tối ưu hoá tỷ trọng (gợi ý)</div>';
+    const held = (st.holdings || []).filter(h => h.value > 0), equity = held.reduce((s, h) => s + h.value, 0), nav = r.nav > 0 ? r.nav : equity;
+    const syms = held.map(h => h.symbol).filter(s => r.model.rets[s]), skipped = held.map(h => h.symbol).filter(s => !r.model.rets[s]);
+    if (syms.length < 2 || !(equity > 0)) return head + '<p class="tl-hint">Cần ít nhất 2 mã đang nắm có đủ lịch sử giá để tối ưu hoá.</p>';
+    const limitNav = rkoLimitNav(scope), maxNav = o.maxNav !== null ? o.maxNav : (limitNav !== null ? limitNav : 35);
+    const sleeveOf = (pctNav) => pctNav / 100 * nav / equity;
+    const values = {}; held.forEach(h => { values[h.symbol] = h.value; });
+    let mu = null, muNote = '';
+    if (o.method === 'maxsharpe' && o.vb) {
+        mu = {}; const miss = [];
+        syms.forEach(s => { const h = held.find(x => x.symbol === s), v = o.vb[s], price = h && h.quantity > 0 ? h.value / h.quantity : null;
+            const e = v ? PortfolioOptimizer.expectedFromFair(price, v.fair_base, o.horizon, o.mkt / 100, 0.5) : null;
+            mu[s] = e !== null ? e : o.mkt / 100; if (e === null) miss.push(s); });
+        muNote = miss.length ? `Chưa có định giá đã lưu ở Valuation Bench: ${miss.join(', ')} (dùng mức chung ${rkNum(o.mkt, 1)}%/năm).` : '';
+    }
+    const key = JSON.stringify([o.method, maxNav, o.minNav, o.horizon, o.mkt, o.rf, syms, held.map(h => Math.round(h.value)), !!o.vb, r.coverage && r.coverage.to]);
+    if (o.key !== key && !(o.method === 'maxsharpe' && !o.vb)) {
+        o.res = PortfolioOptimizer.optimize({ symbols: syms, rets: r.model.rets, values, method: o.method, maxPct: sleeveOf(maxNav), minPct: sleeveOf(o.minNav || 0), mu, rf: o.rf / 100 });
+        o.key = key;
+    }
+    const controls = `<div class="rk-liq-tools rko-tools">
+        <label>Cách tối ưu <select class="tl-select" onchange="rkoSet('${scope}','method',this.value)">${Object.keys(RKO_METHODS).map(k => `<option value="${k}"${o.method === k ? ' selected' : ''}>${RKO_METHODS[k]}</option>`).join('')}</select></label>
+        <label title="Mặc định lấy theo giới hạn 'Một mã tối đa' của bạn (nếu có), không thì 35% NAV">Mỗi mã tối đa (% NAV) <input class="tl-input num" type="number" min="1" max="100" step="1" value="${maxNav}" onchange="rkoSet('${scope}','maxNav',this.value)"></label>
+        <label title="Đặt lớn hơn 0 nếu không muốn bán hẳn mã nào">Mỗi mã tối thiểu (% NAV) <input class="tl-input num" type="number" min="0" max="50" step="1" value="${o.minNav || 0}" onchange="rkoSet('${scope}','minNav',this.value)"></label>
+        ${o.method === 'maxsharpe' ? `<label title="Khoảng cách giá tới giá trị hợp lý được giả định thu hẹp dần trong chừng này năm">Đóng khoảng cách trong (năm) <input class="tl-input num" type="number" min="0.5" max="10" step="0.5" value="${o.horizon}" onchange="rkoSet('${scope}','horizon',this.value)"></label>
+        <label title="Lợi nhuận kỳ vọng chung của thị trường; lợi nhuận kỳ vọng từng mã được co một nửa về mức này">Mức chung (%/năm) <input class="tl-input num" type="number" min="0" max="30" step="0.5" value="${o.mkt}" onchange="rkoSet('${scope}','mkt',this.value)"></label>
+        <label>Lãi phi rủi ro (%/năm) <input class="tl-input num" type="number" min="0" max="15" step="0.1" value="${o.rf}" onchange="rkoSet('${scope}','rf',this.value)"></label>` : ''}
+    </div>`;
+    if (o.method === 'maxsharpe' && !o.vb) return head + controls + (o.vbLoading ? '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải giá trị hợp lý đã lưu…</div>' : `<p class="tl-hint">${o.vbError ? `<b class="tl-down">Không tải được định giá: ${rkEsc(o.vbError)}</b> ` : ''}<button type="button" class="btn-tool" onclick="rkoLoadVb('${scope}')">Tải giá trị hợp lý đã lưu</button></p>`);
+    const res = o.res;
+    if (!res || !res.ok) {
+        const why = { infeasible: `Cận tỷ trọng không khả thi với ${syms.length} mã: tối đa ${rkNum(maxNav, 0)}% NAV mỗi mã chưa đủ để chứa toàn bộ phần cổ phiếu (${rkPct(equity / nav * 100, 0)} NAV), hoặc tối thiểu quá cao. Hãy nới cận.`, short: 'Chưa đủ 60 phiên lịch sử giá chung của các mã.', 'mu-below-rf': 'Không mã nào có lợi nhuận kỳ vọng vượt lãi phi rủi ro: Sharpe tối đa không có nghĩa. Dùng phương sai nhỏ nhất.', 'no-mu': 'Thiếu lợi nhuận kỳ vọng.' }[res && res.reason] || 'Không tối ưu được với dữ liệu hiện có.';
+        return head + controls + `<p class="tl-hint"><b class="tl-down">${rkEsc(why)}</b></p>`;
+    }
+    const od = PortfolioOptimizer.orders(res, held), toNav = (w) => w * equity / nav * 100;
+    const buy = od.filter(x => x.delta > 0).reduce((s, x) => s + x.delta, 0), sell = od.filter(x => x.delta < 0).reduce((s, x) => s - x.delta, 0);
+    const fee = (buy + sell) * 0.0015 + sell * 0.001;
+    const kpis = [
+        rkKpi('Biến động năm', rkPct(res.next.vol * 100, 1), `hiện tại ${rkPct(res.now.vol * 100, 1)}`, res.next.vol < res.now.vol ? 'tl-up' : ''),
+        res.mu ? rkKpi('Lợi nhuận kỳ vọng năm', rkPct(res.next.ret * 100, 1), `hiện tại ${rkPct(res.now.ret * 100, 1)}`) : '',
+        res.mu ? rkKpi('Tỷ lệ Sharpe', rkNum(res.next.sharpe, 2), `hiện tại ${rkNum(res.now.sharpe, 2)}`, res.next.sharpe > res.now.sharpe ? 'tl-up' : '') : '',
+        rkKpi('Phải đổi', rkPct(res.turnover * 100, 0), `phần cổ phiếu · mua ${rkVnd(buy)}, bán ${rkVnd(sell)}`),
+        rkKpi('Phí và thuế ước tính', rkVnd(fee), '0,15% giá trị giao dịch + 0,1% thuế bán'),
+    ].join('');
+    const rows = res.symbols.map((s, i) => { const x = od[i]; return `<tr><td><b>${rkEsc(s)}</b></td><td class="text-right">${rkPct(toNav(res.current[i]), 1)}</td><td class="text-right"><b>${rkPct(toNav(res.weights[i]), 1)}</b></td>
+        <td class="text-right ${res.weights[i] > res.current[i] + 0.005 ? 'tl-up' : (res.weights[i] < res.current[i] - 0.005 ? 'tl-down' : '')}">${rkPct(toNav(res.weights[i] - res.current[i]), 1, true)}</td>
+        <td class="text-right">${Math.abs(x.delta) < 1 ? '—' : rkVnd(x.delta)}</td><td class="text-right">${x.shares ? `${x.side === 'buy' ? 'Mua' : 'Bán'} ${rkNum(Math.abs(x.shares))}` : '—'}</td>
+        <td class="text-right">${rkPct(res.now.riskShare[i] * 100, 0)} → ${rkPct(res.next.riskShare[i] * 100, 0)}</td>${res.mu ? `<td class="text-right">${rkPct(res.mu[i] * 100, 1)}</td>` : ''}</tr>`; }).join('');
+    const notes = [];
+    if (res.capped) notes.push('Cận tỷ trọng chặn lời giải cân bằng rủi ro: đóng góp rủi ro không còn bằng nhau tuyệt đối.');
+    if (skipped.length) notes.push(`Không đưa vào tối ưu (thiếu lịch sử giá): ${skipped.join(', ')} — giữ nguyên.`);
+    if (muNote) notes.push(muNote);
+    return head + controls + `<div class="tl-kpis">${kpis}</div>
+        <div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Mã</th><th class="text-right">Hiện tại (% NAV)</th><th class="text-right">Đề xuất (% NAV)</th><th class="text-right">Chênh</th><th class="text-right">Giá trị mua/bán</th><th class="text-right">Khối lượng (lô 100)</th><th class="text-right">Đóng góp rủi ro</th>${res.mu ? '<th class="text-right" title="Lợi nhuận kỳ vọng năm dùng để tính">Kỳ vọng/năm</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
+        ${notes.length ? `<div class="rk-warns">${notes.map(t => `<div class="rk-warn low"><i class="fa-solid fa-circle-info"></i><span>${rkEsc(t)}</span></div>`).join('')}</div>` : ''}
+        <p class="tl-hint">${o.method === 'minvar' ? 'Phương sai nhỏ nhất: tỷ trọng ít biến động nhất trong các cận, không cần dự báo lợi nhuận.' : (o.method === 'riskparity' ? 'Cân bằng rủi ro: mỗi mã đóng góp rủi ro như nhau, tránh vài mã biến động mạnh chiếm phần lớn rủi ro.' : 'Sharpe tối đa: lợi nhuận kỳ vọng mỗi mã = khoảng cách tới giá trị hợp lý đã lưu, thu hẹp dần trong số năm đã chọn, co một nửa về mức chung và chặn trong khoảng −30% đến +40%; rất nhạy với định giá, nên đặt cận chặt.')}
+        Hiệp phương sai co Ledoit-Wolf từ ${res.obs} phiên lịch sử (cường độ co ${rkPct(res.shrink * 100, 0)}), chỉ phân bổ lại giữa các mã đang nắm, giữ nguyên tổng giá trị cổ phiếu và tiền mặt. Đây là gợi ý định lượng dựa trên quá khứ, chưa xét thanh khoản, thuế, giới hạn ngành hay luận điểm đầu tư: kiểm tra lại trước khi đặt lệnh (công cụ "Kiểm tra trước lệnh" ở Sổ Lệnh).</p>`;
+}
+
+// Gộp các phần, đặt cuối khối rủi ro. scope: 'rk' | 'grp'.
 function rkAdvancedHtml(scope, r) {
     if (!r || !r.ok) return '';
-    return rkxHistoricalHtml(scope, r) + rkxModelsHtml(scope, r) + rkxLiquidityHtml(scope, r) + rkxCustomHtml(scope, r);
+    return rkxHistoricalHtml(scope, r) + rkxModelsHtml(scope, r) + rkxOptimizerHtml(scope, r) + rkxLiquidityHtml(scope, r) + rkxCustomHtml(scope, r);
 }
