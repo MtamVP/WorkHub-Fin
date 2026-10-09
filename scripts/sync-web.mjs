@@ -10,7 +10,11 @@ const dest = path.join(root, 'tauri-dist');
 const EXCLUDE_TOP_LEVEL = new Set([
   'src-tauri', 'node_modules', 'tauri-dist', '.git', '.wrangler', '.claude',
   'package.json', 'package-lock.json', '.gitignore', 'wrangler.toml', 'scripts', 'supabase', 'tests',
+  // docs/ = nguồn và PDF hướng dẫn mọi phiên bản (~13 MB, app không mở tới; PDF phát hành kèm GitHub Release) -- từng làm bộ cài 0.1.15 nặng 15,6 MB
+  'docs', '.github', 'vitest.config.mjs', '.htmlvalidate.json',
 ]);
+// Tệp ở gốc chỉ dành cho người phát triển (migration SQL, ghi chú .md/.txt): không đưa vào app
+const EXCLUDE_ROOT_FILE = /\.(sql|md|txt)$/i;
 
 fs.rmSync(dest, { recursive: true, force: true });
 fs.mkdirSync(dest, { recursive: true });
@@ -19,6 +23,7 @@ function copyDir(src, dst, isRoot) {
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     if (isRoot && EXCLUDE_TOP_LEVEL.has(entry.name)) continue;
+    if (isRoot && entry.isFile() && EXCLUDE_ROOT_FILE.test(entry.name)) continue;
     const s = path.join(src, entry.name);
     const d = path.join(dst, entry.name);
     if (entry.isDirectory()) {
