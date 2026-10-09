@@ -48,13 +48,33 @@ function mkField(c) {
     return `<label class="sc-field" title="${VU.esc(c.hint || '')}"><span>${VU.esc(c.label)}${c.unit ? ` <small>(${VU.esc(c.unit)})</small>` : ''}</span>
         <input type="number" step="any" inputmode="decimal" data-mk="${c.key}" value="${v === undefined ? '' : v}" placeholder="Bỏ trống = không lọc" oninput="mkOnInput()"></label>`;
 }
+// Nhóm tiêu chí thu gọn được (hơn 50 tiêu chí): nhóm đang có tiêu chí bật, hoặc hai nhóm đầu, thì mở sẵn. Nhớ nhóm người dùng tự mở/đóng trong phiên.
+const MK_OPEN = {};
+function mkGroup(g, i) {
+    const n = g.items.filter(c => MK.filters.values[c.key] !== undefined).length;
+    const open = MK_OPEN[g.name] !== undefined ? MK_OPEN[g.name] : (n > 0 || i < 2);
+    return `<details class="sc-group mk-group"${open ? ' open' : ''} ontoggle="MK_OPEN[this.dataset.g] = this.open" data-g="${VU.esc(g.name)}"><summary>${VU.esc(g.name)} <small>${g.items.length} tiêu chí${n ? ` · <b>đang bật ${n}</b>` : ''}</small></summary>${g.items.map(mkField).join('')}</details>`;
+}
+// Trọng số điểm xếp hạng (để trống = mặc định). Lưu cùng bộ lọc.
+function mkWeights() {
+    const w = MK.filters.weights || {};
+    return `<details class="sc-group mk-group"${MK.filters.weights || MK_OPEN.__w ? ' open' : ''} ontoggle="MK_OPEN.__w = this.open"><summary>Trọng số điểm xếp hạng <small>${MK.filters.weights ? '<b>đã chỉnh</b>' : 'mặc định'}</small></summary>
+        <p class="vl-hint" style="margin:0">Điểm 0-100 chỉ để xếp hạng mã đã đạt. Nhập trọng số tương đối (ví dụ 50, 30, 20); để trống tất cả là dùng mặc định. Nhóm 0 không được tính.</p>
+        ${Object.keys(MarketScreener.WEIGHTS).map(k => `<label class="sc-field"><span>${VU.esc(MarketScreener.WEIGHT_LABELS[k])} <small>(mặc định ${Math.round(MarketScreener.WEIGHTS[k] * 100)})</small></span><input type="number" min="0" step="any" inputmode="decimal" data-mk-w="${k}" value="${w[k] === undefined ? '' : w[k]}" placeholder="${Math.round(MarketScreener.WEIGHTS[k] * 100)}" oninput="mkOnInput()"></label>`).join('')}
+        ${MK.filters.weights ? '<button type="button" class="vl-link" onclick="mkWeightsReset()">Về mặc định</button>' : ''}</details>`;
+}
+function mkWeightsReset() { document.querySelectorAll('#mk-root [data-mk-w]').forEach(el => { el.value = ''; }); mkOnInput(); renderMarketScreener(); }
+function mkWeightText() {
+    const W = MarketScreener.weightsOf(MK.filters), keys = Object.keys(W).filter(k => W[k] > 0), tot = keys.reduce((s, k) => s + W[k], 0);
+    return keys.map(k => `${MarketScreener.WEIGHT_LABELS[k].toLowerCase()} (${Math.round(W[k] / tot * 100)}%)`).join(', ');
+}
 
 function renderMarketScreener() {
     const root = document.getElementById('mk-root');
     if (!root) return;
     if (MK.state === 'idle' || MK.state === 'loading') { root.innerHTML = '<div class="vl-card"><div class="vl-empty"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh chụp thị trường…</div></div>'; return; }
     if (MK.state === 'error') { root.innerHTML = `<div class="vl-card"><div class="vl-empty">Không tải được: ${VU.esc(MK.error)}<br><button type="button" class="btn-save" style="margin-top:10px" onclick="mkLoad(true)">Thử lại</button></div></div>`; return; }
-    if (MK.state === 'empty') { root.innerHTML = '<div class="vl-card"><div class="vl-empty"><i class="fa-solid fa-database"></i> Chưa có ảnh chụp thị trường. Hàm cập nhật chạy mỗi ngày làm việc lúc 18:20; hãy thử lại sau.</div></div>'; return; }
+    if (MK.state === 'empty') { root.innerHTML = '<div class="vl-card"><div class="vl-empty"><i class="fa-solid fa-database"></i> Chưa có ảnh chụp thị trường. Hàm cập nhật chạy mỗi ngày làm việc lúc 8:15 sáng (số liệu phiên trước) và 18:20; hãy thử lại sau.</div></div>'; return; }
     const groups = [];
     MarketScreener.CRITERIA.forEach(c => { let g = groups.find(x => x.name === c.group); if (!g) groups.push(g = { name: c.group, items: [] }); g.items.push(c); });
     const icbs = [...new Set(MK.rows.map(r => r.icb2_code).filter(Boolean))].sort();
@@ -75,7 +95,7 @@ function renderMarketScreener() {
             <button type="button" class="vl-link" onclick="mkSavedDelete()">Xoá bộ lọc đang chọn</button>
         </div>
         ${MK.preset ? `<p class="vl-hint" style="margin-top:0">${VU.esc(MarketScreener.PRESETS.find(p => p.key === MK.preset).desc)} Bạn có thể chỉnh các ô bên dưới.</p>` : ''}
-        <div class="sc-grid">${groups.map(g => `<fieldset class="sc-group"><legend>${VU.esc(g.name)}</legend>${g.items.map(mkField).join('')}</fieldset>`).join('')}
+        <div class="sc-grid">${groups.map(mkGroup).join('')}${mkWeights()}
             <fieldset class="sc-group"><legend>Ngành và số mã lấy</legend>
                 <div class="mk-icb-head"><span>Ngành ICB <small>(${MK.filters.icbs.length ? 'đã chọn ' + MK.filters.icbs.length : 'tất cả ngành'})</small></span><span><button type="button" class="vl-link" onclick="mkIcbAll(true)">Chọn hết</button> · <button type="button" class="vl-link" onclick="mkIcbAll(false)">Bỏ chọn</button></span></div>
                 <div class="mk-icb-list" role="group" aria-label="Chọn ngành ICB">${icbs.map(c => `<label class="mk-icb-item"><input type="checkbox" data-mk-icb="${c}"${MK.filters.icbs.includes(c) ? ' checked' : ''} onchange="mkOnInput()"> ${VU.esc(mkIcbName(c))}</label>`).join('')}</div>
@@ -213,7 +233,36 @@ function mkValCells(sym) {
     const cls = x.mos === null ? '' : (x.mos >= 0.2 ? 'vl-pill-cheap' : (x.mos <= -0.1 ? 'vl-pill-expensive' : 'vl-pill-fair'));
     return `<td class="num">${VU.dec(x.fairBase, 0)}</td><td class="num">${x.mos === null ? '—' : `<span class="vl-pill ${cls}">${x.mos > 0 ? '+' : ''}${VU.dec(x.mos * 100, 0)}%</span>`}</td><td><small>${VU.esc(x.grade || '')}</small>${x.confidence ? `<small class="symbol-sub">${VU.esc(x.confidence)}</small>` : ''}${x.archetype ? `<small class="symbol-sub">${VU.esc(x.archetype)}</small>` : ''}</td>`;
 }
-function mkRow(e, i, showVal) {
+// Cột hiện sẵn trong bảng kết quả; tiêu chí đang bật mà chưa có cột thì thêm cột riêng (để thấy luôn số liệu đã lọc). Tiêu chí cùng số liệu dùng chung một cột.
+const MK_FIXED = new Set(['cap', 'capMax', 'pe', 'peHist', 'pb', 'evEbitda', 'evRel', 'valPct', 'roe', 'epsG', 'netG', 'div', 'de', 'ytd', 'ytdMax', 'chg1y', 'health']);
+const MK_COL_OF = { nearHigh: 'offHigh' };
+const MK_SHORT = { adv: 'GTGD TB 20 phiên (tỷ)', ps: 'P/S', evSales: 'EV/DT', pbHist: 'P/B so TB 5 năm', roic: 'ROIC', roa: 'ROA', margin: 'Biên ròng', gross: 'Biên gộp', ebitM: 'Biên EBIT', marginUp: 'Đổi biên (điểm %)', netGq: 'LN quý so cùng kỳ', net3y: 'LN 3 năm/năm', pretaxG: 'LN trước thuế 12T', salesG: 'Doanh thu so cùng kỳ',
+    payout: 'Tỷ lệ chi trả', freefloat: 'Tự do CN', netCash: 'Tiền ròng/vốn', icr: 'Trả lãi (x)', cr: 'Thanh toán HH', cfo: 'Dòng tiền KD/DT', cfoYears: 'Năm CFO dương', betaMax: 'Beta', nim: 'NIM', nplCover: 'Dự phòng/nợ xấu', eqAsset: 'Vốn chủ/TTS',
+    chg1m: 'Giá 1 tháng', chg3m: 'Giá 3 tháng', chg6m: 'Giá 6 tháng', jdkRs: 'RS JdK', jdkMom: 'RS Momentum', offHigh: 'Cách đỉnh 52T', aboveLow: 'Trên đáy 52T' };
+function mkExtraCols() {
+    const seen = new Set(), out = [];
+    MarketScreener.CRITERIA.forEach(c => {
+        if (MK.filters.values[c.key] === undefined || MK_FIXED.has(c.key)) return;
+        const col = MK_COL_OF[c.key] || c.key; if (seen.has(col)) return; seen.add(col);
+        out.push(MarketScreener.BY_KEY[col] || c);
+    });
+    return out;
+}
+function mkFmtCrit(c, row) {
+    if ((c.nonFinancial && row.financial) || (c.bankOnly && !row.bank)) return 'n/a';
+    const v = c.get(row);
+    if (v === null || v === undefined || !isFinite(v)) return '—';
+    if (c.pct) return VU.dec(v * 100, 1) + '%';
+    if (c.scale) return VU.dec(v / c.scale, 1);
+    return VU.dec(v, c.unit === 'x' ? 2 : 1) + (c.unit === 'x' ? 'x' : '');
+}
+function mkHealthCell(r) {
+    const h = r.health;
+    if (!h) return `<td class="num"><span title="${r.financial && !r.bank ? 'Không chấm cho bảo hiểm, chứng khoán' : 'Thiếu số liệu để chấm'}">—</span></td>`;
+    const tip = h.items.map(x => (x.ok ? '✓ ' : '✗ ') + x.label).join('\n') + `\n(${h.pass}/${h.avail} dấu hiệu có số liệu đạt)`;
+    return `<td class="num"><span class="vl-pill ${h.score >= 8 ? 'vl-pill-cheap' : (h.score <= 4 ? 'vl-pill-expensive' : 'vl-pill-fair')}" title="${VU.esc(tip)}">${h.score}/9</span></td>`;
+}
+function mkRow(e, i, showVal, extra) {
     const r = e.row, m = r.m, inTable = state.items.some(x => x.symbol === r.symbol);
     const peHist = m.pe > 0 && m.pe5y > 0 ? m.pe / m.pe5y : null;
     return `<tr data-mk-symbol="${VU.esc(r.symbol)}"><td>${i + 1}</td>
@@ -225,7 +274,7 @@ function mkRow(e, i, showVal) {
         <td class="num">${r.financial ? 'n/a' : mkX(m.evEbitda)}${!r.financial && r.evEbitdaRel !== null && r.evEbitdaRel !== undefined ? `<small>${VU.dec(r.evEbitdaRel * 100, 0)}% trung vị ngành</small>` : ''}</td>
         <td class="num">${r.valuationPct === null ? '—' : `<span class="vl-pill ${r.valuationPct <= 30 ? 'vl-pill-cheap' : (r.valuationPct >= 70 ? 'vl-pill-expensive' : 'vl-pill-fair')}">${VU.dec(r.valuationPct, 0)}</span>`}</td>
         <td class="num">${mkP(m.roae)}</td><td class="num">${mkP(m.epsGrowthYoY, 0)}</td><td class="num">${mkP(m.netProfitGrowthYoY, 0)}</td><td class="num">${mkP(m.divYield)}</td>
-        <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>${showVal ? mkValCells(r.symbol) : ''}
+        <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>${mkHealthCell(r)}${(extra || []).map(c => `<td class="num">${mkFmtCrit(c, r)}</td>`).join('')}${showVal ? mkValCells(r.symbol) : ''}
         <td><a class="vl-link" href="/valuation/#stock/${encodeURIComponent(r.symbol)}" title="Mở hồ sơ định giá chi tiết trong Valuation Bench">Hồ sơ</a> ${inTable ? '<span class="vl-tag">Trong bảng</span>' : `<button type="button" class="vl-link" data-mk-add="${VU.esc(r.symbol)}">Thêm vào bảng</button>`}</td></tr>`;
 }
 
@@ -237,7 +286,7 @@ function renderMkResults() {
     const hasVals = res.entries.some(e => MK.vals[e.row.symbol]);
     const ordered = MK.sort === 'mos' && hasVals ? MarketBatch.rankByMos(res.entries, MK.vals) : res.entries;
     const shown = ordered.slice(0, MK.limit), b = MK.batch, running = !!(b && b.running);
-    const nVal = Math.min(res.entries.length, MK_BATCH_MAX);
+    const nVal = Math.min(res.entries.length, MK_BATCH_MAX), extra = mkExtraCols();
     const toolbar = `<div class="mk-toolbar">
         <button type="button" class="btn-save" onclick="mkValueAll()"${running ? ' disabled' : ''} title="Chạy bộ máy Valuation Bench với giả định mặc định cho từng mã trong danh sách (tối đa ${MK_BATCH_MAX} mã mỗi lần), rồi xếp theo biên an toàn. Không lưu gì lên máy chủ."><i class="fa-solid fa-scale-balanced"></i> Định giá cả danh sách (${nVal} mã)</button>
         ${running ? `<button type="button" class="vl-link" onclick="mkValueCancel()">Dừng</button><span class="vl-muted">đang định giá ${b.done}/${b.total}${b.failed ? ` · ${b.failed} mã lỗi` : ''}…</span><progress max="${b.total}" value="${b.done}"></progress>` : ''}
@@ -252,12 +301,12 @@ function renderMkResults() {
         return;
     }
     box.innerHTML = `<div class="vl-card">${head}${toolbar}
-        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Giá trị doanh nghiệp / EBITDA hoạt động 4 quý; không áp dụng cho ngân hàng, bảo hiểm, chứng khoán">EV/EBITDA</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th>${hasVals ? '<th class="num" title="Giá trị hợp lý đồng thuận của Valuation Bench (giả định mặc định)">Giá trị hợp lý (đ)</th><th class="num" title="(Giá trị hợp lý - giá hiện tại) / giá trị hợp lý">Biên an toàn</th><th>Kết luận</th>' : ''}<th></th></tr></thead>
-        <tbody>${shown.map((e, i) => mkRow(e, i, hasVals)).join('')}</tbody></table></div>
+        <div class="spreadsheet-wrapper vl-table-wrap"><table class="vl-scen sc-table"><thead><tr><th>#</th><th>Mã</th><th class="num" title="Điểm tổng hợp 0-100 để xếp hạng, không phải khuyến nghị">Điểm</th><th class="num">Vốn hoá (tỷ)</th><th class="num">P/E</th><th class="num">P/B</th><th class="num" title="Giá trị doanh nghiệp / EBITDA hoạt động 4 quý; không áp dụng cho ngân hàng, bảo hiểm, chứng khoán">EV/EBITDA</th><th class="num" title="Phân vị định giá trong ngành: 0 = rẻ nhất ngành">Rẻ so với ngành</th><th class="num">ROE</th><th class="num">Tăng trưởng EPS</th><th class="num" title="Lợi nhuận ròng 12 tháng so với cùng kỳ">Tăng trưởng LN ròng</th><th class="num">Cổ tức</th><th class="num">Nợ/vốn</th><th class="num" title="Giá hiện tại so với giá đóng cửa cuối năm trước">Giá từ 1/1</th><th class="num">Giá 12 tháng</th><th class="num" title="Điểm sức khoẻ tài chính kiểu Piotroski rút gọn (0-9); rê chuột vào ô để xem từng dấu hiệu">Sức khoẻ</th>${extra.map(c => `<th class="num" title="${VU.esc(c.label)}">${VU.esc(MK_SHORT[c.key] || c.label)}</th>`).join('')}${hasVals ? '<th class="num" title="Giá trị hợp lý đồng thuận của Valuation Bench (giả định mặc định)">Giá trị hợp lý (đ)</th><th class="num" title="(Giá trị hợp lý - giá hiện tại) / giá trị hợp lý">Biên an toàn</th><th>Kết luận</th>' : ''}<th></th></tr></thead>
+        <tbody>${shown.map((e, i) => mkRow(e, i, hasVals, extra)).join('')}</tbody></table></div>
         ${hasVals ? '<p class="vl-hint">Cột định giá do bộ máy Valuation Bench tính tự động với giả định MẶC ĐỊNH (tự phân loại mô hình kinh doanh, không điều chỉnh khoản bất thường, chưa rà soát từng bước), không lưu. Dùng để sàng và xếp hạng; mở “Hồ sơ” để xem quy trình, chỉnh giả định và lưu bản định giá chính thức.</p>' : ''}
         ${res.entries.length > MK.limit ? `<p class="vl-hint"><button type="button" class="vl-link" onclick="mkMore()">Hiện thêm</button> (đang hiện ${MK.limit}/${res.entries.length})</p>` : ''}
         ${miss.length ? `<p class="vl-hint">Mã bị loại vì thiếu số liệu: ${miss.map(x => `${VU.esc(MarketScreener.BY_KEY[x.k].label)} (${x.n})`).join(', ')}. Mã thiếu số liệu cho tiêu chí đang bật không được tính là đạt.</p>` : ''}
-        <p class="vl-hint">Điểm ghép định giá tương đối trong ngành (30%), chất lượng (30%), tăng trưởng (20%), cổ tức (10%), an toàn tài chính (10%); chỉ để xếp hạng. Nợ/vốn không áp dụng cho ngân hàng, bảo hiểm, dịch vụ tài chính. Số liệu là chỉ số công bố của VNDirect, chưa soát với báo cáo tài chính gốc: coi kết quả là danh sách để nghiên cứu tiếp, không phải khuyến nghị mua bán. Mã thêm vào bảng sẽ tự lấy số liệu tài chính để định giá chi tiết.</p></div>`;
+        <p class="vl-hint">Điểm ghép ${VU.esc(mkWeightText())}${MK.filters.weights ? ' (trọng số bạn đặt)' : ''}; chỉ để xếp hạng. Chất lượng gồm ROE, biên lợi nhuận và điểm sức khoẻ tài chính. Sức khoẻ tài chính là bản rút gọn kiểu Piotroski từ chỉ số VNDirect (dùng mức hiện tại, không phải thay đổi qua từng năm). Nợ/vốn không áp dụng cho ngân hàng, bảo hiểm, dịch vụ tài chính. Số liệu là chỉ số công bố của VNDirect, chưa soát với báo cáo tài chính gốc: coi kết quả là danh sách để nghiên cứu tiếp, không phải khuyến nghị mua bán. Mã thêm vào bảng sẽ tự lấy số liệu tài chính để định giá chi tiết.</p></div>`;
 }
 
 function mkOnInput() {
@@ -265,7 +314,9 @@ function mkOnInput() {
     document.querySelectorAll('#mk-root [data-mk]').forEach(el => { if (el.value !== '') { const n = Number(el.value); if (isFinite(n)) values[el.getAttribute('data-mk')] = n; } });
     const opt = (k) => { const el = document.querySelector(`#mk-root [data-mk-opt="${k}"]`); return el ? el.value : ''; };
     const icbs = [...document.querySelectorAll('#mk-root [data-mk-icb]')].filter(el => el.checked).map(el => el.getAttribute('data-mk-icb'));
-    MK.filters = MarketScreener.normalizeFilters({ values, icbs, perSector: opt('perSector'), topN: opt('topN') });
+    const weights = {};
+    document.querySelectorAll('#mk-root [data-mk-w]').forEach(el => { if (el.value !== '') weights[el.getAttribute('data-mk-w')] = Number(el.value); });
+    MK.filters = MarketScreener.normalizeFilters({ values, icbs, perSector: opt('perSector'), topN: opt('topN'), weights });
     const head = document.querySelector('#mk-root .mk-icb-head small'); if (head) head.textContent = `(${icbs.length ? 'đã chọn ' + icbs.length : 'tất cả ngành'})`;
     MK.preset = null; MK.limit = 50; mkSave();
     document.querySelectorAll('#mk-root .sc-presets [aria-pressed]').forEach(b => b.setAttribute('aria-pressed', 'false'));
@@ -273,7 +324,7 @@ function mkOnInput() {
 }
 function mkPreset(key) {
     const p = MarketScreener.PRESETS.find(x => x.key === key); if (!p) return;
-    MK.filters = MarketScreener.normalizeFilters({ values: Object.assign({}, p.values), icbs: MK.filters.icbs, perSector: p.perSector || 0, topN: MK.filters.topN }); MK.preset = key; MK.limit = 50; mkSave(); renderMarketScreener();
+    MK.filters = MarketScreener.normalizeFilters({ values: Object.assign({}, p.values), icbs: MK.filters.icbs, perSector: p.perSector || 0, topN: MK.filters.topN, weights: MK.filters.weights }); MK.preset = key; MK.limit = 50; mkSave(); renderMarketScreener();
 }
 function mkReset() { MK.filters = MarketScreener.normalizeFilters({}); MK.preset = null; MK.limit = 50; mkSave(); renderMarketScreener(); }
 function mkIcbAll(on) {

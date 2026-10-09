@@ -133,3 +133,28 @@ describe('buildSnapshot: giá từ đầu năm và tăng trưởng lợi nhuận
     expect(a.metrics).toMatchObject({ chgYtd: -0.297, netProfitGrowthYoY: 0.16, netProfitGrowthQ: 0.137, netProfitGrowth3y: 0.199, pretaxGrowthYoY: 0.046 });
   });
 });
+
+describe('ảnh chụp 09/10/2026: thêm chất lượng, dòng tiền, an toàn, đỉnh/đáy 52 tuần, số cổ phiếu, ngân hàng', () => {
+  it('mọi mã chỉ số yêu cầu đều có tên ngắn (không mã nào bị bỏ âm thầm) và có đủ nhóm mới', async () => {
+    const { SNAP_DAILY, SNAP_QUARTER } = await import('../../supabase/functions/market-data-sync/peers.ts');
+    const { DAILY_MAP, QUARTER_MAP } = await import('../../supabase/functions/market-data-sync/logic.ts');
+    SNAP_DAILY.forEach((c) => expect(DAILY_MAP[c], c).toBeTruthy());
+    SNAP_QUARTER.forEach((c) => expect(QUARTER_MAP[c], c).toBeTruthy());
+    ['PRICE_HIGHEST_CR_52W', 'PRICE_LOWEST_CR_52W'].forEach((c) => expect(SNAP_DAILY).toContain(c));
+    ['ROIC_TR_AVG5Q', 'ROAA_TR_AVG5Q', 'GROSS_MARGIN_TR', 'OPERATING_EBIT_MARGIN_TR', 'DELTA_MARGIN_TR', 'CFO_TO_SALES_TR', 'POSITIVE_CFO_NUM_CR_2YR', 'INTEREST_COVERAGE_TR',
+      'CURRENT_RATIO_AQ', 'EQUITY_TO_ASSET_AQ', 'DIVIDEND_PAYOUT_TR', 'NET_INTEREST_MARGIN_TR_AVG5Q', 'PROVISION_BAD_LOANS_AQ', 'TOTAL_SHARES', 'FREEFLOAT'].forEach((c) => expect(SNAP_QUARTER).toContain(c));
+  });
+  it('số cổ phiếu ghi ngày cuối năm (tương lai) vẫn là kỳ mới nhất của mã; các chỉ số mới vào đúng tên', () => {
+    const dly = { MARKETCAP: d('MARKETCAP', D, [['FPT', 112577940585600]]), PRICE_HIGHEST_CR_52W: d('PRICE_HIGHEST_CR_52W', D, [['FPT', 95144]]), PRICE_LOWEST_CR_52W: d('PRICE_LOWEST_CR_52W', D, [['FPT', 56546]]) };
+    const qtr = {
+      TOTAL_SHARES: [...d('TOTAL_SHARES', '2026-06-30', [['FPT', 1.7e9]]), ...d('TOTAL_SHARES', '2026-12-31', [['FPT', 1885727648]])],
+      ROIC_TR_AVG5Q: d('ROIC_TR_AVG5Q', '2026-06-30', [['FPT', 0.1606]]), CFO_TO_SALES_TR: d('CFO_TO_SALES_TR', '2026-06-30', [['FPT', 0.1147]]),
+      POSITIVE_CFO_NUM_CR_2YR: d('POSITIVE_CFO_NUM_CR_2YR', '2026-06-30', [['FPT', 2]]), NET_INTEREST_MARGIN_TR_AVG5Q: d('NET_INTEREST_MARGIN_TR_AVG5Q', '2026-06-30', [['VCB', 0.023]]),
+    };
+    const rows = buildSnapshot(dly, qtr, () => null), f = rows.find((r) => r.symbol === 'FPT');
+    expect(f.metrics).toMatchObject({ high52: 95144, low52: 56546, shares: 1885727648, roic: 0.1606, cfoToSales: 0.1147, positiveCfo2y: 2 });
+    expect(Math.round(f.metrics.marketcap / f.metrics.shares)).toBe(59700);         // giá đóng cửa 08/10/2026
+    expect(f.quarter_date).toBe('2026-06-30');                                       // ngày cuối năm của số cổ phiếu không thành kỳ báo cáo
+    expect(rows.find((r) => r.symbol === 'VCB')).toBeUndefined();                     // không có vốn hoá/P/E/P/B: không vào ảnh chụp
+  });
+});

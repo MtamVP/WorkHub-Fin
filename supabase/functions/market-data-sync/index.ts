@@ -163,7 +163,8 @@ async function syncSnapshot(supabase: any) {
   const daily: Record<string, any[]> = {}, quarter: Record<string, any[]> = {};
   const jobs: [string, boolean][] = [...SNAP_DAILY.map((c) => [c, false] as [string, boolean]), ...SNAP_QUARTER.map((c) => [c, true] as [string, boolean])];
   await inBatches(jobs, 4, async ([code, isQ]) => {
-    const j = await getJson(`${B}/ratios?q=ratioCode:${code}~reportDate:${isQ ? "gte:" + since : date}&size=4000`);
+    // nhóm quý xếp ngày mới trước: mã có nhiều kỳ trong cửa sổ (TOTAL_SHARES, FREEFLOAT ~4.600 dòng) vượt 4.000 dòng thì phần bị cắt là kỳ cũ
+    const j = await getJson(`${B}/ratios?q=ratioCode:${code}~reportDate:${isQ ? "gte:" + since : date}&size=4000${isQ ? "&sort=reportDate:desc" : ""}`);
     (isQ ? quarter : daily)[code] = j && Array.isArray(j.data) ? j.data : [];
   });
   const metaRows = await fetchAll(() => supabase.from("finance_stock_meta").select("symbol, icb2_code").order("symbol"));

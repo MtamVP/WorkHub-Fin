@@ -6,8 +6,15 @@ import { DAILY_MAP, QUARTER_MAP } from "./logic.ts";
 export const SNAP_DAILY = [
   "PRICE_TO_EARNINGS", "PRICE_TO_BOOK", "PRICE_TO_SALES", "MARKETCAP", "DIVIDEND_YIELD", "PRICE_TO_EARNINGS_AVG_CR_5Y", "PRICE_TO_BOOK_AVG_CR_5Y",
   "NMVALUE_AVG_CR_20D", "PRICE_CHG_PCT_CR_1Y", "PRICE_CHG_PCT_CR_3M", "PRICE_CHG_PCT_CR_YD", "PRICE_CHG_PCT_CR_1M", "PRICE_CHG_PCT_CR_6M", "BETA", "DAILY_JDK_RS_CR", "DAILY_JDK_RS_MOMENTUM_CR",
+  // 09/10/2026: đỉnh/đáy 52 tuần (đồng) cho tiêu chí giá; giá hiện tại = vốn hoá / số cổ phiếu (đo: FPT 112.578 tỷ / 1.885,7 triệu cp = 59.700 đ, khớp giá đóng cửa)
+  "PRICE_HIGHEST_CR_52W", "PRICE_LOWEST_CR_52W",
 ];
-export const SNAP_QUARTER = ["ROAE_TR_AVG5Q", "NET_MARGIN_TR", "EPS_TR_GRYOY", "NET_SALES_TR_GRYOY", "PRETAX_PROFIT_TR_GRYOY", "NET_PROFIT_TR_GRYOY", "NET_PROFIT_QR_GRYOY", "NET_PROFIT_TR_GR3YR", "DEBT_TO_EQUITY_AQ", "OPERATING_EBITDA_TR", "OWNERS_EQUITY_AQ", "NET_CASH_TO_EQUITY_AQ", "NET_SALES_TR"];
+export const SNAP_QUARTER = ["ROAE_TR_AVG5Q", "NET_MARGIN_TR", "EPS_TR_GRYOY", "NET_SALES_TR_GRYOY", "PRETAX_PROFIT_TR_GRYOY", "NET_PROFIT_TR_GRYOY", "NET_PROFIT_QR_GRYOY", "NET_PROFIT_TR_GR3YR", "DEBT_TO_EQUITY_AQ", "OPERATING_EBITDA_TR", "OWNERS_EQUITY_AQ", "NET_CASH_TO_EQUITY_AQ", "NET_SALES_TR",
+  // 09/10/2026: chất lượng, dòng tiền, an toàn, cổ đông và riêng ngân hàng (NIM, dự phòng/nợ xấu chỉ có ở ngân hàng). TOTAL_SHARES và FREEFLOAT VNDirect ghi ngày cuối năm hiện tại (2026-12-31).
+  "ROIC_TR_AVG5Q", "ROAA_TR_AVG5Q", "GROSS_MARGIN_TR", "OPERATING_EBIT_MARGIN_TR", "DELTA_MARGIN_TR", "CFO_TO_SALES_TR", "POSITIVE_CFO_NUM_CR_2YR", "INTEREST_COVERAGE_TR",
+  "CURRENT_RATIO_AQ", "EQUITY_TO_ASSET_AQ", "DIVIDEND_PAYOUT_TR", "NET_INTEREST_MARGIN_TR_AVG5Q", "PROVISION_BAD_LOANS_AQ", "TOTAL_SHARES", "FREEFLOAT",
+];
+const NOT_PERIOD = new Set(["TOTAL_SHARES", "FREEFLOAT"]);
 // Ngân hàng (8300), bảo hiểm (8500), dịch vụ tài chính/chứng khoán (8700): giá trị doanh nghiệp (EV) không có nghĩa, không tính EV/EBITDA và EV/Doanh thu
 const EV_EXCLUDED_ICB = new Set(["8300", "8500", "8700"]);
 
@@ -57,7 +64,9 @@ export function buildSnapshot(daily: Record<string, any[]>, quarter: Record<stri
     if (!name) continue;
     const latest = new Map<string, { date: string; value: number }>();
     for (const x of usable(quarter[code])) { const c = latest.get(x.code); if (!c || x.date > c.date) latest.set(x.code, { date: x.date, value: x.value }); }
-    latest.forEach((v, sym) => { const r = get(sym); r.metrics[name] = v.value; r.quarter_date = !r.quarter_date || v.date > r.quarter_date ? v.date : r.quarter_date; });
+    // TOTAL_SHARES/FREEFLOAT mang ngày cuối năm (tương lai), không phải kỳ báo cáo: không tính vào quarter_date
+    const periodic = !NOT_PERIOD.has(code);
+    latest.forEach((v, sym) => { const r = get(sym); r.metrics[name] = v.value; if (periodic) r.quarter_date = !r.quarter_date || v.date > r.quarter_date ? v.date : r.quarter_date; });
   }
   // EV = vốn hoá + nợ ròng, nợ ròng = -(tỷ lệ tiền mặt ròng/vốn chủ x vốn chủ). Chỉ tính khi đủ cả ba số; EBITDA hoạt động 4 quý liền kề (TTM).
   for (const r of bySym.values()) {

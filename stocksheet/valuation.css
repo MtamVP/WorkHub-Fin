@@ -406,3 +406,10 @@ body.desk { --hm-3: 72%; --hm-2: 52%; --hm-1: 28%; --hm-text-strong: var(--text-
 .mkv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; }
 .mkw-why { margin: 6px 0 0 96px; padding: 0; list-style: none; font-size: 0.74rem; color: var(--text-secondary); }
 @media (max-width: 640px) { .mkw-why { margin-left: 0; } }
+/* Bộ lọc toàn thị trường: nhóm tiêu chí thu gọn được (09/10/2026, hơn 50 tiêu chí) */
+.mk-group > summary { cursor: pointer; padding: 2px 0; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.mk-group > summary small { margin-left: 4px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.mk-group > summary small b { color: var(--gold); font-weight: 700; }
+.mk-group > summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+.mk-group { align-self: start; }
+.mk-group:not([open]) { gap: 0; padding-bottom: 10px; }
