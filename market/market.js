@@ -36,9 +36,10 @@ const MarketPage = (function () {
     const ixOf = (code) => MO.INDICES.filter((i) => i.code === code)[0] || MO.INDICES[0];
     const sessionState = () => (typeof LiveQuotes !== 'undefined' ? LiveQuotes.session() : 'closed');
 
+    // cache: 'no-store' là bắt buộc: bảng giá finfo trả cache-control max-age=300 nên không có nó, trình duyệt dùng lại bản cũ tới 5 phút dù trang hỏi lại mỗi 30 giây (đã đo ngày 09/10/2026)
     async function getJson(url, ms) {
         const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, timer = ctl ? setTimeout(() => ctl.abort(), ms || 12000) : null;
-        try { const r = await fetch(url, ctl ? { signal: ctl.signal } : {}); if (!r || !r.ok) return null; return await r.json(); } catch (e) { return null; } finally { if (timer) clearTimeout(timer); }
+        try { const r = await fetch(url, ctl ? { signal: ctl.signal, cache: 'no-store' } : { cache: 'no-store' }); if (!r || !r.ok) return null; return await r.json(); } catch (e) { return null; } finally { if (timer) clearTimeout(timer); }
     }
 
     // ---------- dữ liệu ----------
@@ -127,9 +128,11 @@ const MarketPage = (function () {
         if (box) { box.className = 'mk-session ' + st; box.textContent = lab; }
         if (!meta) return;
         const parts = [];
-        if (S.date) parts.push('Phiên ' + dmy(S.date));
+        const ixf = stampOf('index').f;
+        if (ixf && /^phiên /.test(ixf.text)) parts.push('Chỉ số: ' + ixf.text);
+        else { if (S.date) parts.push('Phiên ' + dmy(S.date)); if (ixf) parts.push('chỉ số ' + ixf.text); }
         if (S.boardDate && S.boardDate !== S.date) parts.push('bảng giá của phiên ' + dmy(S.boardDate) + ' (phiên mới chưa có số liệu)');
-        if (S.fetchedAt) { const p = LiveQuotes.vnParts(S.fetchedAt); parts.push('cập nhật ' + String(Math.floor(p.min / 60)).padStart(2, '0') + ':' + String(p.min % 60).padStart(2, '0') + ':' + String(p.sec).padStart(2, '0')); }
+        if (S.fetchedAt) { const p = LiveQuotes.vnParts(S.fetchedAt); parts.push('tải lúc ' + String(Math.floor(p.min / 60)).padStart(2, '0') + ':' + String(p.min % 60).padStart(2, '0') + ':' + String(p.sec).padStart(2, '0')); }
         if (st === 'open') parts.push('tự làm mới mỗi 30 giây');
         const errs = ['indices', 'board', 'foreign'].map((k) => S.errors[k]).filter(Boolean);
         meta.innerHTML = esc(parts.join(' · ')) + errs.map((e) => ' · <span class="mk-err">' + esc(e) + '</span>').join('');
@@ -156,7 +159,7 @@ const MarketPage = (function () {
     const CH = { geo: null, kind: null, label: null, ref: null, first: null };
     function chartSpec() {
         const code = S.index, d = merged(code), q = MO.quote(d), sess = MO.lastSession(S.intraday[code]);
-        if (S.range === '1D' && sess.points.length >= 2) {
+        if (S.range === '1D' && sess.points.length >= 2 && (!q || q.date === sess.date)) {      // nến phút của phiên cũ không được vẽ dưới số liệu của phiên mới (đầu phiên chưa có nến phút nào)
             const pts = MO.intradayPoints(sess.points), ref = q && q.date === sess.date && isNum(q.prev) ? q.prev : null;
             return { kind: 'intraday', pts: pts, ref: ref, date: sess.date, xMin: 0, xMax: 270, up: pts[pts.length - 1].y >= (ref !== null ? ref : pts[0].y) };
         }
@@ -228,7 +231,7 @@ const MarketPage = (function () {
             (b ? stat('GTGD cả sàn ' + esc(MO.EXCHANGE_LABEL[ix.exchange]), ty(b.value), 'khớp lệnh + thỏa thuận') : '') + '</div>';
         drawChart();
         const spec = CH.spec;
-        if (spec && spec.fallback) { const n = document.createElement('p'); n.className = 'tl-hint'; n.textContent = 'Chưa có nến trong ngày (nguồn không trả hoặc ngoài giờ giao dịch) — đang hiển thị 1 tháng.'; box.appendChild(n); }
+        if (spec && spec.fallback) { const n = document.createElement('p'); n.className = 'tl-hint'; n.textContent = 'Chưa có nến trong ngày (mới vào phiên, nguồn không trả hoặc ngoài giờ giao dịch) — đang hiển thị 1 tháng.'; box.appendChild(n); }
     }
 
     function exchangeChips() {
@@ -501,6 +504,59 @@ const MarketPage = (function () {
         box.innerHTML = head + (body ? '<div class="mk-val">' + body + '</div>' : '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Chưa có số liệu.</div>') +
             '<p class="tl-hint">Tổng hợp theo vốn hoá, chỉ tính mã có lãi nên thấp hơn P/E của chỉ số khi nhiều doanh nghiệp lỗ. “Rẻ so với lịch sử” không có nghĩa là sẽ tăng.</p>';
     }
+
+    // ---------- giờ cập nhật trên từng thẻ ----------
+    // Cuối mỗi thẻ có một dòng cho biết số liệu là của lúc nào, từ nguồn nào, trễ bao nhiêu. Giờ lấy từ chính dữ liệu (nến cuối, giờ ghi trên bảng giá), không phải giờ bấm làm mới;
+    // nguồn không ghi giờ (khối ngoại, nến ngày) thì nói rõ và chỉ cho biết lúc ứng dụng tải xong.
+    const vnHM = (ms) => MO.hhmm(Math.floor(((ms / 1000 + 7 * 3600) % 86400) / 60));
+    function indexStamp(code) {
+        const q = MO.quote(merged(code)); if (!q) return null;
+        const pts = S.intraday[code], last = pts && pts.length ? pts[pts.length - 1] : null;
+        return { date: q.date, time: last && last.date === q.date ? MO.hhmm(last.min) : null, untimedNote: 'chưa có nến 1 phút của phiên này, đang dùng nến ngày' };
+    }
+    function boardStamp() { return S.rows && S.boardDate ? { date: S.boardDate, time: (MO.latestTime(S.rows, S.boardDate) || '').slice(0, 5) || null } : null; }
+    function newsStamp() {
+        if (!S.newsAt || !S.newsRaw) return null;
+        const newest = S.newsRaw.reduce((m, x) => (isNum(x.ts) && x.ts > m ? x.ts : m), 0), ago = newest ? MarketNews.ago(newest, Date.now()) : '';
+        return S.newsErr ? { tone: 'warn', text: 'chưa cập nhật được, đang dùng bản tải lúc ' + vnHM(S.newsAt) } : { tone: 'ok', text: 'tải lúc ' + vnHM(S.newsAt) + (ago ? ' · tin mới nhất ' + ago : '') };
+    }
+    function stampOf(key) {
+        const fr = (d) => (d ? MO.freshness(Object.assign({ nowMs: Date.now(), session: sessionState() }, d)) : null);
+        switch (key) {
+            case 'index': return { f: fr(indexStamp(S.index)), src: 'nến 1 phút của chỉ số, VNDirect' };
+            case 'perf': return { f: fr(indexStamp('VNINDEX')), src: 'nến ngày và nến 1 phút của chỉ số, VNDirect' };
+            case 'board': return { f: fr(boardStamp()), src: 'bảng giá VNDirect, tổng hợp từ từng mã' };
+            case 'foreign': return { f: fr(S.frows && S.foreignDate ? { date: S.foreignDate, time: null, loadedMs: S.foreignAt } : null), src: 'khối ngoại theo mã, VNDirect' };
+            case 'contrib': return { f: fr(boardStamp()), src: 'bảng giá VNDirect; vốn hoá theo ảnh chụp ngày ' + (S.universe ? dmy(S.universe.asOf) : '—') };
+            case 'sectors': {
+                if (secModeNow() === 'icb') return { f: fr(boardStamp()), src: 'bảng giá VNDirect; ngành theo ảnh chụp của WorkHub' };
+                const dates = MO.SECTOR_INDICES.map((s) => (S.daily[s.code] && S.daily[s.code].length ? S.daily[s.code][S.daily[s.code].length - 1].date : null)).filter(Boolean).sort();
+                return { f: fr(dates.length ? { date: dates[dates.length - 1], time: null, loadedMs: S.sectorAt } : null), src: 'nến ngày của chỉ số ngành, VNDirect' };
+            }
+            case 'valuation': {
+                const ds = S.val && S.val.rows ? S.val.rows.filter((r) => r.scope === 'ALL' && r.as_of).map((r) => String(r.as_of).slice(0, 10)).sort() : [];
+                return { f: fr(ds.length ? { date: ds[ds.length - 1], time: null, dateOnly: true, staleDays: 45 } : null), src: 'lịch sử định giá của WorkHub' };
+            }
+            case 'news': return { f: newsStamp(), src: 'RSS các báo, tự làm mới mỗi 5 phút' };
+            default: return null;
+        }
+    }
+    function stampHtml(key) {
+        const s = stampOf(key); if (!s || !s.f) return '';
+        return '<p class="mk-asof mk-asof-' + s.f.tone + '"><i class="' + (s.f.tone === 'ok' ? 'fa-regular fa-clock' : 'fa-solid fa-triangle-exclamation') + '" aria-hidden="true"></i><span>Số liệu ' + esc(s.f.text) + '</span><span class="mk-asof-src">' + esc(s.src) + '</span></p>';
+    }
+    // Bọc hàm vẽ của thẻ: vẽ xong thì thêm dòng giờ cập nhật vào cuối (không vẽ lại phần đã có, để biểu đồ giữ nguyên); thẻ đang chờ hoặc báo lỗi thì không có dòng này
+    function stamped(id, key, fn) {
+        return function () {
+            fn.apply(null, arguments);
+            const box = $(id); if (!box || /mk-skel|mk-empty/.test(box.innerHTML)) return;
+            const h = stampHtml(key); if (h) box.insertAdjacentHTML('beforeend', h);
+        };
+    }
+    renderDetail = stamped('mk-detail', 'index', renderDetail); renderTech = stamped('mk-tech', 'index', renderTech); renderPerf = stamped('mk-perf', 'perf', renderPerf);
+    renderBreadth = stamped('mk-breadth', 'board', renderBreadth); renderMovers = stamped('mk-movers', 'board', renderMovers); renderForeign = stamped('mk-foreign', 'foreign', renderForeign);
+    renderContrib = stamped('mk-contrib', 'contrib', renderContrib); renderSectors = stamped('mk-sectors', 'sectors', renderSectors); renderValuation = stamped('mk-valuation', 'valuation', renderValuation);
+    renderNews = stamped('mk-news', 'news', renderNews);
 
     function renderAll() { renderStatus(); renderIndices(); renderDetail(); renderBreadth(); renderForeign(); renderMovers(); renderNews(); renderPerf(); renderTech(); renderContrib(); renderSectors(); renderValuation(); }
 

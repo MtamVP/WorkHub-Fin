@@ -10,10 +10,11 @@ const FX = JSON.parse(fs.readFileSync(REPO + '/tests/fixtures/market-overview-sa
 
 function boot(opts) {
   const o = opts || {};
-  const els = {}, store = new Map(), urls = [], intervals = [], docHandlers = {}, opened = [];
+  const els = {}, store = new Map(), urls = [], inits = [], intervals = [], docHandlers = {}, opened = [];
   const stub = () => ({ classList: { add() {}, remove() {}, contains: () => false }, addEventListener() {}, setAttribute() {}, getBoundingClientRect: () => ({ left: 0, width: 720 }), style: {}, textContent: '' });
   const el = (id) => els[id] || (els[id] = Object.assign(stub(), { id, innerHTML: '', className: '', clientWidth: 720, offsetWidth: 80, disabled: false, children: [],
-    querySelector: () => stub(), querySelectorAll: () => [], appendChild(c) { this.children.push(c); } }));
+    querySelector: () => stub(), querySelectorAll: () => [], appendChild(c) { this.children.push(c); }, insertAdjacentHTML(where, h) { if (where === 'beforeend') this.innerHTML += h; } }));
+  const FakeDate = o.now ? class extends Date { constructor(...a) { super(...(a.length ? a : [o.now])); } static now() { return o.now; } } : Date;       // o.now: đồng hồ giả (mili giây) để thử giờ cập nhật trong phiên
   const route = (url) => {
     if (o.failAll) return null;
     if (/resolution=D/.test(url)) return o.failDaily ? null : FX.daily;
@@ -23,18 +24,18 @@ function boot(opts) {
     return null;
   };
   const ctx = vm.createContext({
-    console, Date, JSON, Math, Promise, Object, Array, Number, String, isFinite, encodeURIComponent, Set, setTimeout, clearTimeout, AbortController,
+    console, Date: FakeDate, JSON, Math, Promise, Object, Array, Number, String, isFinite, encodeURIComponent, Set, setTimeout, clearTimeout, AbortController: o.noAbort ? undefined : AbortController,
     document: { getElementById: el, createElement: () => Object.assign(stub(), { className: '', textContent: '' }), addEventListener: (n, f) => { docHandlers[n] = f; }, hidden: !!o.hidden },
     window: { addEventListener() {} },
     localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
     setInterval: (f, ms) => { intervals.push({ f, ms }); return intervals.length; },
-    fetch: async (url) => { urls.push(url); const j = route(url); return j === null ? { ok: false, json: async () => ({}) } : { ok: true, json: async () => j }; },
+    fetch: async (url, init) => { urls.push(url); inits.push(init); const j = route(url); return j === null ? { ok: false, json: async () => ({}) } : { ok: true, json: async () => j }; },
     callGAS: o.callGAS, sbClient: o.sbClient, openExternalUrl: (u) => opened.push(u),
   });
   ['lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/sector-map.js', 'lib/valuation-history.js', 'lib/market-overview.js', 'lib/market-news.js', 'market/market.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
   vm.runInContext("LiveQuotes.session = () => '" + (o.session || 'closed') + "';", ctx);
   vm.runInContext('globalThis.MP = MarketPage;', ctx);
-  return { MP: vm.runInContext('MP', ctx), els, store, urls, intervals, docHandlers, ctx, opened };
+  return { MP: vm.runInContext('MP', ctx), els, store, urls, inits, intervals, docHandlers, ctx, opened };
 }
 const MAIN_D = /resolution=D&symbol=(VNINDEX|VN30|HNX|HNX30|UPCOM)&/;
 const text = (html) => String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
@@ -170,6 +171,21 @@ describe('trang Thị Trường: nguồn lỗi không làm hỏng trang', () => 
     expect(t.els['mk-chart'].innerHTML).toContain('<path class="mk-line"');
     const note = t.els['mk-detail'].children.map((c) => c.textContent).join(' ');
     expect(note).toContain('Chưa có nến trong ngày');
+  });
+  it('đầu phiên mới chưa có nến phút của hôm nay: không vẽ đường của phiên hôm qua dưới số liệu hôm nay, rơi về 1 tháng kèm ghi chú', async () => {
+    const t = boot({ session: 'open', now: Date.UTC(2026, 9, 9, 2, 10) });
+    await t.MP.refresh(true);
+    expect(t.els['mk-chart'].innerHTML).toContain('TC 1,753.39');                       // trước khi có phiên mới: biểu đồ trong ngày của phiên 08/10 như cũ
+    expect(t.els['mk-detail'].children.map((c) => c.textContent).join(' ')).not.toContain('Chưa có nến trong ngày');
+    const d = t.MP.S.daily.VNINDEX, last = d[d.length - 1];
+    t.MP.S.daily.VNINDEX = d.concat([{ date: '2026-10-09', o: last.c, h: last.c, l: last.c - 2, c: last.c - 2, v: 0 }]);   // nến ngày của phiên 09/10 đã có, nến phút thì chưa
+    t.MP.renderAll();
+    const c = t.els['mk-chart'].innerHTML;
+    expect(c).toContain('<path class="mk-line"');
+    expect(c).not.toContain('TC ');                                                      // không có đường tham chiếu / trục giờ của phiên cũ
+    expect(c).not.toContain('11:30');
+    expect(t.els['mk-detail'].children.map((x) => x.textContent).join(' ')).toContain('Chưa có nến trong ngày (mới vào phiên');
+    expect(text(t.els['mk-detail'].innerHTML)).toContain('1,736.97');
   });
   it('lỗi sau khi đã có dữ liệu: giữ số cũ và nói rõ là số cũ', async () => {
     const o = { failBoard: false };
@@ -701,5 +717,161 @@ describe('trang Thị Trường: an toàn HTML', () => {
     expect(t.els['mk-sectors'].innerHTML).toContain('&lt;u&gt;');
     expect(t.els['mk-valuation'].innerHTML).not.toContain('<i>');
     expect(t.els['mk-valuation'].innerHTML).toContain('&lt;i&gt;');
+  });
+});
+
+describe('trang Thị Trường: giờ cập nhật ở cuối từng thẻ', () => {
+  const vn = (date, hm) => { const [y, m, d] = date.split('-').map(Number), [h, mi] = hm.split(':').map(Number); return Date.UTC(y, m - 1, d, h - 7, mi, 30); };
+  const count = (h, s) => String(h).split(s).length - 1;
+  const codes = ['8300', '8600'];
+  const snap = FX.prices.data.filter((r) => r.type === 'STOCK' && r.floor === 'HOSE').slice(0, 10).map((r, i) => ({ symbol: r.code, icb2_code: codes[i % 2], metrics: { marketcap: 1e12 * (i + 1) } }));
+  const histAt = (last) => { const h = []; for (let m = 0; m < 30; m++) h.push({ as_of: m === 29 ? last : '2026-05-01', scope: 'ALL', pe_agg: 10 + (m % 7), pb_agg: 1.5 + (m % 5) / 10 }); return h; };
+  const gas = (rows, uniAsOf) => async (a) => (a === 'getMarketUniverse' ? { status: 'success', data: { snapshot: snap, stats: {}, meta: {}, asOf: uniAsOf || '2026-10-08' } } : { status: 'success', data: { rows: rows, bond10y: 3.1, bondDate: '2026-10-08' } });
+  const newsClient = (over) => {
+    const o = Object.assign({ fail: null, items: [{ id: 'a', title: 'VN-Index tăng điểm', link: 'https://cafef.vn/a', source: 'cafef', sourceName: 'CafeF', ts: Date.now() - 7 * 60000, summary: 'Thị trường đi lên' }] }, over || {});
+    return { o, functions: { invoke: async () => (o.fail ? { data: null, error: { message: o.fail, context: { json: async () => ({ error: o.fail }) } } } : { data: { ok: true, items: o.items, sources: [{ id: 'cafef', name: 'CafeF', ok: true, count: 1 }], asOf: new Date().toISOString() }, error: null }) }, auth: { getSession: async () => ({ data: { session: null } }) } };
+  };
+
+  it('thẻ đang chờ dữ liệu chưa có dòng giờ; có dữ liệu thì mỗi thẻ có đúng một dòng', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00') });
+    t.MP.renderAll();
+    ['mk-detail', 'mk-breadth', 'mk-foreign', 'mk-movers', 'mk-perf', 'mk-tech', 'mk-contrib', 'mk-sectors', 'mk-valuation', 'mk-news'].forEach((id) => expect(t.els[id].innerHTML).not.toContain('mk-asof'));
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    t.MP.renderAll();
+    ['mk-detail', 'mk-breadth', 'mk-foreign', 'mk-movers', 'mk-perf', 'mk-tech'].forEach((id) => expect(count(t.els[id].innerHTML, 'class="mk-asof ')).toBe(1));
+  });
+  it('sau giờ đóng cửa: giờ lấy từ chính dữ liệu (nến cuối 15:05, bảng giá 15:10), không phải giờ bấm làm mới; ghi rõ nguồn', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00') });
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    const d = text(t.els['mk-detail'].innerHTML), b = text(t.els['mk-breadth'].innerHTML), m = text(t.els['mk-movers'].innerHTML);
+    expect(d).toContain('Số liệu lúc 15:05 nến 1 phút của chỉ số, VNDirect');
+    expect(text(t.els['mk-tech'].innerHTML)).toContain('Số liệu lúc 15:05');
+    expect(text(t.els['mk-perf'].innerHTML)).toContain('Số liệu lúc 15:05 nến ngày và nến 1 phút của chỉ số, VNDirect');
+    expect(b).toContain('Số liệu lúc 15:10 bảng giá VNDirect, tổng hợp từ từng mã');
+    expect(m).toContain('Số liệu lúc 15:10 bảng giá VNDirect');
+    expect(t.els['mk-detail'].innerHTML).toContain('mk-asof mk-asof-ok');
+    expect(t.els['mk-detail'].innerHTML).not.toContain('trễ');
+    const meta = t.els['mk-meta'].innerHTML;
+    expect(meta).toContain('Phiên 08/10/2026');
+    expect(meta).toContain('chỉ số lúc 15:05');
+    expect(meta).toContain('tải lúc 18:00:');
+  });
+  it('khối ngoại: nguồn không ghi giờ nên chỉ nói ngày và lúc tải, không bịa giờ dữ liệu', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00') });
+    await t.MP.refresh(true);
+    const f = text(t.els['mk-foreign'].innerHTML);
+    expect(f).toContain('Số liệu hôm nay · nguồn không ghi giờ, tải lúc 18:00 khối ngoại theo mã, VNDirect');
+  });
+  it('nguồn lỗi: thẻ báo lỗi không có dòng giờ, thẻ còn dữ liệu vẫn có', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00'), failBoard: true });
+    await t.MP.refresh(true);
+    expect(t.els['mk-breadth'].innerHTML).toContain('Không lấy được bảng giá');
+    expect(t.els['mk-breadth'].innerHTML).not.toContain('mk-asof');
+    expect(t.els['mk-movers'].innerHTML).not.toContain('mk-asof');
+    expect(t.els['mk-detail'].innerHTML).toContain('mk-asof');
+  });
+  it('trong phiên: chỉ số cuối 15:05 mà đã 15:10 thì ghi trễ 5 phút và đổi sang màu cảnh báo; bảng giá ghi 15:10 là mới cập nhật', async () => {
+    const t = boot({ session: 'open', now: vn('2026-10-08', '15:10') });
+    await t.MP.refresh(true);
+    expect(text(t.els['mk-detail'].innerHTML)).toContain('Số liệu lúc 15:05 · trễ 5 phút');
+    expect(t.els['mk-detail'].innerHTML).toContain('mk-asof mk-asof-warn');
+    expect(t.els['mk-detail'].innerHTML).toContain('fa-triangle-exclamation');
+    expect(text(t.els['mk-breadth'].innerHTML)).toContain('Số liệu lúc 15:10 · mới cập nhật');
+    expect(t.els['mk-breadth'].innerHTML).toContain('mk-asof mk-asof-ok');
+    expect(text(t.els['mk-meta'].innerHTML)).toContain('chỉ số lúc 15:05 · trễ 5 phút');
+  });
+  it('trong phiên mà chỉ mới có số liệu của phiên trước: nói thẳng là chưa có số liệu của hôm nay', async () => {
+    const t = boot({ session: 'open', now: vn('2026-10-09', '09:30') });
+    await t.MP.refresh(true);
+    expect(text(t.els['mk-detail'].innerHTML)).toContain('Số liệu phiên 08/10 lúc 15:05 · chưa có số liệu của hôm nay');
+    expect(text(t.els['mk-breadth'].innerHTML)).toContain('Số liệu phiên 08/10 lúc 15:10 · chưa có số liệu của hôm nay');
+    expect(t.els['mk-breadth'].innerHTML).toContain('mk-asof-warn');
+    expect(text(t.els['mk-meta'].innerHTML)).toContain('Chỉ số: phiên 08/10 lúc 15:05');
+  });
+  it('số liệu cũ nhiều ngày thì báo đỏ', async () => {
+    const t = boot({ now: vn('2026-10-20', '10:00') });
+    await t.MP.refresh(true);
+    expect(t.els['mk-detail'].innerHTML).toContain('mk-asof mk-asof-stale');
+    expect(text(t.els['mk-detail'].innerHTML)).toContain('số liệu cũ');
+  });
+  it('bảng giá đã có nhưng ngành/tác động còn chờ ảnh chụp thì chưa có dòng giờ, tải xong mới có', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-10-01')) });
+    await t.MP.refresh(true);
+    expect(t.els['mk-breadth'].innerHTML).toContain('mk-asof');
+    expect(t.els['mk-sectors'].innerHTML).toContain('mk-skel');
+    expect(t.els['mk-sectors'].innerHTML).not.toContain('mk-asof');
+    expect(t.els['mk-contrib'].innerHTML).not.toContain('mk-asof');
+    await t.MP.loadOptional();
+    expect(t.els['mk-sectors'].innerHTML).toContain('mk-asof');
+    expect(t.els['mk-contrib'].innerHTML).toContain('mk-asof');
+  });
+  it('ngành: theo ICB lấy giờ bảng giá và ghi nguồn ảnh chụp; theo chỉ số ngành là nến ngày nên nói không ghi giờ', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-10-01')) });
+    await t.MP.refresh(true);
+    await t.MP.loadOptional();
+    await t.MP.S.morePromise;
+    t.MP.setSecMode('icb');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect; ngành theo ảnh chụp của WorkHub');
+    t.MP.setSecMode('idx');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu hôm nay · nguồn không ghi giờ, tải lúc 18:00 nến ngày của chỉ số ngành, VNDirect');
+    t.MP.S.daily.VNFIN = t.MP.S.daily.VNFIN.slice(0, -1);               // một chỉ số ngành trễ một phiên: lấy ngày mới nhất của cả nhóm, không phải ngày cũ nhất
+    t.MP.setSecMode('idx');
+    expect(text(t.els['mk-sectors'].innerHTML)).toContain('Số liệu hôm nay · nguồn không ghi giờ');
+    expect(text(t.els['mk-contrib'].innerHTML)).toContain('Số liệu lúc 15:10 bảng giá VNDirect; vốn hoá theo ảnh chụp ngày 08/10/2026');
+  });
+  it('định giá: ghi ngày dữ liệu mới nhất, cũ quá 45 ngày thì báo, không nói "không ghi giờ"', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-06-01')) });
+    await t.MP.refresh(true);
+    await t.MP.loadOptional();
+    const v = text(t.els['mk-valuation'].innerHTML);
+    expect(v).toContain('Số liệu phiên 01/06 · số liệu cũ lịch sử định giá của WorkHub');
+    expect(v).not.toContain('không ghi giờ');
+    expect(t.els['mk-valuation'].innerHTML).toContain('mk-asof-stale');
+    const t2 = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-10-01')) });
+    await t2.MP.refresh(true);
+    await t2.MP.loadOptional();
+    expect(text(t2.els['mk-valuation'].innerHTML)).toContain('Số liệu phiên 01/10 lịch sử định giá của WorkHub');
+    expect(t2.els['mk-valuation'].innerHTML).toContain('mk-asof mk-asof-ok');
+  });
+  it('tin: ghi lúc tải và tin mới nhất cách bao lâu; lỗi sau khi đã có tin thì báo đang dùng bản cũ', async () => {
+    const now = vn('2026-10-08', '18:00'), c = newsClient({ items: [{ id: 'a', title: 'VN-Index tăng điểm', link: 'https://cafef.vn/a', source: 'cafef', sourceName: 'CafeF', ts: now - 7 * 60000, summary: 'Thị trường đi lên' }] }), t = boot({ sbClient: c, now: now });
+    await t.MP.refresh(true);
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Số liệu tải lúc 18:00 · tin mới nhất 7 phút trước RSS các báo, tự làm mới mỗi 5 phút');
+    c.o.fail = 'timeout';
+    await t.MP.loadNews(true);
+    expect(text(t.els['mk-news'].innerHTML)).toContain('Số liệu chưa cập nhật được, đang dùng bản tải lúc 18:00');
+    expect(t.els['mk-news'].innerHTML).toContain('mk-asof mk-asof-warn');
+  });
+  it('mọi lần gọi nguồn đều bỏ qua bộ nhớ đệm của trình duyệt (finfo trả max-age=300 nên nếu không thì số liệu cũ tới 5 phút)', async () => {
+    const t = boot({ session: 'open', now: vn('2026-10-08', '10:00') });
+    await t.MP.refresh(true);
+    await t.MP.S.morePromise;
+    expect(t.urls.length).toBeGreaterThan(10);
+    expect(t.urls.some((u) => u.indexOf('stock_prices') !== -1)).toBe(true);
+    expect(t.urls.some((u) => u.indexOf('foreigns') !== -1)).toBe(true);
+    expect(t.urls.some((u) => u.indexOf('resolution=1&') !== -1)).toBe(true);
+    t.inits.forEach((i) => expect(i && i.cache).toBe('no-store'));
+    const t2 = boot({ noAbort: true });                                       // môi trường không có AbortController vẫn phải bỏ qua bộ nhớ đệm
+    await t2.MP.refresh(true);
+    expect(t2.inits.length).toBeGreaterThan(5);
+    t2.inits.forEach((i) => expect(i && i.cache).toBe('no-store'));
+  });
+  it('chưa có nến 1 phút của phiên (ví dụ đang khớp định kỳ đầu phiên): nói rõ đang dùng nến ngày thay vì "nguồn không ghi giờ"', async () => {
+    const t = boot({ session: 'open', now: vn('2026-10-08', '09:05'), failIntraday: true });
+    await t.MP.refresh(true);
+    const d = text(t.els['mk-detail'].innerHTML);
+    expect(d).toContain('Số liệu hôm nay · chưa có nến 1 phút của phiên này, đang dùng nến ngày nến 1 phút của chỉ số, VNDirect');
+    expect(d).not.toContain('nguồn không ghi giờ');
+  });
+  it('chuỗi lạ trong dữ liệu không lọt vào dòng giờ dưới dạng HTML', async () => {
+    const t = boot({ now: vn('2026-10-08', '18:00'), callGAS: gas(histAt('2026-10-01'), '<u>1-<u>2-<u>3') });
+    await t.MP.refresh(true);
+    await t.MP.loadOptional();
+    const h = t.els['mk-contrib'].innerHTML;
+    expect(h).toContain('mk-asof');
+    expect(h).not.toContain('<u>');
   });
 });

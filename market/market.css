@@ -19,6 +19,14 @@
 .mk-meta { margin: -6px 0 16px; font-size: 0.78rem; color: var(--text-muted); min-height: 1.2em; }
 .mk-meta .mk-err { color: var(--danger-color); }
 
+/* ---- dòng giờ cập nhật cuối mỗi thẻ: xám khi bình thường, vàng khi trễ vài phút, đỏ khi cũ; luôn có chữ và biểu tượng nên không chỉ dựa vào màu ---- */
+.mk-asof { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 12px 0 0; padding-top: 8px; border-top: 1px dashed var(--border-color); font-size: 0.74rem; line-height: 1.4; color: var(--text-secondary); }
+.mk-asof i { font-size: 0.72rem; }
+.mk-asof-src { opacity: 0.85; }
+.mk-asof-src::before { content: "· "; }
+.mk-asof-warn { color: var(--warning-color); }
+.mk-asof-stale { color: var(--danger-color); }
+
 /* ---- thẻ chỉ số ---- */
 .mk-indices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: var(--mk-gap); }
 .mk-ix { text-align: left; font: inherit; color: inherit; cursor: pointer; padding: 12px 14px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-soft); min-width: 0; transition: var(--transition-fast); display: flex; flex-direction: column; gap: 2px; }

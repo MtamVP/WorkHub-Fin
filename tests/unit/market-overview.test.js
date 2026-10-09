@@ -339,3 +339,70 @@ describe('hằng số', () => {
     expect(s).toEqual(s.slice().sort((a, b) => a - b));
   });
 });
+
+describe('giờ cập nhật của số liệu: latestTime', () => {
+  it('bảng giá thật: giờ mới nhất của phiên 08/10 là 15:10:05 (Python độc lập, đã bỏ quỹ OTC ghi 16:10:20 vì không phải cổ phiếu/ETF); dòng ngày khác bị bỏ', () => {
+    expect(MO.latestTime(rows, '2026-10-08')).toBe('15:10:05');
+    expect(MO.latestTime(rows, '2026-10-07')).toBeNull();
+    expect(MO.latestTime([{ date: '2026-10-08', time: '09:15:00' }, { date: '2026-10-08', time: '14:29:55' }, { date: '2026-10-09', time: '23:00:00' }, { date: '2026-10-08', time: null }, { date: '2026-10-08', time: 'abc' }], '2026-10-08')).toBe('14:29:55');
+    expect(MO.latestTime(null, '2026-10-08')).toBeNull();
+    expect(MO.latestTime([], null)).toBeNull();
+  });
+});
+
+describe('giờ cập nhật của số liệu: freshness', () => {
+  const at = (date, hm) => { const [y, m, d] = date.split('-').map(Number), [h, mi] = hm.split(':').map(Number); return Date.UTC(y, m - 1, d, h - 7, mi, 30); };   // giờ Việt Nam -> mili giây, lẫn 30 giây để chắc chắn phần giây không làm lệch phút
+  const f = (o) => MO.freshness(Object.assign({ session: 'open' }, o));
+
+  it('trong phiên, có giờ: trễ 0-3 phút là ok, 4-10 phút là warn, hơn 10 phút là stale; trễ dưới 1 phút ghi "mới cập nhật"', () => {
+    const d = '2026-10-08';
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:30') })).toEqual({ text: 'lúc 10:30 · mới cập nhật', tone: 'ok', lagMin: 0 });
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:32') })).toEqual({ text: 'lúc 10:30 · trễ 2 phút', tone: 'ok', lagMin: 2 });
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:33') }).tone).toBe('ok');
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:34') })).toMatchObject({ tone: 'warn', lagMin: 4 });
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:40') })).toMatchObject({ tone: 'warn', lagMin: 10 });
+    expect(f({ date: d, time: '10:30', nowMs: at(d, '10:41') })).toMatchObject({ tone: 'stale', lagMin: 11, text: 'lúc 10:30 · trễ 11 phút' });
+  });
+  it('đồng hồ máy chạy chậm hơn giờ dữ liệu thì tính là 0 phút, không ra số âm', () => {
+    expect(f({ date: '2026-10-08', time: '10:30', nowMs: at('2026-10-08', '10:28') })).toMatchObject({ lagMin: 0, tone: 'ok', text: 'lúc 10:30 · mới cập nhật' });
+  });
+  it('trong phiên mà dữ liệu là của ngày trước: cảnh báo chưa có số liệu hôm nay', () => {
+    expect(f({ date: '2026-10-07', time: '15:05', nowMs: at('2026-10-08', '09:20') })).toEqual({ text: 'phiên 07/10 lúc 15:05 · chưa có số liệu của hôm nay', tone: 'warn', lagMin: null });
+  });
+  it('nghỉ trưa không bị tính là trễ; ngoài phiên chỉ ghi giờ chốt', () => {
+    expect(f({ session: 'break', date: '2026-10-08', time: '11:30', nowMs: at('2026-10-08', '12:15') })).toEqual({ text: 'lúc 11:30 · nghỉ trưa', tone: 'ok', lagMin: null });
+    expect(f({ session: 'closed', date: '2026-10-08', time: '15:05', nowMs: at('2026-10-08', '18:00') })).toEqual({ text: 'lúc 15:05', tone: 'ok', lagMin: null });
+    expect(f({ session: 'pre', date: '2026-10-08', time: '15:05', nowMs: at('2026-10-09', '08:00') })).toEqual({ text: 'phiên 08/10 lúc 15:05', tone: 'ok', lagMin: null });
+  });
+  it('ngày Việt Nam tính theo múi giờ +7: 23:30 UTC ngày 08 đã là sáng 09 ở Việt Nam', () => {
+    const now = Date.UTC(2026, 9, 8, 23, 30);
+    expect(MO.freshness({ session: 'closed', date: '2026-10-08', time: '15:05', nowMs: now }).text).toBe('phiên 08/10 lúc 15:05');
+    expect(MO.freshness({ session: 'closed', date: '2026-10-09', time: '06:00', nowMs: now }).text).toBe('lúc 06:00');
+  });
+  it('số liệu quá cũ (mặc định hơn 5 ngày, đổi được bằng staleDays) bị báo cũ; đúng 5 ngày thì chưa', () => {
+    const now = at('2026-10-08', '10:00');
+    expect(f({ session: 'closed', date: '2026-10-03', time: '15:05', nowMs: now }).tone).toBe('ok');
+    expect(f({ session: 'closed', date: '2026-10-02', time: '15:05', nowMs: now })).toMatchObject({ tone: 'stale', text: 'phiên 02/10 lúc 15:05 · số liệu cũ' });
+    expect(f({ session: 'closed', date: '2026-08-25', nowMs: now, dateOnly: true, staleDays: 45 }).tone).toBe('ok');
+    expect(f({ session: 'closed', date: '2026-08-23', nowMs: now, dateOnly: true, staleDays: 45 })).toMatchObject({ tone: 'stale', text: 'phiên 23/08 · số liệu cũ' });
+  });
+  it('nguồn không ghi giờ: nói rõ và chỉ cho biết lúc tải; dateOnly bỏ câu đó; trong phiên vẫn ok vì không đo được độ trễ', () => {
+    const now = at('2026-10-08', '10:32');
+    expect(f({ date: '2026-10-08', time: null, nowMs: now, loadedMs: at('2026-10-08', '10:31') })).toEqual({ text: 'hôm nay · nguồn không ghi giờ, tải lúc 10:31', tone: 'ok', lagMin: null });
+    expect(f({ date: '2026-10-08', nowMs: now }).text).toBe('hôm nay · nguồn không ghi giờ');
+    expect(f({ date: '2026-10-08', nowMs: now, dateOnly: true }).text).toBe('hôm nay');
+  });
+  it('untimedNote thay cho câu "nguồn không ghi giờ" khi thiếu giờ vì lý do khác; có giờ thì không dùng', () => {
+    const now = at('2026-10-08', '09:05');
+    expect(f({ date: '2026-10-08', time: null, nowMs: now, loadedMs: now, untimedNote: 'chưa có nến phút' }).text).toBe('hôm nay · chưa có nến phút');
+    expect(f({ date: '2026-10-08', time: '09:04', nowMs: now, untimedNote: 'chưa có nến phút' }).text).toBe('lúc 09:04 · trễ 1 phút');
+  });
+  it('thiếu hoặc sai ngày thì không có nhãn; giờ sai định dạng coi như không có giờ; chuỗi lạ không lọt vào nhãn', () => {
+    expect(MO.freshness(null)).toBeNull();
+    expect(MO.freshness({})).toBeNull();
+    expect(MO.freshness({ date: 'hôm qua', nowMs: 0 })).toBeNull();
+    expect(MO.freshness({ date: '<b>2026-10-08', nowMs: 0 })).toBeNull();
+    const r = f({ date: '2026-10-08', time: '<i>x', nowMs: at('2026-10-08', '10:00') });
+    expect(r.text).toBe('hôm nay · nguồn không ghi giờ');
+  });
+});
