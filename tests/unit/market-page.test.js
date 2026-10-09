@@ -546,6 +546,128 @@ describe('trang Thị Trường: thẻ Tin thị trường', () => {
   });
 });
 
+describe('trang Thị Trường: Tóm tắt bằng AI', () => {
+  const AI_OK = (over) => Object.assign({ ok: true, headline: 'Thị trường giằng co, khối ngoại bán ròng', model: 'claude-haiku-4-5-20251001', generatedAt: '2026-10-09T03:00:00.000Z', itemCount: 58, cached: false, ageSec: 0,
+    points: [
+      { topic: 'Khối ngoại', text: 'Khối ngoại bán ròng nhiều phiên liên tiếp.', refs: [{ n: 1, title: 'Tin một', link: 'https://cafef.vn/t1.chn', sourceName: 'CafeF' }, { n: 4, title: 'Tin bốn', link: 'https://vnexpress.net/t4.html', sourceName: 'VnExpress' }] },
+      { topic: 'Vĩ mô', text: 'Doanh nghiệp góp ý chính sách thuế.', refs: [{ n: 7, title: 'Tin bảy', link: 'https://vnexpress.net/t7.html', sourceName: 'VnExpress' }] },
+    ] }, over || {});
+  const aiClient = (o) => {
+    const st = Object.assign({ calls: 0, names: [], ai: AI_OK() }, o || {});
+    const err = (code, msg) => ({ data: null, error: { message: 'Edge Function returned a non-2xx status code', context: { json: async () => ({ ok: false, code, error: msg }) } } });
+    return { st, functions: { invoke: async (name) => {
+      st.names.push(name);
+      if (name === 'market-news') return { data: { ok: true, items: [], sources: [] }, error: null };
+      st.calls++;
+      if (st.fail) return err(st.fail.code, st.fail.msg);
+      await new Promise((r) => setTimeout(r, st.delay || 0));
+      return { data: st.ai, error: null };
+    } }, auth: { getSession: async () => ({ data: { session: null } }) } };
+  };
+  it('lúc đầu chỉ có nút bấm (không tự gọi AI, không tốn phí) và lời giải thích', async () => {
+    const c = aiClient(), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    const x = text(t.els['mk-news'].innerHTML);
+    expect(x).toContain('Tóm tắt tin hôm nay');
+    expect(x).toContain('Chỉ chạy khi bạn bấm');
+    expect(c.st.calls).toBe(0);
+  });
+  it('bấm: gọi đúng hàm market-news-ai; hiện nhận định chung, các ý, số tin dẫn chứng là link về báo gốc, nhãn "Do AI tóm tắt"', async () => {
+    const c = aiClient(), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    await t.MP.loadAi();
+    const h = t.els['mk-news'].innerHTML, x = text(h);
+    expect(c.st.names).toContain('market-news-ai');
+    expect(x).toContain('Thị trường giằng co, khối ngoại bán ròng');
+    expect(x).toContain('Khối ngoại bán ròng nhiều phiên liên tiếp.');
+    expect(h).toContain('href="https://cafef.vn/t1.chn"');
+    expect(h).toContain('href="https://vnexpress.net/t4.html"');
+    expect(h).toContain('rel="noopener noreferrer"');
+    expect(x).toContain('Do AI tóm tắt');
+    expect(x).toContain('từ 58 tin');
+    expect(x).toContain('có thể sai');
+    expect(x).toContain('Không phải khuyến nghị đầu tư');
+    expect(h).toContain('Cập nhật');
+  });
+  it('kết quả dùng chung từ bộ nhớ đệm của máy chủ: ghi rõ đã dùng lại kết quả bao nhiêu phút trước', async () => {
+    const c = aiClient({ ai: AI_OK({ cached: true, ageSec: 725 }) }), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    await t.MP.loadAi();
+    expect(text(t.els['mk-news'].innerHTML)).toContain('dùng lại kết quả của 12 phút trước');
+  });
+  it('chưa đặt khoá (no_key): hướng dẫn quản trị đặt ANTHROPIC_API_KEY, không có nút thử lại', async () => {
+    const c = aiClient({ fail: { code: 'no_key', msg: 'Chưa cấu hình khoá ANTHROPIC_API_KEY trên máy chủ.' } }), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    await t.MP.loadAi();
+    const h = t.els['mk-news'].innerHTML, x = text(h);
+    expect(x).toContain('ANTHROPIC_API_KEY');
+    expect(x).toContain('RUNBOOK_VAN_HANH.md');
+    expect(x).not.toContain('Thử lại');
+    expect(t.MP.S.ai.code).toBe('no_key');
+  });
+  it('lỗi khác (giới hạn tốc độ): hiện lý do kèm nút thử lại; thử lại thành công thì hiện bản tóm tắt', async () => {
+    const c = aiClient({ fail: { code: 'rate_limited', msg: 'Nhà cung cấp AI đang giới hạn tốc độ, thử lại sau ít phút.' } }), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    await t.MP.loadAi();
+    let x = text(t.els['mk-news'].innerHTML);
+    expect(x).toContain('Nhà cung cấp AI đang giới hạn tốc độ');
+    expect(x).toContain('Thử lại');
+    c.st.fail = null;
+    await t.MP.loadAi();
+    x = text(t.els['mk-news'].innerHTML);
+    expect(x).toContain('Thị trường giằng co');
+    expect(x).not.toContain('giới hạn tốc độ');
+  });
+  it('không có sbClient: báo lỗi, không ném', async () => {
+    const t = boot({});
+    await t.MP.refresh(true);
+    await t.MP.loadAi();
+    expect(t.MP.S.ai.state).toBe('error');
+    expect(text(t.els['mk-news'].innerHTML)).toBeDefined();
+  });
+  it('đang tóm tắt thì bấm thêm không gọi chồng; hiện trạng thái chờ', async () => {
+    const c = aiClient({ delay: 40 }), t = boot({ sbClient: c });
+    await t.MP.refresh(true); await t.MP.loadNews(true);
+    const p1 = t.MP.loadAi(), p2 = t.MP.loadAi();
+    expect(t.MP.S.ai.state).toBe('loading');
+    expect(text(t.els['mk-news'].innerHTML)).toContain('AI đang đọc tiêu đề');
+    await Promise.all([p1, p2]);
+    expect(c.st.calls).toBe(1);
+    expect(t.MP.S.ai.state).toBe('ok');
+  });
+  it('mở số tin dẫn chứng: gọi hàm mở link ngoài với đúng link https; chỉ số sai hoặc link lạ thì bỏ qua', async () => {
+    const t = boot({ sbClient: aiClient() });
+    await t.MP.refresh(true); await t.MP.loadNews(true); await t.MP.loadAi();
+    const ev = { prevented: false, preventDefault() { this.prevented = true; } };
+    expect(t.MP.openAiRef(ev, 0, 1)).toBe(false);
+    expect(ev.prevented).toBe(true);
+    expect(t.opened).toEqual(['https://vnexpress.net/t4.html']);
+    expect(t.MP.openAiRef(ev, 5, 0)).toBe(true);
+    expect(t.MP.openAiRef(ev, 0, 9)).toBe(true);
+    t.MP.S.ai.data.points[0].refs[0].link = 'http://cafef.vn/x';
+    expect(t.MP.openAiRef(ev, 0, 0)).toBe(true);
+    expect(t.opened.length).toBe(1);
+  });
+  it('an toàn HTML: nhận định/ý/tiêu đề tin do AI trả về được escape; số tin có link không phải https không thành liên kết', async () => {
+    const evil = AI_OK({ headline: '<img src=x onerror=alert(1)>Chung', model: '<b>m</b>', points: [
+      { topic: '<script>x</script>', text: '<a href="javascript:alert(2)">bấm</a>', refs: [{ n: 1, title: '<i>t</i>', link: 'javascript:alert(3)', sourceName: '<u>s</u>' }, { n: 2, title: 'ok', link: 'https://cafef.vn/ok.chn', sourceName: 'CafeF' }] }] });
+    const t = boot({ sbClient: aiClient({ ai: evil }) });
+    await t.MP.refresh(true); await t.MP.loadNews(true); await t.MP.loadAi();
+    const h = t.els['mk-news'].innerHTML;
+    expect(h).not.toMatch(/<img|<script|<i>t|<u>s|<b>m<|href="javascript/i);
+    expect(h).toContain('&lt;img src=x onerror=alert(1)&gt;Chung');
+    expect(h).toContain('<span class="mk-ref">1</span>');            // link javascript: chỉ là số, không bấm được
+    expect(h).toContain('href="https://cafef.vn/ok.chn"');
+  });
+  it('dữ liệu thiếu hoặc sai khuôn từ máy chủ: báo lỗi thay vì vẽ ra nửa vời', async () => {
+    for (const bad of [{ ok: true }, { ok: true, headline: 'h' }, { ok: true, headline: '', points: [] }, null]) {
+      const t = boot({ sbClient: aiClient({ ai: bad }) });
+      await t.MP.refresh(true); await t.MP.loadNews(true); await t.MP.loadAi();
+      expect(t.MP.S.ai.state).toBe('error');
+    }
+  });
+});
+
 describe('trang Thị Trường: an toàn HTML', () => {
   it('mã và tên từ nguồn ngoài không lọt thẻ script vào HTML', async () => {
     const t = boot();

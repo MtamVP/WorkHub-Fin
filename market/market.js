@@ -9,7 +9,7 @@ const MarketPage = (function () {
     const KEY = 'wh.fin.market.v1';
     const POLL_MS = 30000, DAILY_TTL = 10 * 60000, FOREIGN_TTL = 60000, NEWS_TTL = 5 * 60000;
     const S = { index: 'VNINDEX', exchange: 'HOSE', range: '1D', mover: 'gain', secMode: null,
-        newsRaw: null, newsList: null, newsKey: '', newsState: 'idle', newsErr: null, newsSources: [], newsAsOf: null, newsAt: 0, newsBusy: false, newsTopic: 'all', newsTicker: null, newsMine: false, newsLimit: 12, newsShown: [], mine: null, mineCount: null,
+        ai: { state: 'idle', data: null, code: null, err: null, cached: false, ageSec: 0 }, newsRaw: null, newsList: null, newsKey: '', newsState: 'idle', newsErr: null, newsSources: [], newsAsOf: null, newsAt: 0, newsBusy: false, newsTopic: 'all', newsTicker: null, newsMine: false, newsLimit: 12, newsShown: [], mine: null, mineCount: null,
         daily: {}, dailyAt: 0, extraAt: 0, sectorAt: 0, sectorErr: false, morePromise: null, intraday: {}, rows: null, frows: null, date: null, boardDate: null, fetchedAt: 0, foreignAt: 0, errors: {},
         busy: false, started: false, universe: null, uniState: 'idle', val: null, valState: 'idle', timer: null };
 
@@ -399,6 +399,47 @@ const MarketPage = (function () {
         } catch (e) { S.mine = null; }
         renderNews();
     }
+
+    // ----- tóm tắt bằng AI (Edge Function market-news-ai, Claude) -----
+    // Chỉ chạy khi người dùng bấm nút (tốn phí theo lượt gọi); máy chủ dùng chung kết quả 30 phút nên nhiều người bấm cũng chỉ tốn một lượt. Mỗi ý dẫn số tin làm căn cứ, liên kết lấy từ danh sách tin do máy chủ ghép.
+    async function loadAi() {
+        if (S.ai.state === 'loading') return;
+        S.ai.state = 'loading'; S.ai.err = null; S.ai.code = null; renderNews();
+        try {
+            if (typeof sbClient === 'undefined' || !sbClient) throw Object.assign(new Error('Chưa sẵn sàng'), { code: 'not_ready' });
+            const r = await sbClient.functions.invoke('market-news-ai', { body: {} });
+            if (r.error) { let d = null; try { d = await r.error.context.json(); } catch (e) { /* không đọc được nội dung lỗi */ } throw Object.assign(new Error((d && d.error) || r.error.message || 'Lỗi'), { code: d && d.code }); }
+            const d = r.data;
+            if (!d || d.ok === false || !d.headline || !Array.isArray(d.points)) throw Object.assign(new Error((d && d.error) || 'Không tóm tắt được'), { code: d && d.code });
+            S.ai.data = d; S.ai.cached = !!d.cached; S.ai.ageSec = Number(d.ageSec) || 0; S.ai.state = 'ok';
+        } catch (e) { S.ai.state = 'error'; S.ai.err = String(e && e.message ? e.message : e).slice(0, 160); S.ai.code = e && e.code || null; }
+        renderNews();
+    }
+    function aiBlock() {
+        const a = S.ai, title = '<b><i class="fa-solid fa-wand-magic-sparkles"></i> Tóm tắt bằng AI</b>';
+        if (a.state === 'loading') return '<div class="mk-ai">' + '<div class="mk-ai-head">' + title + '</div><div class="mk-skel" style="height:90px" aria-hidden="true"></div><p class="tl-hint">AI đang đọc tiêu đề các tin mới nhất, khoảng 3 đến 8 giây…</p></div>';
+        if (a.state === 'error') {
+            const off = a.code === 'no_key';
+            return '<div class="mk-ai"><div class="mk-ai-head">' + title + (off ? '' : '<button type="button" class="btn-tool" onclick="MarketPage.loadAi()"><i class="fa-solid fa-rotate"></i> Thử lại</button>') + '</div>' +
+                '<p class="mk-ai-err">' + (off ? 'Tính năng AI chưa được bật: quản trị cần đặt khoá <b>ANTHROPIC_API_KEY</b> trong Supabase (xem hướng dẫn trong RUNBOOK_VAN_HANH.md).' : esc(a.err || 'Không tóm tắt được.')) + '</p></div>';
+        }
+        if (a.state === 'ok' && a.data) {
+            const d = a.data, mins = Math.max(0, Math.round(a.ageSec / 60)), when = d.generatedAt ? new Date(d.generatedAt) : null;
+            const hh = when && isFinite(when) ? LiveQuotes.vnParts(when.getTime()) : null, hm = hh ? String(Math.floor(hh.min / 60)).padStart(2, '0') + ':' + String(hh.min % 60).padStart(2, '0') : '';
+            const pts = d.points.map((p, i) => '<li><span class="mk-ai-topic">' + esc(p.topic) + '</span> ' + esc(p.text) + ' ' + (p.refs || []).map((r, j) => !/^https:\/\//i.test(String(r.link)) ? '<span class="mk-ref">' + esc(r.n) + '</span>' : '<a class="mk-ref" href="' + esc(r.link) + '" target="_blank" rel="noopener noreferrer" title="' + esc((r.sourceName ? r.sourceName + ': ' : '') + r.title) + '" onclick="return MarketPage.openAiRef(event,' + i + ',' + j + ')">' + esc(r.n) + '</a>').join('') + '</li>').join('');
+            return '<div class="mk-ai"><div class="mk-ai-head">' + title + '<button type="button" class="btn-tool" onclick="MarketPage.loadAi()" title="Lấy lại; máy chủ dùng chung kết quả 30 phút"><i class="fa-solid fa-rotate"></i> Cập nhật</button></div>' +
+                '<p class="mk-ai-headline">' + esc(d.headline) + '</p><ul class="mk-ai-points">' + pts + '</ul>' +
+                '<p class="tl-hint"><b>Do AI tóm tắt</b> (' + esc(d.model || 'Claude') + ') lúc ' + esc(hm) + ' từ ' + esc(d.itemCount) + ' tin' + (a.cached ? ', dùng lại kết quả của ' + mins + ' phút trước' : '') + '. AI chỉ đọc tiêu đề và mô tả ngắn nên có thể sai hoặc thiếu; bấm số ở cuối mỗi ý để mở tin gốc kiểm lại. Không phải khuyến nghị đầu tư.</p></div>';
+        }
+        return '<div class="mk-ai"><div class="mk-ai-head">' + title + '<button type="button" class="btn-tool" onclick="MarketPage.loadAi()"><i class="fa-solid fa-wand-magic-sparkles"></i> Tóm tắt tin hôm nay</button></div>' +
+            '<p class="tl-hint">AI đọc tiêu đề và mô tả ngắn của khoảng 60 tin mới nhất rồi nêu vài ý chính, mỗi ý kèm số tin làm căn cứ. Chỉ chạy khi bạn bấm; có thể sai.</p></div>';
+    }
+    function openAiRef(ev, i, j) {
+        const r = S.ai.data && S.ai.data.points && S.ai.data.points[i] && S.ai.data.points[i].refs && S.ai.data.points[i].refs[j];
+        if (!r || !/^https:\/\//i.test(String(r.link))) return true;
+        if (typeof openExternalUrl === 'function') { if (ev && ev.preventDefault) ev.preventDefault(); openExternalUrl(r.link); return false; }
+        return true;
+    }
     function renderNews() {
         const box = $('mk-news'); if (!box) return;
         const head = '<div class="tl-card-head"><h3><i class="fa-regular fa-newspaper"></i> Tin thị trường <span class="mk-card-sub">từ các báo tài chính</span></h3></div>';
@@ -422,7 +463,7 @@ const MarketPage = (function () {
         }).join('');
         const bad = (S.newsSources || []).filter((s) => !s.ok), srcLine = (S.newsSources || []).map((s) => '<span class="' + (s.ok ? '' : 'mk-err') + '" title="' + esc(s.ok ? s.count + ' tin' : (s.error || 'lỗi')) + '">' + esc(s.name) + (s.ok ? '' : ' (lỗi)') + '</span>').join(' · ');
         box.innerHTML = head +
-            '<p class="mk-digest">Trong ' + dg.hours + ' giờ qua có <b>' + dg.total + '</b> tin, trong đó <b>' + dg.recent3h + '</b> tin trong 3 giờ gần nhất.' + (S.newsErr ? ' <span class="mk-err">Chưa cập nhật được: ' + esc(S.newsErr) + '</span>' : '') + '</p>' +
+            aiBlock() + '<p class="mk-digest">Trong ' + dg.hours + ' giờ qua có <b>' + dg.total + '</b> tin, trong đó <b>' + dg.recent3h + '</b> tin trong 3 giờ gần nhất.' + (S.newsErr ? ' <span class="mk-err">Chưa cập nhật được: ' + esc(S.newsErr) + '</span>' : '') + '</p>' +
             '<div class="mk-chips" role="group" aria-label="Chủ đề tin">' + topicChips + '</div>' + tickerChips + mineChip +
             (shown.length ? '<ul class="mk-news">' + items + '</ul>' : '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Không có tin nào phù hợp bộ lọc này.</div>') +
             (list.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button type="button" class="btn-tool" onclick="MarketPage.moreNews()">Xem thêm (' + (list.length - shown.length) + ' tin)</button></div>' : '') +
@@ -485,7 +526,7 @@ const MarketPage = (function () {
         let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawChart, 150); });
     }
 
-    return { S, start, refresh, loadOptional, loadMore, loadNews, loadMine, openNews, setNewsTopic, setNewsTicker, toggleNewsMine, moreNews, selectIndex, setRange, setExchange, setMover, setSecMode, renderAll, drawChart };
+    return { S, start, refresh, loadOptional, loadMore, loadNews, loadMine, loadAi, openAiRef, openNews, setNewsTopic, setNewsTicker, toggleNewsMine, moreNews, selectIndex, setRange, setExchange, setMover, setSecMode, renderAll, drawChart };
 })();
 
 function applyThemeIcon() { const ic = document.getElementById('theme-ic'); if (ic) ic.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; }

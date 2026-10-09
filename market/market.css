@@ -166,3 +166,17 @@
 .mk-err { color: var(--danger-color); }
 .mk-chip { white-space: nowrap; }
 .mk-chip small { display: inline; margin-left: 4px; }
+
+/* ---- tóm tắt AI ---- */
+.mk-ai { margin: 0 0 14px; padding: 12px 14px 10px; border: 1px solid var(--gold); border-radius: var(--radius-md); background: color-mix(in srgb, var(--gold-dim) 55%, transparent); }
+.mk-ai-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.mk-ai-head b { font-size: 0.9rem; color: var(--text-primary); display: inline-flex; align-items: center; gap: 8px; }
+.mk-ai-head b i { color: var(--gold); }
+.mk-ai-headline { margin: 0 0 8px; font-size: 0.98rem; font-weight: 700; line-height: 1.45; color: var(--text-primary); }
+.mk-ai-points { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.mk-ai-points li { font-size: 0.86rem; line-height: 1.55; color: var(--text-secondary); }
+.mk-ai-topic { display: inline-block; margin-right: 6px; padding: 0 8px; border-radius: var(--radius-pill); font-size: 0.68rem; font-weight: 700; color: var(--text-primary); background: var(--card-bg); border: 1px solid var(--border-strong); }
+.mk-ref { display: inline-block; min-width: 20px; margin-left: 4px; padding: 0 5px; border-radius: 4px; text-align: center; text-decoration: none; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; color: var(--text-primary); background: var(--card-bg); border: 1px solid var(--border-strong); }
+.mk-ref:hover { border-color: var(--gold); color: var(--gold); }
+.mk-ref:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mk-ai-err { margin: 0; font-size: 0.84rem; color: var(--text-secondary); }
