@@ -693,9 +693,11 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
   .asset-hero { grid-template-columns: 1fr; }
   .holdings-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 780px) {
+@media (max-width: 1060px) {          /* thanh điều hướng có 5 mục (thêm Thị Trường) nên xuống hàng riêng sớm hơn để không tràn ngang */
   .desk-topbar-inner { height: auto; flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
   .desk-nav { order: 3; width: 100%; overflow-x: auto; }
+}
+@media (max-width: 780px) {
   .desk-sync .txt { display: none; }
 }
 @media (max-width: 768px) {

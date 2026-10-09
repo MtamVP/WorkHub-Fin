@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thị Trường | Investment Workbench</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi cac trang Investment Workbench: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.10">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
+    <link rel="stylesheet" href="/market/market.css?v=1792100000003">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#B08D57">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body class="desk" data-bench="investment">
+
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Investment Workbench</span>
+            </div>
+            <nav class="desk-nav">
+                <a href="/mastersheet/"><i class="fa-solid fa-users"></i> Toàn Nhóm</a>
+                <a href="/market/" class="active" aria-current="page"><i class="fa-solid fa-earth-asia"></i> Thị Trường</a>
+                <a href="/mastersheet/assets/"><i class="fa-solid fa-sack-dollar"></i> Danh Mục</a>
+                <a href="/stocksheet/"><i class="fa-solid fa-chart-column"></i> Nghiên Cứu</a>
+                <a href="/valuation/"><i class="fa-solid fa-scale-balanced"></i> Valuation Bench</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="asset-container desk mk-page">
+        <div class="desk-byline">
+            <h1>Thị trường</h1>
+            <span class="desk-who">
+                <span class="av"><i class="fa-solid fa-earth-asia"></i></span>
+                <span>Chỉ số · độ rộng · thanh khoản · khối ngoại</span>
+            </span>
+            <div class="desk-byline-actions">
+                <span id="mk-session" class="mk-session" role="status"></span>
+                <button type="button" class="btn-tool" id="mk-refresh" onclick="MarketPage.refresh(true)" title="Lấy lại số liệu mới nhất"><i class="fa-solid fa-rotate"></i> Làm mới</button>
+            </div>
+        </div>
+        <p id="mk-meta" class="mk-meta"></p>
+
+        <section aria-label="Chỉ số thị trường"><div id="mk-indices" class="mk-indices"></div></section>
+
+        <div class="mk-grid">
+            <section id="mk-detail" class="tl-card mk-detail" aria-live="polite"></section>
+            <div class="mk-side">
+                <section id="mk-breadth" class="tl-card" aria-live="polite"></section>
+                <section id="mk-foreign" class="tl-card" aria-live="polite"></section>
+            </div>
+        </div>
+
+        <section id="mk-movers" class="tl-card" aria-live="polite"></section>
+
+        <div class="mk-grid mk-grid-even">
+            <section id="mk-sectors" class="tl-card" aria-live="polite"></section>
+            <section id="mk-valuation" class="tl-card" aria-live="polite"></section>
+        </div>
+
+        <p class="tl-hint mk-source">Nguồn: VNDirect (chỉ số, bảng giá, khối ngoại) — công khai, miễn phí, trễ khoảng 15 giây đến 2 phút trong phiên và không có cam kết dịch vụ. Ngành và định giá lấy từ ảnh chụp thị trường hằng ngày của WorkHub. Thông tin để theo dõi, không phải khuyến nghị đầu tư.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js?v=1791900000000"></script>
+    <script src="../lib/finance-calc.js?v=2"></script>
+    <script src="../lib/sector-map.js?v=1791900000000"></script>
+    <script src="../lib/vn-holidays.js?v=1791900000000"></script>
+    <script src="../lib/live-quotes.js?v=1791900000000"></script>
+    <script src="../lib/valuation-history.js?v=1791900000000"></script>
+    <script src="../lib/market-overview.js?v=1792100000000"></script>
+    <script src="/bench-nav.js?v=1792100000000"></script>
+    <script src="market.js?v=1792100000002"></script>
+</body>
+</html>

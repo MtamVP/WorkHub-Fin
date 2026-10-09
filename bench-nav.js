@@ -1,6 +1,6 @@
 /* --- FILE: /bench-nav.js ---
    Thanh điều hướng DÙNG CHUNG cho hai khu vực của WorkHub Finance:
-     * Investment Workbench (quản lý đầu tư): Toàn Nhóm · Danh Mục · Nghiên Cứu, kèm lối sang Valuation Bench
+     * Investment Workbench (quản lý đầu tư): Toàn Nhóm · Thị Trường · Danh Mục · Nghiên Cứu, kèm lối sang Valuation Bench
      * Valuation Bench (định giá chuyên môn): Tổng quan · Hồ sơ cổ phiếu · Bộ lọc · Thị trường · Bản đồ · Định Giá CP · Phương pháp
    Mỗi trang gọi BenchNav.mount({ bench, active }) để dựng wordmark + thanh điều hướng (một nguồn duy nhất, trang chỉ khai báo mình thuộc khu nào và mục nào đang mở).
    Nạp bằng thẻ <script> thường (global BenchNav) và module.exports cho Vitest. Phần DOM chỉ chạy khi có document. */
@@ -10,6 +10,7 @@ const BenchNav = (function () {
       brand: 'Investment Workbench',
       items: [
         { key: 'group', href: '/mastersheet/', icon: 'fa-users', label: 'Toàn Nhóm' },
+        { key: 'market', href: '/market/', icon: 'fa-earth-asia', label: 'Thị Trường', title: 'Tổng quan thị trường: chỉ số, độ rộng, thanh khoản, khối ngoại, cổ phiếu nổi bật' },
         { key: 'assets', href: '/mastersheet/assets/', icon: 'fa-sack-dollar', label: 'Danh Mục' },
         { key: 'research', href: '/stocksheet/', icon: 'fa-chart-column', label: 'Nghiên Cứu' },
         { key: 'vb', href: '/valuation/', icon: 'fa-scale-balanced', label: 'Valuation Bench', title: 'Khu định giá chuyên môn: phương pháp định giá, phân tích cơ bản và kỹ thuật' },
