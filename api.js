@@ -3497,6 +3497,29 @@ const API = {
             return { histories, historyError, events, eventsError, from, to, windowDays: win };
         },
 
+        // Dữ liệu cho Market Simulation (lib/market-sim.js): giá đóng cửa tới ~7 năm của VN-Index + các mã (tối đa 40, chia lô), sự kiện doanh nghiệp để điều chỉnh giá,
+        // khối lượng 90 ngày (thanh khoản cho chi phí tác động giá) và sàn niêm yết (biên độ). Lỗi ở phần phụ (sự kiện, khối lượng) không làm hỏng phần còn lại.
+        getSimInputs: async (symbols, days) => {
+            const d = Math.min(Math.max(Number(days) || 2555, 400), 2590);
+            const list = [...new Set((symbols || []).map(s => String(s).trim().toUpperCase()).filter(s => /^[A-Z0-9]{1,12}$/.test(s) && s !== 'VNINDEX'))].slice(0, 40);
+            const to = new Date().toISOString().slice(0, 10);
+            const from = new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+            const histories = {};
+            for (let i = 0; i < list.length || i === 0; i += 20) {
+                Object.assign(histories, await API.asset.getPriceHistory(list.slice(i, i + 20).concat(i === 0 ? ['VNINDEX'] : []), from, to));
+                if (i + 20 >= list.length) break;
+            }
+            let events = [], eventsError = null, volumes = {}, volumeError = null;
+            if (list.length) {
+                try { events = (await API.asset.events._fetchEvents(list, from)).events; } catch (e) { eventsError = e.message || String(e); }
+                try { volumes = await API.asset.getVolumeHistory(list, 90); } catch (e) { volumeError = e.message || String(e); }
+            }
+            const listings = {};
+            try { await API.asset.market.ensureMeta(); } catch (e) { /* không có thông tin sàn: mặc định HOSE */ }
+            list.forEach(s => { const l = typeof FinCalc !== 'undefined' && FinCalc.listingOf ? FinCalc.listingOf(s) : null; listings[s] = { exchange: (l && l.exchange) || 'HOSE', type: (l && l.type) || 'STOCK' }; });
+            return { histories, events, eventsError, volumes, volumeError, listings, from, to, symbols: list };
+        },
+
         // Dữ liệu thô của CẢ NHÓM (thành viên finance/admin đang hoạt động): sổ lệnh, hành động DN, dòng tiền, giá, tiền/nợ, lịch sử NAV.
         // Chính sách RLS cho phép nhóm finance/admin đọc dữ liệu của nhau. Phép gộp ở lib/group-calc.js.
         getGroupData: async () => {
@@ -5278,6 +5301,7 @@ async function _dispatchAction(action, params = {}) {
             case 'getBenchSeries': result = await API.asset.getBenchSeries(params.benchKey, params.from); break;
             case 'getGroupData': result = await API.asset.getGroupData(); break;
             case 'getMarketInputs': result = await API.asset.getMarketInputs(params.symbols, params.windowDays); break;
+            case 'getSimInputs': result = await API.asset.getSimInputs(params.symbols, params.days); break;
             case 'getCalendarInputs': result = await API.asset.getCalendarInputs(params.email); break;
             case 'getVolumeHistory': result = await API.asset.getVolumeHistory(params.symbols, params.days); break;
             case 'getRiskInputs': result = await API.asset.getRiskInputs(params.email, params.windowDays); break;

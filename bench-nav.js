@@ -14,6 +14,18 @@ const BenchNav = (function () {
         { key: 'assets', href: '/mastersheet/assets/', icon: 'fa-sack-dollar', label: 'Danh Mục' },
         { key: 'research', href: '/stocksheet/', icon: 'fa-chart-column', label: 'Nghiên Cứu' },
         { key: 'vb', href: '/valuation/', icon: 'fa-scale-balanced', label: 'Valuation Bench', title: 'Khu định giá chuyên môn: phương pháp định giá, phân tích cơ bản và kỹ thuật' },
+        { key: 'sim', href: '/simulation/', icon: 'fa-code-branch', label: 'Market Simulation', title: 'Mô phỏng xác suất thị trường và danh mục, cây kịch bản, so sánh các cách xử lý' },
+      ],
+    },
+    simulation: {
+      brand: 'Market Simulation',
+      items: [
+        { key: 'outlook', href: '/simulation/', icon: 'fa-chart-area', label: 'Triển vọng', title: 'Quạt xác suất VN-Index, chế độ thị trường hiện tại' },
+        { key: 'portfolio', href: '/simulation/#portfolio', icon: 'fa-flask', label: 'Mô phỏng', title: 'Mô phỏng danh mục và so sánh các cách xử lý' },
+        { key: 'tree', href: '/simulation/#tree', icon: 'fa-code-branch', label: 'Cây kịch bản' },
+        { key: 'validate', href: '/simulation/#validate', icon: 'fa-bullseye', label: 'Kiểm chứng', title: 'Mô hình đã dự báo đúng đến đâu trong quá khứ' },
+        { key: 'method', href: '/simulation/#method', icon: 'fa-book-open', label: 'Phương pháp' },
+        { key: 'back', href: '/mastersheet/', icon: 'fa-arrow-left', label: 'Investment', title: 'Về Investment Workbench (quản lý đầu tư)' },
       ],
     },
     valuation: {

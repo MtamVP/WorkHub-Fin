@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '../..');
 describe('BenchNav', () => {
   it('Investment: Toàn Nhóm, Thị Trường (ngay cạnh Toàn Nhóm), Danh Mục, Nghiên Cứu và lối sang Valuation Bench', () => {
     const keys = BenchNav.NAV.investment.items.map((i) => i.key);
-    expect(keys).toEqual(['group', 'market', 'assets', 'research', 'vb']);
+    expect(keys).toEqual(['group', 'market', 'assets', 'research', 'vb', 'sim']);
     expect(BenchNav.NAV.investment.items[1].href).toBe('/market/');
   });
   it('Valuation Bench có lối quay về Investment và giữ Định Giá CP thủ công', () => {
