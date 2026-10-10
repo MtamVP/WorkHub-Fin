@@ -210,3 +210,19 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 .sim-ev-sectors .sim-check { font-size: 0.76rem; }
 .sim-ev-effect { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--finance-accent-subtle); font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary); }
 .sim-ev-effect b { color: var(--text-primary); }
+
+/* đợt 3: cây theo sự kiện, nhật ký mô phỏng, cây sống */
+.sim-tree.four { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .sim-tree.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .sim-tree.four { grid-template-columns: 1fr; } }
+.sim-tree-pick { margin: 0 0 10px; max-width: 100%; }
+.sim-tree-pick button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sim-outlook-save { margin: 0 0 16px; }
+.sim-sub { margin: 16px 0 8px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.sim-live-evs { display: flex; flex-direction: column; gap: 8px; }
+.sim-live-ev { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 14px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--card-bg); font-size: 0.82rem; }
+.sim-live-ev > div:first-child { flex: 1 1 260px; min-width: 0; }
+.sim-live-ev ul { margin: 4px 0 0; padding-left: 1.1em; font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; }
+.sim-live-ev .sim-seg button { padding: 5px 10px; font-size: 0.74rem; }
+/* bảng rộng đặt thẳng trong thẻ (không qua .sim-grid) không được làm cả trang giãn theo bảng trên điện thoại: khung bảng không góp bề rộng nội dung, bảng tự cuộn ngang */
+.sim-root .sim-table-wrap { width: 0; min-width: 100%; }

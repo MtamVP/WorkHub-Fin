@@ -24,6 +24,7 @@ const BenchNav = (function () {
         { key: 'context', href: '/simulation/#context', icon: 'fa-wand-magic-sparkles', label: 'Bối cảnh', title: 'Bối cảnh tin tức bằng AI: thẻ sự kiện đưa vào mô phỏng' },
         { key: 'portfolio', href: '/simulation/#portfolio', icon: 'fa-flask', label: 'Mô phỏng', title: 'Mô phỏng danh mục và so sánh các cách xử lý' },
         { key: 'tree', href: '/simulation/#tree', icon: 'fa-code-branch', label: 'Cây kịch bản' },
+        { key: 'runs', href: '/simulation/#runs', icon: 'fa-bookmark', label: 'Nhật ký', title: 'Các lần mô phỏng đã lưu: tự chấm điểm với thực tế, cây sống, ghi Nhật Ký Quyết Định' },
         { key: 'validate', href: '/simulation/#validate', icon: 'fa-bullseye', label: 'Kiểm chứng', title: 'Mô hình đã dự báo đúng đến đâu trong quá khứ' },
         { key: 'method', href: '/simulation/#method', icon: 'fa-book-open', label: 'Phương pháp' },
         { key: 'back', href: '/mastersheet/', icon: 'fa-arrow-left', label: 'Investment', title: 'Về Investment Workbench (quản lý đầu tư)' },

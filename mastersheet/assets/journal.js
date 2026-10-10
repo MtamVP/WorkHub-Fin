@@ -159,7 +159,7 @@ function renderJournal() {
         return `<tr>
             <td style="white-space:nowrap">${jnDate(e.date)}</td>
             <td><span class="txn-type-badge ${e.action === 'buy' ? 'buy' : (e.action === 'sell' ? 'sell' : 'jn-neutral')}"><i class="fa-solid ${act.icon}"></i>${act.label}</span></td>
-            <td class="text-bold">${jnEsc(e.symbol)}${e.txnId ? ' <span class="tl-badge mute" title="Gắn với lệnh trong sổ lệnh">lệnh</span>' : ''}</td>
+            <td class="text-bold">${jnEsc(e.symbol)}${e.txnId ? ' <span class="tl-badge mute" title="Gắn với lệnh trong sổ lệnh">lệnh</span>' : ''}${e.simRunId ? ` <a class="tl-badge mute" href="/simulation/#runs/${jnEsc(e.simRunId)}" title="Quyết định dựa trên một lần Market Simulation đã lưu: mở để xem dự báo lúc đó và kết quả chấm điểm">mô phỏng</a>` : ''}</td>
             <td class="text-right">${e.price ? jnNum(e.price) : '—'}</td>
             <td><div class="jn-plan-bits">${planBits.join('') || '<span class="tl-hint" style="margin:0">—</span>'}</div>${val}</td>
             <td class="jn-reason" title="${jnEsc(e.reason)}">${jnEsc(e.reason) || '<span class="tl-hint" style="margin:0">Chưa ghi lý do</span>'}${e.tags.length ? `<div class="jn-tags">${e.tags.map(t => `<span class="tl-badge mute">${jnEsc(t)}</span>`).join('')}</div>` : ''}</td>

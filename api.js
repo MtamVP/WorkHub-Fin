@@ -3246,6 +3246,7 @@ const API = {
                 if (existingId) {
                     const patch = Object.assign({}, row);
                     if (!patch.txn_id) delete patch.txn_id; // sửa tay không được gỡ liên kết với lệnh
+                    if (!patch.sim_run_id) delete patch.sim_run_id; // ...hay với lần mô phỏng làm căn cứ
                     const { error } = await sbClient.from('finance_decisions').update(patch).eq('id', existingId).eq('user_id', userId);
                     if (error) throw error;
                     return "Đã cập nhật quyết định";
@@ -3285,6 +3286,47 @@ const API = {
                 const { data: linked } = await sbClient.from('finance_decisions').select('txn_id').eq('user_id', userId).is('deleted_at', null);
                 const done = new Set((linked || []).map(d => d.txn_id).filter(Boolean));
                 return txns.filter(t => !done.has(t.id)).map(t => ({ id: t.id, symbol: t.symbol, type: t.type, quantity: Number(t.quantity), price: Number(t.price), trade_date: t.trade_date }));
+            },
+        },
+
+        // --- Nhật ký mô phỏng (Market Simulation): ảnh chụp dự báo để tự chấm điểm khi các mốc tới; kiểm tra dữ liệu ở lib/sim-score.js ---
+        simRuns: {
+            list: async (email, limit) => {
+                const userId = await getUserId(email);
+                if (!userId) return [];
+                const { data, error } = await sbClient.from('finance_sim_runs').select('*')
+                    .eq('user_id', userId).is('deleted_at', null).order('created_at', { ascending: false }).limit(Math.min(Math.max(Number(limit) || 60, 1), 200));
+                if (error) throw error;
+                return data || [];
+            },
+            save: async (email, input) => {
+                if (typeof SimScore === 'undefined') throw new Error("Thiếu thư viện nhật ký mô phỏng (lib/sim-score.js)");
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const v = SimScore.validateRun(input);
+                if (!v.ok) throw new Error(v.error);
+                const { data, error } = await sbClient.from('finance_sim_runs').insert(Object.assign({ user_id: userId }, v.row)).select('id').single();
+                if (error) throw error;
+                return { id: data && data.id, message: "Đã lưu lần mô phỏng vào nhật ký" };
+            },
+            // Sửa ghi chú / tên / đánh dấu sự kiện (cây sống). Không sửa được ảnh chụp: dự báo đã lưu là cố định để chấm điểm công bằng.
+            update: async (email, id, patch) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const p = patch || {}, row = { updated_at: new Date().toISOString() };
+                if (p.note !== undefined) row.note = p.note ? String(p.note).trim().slice(0, 1000) : null;
+                if (p.label !== undefined) row.label = p.label ? String(p.label).trim().slice(0, 120) : null;
+                if (p.marks !== undefined) row.marks = typeof SimScore !== 'undefined' ? SimScore.cleanMarks(p.marks) : {};
+                const { error } = await sbClient.from('finance_sim_runs').update(row).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+                return "Đã cập nhật lần mô phỏng";
+            },
+            remove: async (email, id) => {
+                const userId = await getUserId(email);
+                if (!userId) throw new Error("User không tồn tại");
+                const { error } = await sbClient.from('finance_sim_runs').update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId);
+                if (error) throw error;
+                return "Đã xoá lần mô phỏng khỏi nhật ký";
             },
         },
 
@@ -4712,7 +4754,7 @@ const API = {
             const ORDER = ['users', 'org_units', 'projects', 'tasks', 'task_assignees', 'task_comments',
                 'project_milestones', 'files', 'events', 'app_settings', 'fin_roles', 'sci_roles',
                 'member_roles', 'finance_assets', 'finance_transactions', 'finance_cash_flows',
-                'finance_corporate_actions', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
+                'finance_corporate_actions', 'finance_sim_runs', 'finance_decisions', 'finance_holdings_price', 'finance_benchmark_prices',
                 'finance_nav_history', 'finance_notes', 'finance_stock_valuations', 'finance_stock_quarters', 'finance_stocks',
                 'finance_watchlist', 'finance_allocation_targets', 'finance_event_dismissals', 'finance_limits', 'finance_limit_exceptions', 'finance_ideas', 'finance_idea_comments', 'finance_idea_votes', 'finance_vb_valuations', 'finance_reconciliations', 'finance_policy_weights', 'finance_approval_policy', 'finance_order_requests', 'finance_approval_audit', 'finance_restricted_symbols', 'personal_items', 'personal_sync_files', 'calendar_connections', 'sci_journals',
                 'user_status', 'lounge_players'];
@@ -5172,7 +5214,7 @@ const MUTATING_ACTIONS = new Set([
     'restoreItem', 'hardDeleteItem',
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
-    'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision',
+    'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision', 'saveSimRun', 'updateSimRun', 'deleteSimRun',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addRestricted', 'setRestrictedActive', 'resolveDataHealth', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'reviewApprovalAudit', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
@@ -5404,6 +5446,10 @@ async function _dispatchAction(action, params = {}) {
             case 'saveDecision': result = await API.asset.journal.save(params.email, params.decision); break;
             case 'saveDecisionReview': result = await API.asset.journal.saveReview(params.email, params.id, params.review); break;
             case 'deleteDecision': result = await API.asset.journal.remove(params.email, params.id); break;
+            case 'listSimRuns': result = await API.asset.simRuns.list(params.email, params.limit); break;
+            case 'saveSimRun': result = await API.asset.simRuns.save(params.email, params.run); break;
+            case 'updateSimRun': result = await API.asset.simRuns.update(params.email, params.id, params.patch); break;
+            case 'deleteSimRun': result = await API.asset.simRuns.remove(params.email, params.id); break;
             case 'getUnplannedTrades': result = await API.asset.journal.unplannedTrades(params.email, params.days); break;
             case 'getStockOverview': result = await API.stock.getOverview(params.email); break;
             case 'getStockQuarters': result = await API.stock.getQuarters(params.symbol); break;

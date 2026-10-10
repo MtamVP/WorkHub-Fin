@@ -228,6 +228,43 @@ describe('sự kiện của bối cảnh', () => {
   });
 });
 
+describe('cây theo sự kiện, xác suất nhánh, lưới phân vị (đợt 3)', () => {
+  const SC = MS.eventScale(CTX.rm);
+  const idx = { cash: 0, debt: 0, positions: [{ symbol: MS.INDEX, qty: 1, price: 1e8 }] };
+  it('gốc Y/N tách đúng các đường có sự kiện; con của mỗi gốc cộng lại bằng gốc; giảm chắc chắn làm gốc Y thấp hơn N', () => {
+    const ev = MS.eventFromCard({ id: 'x', prob: 0.5, window: '1m', direction: 'down', scope: 'market', marketMove: 0.08 }, SC);
+    const r = MS.simulate(CTX, BOOK, [MS.PRESETS[0], MS.PRESETS[1]], { paths: 2000, seed: 8, events: [ev] });
+    expect(r.eventTrees).toHaveLength(1);
+    const t = r.eventTrees[0], by = {}; t.nodes.forEach((n) => { by[n.id] = n; });
+    expect(by.Y.n + by.N.n).toBe(2000);
+    expect(by.Y.prob).toBeCloseTo(r.events[0].byHorizon[2].share, 12);
+    ['Y', 'N'].forEach((root) => {
+      expect([0, 1, 2].reduce((s, b) => s + (by[root + b] ? by[root + b].n : 0), 0)).toBe(by[root].n);
+      expect(by[root + '0'].parentProb).toBeCloseTo(by[root + '0'].n / by[root].n, 12);
+      expect(by[root].policies).toHaveLength(2);
+    });
+    expect(by.Y.index.median).toBeLessThan(by.N.index.median);
+    expect(by.Y0.prob).toBeGreaterThan(by.N0.prob * by.Y.prob / by.N.prob);                  // trong gốc Y, nhánh giảm tuần đầu / tháng đầu dày hơn
+  });
+  it('không có sự kiện thì không có cây sự kiện; tối đa 3 cây', () => {
+    expect(MS.simulate(CTX, idx, [MS.PRESETS[0]], { paths: 300, seed: 1 }).eventTrees).toEqual([]);
+    const evs = [1, 2, 3, 4].map((i) => MS.eventFromCard({ id: 'e' + i, prob: 0.3, magnitude: 'small' }, SC));
+    expect(MS.simulate(CTX, idx, [MS.PRESETS[0]], { paths: 300, seed: 1, events: evs }).eventTrees).toHaveLength(3);
+  });
+  it('xác suất nhánh mỗi giai đoạn cộng bằng 1 và khớp cây ở giai đoạn 1; lưới phân vị tăng dần, khớp phân vị trong thống kê', () => {
+    const r = MS.simulate(CTX, idx, [MS.PRESETS[0]], { paths: 3000, seed: 2 });
+    r.branchProb.forEach((p) => expect(p[0] + p[1] + p[2]).toBeCloseTo(1, 12));
+    r.tree.filter((n) => n.depth === 1).forEach((n) => expect(r.branchProb[0][n.branch]).toBeCloseTo(n.prob, 12));
+    expect(r.grid.levels).toHaveLength(39);
+    r.grid.index.forEach((g, hk) => {
+      for (let i = 1; i < g.length; i++) expect(g[i]).toBeGreaterThanOrEqual(g[i - 1]);
+      expect(g[r.grid.levels.indexOf(0.5)]).toBeCloseTo(r.byHorizon[hk].index.median, 12);
+      expect(g[r.grid.levels.indexOf(0.05)]).toBeCloseTo(r.byHorizon[hk].index.q05, 12);
+      expect(r.grid.hold[hk][r.grid.levels.indexOf(0.5)]).toBeCloseTo(r.byHorizon[hk].policies[0].median, 9);   // tài sản theo chỉ số: Giữ nguyên = VN-Index
+    });
+  });
+});
+
 describe('backtest', () => {
   it('dữ liệu sinh từ đúng mô hình -> độ phủ khoảng 90% gần danh nghĩa', () => {
     const r = MS.logRets(DATA.index);

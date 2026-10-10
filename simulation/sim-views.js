@@ -67,7 +67,7 @@ function renderOutlookView() {
         '<div class="tl-kpi"><span class="k">Kỳ vọng dài hạn</span><span class="v">' + sPct(D.driftAnnual, 0) + '/năm</span><span class="s">neo lợi suất, chỉnh ở mục Mô phỏng</span></div></div>' +
         '<p class="tl-hint">Kết hợp hai mô hình (mỗi mô hình một nửa số đường): GJR-GARCH lấy mẫu lại phần dư thật, và chuyển chế độ Markov lấy mẫu lại lợi suất thật của những ngày cùng chế độ. Chi tiết ở mục Phương pháp.</p></section>';
     const ctxNote = withCtx ? ctxCompareHtml() : (SIM.ctx && SIM.ctx.use && ctxEvents().length ? '' : '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Đưa bối cảnh vào</h3><div class="tl-card-tools"><a class="sim-btn ghost sm" href="#context">Mở Bối cảnh <i class="fa-solid fa-arrow-right"></i></a></div></div><p class="tl-hint" style="margin:0">Triển vọng trên chỉ dựa vào lịch sử giá. Ở mục Bối cảnh, AI đọc tin mới nhất và đề xuất các sự kiện (bạn chỉnh được) để cộng vào mô phỏng.</p></section>');
-    return thesis + ctxNote + '<div class="sim-grid"><div class="sim-stack">' + fanCard + stressCard + '</div><div class="sim-stack">' + branchCard + regimeCard + modelCard + '</div></div>';
+    return thesis + ctxNote + (typeof outlookSaveHtml === 'function' ? outlookSaveHtml(R) : '') + '<div class="sim-grid"><div class="sim-stack">' + fanCard + stressCard + '</div><div class="sim-stack">' + branchCard + regimeCard + modelCard + '</div></div>';
 }
 function mountOutlookCharts() {
     const M = SIM.market; if (M.state !== 'ok') return;
@@ -193,7 +193,7 @@ function resultsHtml(res) {
     notes.push('Chi phí: phí ' + sPct(res.costs.fee, 2) + ', thuế bán ' + sPct(res.costs.tax, 2) + ', chi phí tác động giá theo thanh khoản, tối đa ' + sPct(res.costs.participation, 0) + ' thanh khoản mỗi phiên; lệnh quyết định theo giá đóng cửa được khớp ở phiên sau; cổ phiếu mua T+2 mới bán được.');
     const stale = typeof ctxKey === 'function' && res.ctxKey !== undefined && res.ctxKey !== ctxKey() ? '<p class="tl-hint"><b class="sim-down">Bối cảnh đã thay đổi sau lần chạy này: bấm Chạy mô phỏng để tính lại.</b></p>' : '';
     const evInfo = res.events && res.events.length ? '<p class="tl-hint" style="margin-top:0">Đã tính ' + res.events.length + ' sự kiện của bối cảnh (mục Bối cảnh).</p>' : '';
-    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + stale + evInfo + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + (typeof eventImpactHtml === 'function' ? eventImpactHtml(res, hk) : '') + '<div class="sim-grid even">' + truth + sens + '</div>';
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + stale + evInfo + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + (typeof eventImpactHtml === 'function' ? eventImpactHtml(res, hk) : '') + (typeof runSaveHtml === 'function' ? runSaveHtml(res) : '') + '<div class="sim-grid even">' + truth + sens + '</div>';
 }
 function mountPortfolioCharts() {
     const R = SIM.run; if (R.state !== 'ok' || !R.result) return;
@@ -205,40 +205,56 @@ function mountPortfolioCharts() {
 }
 
 // ---------- Cây kịch bản ----------
+// Cây thường: 3 giai đoạn x 3 nhánh của VN-Index. Cây theo sự kiện (khi lần chạy có bối cảnh): thêm một gốc "sự kiện xảy ra / không xảy ra" trước 3 giai đoạn;
+// id nút khi đó bắt đầu bằng Y hoặc N (MarketSim.summarize -> eventTrees).
 function renderTreeView() {
     const src = SIM.run.state === 'ok' && SIM.run.result ? 'run' : (SIM.market.state === 'ok' ? 'market' : null);
     if (!src) return SIM.market.state === 'error' ? errorHtml('Chưa có mô hình thị trường: ' + SIM.market.error, 'simLoadMarket(true)') : loadingHtml('Đang dựng mô hình thị trường…');
-    const res = src === 'run' ? SIM.run.result : SIM.market.result, T = res.tree, path = SIM.treePath || '';
+    const mres = SIM.market.ctxResult && SIM.ctx && SIM.ctx.use && ctxEvents().length ? SIM.market.ctxResult : SIM.market.result;
+    const res = src === 'run' ? SIM.run.result : mres, ets = res.eventTrees || [];
+    const ti = SIM.treeEvent >= 0 && ets[SIM.treeEvent] ? SIM.treeEvent : -1, ev = ti >= 0 ? ets[ti] : null;
+    const T = ev ? ev.nodes : res.tree, path = SIM.treePath || '';
+    const rootId = ev && (path[0] === 'Y' || path[0] === 'N') ? path[0] : '', mp = ev ? path.slice(rootId ? 1 : 0) : path;
     const byId = {}; T.forEach((n) => { byId[n.id] = n; });
+    const rootText = (id) => (id === 'Y' ? 'Sự kiện xảy ra' : 'Sự kiện không xảy ra');
     const node = (n) => {
         const on = n.id === path, inPath = path.indexOf(n.id) === 0 && !on, hold = n.policies ? n.policies[0] : null;
-        return '<button type="button" class="sim-node b' + n.branch + (on ? ' on' : '') + (inPath ? ' path' : '') + (n.n < 200 ? ' thin' : '') + '" onclick="simTreeSelect(\'' + n.id + '\')" aria-pressed="' + on + '"><span class="edge"></span><span class="t">' + sE(branchText(n.branch, res.bands[n.depth - 1])) + '<small>VN-Index tích luỹ ' + sPct(n.index ? n.index.median : null, 1, true) + (src === 'run' && hold ? ' · danh mục ' + sPct(hold.median, 1, true) : '') + '</small></span><span class="p">' + sProb(n.prob) + '<small>' + (n.depth > 1 ? sProb(n.parentProb) + ' nhánh' : '') + '</small></span></button>';
+        const label = n.depth === 0 ? rootText(n.id) + '<small>trước mốc ' + sE(hzLabel(res.horizons[res.horizons.length - 1])) + ' · VN-Index ' + sPct(n.index ? n.index.median : null, 1, true) + (src === 'run' && hold ? ' · danh mục ' + sPct(hold.median, 1, true) : '') + '</small>'
+            : sE(branchText(n.branch, res.bands[n.depth - 1])) + '<small>VN-Index tích luỹ ' + sPct(n.index ? n.index.median : null, 1, true) + (src === 'run' && hold ? ' · danh mục ' + sPct(hold.median, 1, true) : '') + '</small>';
+        const cls = n.depth === 0 ? (n.id === 'Y' ? (ev.sign > 0 ? 'b2' : (ev.sign < 0 ? 'b0' : 'b1')) : 'b1') : 'b' + n.branch;
+        return '<button type="button" class="sim-node ' + cls + (on ? ' on' : '') + (inPath ? ' path' : '') + (n.n < 200 ? ' thin' : '') + '" onclick="simTreeSelect(\'' + n.id + '\')" aria-pressed="' + on + '"><span class="edge"></span><span class="t">' + label + '</span><span class="p">' + sProb(n.prob) + '<small>' + (n.depth > 1 || (ev && n.depth === 1) ? sProb(n.parentProb) + ' nhánh' : '') + '</small></span></button>';
     };
     const col = (depth) => {
-        const parents = depth === 1 ? [''] : (path.length >= depth - 1 ? [path.slice(0, depth - 1)] : []);
-        const groups = parents.map((pid) => { const kids = [0, 1, 2].map((b) => byId[pid + b]).filter(Boolean); if (!kids.length) return ''; return '<div class="grp">' + (pid ? '<div class="grp-label">Nếu ' + sE(pathWords(pid, res.bands)) + '</div>' : '') + kids.map(node).join('') + '</div>'; }).join('');
-        return '<div class="sim-tree-col"><h4>' + STAGE_LABEL[depth - 1] + ' · tới ' + hzLabel(res.horizons[depth - 1]) + '</h4>' + (groups || '<p class="tl-hint">Chọn một nhánh ở cột trước.</p>') + '</div>';
+        const pre = ev ? rootId : '';
+        const parents = ev && !rootId ? [] : (depth === 1 ? [pre] : (mp.length >= depth - 1 ? [pre + mp.slice(0, depth - 1)] : []));
+        const groups = parents.map((pid) => { const kids = [0, 1, 2].map((b) => byId[pid + b]).filter(Boolean); if (!kids.length) return ''; const words = pid.replace(/^[YN]/, ''); return '<div class="grp">' + (words || (ev && pid) ? '<div class="grp-label">Nếu ' + sE((ev && pid ? rootText(pid[0]).toLowerCase() + (words ? ', ' : '') : '') + pathWords(words)) + '</div>' : '') + kids.map(node).join('') + '</div>'; }).join('');
+        return '<div class="sim-tree-col"><h4>' + STAGE_LABEL[depth - 1] + ' · tới ' + hzLabel(res.horizons[depth - 1]) + '</h4>' + (groups || '<p class="tl-hint">' + (ev && !rootId ? 'Chọn sự kiện xảy ra hay không ở cột đầu.' : 'Chọn một nhánh ở cột trước.') + '</p>') + '</div>';
     };
-    const head = '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-code-branch"></i> Cây kịch bản ' + (src === 'run' ? 'cho ' + sE(subjectWord()) : 'VN-Index') + '</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · 3 mốc × 3 nhánh</span></div>' +
-        '<p class="tl-hint" style="margin:0 0 12px">Mỗi nhánh là cách VN-Index đi trong giai đoạn đó (so với đầu giai đoạn). Xác suất = tỷ lệ đường mô phỏng đi qua nhánh; số nhỏ bên dưới là xác suất có điều kiện khi đã ở nhánh trước. Nhánh mờ có ít hơn 200 đường: kém tin cậy, tăng số đường nếu cần.' + (src === 'market' ? ' Chạy mục Mô phỏng để xem danh mục và các cách xử lý ở từng nhánh.' : '') + '</p>' +
-        '<div class="sim-tree">' + col(1) + col(2) + col(3) + '</div></section>';
+    const rootCol = ev ? '<div class="sim-tree-col"><h4>Sự kiện</h4><div class="grp"><div class="grp-label">' + sE(ev.title) + ' · ' + sProb(ev.p) + ' khả năng</div>' + ['Y', 'N'].map((id) => byId[id]).filter(Boolean).map(node).join('') + '</div></div>' : '';
+    const picker = ets.length ? '<div class="sim-seg sim-tree-pick" role="group" aria-label="Chọn cây"><button type="button" aria-pressed="' + (ti < 0) + '" onclick="simTreeEvent(-1)">Theo VN-Index</button>' +
+        ets.map((e, i) => '<button type="button" aria-pressed="' + (ti === i) + '" onclick="simTreeEvent(' + i + ')" title="' + sE(e.title) + '">Nếu: ' + sE(e.title.length > 38 ? e.title.slice(0, 37) + '…' : e.title) + '</button>').join('') + '</div>' : '';
+    const head = '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-code-branch"></i> Cây kịch bản ' + (src === 'run' ? 'cho ' + sE(subjectWord()) : 'VN-Index') + '</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · ' + (ev ? 'sự kiện × ' : '') + '3 mốc × 3 nhánh</span></div>' + picker +
+        '<p class="tl-hint" style="margin:0 0 12px">' + (ev ? 'Gốc tách các đường mô phỏng có sự kiện <b>' + sE(ev.title) + '</b> xảy ra (trước mốc cuối) và không xảy ra; mỗi bên lại rẽ 3 giai đoạn của VN-Index. So hai gốc để thấy sự kiện làm các nhánh và cách xử lý thay đổi thế nào. ' : 'Mỗi nhánh là cách VN-Index đi trong giai đoạn đó (so với đầu giai đoạn). ') +
+        'Xác suất = tỷ lệ đường mô phỏng đi qua nhánh; số nhỏ bên dưới là xác suất có điều kiện khi đã ở nút trước. Nhánh mờ có ít hơn 200 đường: kém tin cậy, tăng số đường nếu cần.' + (src === 'market' ? ' Chạy mục Mô phỏng để xem danh mục và các cách xử lý ở từng nhánh.' : '') + '</p>' +
+        '<div class="sim-tree' + (ev ? ' four' : '') + '">' + rootCol + col(1) + col(2) + col(3) + '</div></section>';
     const n = byId[path];
     if (!n) return head;
-    let detail = '<section class="tl-card"><div class="sim-crumbs">' + path.split('').map((c, i) => '<span>' + sE(STAGE_LABEL[i]) + ': <b>' + BR_WORD[+c] + '</b></span>' + (i < path.length - 1 ? '<span class="sep">›</span>' : '')).join('') + '</div>' +
-        '<div class="tl-kpis"><div class="tl-kpi"><span class="k">Xác suất tới đây</span><span class="v">' + sProb(n.prob) + '</span><span class="s">' + sNum(n.n) + ' đường</span></div><div class="tl-kpi"><span class="k">VN-Index tích luỹ</span><span class="v">' + sPct(n.index.median, 1, true) + '</span><span class="s">90%: ' + sPct(n.index.q05, 0, true) + ' … ' + sPct(n.index.q95, 0, true) + '</span></div>' +
+    const crumbs = (rootId ? ['<span>Sự kiện: <b>' + (rootId === 'Y' ? 'xảy ra' : 'không xảy ra') + '</b></span>'] : []).concat(mp.split('').filter(Boolean).map((c, i) => '<span>' + sE(STAGE_LABEL[i]) + ': <b>' + BR_WORD[+c] + '</b></span>'));
+    let detail = '<section class="tl-card"><div class="sim-crumbs">' + crumbs.join('<span class="sep">›</span>') + '</div>' +
+        '<div class="tl-kpis"><div class="tl-kpi"><span class="k">Xác suất tới đây</span><span class="v">' + sProb(n.prob) + '</span><span class="s">' + sNum(n.n) + ' đường</span></div><div class="tl-kpi"><span class="k">VN-Index tích luỹ</span><span class="v">' + sPct(n.index.median, 1, true) + '</span><span class="s">90%: ' + sPct(n.index.q05, 0, true) + ' … ' + sPct(n.index.q95, 0, true) + (n.depth === 0 ? ' · tới ' + hzLabel(n.h) : '') + '</span></div>' +
         (n.stressShare !== null ? '<div class="tl-kpi"><span class="k">Thời gian căng thẳng</span><span class="v">' + sProb(n.stressShare) + '</span><span class="s">trong các đường mô hình chế độ</span></div>' : '') + '</div>';
     if (n.policies && src === 'run') {
         detail += '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Cách xử lý (nếu đi theo nhánh này)</th><th>Trung bình</th><th>Trung vị</th><th>Khoảng 90%</th><th>P(lỗ &gt;10%)</th><th>Tương đương chắc chắn</th><th>Hối tiếc TB</th></tr></thead><tbody>' +
             n.policies.map((p) => '<tr><td>' + sE(p.label) + (p.id === n.best.ce ? '<span class="sim-tag">hợp khẩu vị</span>' : '') + '</td><td class="' + sCls(p.mean) + '">' + sPct(p.mean, 2, true) + '</td><td>' + sPct(p.median, 1, true) + '</td><td>' + sPct(p.q05, 1, true) + ' … ' + sPct(p.q95, 1, true) + '</td><td>' + sProb(p.pLoss10) + '</td><td>' + sPct(p.ce, 2, true) + '</td><td>' + sPct(p.regretMean, 2) + '</td></tr>').join('') + '</tbody></table></div>';
-        const overall = res.byHorizon[n.depth - 1].best.ce, here = n.best.ce, lab = (id) => (res.policies.find((p) => p.id === id) || {}).label;
+        const overall = res.byHorizon[n.depth === 0 ? res.byHorizon.length - 1 : n.depth - 1].best.ce, here = n.best.ce, lab = (id) => (res.policies.find((p) => p.id === id) || {}).label;
         detail += '<p class="sim-prose" style="margin-top:12px">' + (overall === here
             ? 'Ở nhánh này, cách hợp khẩu vị nhất vẫn là <b>' + sE(lab(here)) + '</b>, giống khi xét mọi kịch bản: quyết định này bền vững với nhánh này.'
-            : 'Ở nhánh này, cách hợp khẩu vị nhất là <b>' + sE(lab(here)) + '</b>, khác với <b>' + sE(lab(overall)) + '</b> khi xét mọi kịch bản. Đây là chỗ một <b>kế hoạch có điều kiện</b> có thể đáng giá: quyết định khi đã biết thị trường đi nhánh nào.') + '</p>';
-        if (n.depth <= 2) {
+            : 'Ở nhánh này, cách hợp khẩu vị nhất là <b>' + sE(lab(here)) + '</b>, khác với <b>' + sE(lab(overall)) + '</b> khi xét mọi kịch bản. Đây là chỗ một <b>kế hoạch có điều kiện</b> có thể đáng giá: quyết định khi đã biết ' + (n.depth === 0 ? 'sự kiện có xảy ra hay không (theo dõi các dấu hiệu trên thẻ sự kiện).' : 'thị trường đi nhánh nào.')) + '</p>';
+        if (n.depth >= 1 && n.depth <= 2) {
             detail += '<div class="sim-actions"><span class="tl-hint" style="margin:0">Thử ngay một kế hoạch có điều kiện cho nhánh này:</span>' +
-                '<button type="button" class="sim-btn ghost sm" onclick="simPlanFromNode(\'' + n.id + '\',\'sell\',30)">Nếu xảy ra thì bán 30%</button>' +
-                '<button type="button" class="sim-btn ghost sm" onclick="simPlanFromNode(\'' + n.id + '\',\'buy\',50)">Nếu xảy ra thì mua bằng 50% tiền mặt</button></div>' +
-                '<p class="tl-hint">Kế hoạch được thêm vào danh sách cách xử lý và mô phỏng lại: lần này quyết định chỉ được đưa ra SAU khi thị trường đã đi đúng chuỗi nhánh này (không nhìn trước), nên so sánh mới công bằng.</p>';
+                '<button type="button" class="sim-btn ghost sm" onclick="simPlanFromNode(\'' + mp + '\',\'sell\',30)">Nếu xảy ra thì bán 30%</button>' +
+                '<button type="button" class="sim-btn ghost sm" onclick="simPlanFromNode(\'' + mp + '\',\'buy\',50)">Nếu xảy ra thì mua bằng 50% tiền mặt</button></div>' +
+                '<p class="tl-hint">Kế hoạch được thêm vào danh sách cách xử lý và mô phỏng lại: lần này quyết định chỉ được đưa ra SAU khi thị trường đã đi đúng chuỗi nhánh này (không nhìn trước), nên so sánh mới công bằng.' + (ev ? ' Kế hoạch chỉ căn theo nhánh của VN-Index, không căn theo sự kiện.' : '') + '</p>';
         }
     } else if (src === 'run') detail += '<p class="tl-hint">Nhánh này có quá ít đường để so sánh các cách xử lý. Tăng số đường mô phỏng ở phần Giả định.</p>';
     detail += '</section>';
@@ -287,7 +303,12 @@ function renderMethodView() {
         '<h3>Bối cảnh (AI)</h3><ul><li>AI (Gemini, qua máy chủ) đọc tiêu đề và mô tả ngắn của khoảng 60 tin mới nhất cùng trạng thái thị trường dạng SỐ, rồi liệt kê sự kiện có thể làm thị trường đổi hướng trong 3 tháng. Mỗi sự kiện phải dẫn tin làm căn cứ; liên kết lấy từ danh sách tin chứ không từ lời AI; nội dung tin được coi là dữ liệu (AI được dặn bỏ qua mọi chỉ dẫn trong tin).</li>' +
         '<li>AI <b>chỉ</b> đưa mức thô (khả năng thấp/vừa/cao, tác động nhỏ/vừa/lớn, hướng, thời điểm, ngành). Bộ máy quy đổi: khả năng thấp 15%, vừa 35%, cao 60%; độ lớn theo phân vị của các nhịp 5 phiên trong lịch sử VN-Index (nhỏ = trung vị, vừa = 85%, lớn = 97%); sự kiện theo ngành tác động thêm 1,5 lần lên cổ phiếu trong ngành và 25% lên thị trường chung. Bạn chỉnh mọi con số trên thẻ.</li>' +
         '<li>Trong mỗi đường mô phỏng, một sự kiện xảy ra với xác suất của nó, vào một phiên ngẫu nhiên trong cửa sổ thời gian, thành một cú sốc cộng vào lợi suất (với GARCH, cú sốc làm biến động các phiên sau tăng theo). Sự kiện "chưa rõ chiều" là 50/50 tăng hoặc giảm. Lịch sự kiện bốc bằng bộ số ngẫu nhiên riêng nên bật/tắt một sự kiện không làm xáo trộn phần lịch sử: so sánh có và không có bối cảnh là công bằng.</li>' +
-        '<li>Sự kiện là <b>quan điểm cộng thêm</b> trên mô hình lịch sử (giống quan điểm trong Black-Litterman): lịch sử đã chứa những biến cố thường gặp, nên chỉ bật sự kiện bạn tin là đặc biệt của giai đoạn này. Phần Kiểm chứng chỉ chấm mô hình lịch sử (không chấm được bối cảnh AI trong quá khứ); việc chấm điểm các lần dùng bối cảnh sẽ có ở đợt sau.</li></ul>' +
+        '<li>Sự kiện là <b>quan điểm cộng thêm</b> trên mô hình lịch sử (giống quan điểm trong Black-Litterman): lịch sử đã chứa những biến cố thường gặp, nên chỉ bật sự kiện bạn tin là đặc biệt của giai đoạn này. Phần Kiểm chứng chỉ chấm mô hình lịch sử (không chấm được bối cảnh AI trong quá khứ); các lần dùng bối cảnh được chấm dần ở mục Nhật ký khi bạn lưu lần chạy.</li>' +
+        '<li><b>Cây theo sự kiện</b>: với 3 sự kiện đầu, cây có thêm một gốc tách các đường có sự kiện xảy ra (trước mốc 3 tháng) và không xảy ra, rồi mới tới 3 giai đoạn của VN-Index.</li></ul>' +
+        '<h3>Nhật ký mô phỏng và tự chấm điểm</h3><ul><li>Bấm <b>Lưu</b> ở Mô phỏng hoặc Triển vọng để giữ lại dự báo đúng như lúc đó: 39 phân vị lợi suất VN-Index ở từng mốc (có bối cảnh và chỉ lịch sử), phân vị của danh mục nếu giữ nguyên, xác suất 3 nhánh mỗi giai đoạn và cây kịch bản. Dự báo đã lưu không sửa được.</li>' +
+        '<li>Khi đủ 5 / 21 / 63 phiên sau ngày dữ liệu của lần chạy, trang so với VN-Index thật: giá trị thật nằm ở phân vị nào (PIT), có trong khoảng 50% / 90% không, CRPS (xấp xỉ từ phân vị) và điểm Brier của xác suất nhánh so với tần suất lịch sử TRƯỚC ngày chạy. Gộp nhiều lần chạy: độ phủ thật so với danh nghĩa, và trên các lần có bối cảnh, CRPS có bối cảnh so với chỉ lịch sử.</li>' +
+        '<li><b>Cây sống</b>: theo các mốc đã qua, trang biết thị trường thật đã đi nhánh nào và đọc từ cây đã lưu xác suất CÓ ĐIỀU KIỆN của các nhánh còn lại (không mô phỏng lại). Đánh dấu một sự kiện đã xảy ra hay không thì cây sống chuyển sang cây theo sự kiện đó.</li>' +
+        '<li>Từ một lần chạy đã lưu, ghi quyết định vào <b>Nhật Ký Quyết Định</b> (lý do điền sẵn tóm tắt mô phỏng, nhãn "mô phỏng", liên kết về lần chạy) để sau này đánh giá lại cả quyết định lẫn dự báo.</li></ul>' +
         '<h3>Giới hạn</h3><ul><li>Mô hình học từ 7 năm lịch sử (gồm 2020 và 2022): sự kiện chưa từng có trong lịch sử chỉ được đưa vào qua thẻ bối cảnh, và độ chính xác phụ thuộc vào đánh giá của bạn và của AI.</li>' +
         '<li>Tin xấu riêng của một doanh nghiệp chỉ được mô phỏng ở mức đã từng xảy ra với chính mã đó.</li><li>Lãi vay ký quỹ không được tính; tiền mặt không sinh lãi.</li></ul>' +
         '</div></section>';

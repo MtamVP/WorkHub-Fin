@@ -66,7 +66,7 @@ const SimCharts = (function () {
         const lx = Math.min(x(m), padL + plotW - 24); if (lx - lastX < 34) return;
         ctx.fillStyle = P.text; ctx.fillText((spec.labels && spec.labels[m]) || m + ' phiên', lx, s.H - 10); lastX = lx + 20;
       });
-      ctx.textAlign = 'left'; ctx.fillStyle = P.text; ctx.fillText('Hôm nay', padL, s.H - 10);
+      ctx.textAlign = 'left'; ctx.fillStyle = P.text; ctx.fillText(spec.startLabel || 'Hôm nay', padL, s.H - 10);
       const band = (a, c, col) => { ctx.fillStyle = col; ctx.beginPath(); a.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)))); for (let i = n - 1; i >= 0; i--) ctx.lineTo(x(i), y(c[i])); ctx.closePath(); ctx.fill(); };
       band(b.q95, b.q05, P.outer); band(b.q75, b.q25, P.inner);
       // mốc 1 (giá trị hiện tại)
@@ -79,7 +79,7 @@ const SimCharts = (function () {
         const r = canvas.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - padL) / plotW * (n - 1))));
         el.style.display = 'block';
         const row = (k, t) => '<div>' + t + ': <b>' + lab(b[k][i]) + '</b></div>';
-        el.innerHTML = '<div><b>' + (i === 0 ? 'Hôm nay' : 'Sau ' + i + ' phiên') + '</b></div>' + row('q95', 'Tốt (95%)') + row('q75', '75%') + row('q50', 'Trung vị') + row('q25', '25%') + row('q05', 'Xấu (5%)') + (spec.overlay ? '<div class="sim-muted">' + spec.overlay.label + ': ' + lab(spec.overlay.data[i]) + '</div>' : '');
+        el.innerHTML = '<div><b>' + (i === 0 ? spec.startLabel || 'Hôm nay' : 'Sau ' + i + ' phiên') + '</b></div>' + row('q95', 'Tốt (95%)') + row('q75', '75%') + row('q50', 'Trung vị') + row('q25', '25%') + row('q05', 'Xấu (5%)') + (spec.overlay ? '<div class="sim-muted">' + spec.overlay.label + ': ' + lab(spec.overlay.data[i]) + '</div>' : '');
         const left = Math.min(x(i) + 14, s.W - el.offsetWidth - 4); el.style.left = left + 'px'; el.style.top = '6px';
       };
       canvas.onmouseleave = function () { el.style.display = 'none'; };
