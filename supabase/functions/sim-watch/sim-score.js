@@ -194,3 +194,4 @@ const SimScore = (function () {
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SimScore;
+globalThis.SimScore = SimScore;

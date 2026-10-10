@@ -226,3 +226,6 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 .sim-live-ev .sim-seg button { padding: 5px 10px; font-size: 0.74rem; }
 /* bảng rộng đặt thẳng trong thẻ (không qua .sim-grid) không được làm cả trang giãn theo bảng trên điện thoại: khung bảng không góp bề rộng nội dung, bảng tự cuộn ngang */
 .sim-root .sim-table-wrap { width: 0; min-width: 100%; }
+/* Gợi ý AI đọc tin cho sự kiện của cây sống (đợt 4) */
+.sim-hint { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--finance-accent); background: var(--finance-accent-subtle); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.78rem; line-height: 1.5; }
+.sim-hint .sim-ev-refs { margin-top: 4px; }

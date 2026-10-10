@@ -1,4 +1,4 @@
-// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch, valuation-watch và vb-data (Deno không đọc được thư mục lib/ của app).
+// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch, valuation-watch, vb-data, source-watch và sim-watch (Deno không đọc được thư mục lib/ của app).
 // Bản sao = nguyên văn lib/<tên>.js + một dòng `globalThis.<Tên> = <Tên>;` ở cuối (để các thư viện phụ thuộc nhau thấy global như khi nạp bằng thẻ <script>).
 // Chạy sau mỗi lần sửa lib/finance-calc.js, portfolio-calc.js, group-calc.js, limits-calc.js hoặc approval-calc.js:  node scripts/sync-edge-libs.mjs
 // tests/unit/check-limits.test.js kiểm tra bản sao khớp với lib/ nên quên chạy sẽ làm CI đỏ.
@@ -28,6 +28,8 @@ export const VALUATION_LIBS = [
 export const VBDATA_LIBS = [{ file: 'vb-statements.js', global: 'VBStatements' }];
 // source-watch cần lịch nghỉ lễ của sàn để không báo sai vào ngày lễ
 export const SOURCEWATCH_LIBS = [{ file: 'vn-holidays.js', global: 'VnHolidays' }];
+// sim-watch chấm điểm nhật ký mô phỏng bằng đúng SimScore của trang và logic theo dõi SimWatch
+export const SIMWATCH_LIBS = [{ file: 'sim-score.js', global: 'SimScore' }, { file: 'sim-watch.js', global: 'SimWatch' }];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -51,6 +53,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const lib of VBDATA_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'vb-data', lib.file), expectedCopy(lib));
     console.log('đã sao chép (vb-data)', lib.file);
+  }
+  for (const lib of SIMWATCH_LIBS) {
+    fs.writeFileSync(path.join(root, 'supabase', 'functions', 'sim-watch', lib.file), expectedCopy(lib));
+    console.log('đã sao chép (sim-watch)', lib.file);
   }
   for (const lib of SOURCEWATCH_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'source-watch', lib.file), expectedCopy(lib));

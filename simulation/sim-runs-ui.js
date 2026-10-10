@@ -87,7 +87,23 @@ async function runsLoadDecisions() {
     catch (e) { SIM.runs.decisions = []; SIM.runs.decState = 'error'; }
     if (SIM.view === 'runs' && SIM.runs.sel === id) render();
 }
-function runsSelect(id) { location.hash = '#runs/' + id; }
+function runsSelect(id) { runsMarkSeen(SIM.runs.list.find((x) => x.id === id)); if (location.hash === '#runs/' + id) render(); else location.hash = '#runs/' + id; }
+// Mốc đã tới (theo điểm chấm ở trang hoặc của máy chủ) mà người dùng chưa mở lần chạy kể từ đó: nhớ trong máy, chỉ để hiện nhãn "mới tới mốc"
+const RUNS_SEEN_KEY = 'wh.fin.simruns.seen.v1';
+function runsSeenMap() { try { return JSON.parse(localStorage.getItem(RUNS_SEEN_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function runsDueList(r) {
+    const sc = SIM.runs.scores[r.id], due = new Set(((r.watch && r.watch.horizons) || []).filter((h) => h.due).map((h) => h.h));
+    if (sc) sc.horizons.forEach((h) => { if (h.due) due.add(h.h); });
+    return [...due];
+}
+function runsUnseen(r) { const seen = runsSeenMap()[r.id] || []; return runsDueList(r).filter((h) => seen.indexOf(h) === -1); }
+function runsMarkSeen(r) {
+    if (!r || !runsUnseen(r).length) return;
+    const m = runsSeenMap(), ids = new Set(SIM.runs.list.map((x) => x.id));
+    m[r.id] = runsDueList(r);
+    Object.keys(m).forEach((k) => { if (!ids.has(k)) delete m[k]; });
+    try { localStorage.setItem(RUNS_SEEN_KEY, JSON.stringify(m)); } catch (e) { /* không lưu được: chỉ mất nhãn mới */ }
+}
 async function runsSetMark(id, eventId, val) {
     const r = SIM.runs.list.find((x) => x.id === id); if (!r) return;
     const marks = Object.assign({}, r.marks || {});
@@ -169,7 +185,7 @@ function runsTableHtml() {
     const rows = R.list.map((r) => {
         const s = r.snapshot, sc = R.scores[r.id] || { horizons: [] }, pol = s.policies.find((p) => p.id === s.chosen) || s.policies[0];
         return '<tr class="' + (r.id === R.sel ? 'sel' : '') + '"><td><button type="button" class="sim-row-btn" onclick="runsSelect(\'' + sE(r.id) + '\')">' + sE(fmtDate(s.asOf)) + '</button><div class="sim-muted" style="font-size:0.72rem">lưu ' + sE(new Date(r.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })) + '</div></td>' +
-            '<td>' + sE(subjectLabel(r.subject)) + (s.events.length ? '<span class="sim-tag warn" title="Có ' + s.events.length + ' sự kiện bối cảnh">bối cảnh</span>' : '') + '</td><td>' + sE(s.subject === 'outlook' ? '—' : pol.label) + '</td>' +
+            '<td>' + sE(subjectLabel(r.subject)) + (runsUnseen(r).length ? '<span class="sim-tag ok" title="Có mốc mới tới từ lần xem trước">mới tới mốc</span>' : '') + (s.events.length ? '<span class="sim-tag warn" title="Có ' + s.events.length + ' sự kiện bối cảnh">bối cảnh</span>' : '') + '</td><td>' + sE(s.subject === 'outlook' ? '—' : pol.label) + '</td>' +
             s.horizons.map((h, i) => '<td>' + runStatusTag(sc.horizons[i]) + '</td>').join('') + '</tr>';
     }).join('');
     return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-list"></i> Các lần đã lưu</h3><div class="tl-card-tools"><button type="button" class="sim-btn ghost sm" onclick="SIM.runs.state=\'idle\';simInputsCache={};runsLoad()"><i class="fa-solid fa-rotate"></i> Tải lại</button></div></div>' +
@@ -205,17 +221,22 @@ function runsLiveHtml(r, sc) {
     const branchCell = (id) => id.replace(/^[YN]/, '').split('').map((c, i) => '<span>' + STAGE_LABEL[i] + ': <b>' + BR_WORD[+c] + '</b></span>').join('<span class="sep">›</span>');
     const nodeRow = (x) => '<tr><td><div class="sim-crumbs" style="margin:0">' + branchCell(x.id) + '</div></td><td><b>' + sProb(x.cond) + '</b></td><td>' + sPct(x.im, 1, true) + '</td><td>' + (s.subject === 'outlook' ? '—' : sPct(x.hm, 1, true)) + '</td><td>' + (x.best && s.subject !== 'outlook' ? sE((s.policies.find((p) => p.id === x.best) || {}).label || '') : '—') + '</td></tr>';
     const where = live.path ? 'Thực tế đã đi: <div class="sim-crumbs" style="display:inline-flex;margin:0 0 0 4px">' + branchCell(live.path) + '</div>' : 'Chưa qua mốc nào: ' + (sc.horizons[0] ? 'còn ' + sc.horizons[0].sessionsLeft + ' phiên tới mốc 1 tuần.' : '');
+    const hints = typeof SimWatch !== 'undefined' ? SimWatch.hintsToShow(s, marks, r.watch) : [];
     const evRows = (s.events || []).map((e) => {
-        const v = marks[e.id], hasTree = (s.eventTrees || []).some((t) => t.id === e.id);
-        return '<div class="sim-live-ev"><div><b>' + sE(e.title) + '</b> <span class="sim-muted">· ' + sProb(e.p) + ' khả năng lúc chạy</span>' + (e.signposts.length ? '<ul>' + e.signposts.map((x) => '<li>' + sE(x) + '</li>').join('') + '</ul>' : '') + '</div>' +
+        const v = marks[e.id], hasTree = (s.eventTrees || []).some((t) => t.id === e.id), h = hints.find((x) => x.id === e.id);
+        const hint = h ? '<div class="sim-hint"><i class="fa-solid fa-robot"></i> <b>AI đọc tin' + (h.at ? ' ' + sE(fmtDate(h.at.slice(0, 10))) : '') + ':</b> có vẻ ' + (h.status === 'happened' ? '<b>đã xảy ra</b>' : '<b>không xảy ra</b>') + (h.reason ? '. ' + sE(h.reason) : '') +
+            (h.refs && h.refs.length ? '<div class="sim-ev-refs">' + h.refs.map((x) => '<a href="' + sE(x.link) + '" target="_blank" rel="noopener noreferrer" onclick="return simOpenLink(event, this.href)"><i class="fa-regular fa-newspaper"></i> ' + sE(x.title) + (x.sourceName ? ' <span class="sim-muted">· ' + sE(x.sourceName) + '</span>' : '') + '</a>').join('') + '</div>' : '') +
+            '<div class="sim-actions" style="margin-top:6px"><button type="button" class="sim-btn ghost sm" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + (h.status === 'happened' ? 'yes' : 'no') + '\')">Xác nhận</button><span class="sim-muted">Chỉ là gợi ý: đọc tin rồi mới xác nhận.</span></div></div>' : '';
+        return '<div class="sim-live-ev"><div><b>' + sE(e.title) + '</b> <span class="sim-muted">· ' + sProb(e.p) + ' khả năng lúc chạy</span>' + (e.signposts.length ? '<ul>' + e.signposts.map((x) => '<li>' + sE(x) + '</li>').join('') + '</ul>' : '') + hint + '</div>' +
             '<div class="sim-seg" role="group" aria-label="Sự kiện đã xảy ra chưa">' + [['', 'Chưa rõ'], ['yes', 'Đã xảy ra'], ['no', 'Không xảy ra']].map((o) => '<button type="button" aria-pressed="' + ((o[0] === 'yes' && v === true) || (o[0] === 'no' && v === false) || (o[0] === '' && v === undefined)) + '" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + o[0] + '\')"' + (!hasTree && o[0] ? ' title="Sự kiện này không có cây riêng (chỉ 3 sự kiện đầu có): đánh dấu chỉ để ghi nhớ"' : '') + '>' + o[1] + '</button>').join('') + '</div></div>';
     }).join('');
     return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-seedling"></i> Cây sống</h3><span class="tl-hint" style="margin:0">' + (live.eventTitle ? 'theo sự kiện: ' + sE(live.eventTitle) + ' (' + (live.root === 'Y' ? 'đã xảy ra' : 'không xảy ra') + ')' : 'theo VN-Index') + '</span></div>' +
+        (r.watched_at ? '<p class="tl-hint" style="margin:0 0 6px"><i class="fa-solid fa-server"></i> Máy chủ chấm lần cuối ' + sE(new Date(r.watched_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })) + ' (mỗi ngày làm việc, cả khi không mở app; email nhắc khi tới mốc nếu bạn đã bật email cảnh báo).</p>' : '') +
         '<p class="sim-prose" style="margin:0 0 10px">' + where + (live.stalled ? ' <span class="sim-muted">(nhánh tiếp theo có quá ít đường trong lần chạy này nên dừng ở nút gần nhất)</span>' : '') + (live.current ? ' Lúc chạy, xác suất tới nút này là <b>' + sProb(live.current.p) + '</b>.' : '') + '</p>' +
         (live.done ? '<p class="tl-hint">Đã qua cả 3 mốc: cây đã khép lại. Xem phần chấm điểm ở trên.</p>'
             : '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Từ đây tới mốc cuối</th><th>Xác suất có điều kiện</th><th>VN-Index tích luỹ (trung vị)</th><th>Giữ nguyên (trung vị)</th><th>Hợp khẩu vị nhất ở nhánh</th></tr></thead><tbody>' + live.ahead.map(nodeRow).join('') + '</tbody></table></div>' +
             '<p class="tl-hint">Xác suất có điều kiện đọc từ cây đã lưu (không mô phỏng lại): đã biết các giai đoạn đã qua, phần còn lại của cây được chuẩn hoá lại. Nếu thị trường đang đi nhánh mà cách hợp khẩu vị khác cách bạn đã chọn, đó là lúc xem lại kế hoạch.</p>') +
-        (evRows ? '<h4 class="sim-sub">Sự kiện của bối cảnh lúc chạy: đánh dấu khi đã rõ</h4><div class="sim-live-evs">' + evRows + '</div><p class="tl-hint">Đánh dấu một sự kiện (trong 3 sự kiện đầu) đã xảy ra hay không thì cây sống chuyển sang cây theo sự kiện đó, gốc tương ứng. Theo dõi các dấu hiệu bên dưới mỗi sự kiện để biết khi nào đã rõ.</p>' : '') + '</section>';
+        (evRows ? '<h4 class="sim-sub">Sự kiện của bối cảnh lúc chạy: đánh dấu khi đã rõ</h4><div class="sim-live-evs">' + evRows + '</div><p class="tl-hint">Đánh dấu một sự kiện (trong 3 sự kiện đầu) đã xảy ra hay không thì cây sống chuyển sang cây theo sự kiện đó, gốc tương ứng. Theo dõi các dấu hiệu bên dưới mỗi sự kiện để biết khi nào đã rõ. Mỗi tối máy chủ nhờ AI đọc tin xem các sự kiện còn chưa rõ đã xảy ra chưa; gợi ý hiện ngay dưới sự kiện và chỉ được tính khi bạn xác nhận.</p>' : '') + '</section>';
 }
 function runsJournalHtml(r) {
     const R = SIM.runs, f = R.jform && R.jform.runId === r.id ? R.jform : null, s = r.snapshot;

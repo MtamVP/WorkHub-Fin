@@ -1,3 +1,4 @@
+-- 10/10/2026: ĐÃ ÁP DỤNG trên WorkHub-AI.
 -- Nhật ký mô phỏng (Market Simulation đợt 3): mỗi lần người dùng bấm "Lưu lần chạy" ghi một ảnh chụp dự báo (lib/sim-score.js snapshot, ~30 KB) để khi các mốc
 -- 1 tuần / 1 tháng / 3 tháng tới, trang tự chấm điểm với VN-Index thật (độ phủ, PIT, CRPS, Brier; có bối cảnh so với chỉ lịch sử) và hiện cây sống.
 -- marks: sự kiện người dùng đánh dấu đã xảy ra / chưa ({ "<id thẻ>": true|false }). finance_decisions.sim_run_id nối quyết định trong nhật ký với lần mô phỏng làm căn cứ.

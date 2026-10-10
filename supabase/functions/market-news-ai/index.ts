@@ -5,7 +5,10 @@
 // Chưa có khoá: 503 code no_key (trang hiện hướng dẫn). verify_jwt = true. {"probe":true} gọi thử từng mô hình (5 phút một lần). {"selftest":true} trả { ok, hasKey, provider, model, models, cooling } (chỉ cho biết đã có khoá hay chưa, không lộ khoá), không gọi AI.
 // Chế độ {"mode":"scenarios","state":{...số liệu...}} (Market Simulation): AI liệt kê sự kiện có thể làm thị trường đổi hướng trong 3 tháng (cấu trúc + mức thô + dẫn tin), xem scenarios.ts.
 // Bộ nhớ đệm riêng 3 giờ dùng chung mọi người, trần riêng AI_SCEN_DAILY_CAP (mặc định 24 lượt/ngày/phiên bản chạy), lời nhắc dài hơn nên mỗi mô hình chờ tối đa 25 giây.
+// Chế độ {"mode":"signposts","events":[{id,title,signposts,since}]} (đợt 4, do hàm sim-watch gọi): AI đọc tin và cho biết từng sự kiện đang theo dõi đã xảy ra / không xảy ra / chưa rõ
+// (dẫn tin), xem signposts.ts. Không có bộ nhớ đệm (mỗi lượt một danh sách khác), trần riêng AI_SIGN_DAILY_CAP (mặc định 8 lượt/ngày/phiên bản chạy).
 import { DAILY_CAP_DEFAULT, buildPrompt, callAi, chainFor, createCooldown, createGate, fail, parseModel, pickProvider, resolveSummary, selectItems, statusFor, summarizeWithFallback } from "./ai.ts";
+import { SIGN_DAILY_CAP, SIGN_MAX_TOKENS, buildSignpostPrompt, parseSignposts, resolveSignposts, sanitizeEvents } from "./signposts.ts";
 import { SCEN_CACHE_MS, SCEN_DAILY_CAP, SCEN_MAX_TOKENS, buildScenarioPrompt, parseScenarios, resolveScenarios, sanitizeState } from "./scenarios.ts";
 
 const corsHeaders = {
@@ -20,6 +23,8 @@ const THINKING_OK = ["", "none", "minimal", "low", "medium", "high"];
 // Mức "suy nghĩ" gửi cho Gemini 3.x: mặc định low (đo thật 09/10/2026: không đặt thì 3.5 Flash mất 9,6 giây và 3.7/3.8 quá 25 giây cho cả một câu ngắn; đặt low thì còn 1-2 giây, riêng 3.8 vẫn ~10 giây khi đông). AI_THINKING=none để tắt.
 const envThinking = () => { const v = (Deno.env.get("AI_THINKING") || "low").trim().toLowerCase(); return THINKING_OK.includes(v) && v !== "none" && v !== "" ? v : (v === "none" ? "" : "low"); };
 let lastProbe = 0;
+const signCap = Number(Deno.env.get("AI_SIGN_DAILY_CAP")) > 0 ? Number(Deno.env.get("AI_SIGN_DAILY_CAP")) : SIGN_DAILY_CAP;
+let signDay = "", signCount = 0;
 const gate = createGate({ now: () => Date.now(), cap: Number(Deno.env.get("AI_DAILY_CAP")) > 0 ? Number(Deno.env.get("AI_DAILY_CAP")) : DAILY_CAP_DEFAULT });
 const scenGate = createGate<any>({ now: () => Date.now(), cacheMs: SCEN_CACHE_MS, cap: Number(Deno.env.get("AI_SCEN_DAILY_CAP")) > 0 ? Number(Deno.env.get("AI_SCEN_DAILY_CAP")) : SCEN_DAILY_CAP });
 
@@ -67,6 +72,24 @@ Deno.serve(async (req: Request) => {
       return { model: m, ok: r.ok, ms: Date.now() - t0, code: r.ok ? null : r.code, status: r.ok ? null : (r.status ?? null), detail: r.ok ? null : (r.detail ?? null) };
     }));
     return json({ ok: true, provider: pick.provider, thinking: th || null, results });
+  }
+  if (body && body.mode === "signposts") {
+    const events = sanitizeEvents(body.events);
+    if (!events.length) return json({ ok: false, code: "bad_request", error: "Thiếu danh sách sự kiện." }, 400);
+    const d = new Date().toISOString().slice(0, 10);
+    if (d !== signDay) { signDay = d; signCount = 0; }
+    if (signCount >= signCap) { const f = fail("cap"); return json(f, statusFor(f.code)); }
+    signCount++;
+    const now = Date.now(), items = selectItems(await fetchNews(req), now);
+    if (!items.length) { const f = fail("no_news"); return json(f, statusFor(f.code)); }
+    const p = buildSignpostPrompt(items, events);
+    const res = await summarizeWithFallback({
+      models, cooldown, now: () => Date.now(), budgetMs: 50000,
+      attempt: (m) => callAi({ provider: pick.provider, key: pick.key, model: m, system: p.system, user: p.user, fetchFn: fetch, signal: AbortSignal.timeout(25000), thinking: envThinking() || undefined, maxTokens: SIGN_MAX_TOKENS }),
+      parse: (text) => parseSignposts(text, events, items.length),
+    });
+    if (!res.ok) return json({ ok: false, code: res.code, error: res.error }, statusFor(res.code));
+    return json({ ok: true, ...resolveSignposts(res.parsed, items, res.model, now) });
   }
   if (body && body.mode === "scenarios") {
     const state = sanitizeState(body.state);
