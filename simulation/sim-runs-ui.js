@@ -68,7 +68,8 @@ async function runsLoad() {
         // VN-Index trước để chấm phần thị trường; giá các mã (danh mục giữ nguyên) chỉ tải khi có lần chạy đã tới mốc
         let inp = await getInputs([]);
         runsScoreAll(inp.input);
-        const due = SIM.runs.list.filter((r) => (SIM.runs.scores[r.id] || {}).horizons && SIM.runs.scores[r.id].horizons.some((h) => h.due));
+        // chỉ tải giá các mã cho lần chạy đã tới mốc mà máy chủ CHƯA chấm được phần danh mục giữ nguyên (cron sim-watch ghi vào cột watch)
+        const due = SIM.runs.list.filter((r) => { const sc = SIM.runs.scores[r.id], s = r.snapshot; return sc && sc.horizons && sc.horizons.some((h) => h.due && !h.hold) && s.grid && s.grid.hold && (s.positions || []).some((p) => p.symbol !== MarketSim.INDEX); });
         const syms = [...new Set([].concat.apply([], due.map((r) => (r.snapshot.positions || []).map((p) => p.symbol).filter((s) => s !== MarketSim.INDEX))))].slice(0, 40);
         if (syms.length) { try { inp = await getInputs(syms); runsScoreAll(inp.input); } catch (e) { /* không tải được giá các mã: vẫn chấm phần VN-Index */ } }
         SIM.runs.state = 'ok';
@@ -78,7 +79,21 @@ async function runsLoad() {
 }
 function runsScoreAll(series) {
     SIM.runs.series = series; SIM.runs.scores = {};
-    SIM.runs.list.forEach((r) => { SIM.runs.scores[r.id] = SimScore.scoreRun(r.snapshot, series); });
+    SIM.runs.list.forEach((r) => { SIM.runs.scores[r.id] = SimScore.scoreRun(r.snapshot, series); runsMergeServerHold(r, SIM.runs.scores[r.id]); });
+    learnCompute();
+}
+// Học độ lớn cú sốc theo loại sự kiện từ các lần chạy đã chấm (SimScore.learnShocks); hệ số mới làm đổi sự kiện đưa vào mô phỏng nên triển vọng có bối cảnh được tính lại
+function learnCompute() {
+    const R = SIM.runs;
+    try {
+        SIM.learn.res = SimScore.learnShocks(R.list.map((r) => ({ snap: r.snapshot, score: R.scores[r.id], marks: r.marks || {} })));
+        if (SIM.market.state === 'ok' && ctxEvents().length && SIM.market.ctxKey !== ctxKey()) ctxRefreshOutlook();
+    } catch (e) { SIM.learn.res = null; }
+}
+// Phần "danh mục giữ nguyên" do máy chủ chấm (cột watch, cùng SimScore.holdReturn trên giá đã điều chỉnh): dùng khi trang chưa tự chấm được (chưa tải giá các mã)
+function runsMergeServerHold(r, sc) {
+    const wh = (r.watch && r.watch.horizons) || [];
+    (sc.horizons || []).forEach((row, i) => { const w = wh[i]; if (row.due && !row.hold && w && w.due && w.h === row.h && w.hold) row.hold = w.hold; });
 }
 async function runsLoadDecisions() {
     const id = SIM.runs.sel; if (!id) return;
@@ -108,7 +123,7 @@ async function runsSetMark(id, eventId, val) {
     const r = SIM.runs.list.find((x) => x.id === id); if (!r) return;
     const marks = Object.assign({}, r.marks || {});
     if (val === 'yes') marks[eventId] = true; else if (val === 'no') marks[eventId] = false; else delete marks[eventId];
-    r.marks = marks; render();
+    r.marks = marks; learnCompute(); render();
     try { await simCall('updateSimRun', { email: SIM.email, id: id, patch: { marks: marks } }); } catch (e) { showToast(e.message || String(e), 'error'); }
 }
 async function runsSaveNote(id) {
@@ -166,7 +181,20 @@ function renderRunsView() {
     if (R.state === 'loading' || R.state === 'idle') return loadingHtml('Đang tải nhật ký mô phỏng và VN-Index để chấm điểm…');
     if (R.state === 'error') return errorHtml('Không tải được nhật ký mô phỏng: ' + R.error + (/finance_sim_runs/.test(R.error) ? ' (quản trị cần chạy finance-sim-runs-migration.sql)' : ''), 'runsLoad()');
     if (!R.list.length) return '<section class="tl-card"><div class="tl-empty"><i class="fa-solid fa-bookmark"></i>Chưa lưu lần mô phỏng nào. Ở mục <b>Mô phỏng</b> (sau khi chạy) hoặc <b>Triển vọng</b>, bấm <b>Lưu</b> để giữ dự báo lại; khi các mốc 1 tuần / 1 tháng / 3 tháng tới, trang tự so với thực tế.</div></section>';
-    return runsAggregateHtml() + runsTableHtml() + runsDetailHtml();
+    return runsAggregateHtml() + runsLearnHtml() + runsTableHtml() + runsDetailHtml();
+}
+// Hệ số độ lớn cú sốc đã học theo loại sự kiện + tần suất xảy ra thật so với xác suất đã đặt
+function runsLearnHtml() {
+    const L = SIM.learn.res; if (!L) return '';
+    const cats = Object.keys(L.cats).sort((a, b) => L.cats[b].n - L.cats[a].n), pc = L.prob.byCat || {}, all = [...new Set(cats.concat(Object.keys(pc)))];
+    const row = (name, c, p) => '<tr><td><b>' + sE(name) + '</b></td><td>' + (c ? c.n : 0) + '</td><td>' + (c ? '×' + sNum(c.mult, 2) + ' <span class="sim-muted">(' + sNum(c.beta, 2) + ' ± ' + sNum(c.sd, 2) + ')</span>' : '—') + '</td>' +
+        '<td>' + (c ? (c.ready ? '<span class="sim-tag ok">đang dùng</span>' : '<span class="sim-tag" title="Cần ' + L.minN + ' mốc độc lập mỗi loại">chưa đủ (' + c.n + '/' + L.minN + ')</span>') : '<span class="sim-muted">chưa có</span>') + '</td>' +
+        '<td>' + (p ? sProb(p.meanP) + ' → ' + sProb(p.freq) + ' <span class="sim-muted">(' + p.n + ')</span>' : '—') + '</td></tr>';
+    const rows = all.map((k) => row(k, L.cats[k], pc[k])).join('');
+    const g = L.global, ready = g.ready ? '<span class="sim-tag ok">đang dùng cho loại chưa đủ mốc</span>' : '<span class="sim-tag">chưa đủ (' + g.n + '/' + L.minNGlobal + ')</span>';
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-ruler-combined"></i> Độ lớn cú sốc: kết quả thật so với dự kiến</h3><span class="tl-hint" style="margin:0">' + g.n + ' mốc đã xảy ra · hệ số chung ×' + sNum(g.mult, 2) + ' ' + ready + '</span></div>' +
+        (all.length ? '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Loại sự kiện</th><th title="Mốc độc lập (ngày dữ liệu x kỳ hạn) có đúng một sự kiện loại này đã xảy ra">Số mốc</th><th title="Hệ số nhân độ lớn cú sốc VN-Index; trong ngoặc: ước lượng ± sai số">Hệ số học được</th><th>Dùng?</th><th title="Xác suất trung bình đã đặt → tần suất thật (sự kiện đã đánh dấu xảy ra / không xảy ra)">Xác suất đặt → thật</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="tl-empty" style="margin:0">Chưa có sự kiện nào được đánh dấu "đã xảy ra" hay "không xảy ra" ở các lần chạy đã lưu.</p>') +
+        '<p class="tl-hint">Cách học: với sự kiện cả thị trường bạn đánh dấu <b>đã xảy ra</b>, so lợi suất VN-Index thật trong cửa sổ của sự kiện với độ lớn mô hình đã đặt (trừ độ dời kỳ vọng), rồi tính hệ số nhân theo kiểu Bayes, co mạnh về 1 và chặn trong 0,5 đến 1,6: vài quan sát không thay đổi được gì. Chỉ dùng khi một loại có từ ' + L.minN + ' mốc độc lập; loại chưa đủ dùng hệ số chung khi đủ ' + L.minNGlobal + ' mốc, không thì bằng 1. Không học từ độ lớn bạn tự nhập hay sự kiện theo ngành. Các lần lưu sát nhau cùng chung một đoạn thị trường nên không độc lập hẳn; hệ số chỉ nên coi là gợi ý hiệu chỉnh. Bật/tắt ở phần Giả định mô phỏng.</p></section>';
 }
 function runsAggregateHtml() {
     const R = SIM.runs, items = R.list.map((r) => ({ snap: r.snapshot, score: R.scores[r.id] })), agg = SimScore.aggregate(items, [5, 21, 63]);

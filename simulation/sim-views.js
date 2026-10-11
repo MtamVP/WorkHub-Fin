@@ -24,6 +24,7 @@ function describePolicy(p) {
     if (p.stop) parts.push((p.stop.trailing ? 'cắt lỗ động ' : 'cắt lỗ ') + p.stop.pct + '% từng mã');
     if (p.take) parts.push('chốt ' + p.take.sellPct + '% khi một mã +' + p.take.pct + '%');
     if (p.dip) parts.push('khi VN-Index giảm ' + p.dip.drop + '% thì mua bằng ' + p.dip.deployPct + '% tiền mặt');
+    if (p.rebalance) parts.push('đưa tỷ trọng các mã về mức ' + ({ minvar: 'ít biến động nhất', riskparity: 'cân bằng rủi ro', maxsharpe: 'Sharpe tối đa' }[p.rebalance.method] || '') + ' (bán phần vượt, mua phần thiếu bằng tiền vừa bán' + (p.rebalance.maxPct ? '; mỗi mã tối đa ' + p.rebalance.maxPct + '%' : '') + ')');
     (p.rules || []).forEach((r) => parts.push((r.path && r.path.length > 1 ? 'nếu ' + pathWords(r.path) : 'sau ' + (r.stage === 1 ? '1 tuần' : '1 tháng') + ' nếu thị trường ' + BR_WORD[['down', 'flat', 'up'].indexOf(r.when)]) + ' thì ' + (r.act === 'sell' ? 'bán ' + r.pct + '% mỗi mã' : 'mua bằng ' + r.pct + '% tiền mặt')));
     return parts.length ? parts.join('; ') : 'không làm gì, giữ nguyên danh mục';
 }
@@ -126,6 +127,8 @@ function policiesHtml() {
         '<label class="sim-field">nếu VN-Index' + sel('pb-rwhen', [['down', 'giảm'], ['flat', 'đi ngang'], ['up', 'tăng']], 'down') + '</label>' +
         '<label class="sim-field">thì' + sel('pb-ract', [['sell', 'bán (% mỗi mã)'], ['buy', 'mua (% tiền mặt)']], 'sell') + '</label>' +
         '<label class="sim-field">mức (%)<input class="tl-input num" id="pb-rpct" inputmode="decimal" placeholder="30"></label>' +
+        '<label class="sim-field">Cân bằng lại về tỷ trọng tối ưu' + sel('pb-rb', [['', 'Không dùng'], ['minvar', 'Ít biến động nhất'], ['riskparity', 'Cân bằng rủi ro'], ['maxsharpe', 'Sharpe tối đa (cần giá trị hợp lý)']], '') + '</label>' +
+        '<label class="sim-field">Mỗi mã tối đa (% rổ cổ phiếu)<input class="tl-input num" id="pb-rbmax" inputmode="decimal" placeholder="tự chọn (từ 40%)"></label>' +
         '</div><div class="sim-actions"><button type="button" class="sim-btn sm" onclick="simAddCustomPolicy()"><i class="fa-solid fa-plus"></i> Thêm chính sách</button><span class="tl-hint" style="margin:0">Ngưỡng "giảm / tăng" của kế hoạch có điều kiện là ' + sPct(SIM.settings.bands[0], 0) + ' sau 1 tuần và ' + sPct(SIM.settings.bands[1], 0) + ' trong giai đoạn tới hết tháng.</span></div></details>';
     return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-chess"></i> Các cách xử lý cần so sánh</h3><span class="tl-hint" style="margin:0">' + SIM.selected.length + ' đang chọn · tối đa 10</span></div><div class="sim-pols">' + cards + '</div>' + builder + '</section>';
 }
@@ -144,6 +147,7 @@ function settingsHtml() {
         '<label class="sim-field">Tối đa mỗi phiên (% thanh khoản)' + inp('st-part', s.participation) + '<small>Lệnh lớn hơn được chia sang các phiên sau.</small></label>' +
         '<label class="sim-field">Hạt giống ngẫu nhiên' + inp('st-seed', s.seed) + '<small>Cùng hạt giống thì cùng kết quả.</small></label>' +
         '<label class="sim-field" style="justify-content:flex-end"><span class="sim-check"><input type="checkbox" id="st-fair"' + (s.useFair ? ' checked' : '') + ' onchange="simSettingsChanged()"> Kéo về giá trị hợp lý (Valuation Bench)</span><small>Mã có bản định giá đã lưu được cộng kỳ vọng riêng. Tín hiệu này yếu khi kiểm chứng ngoài mẫu: dùng để thử, không nên tin mặc định.</small></label>' +
+        '<label class="sim-field" style="justify-content:flex-end"><span class="sim-check"><input type="checkbox" id="st-learn"' + (s.useLearned !== false ? ' checked' : '') + ' onchange="simSettingsChanged()"> Dùng độ lớn cú sốc đã học từ Nhật ký</span><small>Chỉ có tác dụng khi loại sự kiện đã có đủ mốc đã chấm (xem mục Nhật ký); chưa đủ thì hệ số bằng 1.</small></label>' +
         '</div></details>';
 }
 const riskWord = (g) => ({ 1: 'chấp nhận rủi ro', 3: 'vừa phải', 6: 'thận trọng', 10: 'rất thận trọng' }[g] || 'γ=' + g);
@@ -158,6 +162,21 @@ function renderPortfolioView() {
     return '<div class="sim-grid even"><div class="sim-stack">' + bookHtml() + '</div><div class="sim-stack">' + policiesHtml() + '</div></div>' + settingsHtml() +
         '<div class="sim-actions" style="margin:0 0 18px"><button type="button" class="sim-btn" id="sim-run-btn" onclick="simRun()"' + (R.state === 'running' || SIM.bookState !== 'ok' ? ' disabled' : '') + '><i class="fa-solid fa-play"></i> Chạy mô phỏng</button>' +
         (R.result && R.state === 'ok' ? '<span class="tl-hint" style="margin:0">Lần chạy gần nhất: ' + sNum(R.result.paths) + ' đường, ' + sE(R.ms ? (R.ms / 1000).toFixed(1) + ' giây' : '') + '</span>' : '') + '</div>' + results;
+}
+// Tỷ trọng hiện tại và đề xuất của các cách "cân bằng lại theo tối ưu hoá" đã chạy
+function rebalanceHtml(res) {
+    const list = res.rebalance || [];
+    if (!list.length) return '';
+    const word = { minvar: 'phương sai nhỏ nhất', riskparity: 'cân bằng rủi ro', maxsharpe: 'Sharpe tối đa' };
+    const blocks = list.map((r) => {
+        const rows = r.symbols.map((s, i) => { const d = r.target[i] - r.current[i]; return '<tr><td><b>' + sE(s) + '</b></td><td>' + sPct(r.current[i], 1) + '</td><td><b>' + sPct(r.target[i], 1) + '</b></td><td class="' + (d > 0.005 ? 'sim-up' : (d < -0.005 ? 'sim-down' : '')) + '">' + sPct(d, 1, true) + '</td></tr>'; }).join('');
+        return '<div><p class="sim-prose" style="margin:0 0 8px"><b>' + sE(r.label) + '</b> · ' + sE(word[r.method] || r.method) + ': biến động năm ước tính ' + sPct(r.vol.now, 1) + ' → <b>' + sPct(r.vol.next, 1) + '</b>' +
+            (r.sharpe.now !== null && r.sharpe.next !== null ? ', Sharpe ' + sNum(r.sharpe.now, 2) + ' → ' + sNum(r.sharpe.next, 2) : '') + ', đổi ' + sPct(r.turnover, 0) + ' giá trị rổ, mỗi mã tối đa ' + sPct(r.maxPct, 0) + '.</p>' +
+            '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Mã</th><th>Tỷ trọng hiện tại</th><th>Đề xuất</th><th>Thay đổi</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }).join('');
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-balanced"></i> Cân bằng lại theo tối ưu hoá</h3><span class="tl-hint" style="margin:0">' + list[0].symbols.length + ' mã · ' + sNum(list[0].obs) + ' phiên lịch sử</span></div>' +
+        '<div class="sim-grid even">' + blocks + '</div>' +
+        '<p class="tl-hint">Tỷ trọng tính trên phần cổ phiếu có lịch sử giá (cùng bộ ước lượng với tab Rủi Ro, đã đối chiếu thư viện khoa học). Mô phỏng bán phần vượt và mua phần thiếu bằng chính tiền vừa bán, có biên độ, T+2, lô 100, phí, thuế và giới hạn thanh khoản; tiền mặt sẵn có không bị dùng. Biến động là ước lượng từ lịch sử, không phải dự báo.</p></section>';
 }
 function picksHtml(hh, res) {
     const rows = hh.policies, by = (id) => rows.find((r) => r.id === id);
@@ -188,12 +207,13 @@ function resultsHtml(res) {
     const sens = '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-sliders"></i> Danh mục phản ứng theo VN-Index</h3><span class="tl-hint" style="margin:0">Giữ nguyên · sau ' + hzLabel(res.horizons[res.horizons.length - 1]) + '</span></div><div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Nếu VN-Index</th><th>Xác suất</th><th>Danh mục: trung vị</th><th>Khoảng 90%</th></tr></thead><tbody>' +
         res.sensitivity.filter((b) => b.n > 0).map((b) => '<tr><td>' + (b.lo === -Infinity ? 'giảm hơn ' + sPct(-b.hi, 0) : b.hi === Infinity ? 'tăng hơn ' + sPct(b.lo, 0) : sPct(b.lo, 0, true) + ' đến ' + sPct(b.hi, 0, true)) + '</td><td>' + sProb(b.prob) + '</td><td class="' + sCls(b.median) + '">' + sPct(b.median, 1, true) + '</td><td>' + sPct(b.q05, 1, true) + ' … ' + sPct(b.q95, 1, true) + '</td></tr>').join('') + '</tbody></table></div></section>';
     const notes = [];
+    (res.droppedPolicies || []).forEach((d) => notes.push('Bỏ qua "' + d.label + '": ' + d.reason + '.'));
     if (res.skipped && res.skipped.length) notes.push('Không đủ lịch sử giá để mô phỏng (giữ nguyên giá trị): ' + res.skipped.join(', ') + '.');
     if (res.stuckSessions > 0.05) notes.push('Trung bình mỗi đường có ' + sNum(res.stuckSessions, 1) + ' phiên muốn bán nhưng cổ phiếu nằm sàn không bán được: kết quả cắt lỗ đã tính điều này.');
     notes.push('Chi phí: phí ' + sPct(res.costs.fee, 2) + ', thuế bán ' + sPct(res.costs.tax, 2) + ', chi phí tác động giá theo thanh khoản, tối đa ' + sPct(res.costs.participation, 0) + ' thanh khoản mỗi phiên; lệnh quyết định theo giá đóng cửa được khớp ở phiên sau; cổ phiếu mua T+2 mới bán được.');
     const stale = typeof ctxKey === 'function' && res.ctxKey !== undefined && res.ctxKey !== ctxKey() ? '<p class="tl-hint"><b class="sim-down">Bối cảnh đã thay đổi sau lần chạy này: bấm Chạy mô phỏng để tính lại.</b></p>' : '';
     const evInfo = res.events && res.events.length ? '<p class="tl-hint" style="margin-top:0">Đã tính ' + res.events.length + ' sự kiện của bối cảnh (mục Bối cảnh).</p>' : '';
-    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + stale + evInfo + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + (typeof eventImpactHtml === 'function' ? eventImpactHtml(res, hk) : '') + (typeof runSaveHtml === 'function' ? runSaveHtml(res) : '') + '<div class="sim-grid even">' + truth + sens + '</div>';
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-unbalanced"></i> So sánh các cách xử lý</h3><span class="tl-hint" style="margin:0">' + sNum(res.paths) + ' đường · NAV ' + sVnd(res.nav0) + '</span></div>' + stale + evInfo + tabs + picksHtml(hh, res) + table + charts + '<p class="tl-hint">' + notes.map(sE).join(' ') + '</p></section>' + rebalanceHtml(res) + (typeof eventImpactHtml === 'function' ? eventImpactHtml(res, hk) : '') + (typeof runSaveHtml === 'function' ? runSaveHtml(res) : '') + '<div class="sim-grid even">' + truth + sens + '</div>';
 }
 function mountPortfolioCharts() {
     const R = SIM.run; if (R.state !== 'ok' || !R.result) return;
@@ -296,6 +316,8 @@ function renderMethodView() {
         '<li>Giá nằm sàn thì không bán được, nằm trần thì không mua được. Cổ phiếu mua phải chờ T+2 mới bán được. Lô 100 cổ phiếu.</li>' +
         '<li>Chi phí: phí và thuế bán, chi phí tác động giá theo căn bậc hai của khối lượng so với thanh khoản, và giới hạn tỷ lệ tham gia mỗi phiên (lệnh lớn được chia nhiều phiên).</li>' +
         '<li>Quyết định theo giá đóng cửa phiên này được khớp ở phiên sau: không chính sách nào được nhìn trước tương lai.</li></ul>' +
+        '<h3>Cân bằng lại theo tối ưu hoá</h3><ul><li>Ba cách đưa tỷ trọng các mã về mức tối ưu (cùng bộ ước lượng với tab Rủi Ro của Investment Workbench, đã đối chiếu thư viện khoa học): <b>ít biến động nhất</b> (không cần dự báo lợi nhuận), <b>cân bằng rủi ro</b> (mỗi mã đóng góp rủi ro như nhau), <b>Sharpe tối đa</b> (cần giá trị hợp lý đã lưu ở Valuation Bench làm lợi nhuận kỳ vọng; tín hiệu này yếu khi kiểm chứng ngoài mẫu). Hiệp phương sai co kiểu Ledoit-Wolf từ 3 năm lợi suất ngày; mỗi mã tối đa max(40%, 1/số mã + 10%) nếu bạn không đặt.</li>' +
+        '<li>Trong mô phỏng: bán phần vượt ngay, mua phần thiếu bằng CHÍNH tiền vừa bán (tiền mặt sẵn có không bị dùng), vẫn chịu biên độ, T+2, lô 100, phí, thuế, tác động giá và giới hạn thanh khoản. Cần ít nhất 2 mã có đủ lịch sử; không đủ thì cách này bị bỏ kèm lý do. Biến động trước/sau là ước lượng từ lịch sử; kết quả đo trên cùng bộ đường giá với các cách khác nên so sánh công bằng.</li></ul>' +
         '<h3>Đọc kết quả</h3><ul><li><b>CVaR 95%</b>: lỗ trung bình trong 5% kịch bản xấu nhất. <b>Sụt giảm</b>: mức giảm từ đỉnh trong kỳ.</li>' +
         '<li><b>Tương đương chắc chắn</b>: lợi suất chắc chắn mà bạn thấy ngang giá với phân phối rủi ro đó, theo khẩu vị rủi ro (hàm lợi ích CRRA). Đây là tiêu chí chính để xếp hạng.</li>' +
         '<li><b>Hối tiếc</b>: trên mỗi đường giá, chênh lệch so với cách xử lý tốt nhất trên chính đường đó. Cách ít hối tiếc là cách bền vững qua mọi kịch bản.</li>' +
@@ -308,7 +330,8 @@ function renderMethodView() {
         '<h3>Nhật ký mô phỏng và tự chấm điểm</h3><ul><li>Bấm <b>Lưu</b> ở Mô phỏng hoặc Triển vọng để giữ lại dự báo đúng như lúc đó: 39 phân vị lợi suất VN-Index ở từng mốc (có bối cảnh và chỉ lịch sử), phân vị của danh mục nếu giữ nguyên, xác suất 3 nhánh mỗi giai đoạn và cây kịch bản. Dự báo đã lưu không sửa được.</li>' +
         '<li>Khi đủ 5 / 21 / 63 phiên sau ngày dữ liệu của lần chạy, trang so với VN-Index thật: giá trị thật nằm ở phân vị nào (PIT), có trong khoảng 50% / 90% không, CRPS (xấp xỉ từ phân vị) và điểm Brier của xác suất nhánh so với tần suất lịch sử TRƯỚC ngày chạy. Gộp nhiều lần chạy: độ phủ thật so với danh nghĩa, và trên các lần có bối cảnh, CRPS có bối cảnh so với chỉ lịch sử.</li>' +
         '<li><b>Cây sống</b>: theo các mốc đã qua, trang biết thị trường thật đã đi nhánh nào và đọc từ cây đã lưu xác suất CÓ ĐIỀU KIỆN của các nhánh còn lại (không mô phỏng lại). Đánh dấu một sự kiện đã xảy ra hay không thì cây sống chuyển sang cây theo sự kiện đó.</li>' +
-        '<li><b>Máy chủ theo dõi</b>: mỗi ngày làm việc (8:25 sáng và 18:55 tối), cả khi không ai mở app, máy chủ chấm lại mọi lần chạy đã lưu trong 200 ngày bằng VN-Index thật và cập nhật cây sống. Khi một mốc mới tới, ai đã bật email cảnh báo sẽ nhận email nhắc; trong trang, lần chạy có nhãn <b>mới tới mốc</b> cho tới khi bạn mở xem. Lượt buổi tối nhờ AI đọc tin xem các sự kiện còn chưa rõ đã xảy ra chưa: AI chỉ <b>gợi ý</b> (kèm tin dẫn), không tự đánh dấu; bạn đọc tin rồi bấm Xác nhận. Phần chấm danh mục giữ nguyên vẫn tính ở trang (cần giá các mã).</li>' +
+        '<li><b>Máy chủ theo dõi</b>: mỗi ngày làm việc (8:25 sáng và 18:55 tối), cả khi không ai mở app, máy chủ chấm lại mọi lần chạy đã lưu trong 200 ngày bằng VN-Index thật và cập nhật cây sống. Khi một mốc mới tới, ai đã bật email cảnh báo sẽ nhận email nhắc; trong trang, lần chạy có nhãn <b>mới tới mốc</b> cho tới khi bạn mở xem. Lượt buổi tối nhờ AI đọc tin xem các sự kiện còn chưa rõ đã xảy ra chưa: AI chỉ <b>gợi ý</b> (kèm tin dẫn), không tự đánh dấu; bạn đọc tin rồi bấm Xác nhận. Phần "danh mục giữ nguyên" cũng do máy chủ chấm: lấy giá đóng cửa các mã và sự kiện doanh nghiệp (cổ tức, thưởng) từ VNDirect, điều chỉnh giá như phần Rủi Ro rồi tính lãi/lỗ thật của danh mục lúc chạy; mã nào không tải được thì bỏ, thiếu quá 25% giá trị thì không chấm.</li>' +
+        '<li><b>Học độ lớn cú sốc</b>: với sự kiện cả thị trường bạn đánh dấu <b>đã xảy ra</b>, trang so lợi suất VN-Index thật trong cửa sổ của sự kiện với độ lớn mô hình đã đặt và rút ra hệ số nhân theo loại sự kiện (Bayes, co về 1, chặn 0,5 đến 1,6). Chỉ dùng khi một loại có đủ 8 mốc độc lập (chung: 12 mốc); chưa đủ thì bằng 1. Không học từ độ lớn bạn nhập tay hay sự kiện theo ngành. Xem bảng ở mục Nhật ký; tắt được ở Giả định mô phỏng.</li>' +
         '<li>Từ một lần chạy đã lưu, ghi quyết định vào <b>Nhật Ký Quyết Định</b> (lý do điền sẵn tóm tắt mô phỏng, nhãn "mô phỏng", liên kết về lần chạy) để sau này đánh giá lại cả quyết định lẫn dự báo.</li></ul>' +
         '<h3>Giới hạn</h3><ul><li>Mô hình học từ 7 năm lịch sử (gồm 2020 và 2022): sự kiện chưa từng có trong lịch sử chỉ được đưa vào qua thẻ bối cảnh, và độ chính xác phụ thuộc vào đánh giá của bạn và của AI.</li>' +
         '<li>Tin xấu riêng của một doanh nghiệp chỉ được mô phỏng ở mức đã từng xảy ra với chính mã đó.</li><li>Lãi vay ký quỹ không được tính; tiền mặt không sinh lãi.</li></ul>' +

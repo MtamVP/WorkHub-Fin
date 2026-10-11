@@ -10,11 +10,11 @@ const SIM = {
     subject: 'mine', custom: { symbols: 'FPT, HPG, MWG, VCB', amount: 100000000 }, watchlist: [],
     book: null, bookState: 'idle', bookError: '', bookKey: '',
     selected: ['hold', 'trim30', 'stop8', 'trail12', 'plan', 'dip', 'cash'], customPolicies: [],
-    settings: { paths: 10000, model: 'blend', drift: 9, riskAversion: 3, target: 10, fee: 0.15, tax: 0.1, participation: 20, seed: 20261009, useFair: false, bands: [0.02, 0.04, 0.06] },
+    settings: { paths: 10000, model: 'blend', drift: 9, riskAversion: 3, target: 10, fee: 0.15, tax: 0.1, participation: 20, seed: 20261009, useFair: false, useLearned: true, bands: [0.02, 0.04, 0.06] },
     run: { state: 'idle', result: null, error: '', hk: 2, sel: null, step: '', ms: 0 },
     validate: { state: 'idle', result: null, error: '' },
     treePath: '', treeEvent: -1, settingsOpen: false, builderOpen: false,
-    prepared: { key: null, model: null },
+    prepared: { key: null, model: null }, learn: { res: null },
 };
 
 // ---------- lưu / đọc giả định ----------
@@ -49,7 +49,7 @@ const SimWorker = (function () {
     function ensure() {
         if (w || broken) return w;
         try {
-            w = new Worker('sim-worker.js?v=1792600000000');
+            w = new Worker('sim-worker.js?v=1792800000000');
             w.onmessage = function (e) { const d = e.data || {}, p = pending[d.id]; if (!p) return; delete pending[d.id]; if (d.ok) p.res(d.data); else p.rej(new Error(d.error || 'Lỗi mô phỏng')); };
             w.onerror = function (e) { if (e && e.preventDefault) e.preventDefault(); fail(); };
         } catch (e) { broken = true; w = null; }
@@ -158,6 +158,7 @@ async function simLoadMarket(force) {
         if (!result || !result.ok) throw new Error('Mô phỏng không chạy được.');
         SIM.market = { state: 'ok', model: p.model, result: result, error: '', ctxResult: null, ctxKey: null };
         if (ctxEvents().length) ctxRefreshOutlook();
+        if (SIM.runs && SIM.runs.state === 'idle' && SIM.email) runsLoad();            // nhật ký để học độ lớn cú sốc theo loại sự kiện (dùng lại bản VN-Index đã tải)
         setStatus('<i class="fa-solid fa-circle-check" style="color:var(--success-color)"></i> Số liệu tới ' + sE(fmtDate(p.model.lastDate)) + (SimWorker.isInline() ? ' · chạy trên trang' : ''));
     } catch (e) {
         SIM.market = { state: 'error', error: e.message || String(e) }; setStatus('');
@@ -248,8 +249,10 @@ function simAddCustomPolicy() {
     const dip = numOf('pb-dip'); if (dip) raw.dip = { drop: dip, deployPct: numOf('pb-dipuse') || 50 };
     const st = document.getElementById('pb-rstage').value;
     if (st) raw.rules = [{ stage: Number(st), when: document.getElementById('pb-rwhen').value, act: document.getElementById('pb-ract').value, pct: numOf('pb-rpct') || 30 }];
+    const rb = document.getElementById('pb-rb').value;
+    if (rb) raw.rebalance = { method: rb, maxPct: numOf('pb-rbmax') };
     const p = MarketSim.validatePolicy(raw);
-    if (!p.now && !p.stop && !p.take && !p.dip && !p.rules) { showToast('Chính sách chưa có hành động nào: điền ít nhất một ô.', 'error'); return; }
+    if (!p.now && !p.stop && !p.take && !p.dip && !p.rules && !p.rebalance) { showToast('Chính sách chưa có hành động nào: điền ít nhất một ô.', 'error'); return; }
     addPolicy(p);
 }
 function addPolicy(p) {
@@ -273,8 +276,9 @@ function simSettingsChanged() {
     s.paths = clamp(val('st-paths').value, 500, 30000, 10000); s.model = ['blend', 'garch', 'hmm'].indexOf(val('st-model').value) !== -1 ? val('st-model').value : 'blend';
     s.drift = clamp(val('st-drift').value, -20, 30, 9); s.riskAversion = clamp(val('st-gamma').value, 1, 10, 3); s.target = clamp(val('st-target').value, 1, 200, 10);
     s.fee = clamp(val('st-fee').value, 0, 2, 0.15); s.tax = clamp(val('st-tax').value, 0, 2, 0.1); s.participation = clamp(val('st-part').value, 1, 100, 20);
-    s.seed = Math.round(clamp(val('st-seed').value, 1, 2147483647, 20261009)); s.useFair = !!val('st-fair').checked;
+    s.seed = Math.round(clamp(val('st-seed').value, 1, 2147483647, 20261009)); s.useFair = !!val('st-fair').checked; s.useLearned = !!val('st-learn').checked;
     simSave();
+    if (typeof ctxChanged === 'function') ctxChanged();
 }
 
 // ---------- chạy mô phỏng ----------
@@ -290,19 +294,23 @@ async function simRun() {
     SIM.run = Object.assign({}, SIM.run, { state: 'running', error: '', step: 'Đang lấy lịch sử giá và ước lượng mô hình cho từng mã…' }); render();
     try {
         const book = SIM.book, syms = book.positions.map((p) => p.symbol).filter((s) => s !== MarketSim.INDEX);
-        let expected = null;
-        if (SIM.settings.useFair && syms.length) {
+        const all = MarketSim.PRESETS.concat(SIM.customPolicies), pols = SIM.selected.map((id) => all.find((x) => x.id === id)).filter(Boolean);
+        // giá trị hợp lý đã lưu: kéo độ dời của các mã khi bật tuỳ chọn, và (riêng) làm lợi nhuận kỳ vọng cho cách cân bằng "Sharpe tối đa", không làm lệch đường giá của các cách khác
+        const wantMu = pols.some((p) => p.rebalance && p.rebalance.method === 'maxsharpe');
+        let expected = null, optExpected = null;
+        if ((SIM.settings.useFair || wantMu) && syms.length) {
             SIM.run.step = 'Đang tải giá trị hợp lý đã lưu…'; render();
             try {
-                const vb = await simCall('getVbLatestMany', { symbols: syms }); expected = {};
-                book.positions.forEach((x) => { const v = vb && vb[x.symbol]; const e = v ? expectedFromFair(x.price, Number(v.fair_base), Number(SIM.settings.drift) / 100) : null; if (e !== null) expected[x.symbol] = e; });
-            } catch (e) { expected = null; }
+                const vb = await simCall('getVbLatestMany', { symbols: syms }), map = {};
+                book.positions.forEach((x) => { const v = vb && vb[x.symbol]; const e = v ? expectedFromFair(x.price, Number(v.fair_base), Number(SIM.settings.drift) / 100) : null; if (e !== null) map[x.symbol] = e; });
+                if (SIM.settings.useFair) expected = map;
+                if (wantMu) optExpected = map;
+            } catch (e) { expected = null; optExpected = null; }
         }
         SIM.run.step = 'Đang mô phỏng ' + Number(SIM.settings.paths).toLocaleString('vi-VN') + ' đường × ' + SIM.selected.length + ' cách xử lý…'; render();
-        const all = MarketSim.PRESETS.concat(SIM.customPolicies), pols = SIM.selected.map((id) => all.find((x) => x.id === id)).filter(Boolean);
         const evs = ctxEvents(), key = ctxKey();
         // ngành của từng mã (cho sự kiện theo ngành) lấy SAU khi getSimInputs đã nạp bảng ngành
-        const result = await withModel(syms, (pm) => SimWorker.call('simulate', { book: { cash: book.cash, debt: book.debt, positions: book.positions.map((x) => Object.assign({}, x, { sector: x.symbol === MarketSim.INDEX || typeof FinCalc === 'undefined' ? null : FinCalc.sectorOf(x.symbol) })) }, policies: pols, opts: simOpts({ expected: expected, events: evs }) }).then((r) => { if (r && r.ok) { r.asOf = pm.model.lastDate; r.indexLevel = pm.model.indexLevel; } return r; }));
+        const result = await withModel(syms, (pm) => SimWorker.call('simulate', { book: { cash: book.cash, debt: book.debt, positions: book.positions.map((x) => Object.assign({}, x, { sector: x.symbol === MarketSim.INDEX || typeof FinCalc === 'undefined' ? null : FinCalc.sectorOf(x.symbol) })) }, policies: pols, opts: simOpts({ expected: expected, optExpected: optExpected, events: evs }) }).then((r) => { if (r && r.ok) { r.asOf = pm.model.lastDate; r.indexLevel = pm.model.indexLevel; } return r; }));
         if (result) result.ctxKey = key;
         if (!result || !result.ok) throw new Error(result && result.reason === 'nav' ? 'Giá trị ròng của danh mục không dương: không mô phỏng được.' : 'Mô phỏng không chạy được.');
         result.expectedUsed = expected ? Object.keys(expected).length : 0;

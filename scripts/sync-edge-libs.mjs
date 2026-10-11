@@ -30,6 +30,8 @@ export const VBDATA_LIBS = [{ file: 'vb-statements.js', global: 'VBStatements' }
 export const SOURCEWATCH_LIBS = [{ file: 'vn-holidays.js', global: 'VnHolidays' }];
 // sim-watch chấm điểm nhật ký mô phỏng bằng đúng SimScore của trang và logic theo dõi SimWatch
 export const SIMWATCH_LIBS = [{ file: 'sim-score.js', global: 'SimScore' }, { file: 'sim-watch.js', global: 'SimWatch' }];
+// sim-watch cũng cần phần chuẩn hoá sự kiện doanh nghiệp (cổ tức, thưởng, chia tách) của hàm stock-events để điều chỉnh giá các mã trước khi chấm "danh mục giữ nguyên": bản sao nguyên văn tệp .ts
+export const SIMWATCH_TS = [{ from: 'supabase/functions/stock-events/parse.ts', to: 'supabase/functions/sim-watch/events-parse.ts' }];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -57,6 +59,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const lib of SIMWATCH_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'sim-watch', lib.file), expectedCopy(lib));
     console.log('đã sao chép (sim-watch)', lib.file);
+  }
+  for (const c of SIMWATCH_TS) {
+    fs.writeFileSync(path.join(root, c.to), fs.readFileSync(path.join(root, c.from), 'utf8'));
+    console.log('đã sao chép (sim-watch)', c.to);
   }
   for (const lib of SOURCEWATCH_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'source-watch', lib.file), expectedCopy(lib));

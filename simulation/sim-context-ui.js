@@ -20,7 +20,12 @@ function ctxRestore() {
 // Sự kiện đưa vào bộ máy (rỗng nếu tắt bối cảnh hoặc chưa có thang độ lớn)
 function ctxEvents() {
     if (!SIM.ctx.use || !SIM.market.model || !SIM.market.model.eventScale) return [];
-    return SIM.ctx.cards.map((c) => MarketSim.eventFromCard(c, SIM.market.model.eventScale)).filter(Boolean);
+    return SIM.ctx.cards.map((c) => MarketSim.eventFromCard(c, SIM.market.model.eventScale, ctxMult(c).mult)).filter(Boolean);
+}
+// Hệ số độ lớn đã HỌC cho loại sự kiện của thẻ (lib/sim-score.js learnShocks từ Nhật ký): chỉ khi bật trong Giả định và đủ mốc đã chấm; còn lại = 1
+function ctxMult(c) {
+    if (SIM.settings.useLearned === false || !SIM.learn || !SIM.learn.res) return { mult: 1, n: 0, source: 'prior' };
+    return SimScore.multFor(SIM.learn.res, c.category);
 }
 const ctxKey = () => JSON.stringify(ctxEvents().map((e) => [e.id, e.p, e.win, e.sign, Math.round(e.jM * 1e5), Math.round(e.jS * 1e5), e.sectors]));
 
@@ -90,11 +95,12 @@ function ctxRefreshOutlook() {
 const DIR_WORD = { up: 'tăng', down: 'giảm', mixed: 'chưa rõ chiều' }, WIN_WORD = { '1w': 'trong 1 tuần', '1m': 'trong 1 tháng', '3m': 'trong 3 tháng' };
 const LIK_WORD = { low: 'thấp', medium: 'vừa', high: 'cao' }, MAG_WORD = { small: 'nhỏ', medium: 'vừa', large: 'lớn' };
 function ctxEffectText(c) {
-    const ev = MarketSim.eventFromCard(Object.assign({}, c, { on: true }), SIM.market.model.eventScale);
+    const lm = ctxMult(c), ev = MarketSim.eventFromCard(Object.assign({}, c, { on: true }), SIM.market.model.eventScale, lm.mult);
     if (!ev) return 'Không có tác động (xác suất hoặc mức bằng 0).';
     const mv = (j) => sPct(Math.exp(j) - 1, 1).replace('−', '');
     const dir = ev.sign > 0 ? '+' : (ev.sign < 0 ? '−' : '±');
-    return 'Vào mô phỏng: <b>' + sProb(ev.p) + '</b> khả năng xảy ra ' + WIN_WORD[c.window] + '; nếu xảy ra, VN-Index ' + dir + mv(ev.jM) + ' trong một phiên' + (ev.jS ? ', cổ phiếu ' + sE(ev.sectors.join(', ')) + ' thêm ' + dir + mv(ev.jS) : '') + '.';
+    const learned = ev.k !== 1 ? ' Độ lớn đã nhân <b>×' + sNum(ev.k, 2) + '</b> theo kết quả chấm điểm các lần chạy trước (' + (lm.source === 'cat' ? 'riêng loại "' + sE(c.category) + '"' : 'chung mọi loại') + ', ' + lm.n + ' mốc).' : '';
+    return 'Vào mô phỏng: <b>' + sProb(ev.p) + '</b> khả năng xảy ra ' + WIN_WORD[c.window] + '; nếu xảy ra, VN-Index ' + dir + mv(ev.jM) + ' trong một phiên' + (ev.jS ? ', cổ phiếu ' + sE(ev.sectors.join(', ')) + ' thêm ' + dir + mv(ev.jS) : '') + '.' + learned;
 }
 function ctxCardHtml(c) {
     const sc = SIM.market.model.eventScale, sel = (field, opts, v) => '<select class="tl-select" onchange="ctxSet(\'' + c.id + '\',\'' + field + '\',this.value)">' + opts.map((o) => '<option value="' + o[0] + '"' + (o[0] === v ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';

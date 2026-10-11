@@ -5,6 +5,8 @@
 //     CRPS xấp xỉ từ lưới phân vị, điểm Brier của xác suất nhánh so với tần suất lịch sử trước ngày chạy (chỉ dùng dữ liệu tới ngày chạy, không nhìn trước).
 //   * aggregate: gộp nhiều lần chạy theo mốc: độ phủ thật so với danh nghĩa, BSS, và CRPS có bối cảnh so với chỉ lịch sử trên CÙNG các lần chạy có bối cảnh
 //     (trả lời câu hỏi "bối cảnh AI có làm dự báo tốt hơn không").
+//   * learnShocks / multFor: HỌC độ lớn cú sốc theo loại sự kiện từ các lần chạy đã chấm: với sự kiện cả thị trường được đánh dấu "đã xảy ra", so lợi suất VN-Index thật trong cửa sổ của sự kiện với độ lớn
+//     bộ máy đã dùng (trước khi nhân hệ số học), ra hệ số nhân (hậu nghiệm chuẩn-chuẩn, co mạnh về 1; chỉ dùng khi đủ số mốc độc lập). Kèm tần suất xảy ra thật so với xác suất đã đặt.
 //   * liveTree: cây sống của một lần chạy đã lưu: nhánh thực tế đã đi (theo mốc đã qua) + sự kiện đã đánh dấu xảy ra hay chưa -> nút hiện tại và xác suất CÓ ĐIỀU KIỆN
 //     của các nhánh phía trước (đọc từ cây đã lưu, không mô phỏng lại).
 //   * validateRun: kiểm tra dữ liệu trước khi ghi DB.
@@ -41,7 +43,7 @@ const SimScore = (function () {
       bestFinal: res.byHorizon[hkL].best ? res.byHorizon[hkL].best.ce : null,
       tree: (res.tree || []).map(slimNode),
       eventTrees: (res.eventTrees || []).map((t) => ({ id: t.id, title: str(t.title, 110), p: r4(t.p), sign: t.sign, nodes: t.nodes.map(slimNode) })),
-      events: (res.events || []).map((e) => { const c = evCards.find((x) => x.id === e.id) || {}; return { id: e.id, title: str(e.title, 110), p: r4(e.p), win: e.win, sign: e.sign, jM: r4(e.jM), jS: r4(e.jS), sectors: (e.sectors || []).slice(0, 6), signposts: (c.signposts || []).slice(0, 3).map((x) => str(x, 140)), source: c.source === 'ai' ? 'ai' : 'user' }; }),
+      events: (res.events || []).map((e) => { const c = evCards.find((x) => x.id === e.id) || {}; return { id: e.id, title: str(e.title, 110), p: r4(e.p), win: e.win, sign: e.sign, jM: r4(e.jM), jS: r4(e.jS), sectors: (e.sectors || []).slice(0, 6), cat: str(e.cat, 40) || null, man: !!e.man, jM0: r4(e.jM0), k: r4(e.k), signposts: (c.signposts || []).slice(0, 3).map((x) => str(x, 140)), source: c.source === 'ai' ? 'ai' : 'user' }; }),
     };
   }
 
@@ -144,6 +146,73 @@ const SimScore = (function () {
     });
   }
 
+  // ---------- học độ lớn cú sốc theo loại sự kiện ----------
+  // Quy ước: mỗi "mốc quan sát" = (ngày dữ liệu, kỳ hạn của sự kiện) -- nhiều lần lưu cùng ngày dữ liệu và kỳ hạn chỉ tính MỘT mốc (cùng một đoạn thị trường), các sự kiện đã xảy ra trong mốc gộp lại.
+  // Mô hình: x = beta * c + nhiễu, trong đó x = lợi suất log VN-Index thật trong kỳ trừ độ dời kỳ vọng, c = tổng cú sốc có dấu bộ máy đã đặt (độ lớn gốc, chưa nhân hệ số học) của các sự kiện đã xảy ra,
+  // nhiễu có độ lệch chuẩn = biến động của kỳ hạn đó theo dự báo lúc chạy (không bối cảnh). Tiên nghiệm beta ~ N(1, 0,5^2) toàn cục; từng loại: N(beta toàn cục, 0,35^2) và chỉ dùng mốc có đúng MỘT sự kiện (biết gán cho loại nào).
+  // Chặn hệ số trong [0,5; 1,6]. Chưa đủ mốc (MIN_N mỗi loại, MIN_N_GLOBAL toàn cục) thì hệ số = 1: không học từ vài quan sát.
+  const LEARN = { MIN_N: 8, MIN_N_GLOBAL: 12, TAU: 0.5, TAU_CAT: 0.35, LO: 0.5, HI: 1.6 };
+  const titleKey = (t) => str(t, 110).toLowerCase();
+  const clampMult = (b) => Math.min(LEARN.HI, Math.max(LEARN.LO, b));
+  function windowSd(snap, hk) {
+    const L = snap.levels || [], g = snap.grid && ((snap.grid.base && snap.grid.base[hk]) || (snap.grid.index && snap.grid.index[hk]));
+    const hi = g ? at(L, g, 0.95) : null, lo = g ? at(L, g, 0.05) : null;
+    return isNum(hi) && isNum(lo) && hi > lo ? (hi - lo) / 3.29 : null;
+  }
+  function posterior(obs, m0, tau) {
+    let prec = 1 / (tau * tau), top = m0 / (tau * tau);
+    obs.forEach((o) => { prec += o.c * o.c / (o.s * o.s); top += o.c * o.x / (o.s * o.s); });
+    return { mean: top / prec, sd: Math.sqrt(1 / prec) };
+  }
+  // items: [{ snap, score (scoreRun), marks }] -> { global: { n, beta, sd, mult, ready }, cats: { loại: { n, beta, sd, mult, ready } }, prob: { n, meanP, freq, byCat }, minN, minNGlobal }
+  function learnShocks(items) {
+    const groups = {}, outcomes = {};
+    (items || []).forEach((it) => {
+      const snap = it && it.snap, sc = it && it.score, marks = (it && it.marks) || {};
+      if (!snap || !sc || !Array.isArray(snap.events)) return;
+      snap.events.forEach((e) => {
+        const m = marks[e.id]; if (m !== true && m !== false) return;
+        const cat = str(e.cat, 40) || 'Khác', ok = titleKey(e.title) + '|' + String(snap.asOf).slice(0, 7);
+        if (!outcomes[ok]) outcomes[ok] = { cat: cat, p: e.p, happened: m }; else if (m === true) outcomes[ok].happened = true;
+        if (m !== true || !e.sign || e.man || (e.sectors && e.sectors.length)) return;
+        const hk = (snap.horizons || []).indexOf(e.win); if (hk < 0) return;
+        const row = (sc.horizons || [])[hk]; if (!row || !row.due || !isNum(row.ret) || row.ret <= -1) return;
+        const j = isNum(e.jM0) ? e.jM0 : e.jM, s = windowSd(snap, hk); if (!(j > 0) || !(s > 0)) return;
+        const gk = snap.asOf + '|' + e.win, drift = isNum(snap.drift) ? snap.drift : 0.09;
+        const g = groups[gk] || (groups[gk] = { x: Math.log(1 + row.ret) - drift * e.win / 252, s: s, evs: {} });
+        g.evs[titleKey(e.title)] = { cat: cat, signed: e.sign * j };
+      });
+    });
+    const obsAll = [], byCat = {};
+    Object.keys(groups).forEach((k) => {
+      const g = groups[k], evs = Object.keys(g.evs).map((t) => g.evs[t]), c = evs.reduce((a, e) => a + e.signed, 0);
+      obsAll.push({ x: g.x, s: g.s, c: c });
+      if (evs.length === 1) (byCat[evs[0].cat] || (byCat[evs[0].cat] = [])).push({ x: g.x, s: g.s, c: c });
+    });
+    const G = posterior(obsAll, 1, LEARN.TAU), gReady = obsAll.length >= LEARN.MIN_N_GLOBAL;
+    const cats = {};
+    Object.keys(byCat).forEach((cat) => {
+      const P = posterior(byCat[cat], gReady ? G.mean : 1, LEARN.TAU_CAT), n = byCat[cat].length;
+      cats[cat] = { n: n, beta: P.mean, sd: P.sd, mult: clampMult(P.mean), ready: n >= LEARN.MIN_N };
+    });
+    const oc = Object.keys(outcomes).map((k) => outcomes[k]).filter((o) => isNum(o.p)), pc = {};
+    oc.forEach((o) => { const a = pc[o.cat] || (pc[o.cat] = { n: 0, sumP: 0, hit: 0 }); a.n++; a.sumP += o.p; if (o.happened) a.hit++; });
+    const byCatP = {}; Object.keys(pc).forEach((k) => { byCatP[k] = { n: pc[k].n, meanP: pc[k].sumP / pc[k].n, freq: pc[k].hit / pc[k].n }; });
+    return {
+      global: { n: obsAll.length, beta: G.mean, sd: G.sd, mult: clampMult(G.mean), ready: gReady }, cats: cats,
+      prob: { n: oc.length, meanP: oc.length ? oc.reduce((a, o) => a + o.p, 0) / oc.length : null, freq: oc.length ? oc.filter((o) => o.happened).length / oc.length : null, byCat: byCatP },
+      minN: LEARN.MIN_N, minNGlobal: LEARN.MIN_N_GLOBAL,
+    };
+  }
+  // Hệ số cho một loại sự kiện: riêng của loại nếu đủ mốc, không thì hệ số chung nếu đủ, không thì 1. -> { mult, n, source: 'cat' | 'global' | 'prior' }
+  function multFor(learned, cat) {
+    const L = learned || null; if (!L) return { mult: 1, n: 0, source: 'prior' };
+    const c = L.cats && L.cats[str(cat, 40) || 'Khác'];
+    if (c && c.ready) return { mult: c.mult, n: c.n, source: 'cat' };
+    if (L.global && L.global.ready) return { mult: L.global.mult, n: L.global.n, source: 'global' };
+    return { mult: 1, n: c ? c.n : 0, source: 'prior' };
+  }
+
   // ---------- cây sống ----------
   // prefix: nhánh thực tế đã đi (từ scoreRun); eventId + happened (true/false/null): sự kiện đã đánh dấu. Có đánh dấu thì đọc cây theo sự kiện, gốc Y/N.
   // Trả { root, nodes (cây đang dùng), path (id nút thực tế), current, next: con của nút hiện tại kèm xác suất có điều kiện, ahead: các đường tới mốc cuối kèm xác suất có điều kiện }
@@ -190,7 +259,7 @@ const SimScore = (function () {
     return out;
   }
 
-  return { VERSION, SUBJECTS, snapshot, originIndex, pitOf, crpsOf, climatology, scoreRun, holdReturn, aggregate, liveTree, validateRun, cleanMarks, branchOf };
+  return { VERSION, SUBJECTS, LEARN, snapshot, originIndex, pitOf, crpsOf, climatology, scoreRun, holdReturn, aggregate, learnShocks, multFor, liveTree, validateRun, cleanMarks, branchOf };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SimScore;

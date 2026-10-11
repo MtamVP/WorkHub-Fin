@@ -536,10 +536,25 @@
   <li><b>Máy chủ theo dõi mỗi ngày làm việc</b> (8:25 sáng và 18:55 tối), cả khi không ai mở app: chấm lại mọi lần chạy trong 200 ngày và cập nhật cây sống. Lần chạy có mốc mới tới mang nhãn <b>mới tới mốc</b> cho tới khi bạn mở xem; nếu bạn đã bật email cảnh báo, máy chủ gửi email nhắc.</li>
   <li><b>AI đọc tin cho sự kiện:</b> lượt buổi tối, AI đọc tin xem các sự kiện còn chưa rõ của từng lần chạy đã xảy ra chưa. Nếu tin nêu rõ, dưới sự kiện hiện ô <b>AI đọc tin</b> kèm tin dẫn và nút <span class="ui">Xác nhận</span>. Đây <b>chỉ là gợi ý</b>: AI không tự đánh dấu; hãy mở tin đọc rồi mới xác nhận.</li>
 </ul>
+<h2>15.3 Cân bằng lại theo tối ưu hoá (mới 0.1.20)</h2>
+<p>Ở <span class="ui">Mô phỏng</span> có thêm ba cách xử lý <b>Cân bằng lại</b>, đưa tỷ trọng các mã về mức tối ưu của tab <span class="ui">Rủi Ro</span> (cùng bộ ước lượng, đã đối chiếu thư viện khoa học) rồi so với giữ nguyên, cắt lỗ, chốt lời... trên <b>cùng</b> các đường giá:</p>
+<ul>
+  <li><b>Ít biến động nhất</b>: danh mục ít dao động nhất trong giới hạn tỷ trọng; không cần dự báo lợi nhuận.</li>
+  <li><b>Cân bằng rủi ro</b>: mỗi mã đóng góp rủi ro như nhau.</li>
+  <li><b>Sharpe tối đa</b>: cần giá trị hợp lý đã lưu ở Valuation Bench làm lợi nhuận kỳ vọng (tự tải khi bạn chọn cách này; không làm lệch đường giá của các cách khác). Tín hiệu giá trị hợp lý yếu khi kiểm chứng ngoài mẫu: dùng để thử.</li>
+</ul>
+<p>Mô phỏng bán phần vượt ngay và mua phần thiếu bằng <b>chính tiền vừa bán</b> (tiền mặt sẵn có không bị dùng), vẫn chịu biên độ giá, T+2, lô 100, phí, thuế và giới hạn thanh khoản. Sau khi chạy, thẻ <span class="ui">Cân bằng lại theo tối ưu hoá</span> hiện tỷ trọng hiện tại và đề xuất của từng mã, biến động năm trước/sau và mức đổi. Mỗi mã tối đa 40% (hoặc cao hơn nếu có ít mã) trừ khi bạn tự đặt trong <span class="ui">Tạo chính sách của riêng bạn</span>. Cần ít nhất 2 mã có đủ lịch sử giá; không đủ thì cách này bị bỏ kèm lý do ngay dưới bảng so sánh.</p>
+<h2>15.4 Học độ lớn cú sốc từ kết quả thật (mới 0.1.20)</h2>
+<p>Độ lớn cú sốc của một sự kiện lúc đầu lấy từ lịch sử VN-Index. Khi bạn đánh dấu sự kiện ở <span class="ui">Nhật ký</span> là <b>đã xảy ra</b> và mốc của nó đã tới, ứng dụng so lợi suất VN-Index thật với độ lớn đã đặt và học một hệ số nhân <b>theo loại sự kiện</b> (chính sách, quốc tế, ...). Bảng <span class="ui">Độ lớn cú sốc: kết quả thật so với dự kiến</span> cho thấy số mốc, hệ số, sai số, và xác suất đã đặt so với tần suất thật.</p>
+<ul>
+  <li>Hệ số co mạnh về 1 và bị chặn trong 0,5 đến 1,6: vài quan sát không đổi được gì. Chỉ <b>dùng</b> khi một loại có từ 8 mốc độc lập; loại chưa đủ dùng hệ số chung nếu tổng đủ 12 mốc, không thì bằng 1. Hiện chưa có hoặc chưa đủ dữ liệu thì mọi hệ số đều bằng 1 và mô phỏng không đổi so với trước.</li>
+  <li>Không học từ độ lớn bạn tự nhập tay và không áp cho sự kiện theo ngành (chưa có số đo thật của cú sốc ngành). Thẻ sự kiện ghi rõ khi độ lớn đã nhân hệ số.</li>
+  <li>Các lần lưu sát nhau cùng chung một đoạn thị trường nên chỉ tính một mốc cho mỗi ngày dữ liệu và kỳ hạn. Cần nhiều tháng đánh dấu đều đặn mới có hệ số đáng tin. Tắt được ở <span class="ui">Giả định mô phỏng</span> &gt; <span class="ui">Dùng độ lớn cú sốc đã học từ Nhật ký</span>.</li>
+</ul>
 <div class="callout"><b class="t">Giới hạn cần biết</b><ul>
   <li>Mô hình học từ khoảng 7 năm giá: cú sốc chưa từng có trong giai đoạn đó (khủng hoảng hệ thống, đổi chính sách lớn) có thể lớn hơn mô hình nghĩ. Thẻ sự kiện là cách đưa phán đoán của bạn vào.</li>
   <li>Các lần lưu sát nhau dùng chung một giai đoạn thị trường nên không độc lập hẳn; cần nhiều tháng mới đánh giá được độ chính xác thật.</li>
-  <li>Phần chấm "danh mục giữ nguyên" cần giá lịch sử các mã; thiếu giá quá 25% giá trị thì bỏ qua lần đó.</li>
+  <li>Phần chấm "danh mục giữ nguyên" do máy chủ tính mỗi ngày làm việc từ giá đóng cửa các mã và sự kiện doanh nghiệp (cổ tức, thưởng) của VNDirect, đã điều chỉnh giá; mã nào không tải được thì bỏ, thiếu quá 25% giá trị thì bỏ qua lần đó.</li>
 </ul></div>
 
 <h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>
