@@ -12,7 +12,9 @@ const INS = {
     acc: { state: 'idle', hk: 'm6', val: null, ideas: null, decisions: null, earn: null, forecastForm: null, lastDate: null, step: '' },
     arch: { state: 'idle', status: null, cov: null, ready: null, lookup: {}, screen: { pe: '15', roe: '15', mcap: '1000' }, screenRes: null, defaultDate: '' },
 };
-const TABS = { thesis: 'th', liquidity: 'liq', cash: 'cash', ownership: 'own', rotation: 'rot', accuracy: 'acc', archive: 'arch' };
+INS.inbox = { state: 'idle', items: [], summary: null, filter: { sev: 'all', kind: 'all' }, notes: [], now: Date.now() };
+INS.evt = { state: 'idle', raw: [], rows: [], total: 0, summary: { alert: 0, watch: 0, negAlert: 0 }, filter: { scope: 'mine', days: 30, type: 'all', dir: 'all', sev: 'all', q: '' }, held: [], tracked: [], lastRun: null, now: Date.now() };
+const TABS = { inbox: 'inbox', events: 'evt', thesis: 'th', liquidity: 'liq', cash: 'cash', ownership: 'own', rotation: 'rot', accuracy: 'acc', archive: 'arch' };
 const LOADERS = {};
 const I = InsUtil;
 
@@ -59,6 +61,8 @@ const isoDaysAgo = (d) => new Date(Date.now() - d * 86400000).toISOString().slic
 // ---------- vẽ và định tuyến ----------
 function html() {
     switch (INS.view) {
+        case 'inbox': return InsViewsD.inboxHtml(INS.inbox);
+        case 'events': return InsViewsD.eventsHtml(INS.evt);
         case 'liquidity': return InsViewsA.liquidityHtml(INS.liq);
         case 'cash': return InsViewsA.cashHtml(Object.assign({}, INS.cash, { cash: INS.cash.cashNow, KINDS: CashflowCalc.KINDS }));
         case 'rotation': return InsViewsA.rotationHtml(INS.rot);
@@ -395,6 +399,104 @@ function insPitScreen() {
     u.rows.sort((a, b) => b.m.marketcap - a.m.marketcap);
     S.screenRes = { total: u.rows.length, rows: u.rows.slice(0, 30) };
     render();
+}
+
+// ---------- Việc cần làm ----------
+const CORP_LABEL = { cash_dividend: 'cổ tức tiền', stock_dividend: 'cổ tức cổ phiếu', bonus: 'cổ phiếu thưởng', rights: 'quyền mua' };
+function insiderFromOverview(ov, symbols, today) {
+    const by = {}; (ov.trades || []).forEach((t) => { (by[t.symbol] = by[t.symbol] || []).push({ id: t.id, trader: t.trader, action: t.action, status: t.status, before: t.shares_before === null ? null : Number(t.shares_before), after: t.shares_after === null ? null : Number(t.shares_after), registered: t.registered === null ? null : Number(t.registered), acquired: t.acquired === null ? null : Number(t.acquired), endDate: t.end_date, publicDate: t.public_date }); });
+    return symbols.filter((s) => by[s]).map((s) => ({ symbol: s, summary: OwnershipCalc.summarize(by[s], today, 90) }));
+}
+// Bản tuân thủ mới nhất của tôi (và của nhóm nếu là quản lý) -> các mục vượt / gần chạm giới hạn
+function complianceItems(rows, myId, mgr) {
+    const latest = {}; (rows || []).forEach((r) => { const k = r.user_id || 'group'; if (!latest[k] || r.log_date > latest[k].log_date) latest[k] = r; });
+    const out = [];
+    Object.keys(latest).map((k) => latest[k]).filter((r) => (r.user_id && r.user_id === myId) || (!r.user_id && mgr)).forEach((r) => {
+        const put = (list, level) => (list || []).forEach((b) => out.push({ subject: b.subject || b.kind, kind: b.kind, level: level, mode: b.mode, current: b.current, threshold: b.threshold, scope: r.user_id ? 'me' : 'group', since: r.log_date }));
+        put(r.breaches, 'breach'); put(r.warns, 'warn');
+    });
+    return out;
+}
+LOADERS.inbox = async function () {
+    const S = INS.inbox;
+    S.notes = []; S.now = Date.now();
+    const today = I.today();
+    const soft = (p, label, fb) => Promise.resolve(p).catch(() => { S.notes.push(label); return fb; });
+    const [hold, wl, thData, extra, evRes, me] = await Promise.all([
+        soft(insCall('getHoldingsView', { email: INS.email }), 'danh mục', []),
+        soft(insCall('getWatchlist', { email: INS.email }), 'danh sách theo dõi', []),
+        soft(insCall('listThesis'), 'luận điểm', null),
+        soft(insCall('getInboxInputs'), 'giới hạn, duyệt lệnh, chất lượng dữ liệu', null),
+        soft(insCall('getNewsEvents', { days: 4 }), 'tin theo mã', { events: [] }),
+        INS.me ? Promise.resolve(INS.me) : insCall('getLimitActor', { email: INS.email }).catch(() => null),
+    ]);
+    INS.me = me;
+    const myId = me ? me.actorId : null, mgr = !!(me && (me.isManager || me.isAdmin));
+    const held = (hold || []).filter((h) => Number(h.quantity) > 0).map((h) => String(h.symbol).toUpperCase());
+    const watch = (wl || []).map((x) => String(x.symbol || '').toUpperCase());
+    // luận điểm của tôi (cùng ThesisCalc với máy chủ)
+    const ideas = [], myIdeas = thData && myId ? thData.ideas.filter((i) => i.user_id === myId) : [];
+    if (myIdeas.length) {
+        const ctx = await soft(insCall('getThesisContext', { symbols: myIdeas.map((i) => i.symbol) }), 'số liệu luận điểm', { snapshots: {}, ratios: {}, insider: {}, synced: [] });
+        const byIdea = {}; thData.conditions.forEach((c) => { (byIdea[c.idea_id] = byIdea[c.idea_id] || []).push(c); });
+        myIdeas.forEach((idea) => {
+            const conds = (byIdea[idea.id] || []).map((c) => ({ id: c.id, metric: c.metric, op: c.op, threshold: c.threshold === null ? null : Number(c.threshold), severity: c.severity, label: c.label, manualMet: c.manual_met, state_since: c.state_since }));
+            if (!conds.length) return;
+            const ev = ThesisCalc.evaluateIdea(conds, thesisCtx(idea, ctx));
+            ideas.push({ id: idea.id, symbol: String(idea.symbol).toUpperCase(), title: idea.title, status: ev.status, conditions: ev.conditions.map((c) => ({ label: ThesisCalc.describe(c), severity: c.severity, state: c.state, since: c.state_since || null })) });
+            watch.push(String(idea.symbol).toUpperCase());
+        });
+    }
+    const watchOnly = [...new Set(watch.filter((s) => held.indexOf(s) === -1))];
+    const tracked = [...new Set(held.concat(watchOnly).filter((s) => /^[A-Z0-9]{1,12}$/.test(s)))].slice(0, 60);
+    // nội bộ 90 ngày của mã đang nắm / theo dõi
+    let insider = [];
+    if (tracked.length) { const ov = await soft(insCall('getOwnershipOverview', { symbols: tracked }), 'giao dịch nội bộ', null); if (ov) insider = insiderFromOverview(ov, tracked, today); }
+    // dòng tiền và hành động doanh nghiệp (dùng lại bộ tải của tab Dòng tiền)
+    let cash = null, corporate = [];
+    try {
+        if (INS.cash.state !== 'ok') await LOADERS.cash();
+        const sm = INS.cash.res && INS.cash.res.summary;
+        if (sm) cash = { firstShortfall: sm.firstShortfall ? { date: sm.firstShortfall } : null, minBalance: sm.minBalance, minDate: sm.minDate };
+        corporate = ((INS.cash.inputs && INS.cash.inputs.events) || []).filter((x) => x.exDate).map((x) => ({ symbol: x.symbol, kind: x.kind, exDate: x.exDate, label: (CORP_LABEL[x.kind] || x.kind) + (x.kind === 'cash_dividend' && x.dps ? ' ' + I.int(x.dps) + ' đ/cp' : (x.ratio ? ' ' + I.dec(x.ratio, 0) + '%' : '')) }));
+    } catch (e) { S.notes.push('dòng tiền và ngày không hưởng quyền'); }
+    const members = extra ? extra.members : {};
+    const input = {
+        now: S.now, today: today, held: held, watch: watchOnly, ideas: ideas,
+        events: ((evRes && evRes.events) || []).map((x) => Object.assign({}, x, { label: NewsEvents.LABELS[x.event_type] || x.event_type })),
+        insider: insider, compliance: complianceItems(extra ? extra.compliance : [], myId, mgr), cash: cash, corporate: corporate,
+        approvals: mgr && extra ? extra.approvals.map((a) => ({ id: a.id, symbol: a.symbol, side: a.side, requester: members[a.created_by] || null, created_at: a.created_at })) : [],
+        health: mgr && extra ? extra.health.map((h) => Object.assign({}, h, { label: h.kind })) : [],
+        runs: mgr && extra ? extra.runs : [],
+    };
+    if (extra && extra.notes) extra.notes.forEach((n) => S.notes.push(n));
+    S.items = ActionInbox.build(input); S.summary = ActionInbox.summarize(S.items);
+};
+function insInbox(k, v) { INS.inbox.filter[k] = v; render(); }
+function insReload() { const S = INS[TABS[INS.view]]; if (!S) return; S.state = 'idle'; insLoad(INS.view, true); }
+
+// ---------- Sự kiện ----------
+LOADERS.events = async function () {
+    const S = INS.evt;
+    S.now = Date.now();
+    const [res, hold, wl] = await Promise.all([insCall('getNewsEvents', { days: 90 }), insCall('getHoldingsView', { email: INS.email }).catch(() => []), insCall('getWatchlist', { email: INS.email }).catch(() => [])]);
+    S.raw = res.events; S.lastRun = res.lastRun;
+    S.held = (hold || []).filter((h) => Number(h.quantity) > 0).map((h) => String(h.symbol).toUpperCase());
+    S.tracked = [...new Set(S.held.concat((wl || []).map((x) => String(x.symbol || '').toUpperCase())))];
+    evtCompute();
+};
+function evtCompute() {
+    const S = INS.evt, F = S.filter, cutoff = Date.now() - F.days * 86400000, q = String(F.q || '').trim().toUpperCase();
+    const inWindow = S.raw.filter((x) => !x.published_at || Date.parse(x.published_at) >= cutoff);
+    S.total = inWindow.length;
+    let rows = inWindow.filter((x) => (F.scope === 'all' || S.tracked.indexOf(x.symbol) !== -1) && (F.type === 'all' || x.event_type === F.type) && (F.dir === 'all' || String(x.direction) === String(F.dir)) && (F.sev === 'all' || x.severity === F.sev) && (!q || x.symbol === q));
+    rows = NewsEvents.sortEvents(rows);
+    S.rows = rows; S.summary = NewsEvents.summarize(rows, Date.now(), F.days);
+}
+function insEvt(k, v) {
+    const F = INS.evt.filter;
+    F[k] = k === 'days' ? Number(v) : (k === 'q' ? String(v || '').trim().toUpperCase().slice(0, 12) : v);
+    evtCompute(); render();
 }
 
 // ---------- khởi động ----------

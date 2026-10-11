@@ -81,7 +81,8 @@
   <li><span class="n">13</span><a href="#s13">Giới hạn và nguyên tắc dùng đúng</a></li>
   <li><span class="n">14</span><a href="#s14">Xử lý sự cố và câu hỏi thường gặp</a></li>
   <li><span class="n">15</span><a href="#s15">Market Simulation: mô phỏng xác suất (mới 0.1.18)</a></li>
-  <li><span class="n">16</span><a href="#s16">Insight: bảy công cụ phân tích sâu (mới 0.1.20)</a></li>
+  <li><span class="n">16</span><a href="#s16">Insight: chín công cụ phân tích sâu (mới 0.1.20)</a></li>
+  <li><span class="n">17</span><a href="#s17">Phòng kiểm thử: thử chiến lược trên lịch sử và phân rã lợi suất (mới 0.1.20)</a></li>
   <li><span class="n">A</span><a href="#pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</a></li>
   <li><span class="n">B</span><a href="#pb">Phụ lục B: thư viện phương pháp</a></li>
   <li><span class="n">C</span><a href="#pc">Phụ lục C: thuật ngữ</a></li>
@@ -558,11 +559,13 @@
   <li>Phần chấm "danh mục giữ nguyên" do máy chủ tính mỗi ngày làm việc từ giá đóng cửa các mã và sự kiện doanh nghiệp (cổ tức, thưởng) của VNDirect, đã điều chỉnh giá; mã nào không tải được thì bỏ, thiếu quá 25% giá trị thì bỏ qua lần đó.</li>
 </ul></div>
 
-<h1 id="s16">16. Insight: bảy công cụ phân tích sâu (mới 0.1.20)</h1>
-<p>Trang <span class="ui">Insight</span> (thanh điều hướng của Investment Workbench) gom bảy công cụ bổ sung cho các trang đã có. Mọi công cụ <b>mô tả và cảnh báo theo điều kiện bạn đặt</b>, không phải khuyến nghị đầu tư; mỗi mục ghi số liệu tính đến lúc nào.</p>
+<h1 id="s16">16. Insight: chín công cụ phân tích sâu (mới 0.1.20)</h1>
+<p>Trang <span class="ui">Insight</span> (thanh điều hướng của Investment Workbench) gom chín công cụ bổ sung cho các trang đã có. Mọi công cụ <b>mô tả và cảnh báo theo điều kiện bạn đặt</b>, không phải khuyến nghị đầu tư; mỗi mục ghi số liệu tính đến lúc nào.</p>
 <table>
   <thead><tr><th style="width:22%">Mục</th><th>Trả lời câu hỏi</th></tr></thead>
   <tbody>
+    <tr><td><span class="ui">Việc cần làm</span></td><td>Sáng nay tôi nên xem gì trước? Mọi tín hiệu từ các công cụ khác gom thành một danh sách xếp theo mức khẩn cấp.</td></tr>
+    <tr><td><span class="ui">Sự kiện</span></td><td>Tin nào là lợi nhuận, cổ tức, giải chấp, đình chỉ, người trong cuộc giao dịch? Lọc tin theo mã, loại, hướng.</td></tr>
     <tr><td><span class="ui">Luận điểm</span></td><td>Ý tưởng đầu tư của tôi còn đúng không? Mỗi ý tưởng có vài điều kiện đo được; máy chủ kiểm mỗi ngày làm việc.</td></tr>
     <tr><td><span class="ui">Thanh khoản</span></td><td>Bán hết mất mấy phiên, tốn bao nhiêu vì tác động giá, danh mục còn lớn thêm được bao nhiêu?</td></tr>
     <tr><td><span class="ui">Dòng tiền</span></td><td>Vài tuần tới tuần nào thiếu hay thừa tiền mặt?</td></tr>
@@ -614,6 +617,41 @@
   <li>Dung lượng khoảng 50–60 MB mỗi năm; dữ liệu từ nguồn công khai không có cam kết dịch vụ nên có thể có ngày thiếu (trang liệt kê).</li>
 </ul></div>
 
+<h2>16.8 Việc cần làm (mới)</h2>
+<p>Mỗi công cụ ở trên có tín hiệu riêng nằm ở một tab; nguy cơ là bạn không mở hết. <span class="ui">Insight → Việc cần làm</span> gom mọi tín hiệu <b>đã có</b> thành một danh sách bốn mức khẩn cấp: <b>nghiêm trọng</b> (nên xem ngay), <b>cao</b> (trong ngày), <b>vừa</b> (trong tuần), <b>thông tin</b>.</p>
+<ul>
+  <li>Luận điểm bị phá vỡ và tin xấu nghiêm trọng (pháp lý, đình chỉ giao dịch, giải chấp, nợ quá hạn) của mã bạn <b>đang nắm</b> là mức nghiêm trọng; tin tương tự của mã bạn chỉ <b>theo dõi</b> là mức cao. Tin của mã bạn không nắm giữ và không theo dõi không bao giờ xuất hiện.</li>
+  <li>Có thêm: nhiều người trong cuộc cùng mua hoặc bán, vượt hay gần chạm giới hạn đầu tư, dự kiến thiếu tiền, sắp tới ngày không hưởng quyền. Quản lý danh mục còn thấy lệnh chờ duyệt, cảnh báo chất lượng dữ liệu và hàm tự chạy bị lỗi.</li>
+  <li>Bấm <span class="ui">Vì sao một mục nằm ở mức này?</span> để xem quy tắc xếp mức; lọc theo mức hoặc loại; mỗi mục có liên kết tới tab liên quan hoặc tin gốc.</li>
+  <li><b>Email buổi sáng:</b> 08:30 các ngày làm việc, hệ thống gửi email tóm tắt cho người đã bật <i>email cảnh báo</i>, và <b>chỉ gửi khi có mục mới</b> mức nghiêm trọng hoặc cao so với email trước. Không có email không có nghĩa là mọi thứ ổn: chỉ là chưa có tín hiệu nào vượt ngưỡng.</li>
+</ul>
+<h2>16.9 Sự kiện theo mã (mới)</h2>
+<p>Máy chủ đọc tin các báo mỗi 3 giờ, gắn mã cổ phiếu có trong tiêu đề, rồi nhận ra tin <b>nói về việc gì</b> bằng luật từ khoá: kết quả kinh doanh, cổ tức, phát hành, mua lại, nhân sự cấp cao, hợp đồng, giải chấp, đình chỉ, pháp lý, người trong cuộc mua bán, dòng tiền khối ngoại, khuyến nghị… Bảng ở <span class="ui">Insight → Sự kiện</span> cho lọc theo <i>mã của tôi</i> hoặc toàn thị trường, 7 / 30 / 90 ngày, loại, hướng, mức; mỗi dòng kèm liên kết tin gốc và <b>cụm từ đã khớp</b> để bạn tự kiểm tra vì sao tin bị xếp vào loại đó.</p>
+<div class="callout"><b class="t">Giới hạn cần biết</b><ul>
+  <li>Không dùng mô hình ngôn ngữ: chỉ đọc tiêu đề và tóm tắt ngắn nên bỏ sót tin diễn đạt lạ và có thể xếp nhầm cụm từ đa nghĩa.</li>
+  <li><b>Hướng</b> tốt / xấu là gợi ý theo từ ngữ, không phải đánh giá tác động lên giá. Tiêu đề nhắc nhiều mã thì gắn cho tất cả các mã đó với độ tin cậy thấp hơn.</li>
+  <li>Có thể dùng làm điều kiện luận điểm (ví dụ "không có tin xấu nghiêm trọng trong 30 ngày"); kho tin mới bắt đầu tích luỹ từ tháng 10/2026.</li>
+</ul></div>
+
+<h1 id="s17">17. Phòng kiểm thử: thử chiến lược trên lịch sử và phân rã lợi suất (mới 0.1.20)</h1>
+<p>Trang <span class="ui">Kiểm thử</span> (thanh điều hướng của Investment Workbench) có hai tab. Mọi phép tính chạy <b>ngay trong máy bạn</b>; kho giá tải về một lần (lần đầu khoảng 1–2 phút) rồi lưu trên máy, các lần sau chỉ tải thêm ngày mới. Kết quả chỉ được lưu lên máy chủ khi bạn bấm <span class="ui">Lưu</span>, và chỉ chủ lần kiểm thử xem được.</p>
+<h2>17.1 Kiểm thử chiến lược</h2>
+<ol class="steps">
+  <li>Chọn một <b>mẫu</b> (Động lượng 12-1, Biến động thấp, Xu hướng tăng, Rẻ và chất lượng, Đảo chiều tuần, Tăng trưởng lợi nhuận) hoặc tự dựng: vũ trụ và giai đoạn, bộ lọc, tiêu chí xếp hạng có trọng số, số mã và cách chia tỷ trọng, tần suất cân bằng, độ trễ khớp, chi phí.</li>
+  <li>Bấm <span class="ui">Chạy kiểm thử</span> (thường 2–6 giây). Mỗi kỳ cân bằng, hệ thống chỉ dùng thông tin <b>có tại thời điểm đó</b>: số liệu cơ bản theo ngày công bố bảo thủ (quý +45 ngày, năm +90 ngày), gồm cả mã sau này bị hủy niêm yết, mã kẹt trần không mua được, mã kẹt sàn không bán được, thanh khoản giới hạn khối lượng khớp, phí, thuế bán 0,1% và tác động giá.</li>
+  <li>Đọc phần <span class="ui">Có đáng tin không?</span> TRƯỚC khi đọc con số lãi: so với 150 rổ chọn ngẫu nhiên cùng vũ trụ, khoảng tin cậy của lợi suất vượt VN-Index, có nhất quán ở hai nửa giai đoạn không, vượt thị trường ở mấy năm, có còn vượt khi đổi nhẹ tham số không, và xác suất Sharpe thật dương sau khi trừ số cấu hình bạn đã thử.</li>
+</ol>
+<div class="callout"><b class="t">Vì sao con số lãi đẹp chưa đủ</b><ul>
+  <li>Thử càng nhiều cấu hình, kết quả đẹp nhất càng dễ chỉ là may rủi. Trang đếm số cấu hình <b>khác nhau</b> bạn đã chạy và trừ vào Sharpe (Deflated Sharpe).</li>
+  <li>Phán quyết ghi thẳng "chưa đủ bằng chứng" khi có phép thử không đạt; không có kết quả nào được trình bày như bảo đảm.</li>
+  <li>Chưa mô phỏng lô chẵn, T+2, ký quỹ. VN-Index là chỉ số giá nên thấp hơn thật ~1–2%/năm cổ tức. Mã penny UPCoM nhiễu mạnh: hãy đặt thanh khoản tối thiểu.</li>
+</ul></div>
+<h2>17.2 Yếu tố: danh mục lãi hay lỗ vì đâu</h2>
+<p>Chọn đối tượng (danh mục của tôi, danh mục nhóm hoặc vài mã tự chọn, ví dụ <span class="ui">FPT:40 HPG:30 VCB:30</span>) và cửa sổ 1 / 2 / 3 năm. Hệ thống dựng lợi suất năm yếu tố mua-bán từ kho giá (quy mô nhỏ, giá trị rẻ, động lượng, biến động thấp, chất lượng) cùng yếu tố thị trường, rồi hồi quy lợi suất ngày của danh mục lên chúng. Bạn thấy: beta thị trường, độ nghiêng từng yếu tố kèm <b>t-stat</b> (chỉ đáng tin khi |t| ≥ 2), mỗi yếu tố đóng góp bao nhiêu %/năm, phần alpha còn lại, và phân vị từng mã so với cả thị trường hôm nay.</p>
+<div class="callout"><b class="t">Giới hạn cần biết</b><ul>
+  <li>Mô hình tự dựng từ số liệu miễn phí, không so trực tiếp được với MSCI Barra hay Fama-French của Mỹ; vũ trụ Việt Nam nhỏ nên yếu tố nhiễu.</li>
+  <li>Hồi quy dùng <b>tỷ trọng hiện tại</b> áp ngược về quá khứ, không phản ánh danh mục bạn đã giữ thật; các yếu tố tương quan nhau nên hệ số riêng lẻ khó đọc khi hệ số VIF lớn.</li>
+</ul></div>
 <h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>
 <p>Bảng do ứng dụng dùng thật (sinh trực tiếp từ mã nguồn). Vai trò mặc định; bạn đổi được trong tab Quy trình. Phương pháp nào chưa tính được (ví dụ cần bạn nhập NAV) sẽ hiện là lỗ hổng nếu là Chính hoặc Hỗ trợ.</p>
 <!--ARCH_TABLE-->

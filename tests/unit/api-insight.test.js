@@ -177,3 +177,33 @@ describe('Độ chính xác dự phóng', () => {
     await API.insight.deleteForecast(EMAIL, fake.table('finance_forecasts')[0].id); expect(fake.table('finance_forecasts')).toHaveLength(1);
   });
 });
+
+describe('Sự kiện theo mã và đầu vào hộp việc', () => {
+  const iso = (h) => new Date(Date.now() - h * 3600000).toISOString();
+  it('newsEvents: chỉ lấy trong cửa sổ, mới nhất trước, kèm lần chạy tin gần nhất; số ngày bị chặn 1-120', async () => {
+    const { API, callGAS } = boot({
+      finance_news_events: [{ id: 'a|FPT|legal', symbol: 'FPT', event_type: 'legal', published_at: iso(5) }, { id: 'b|HPG|earnings', symbol: 'HPG', event_type: 'earnings', published_at: iso(24 * 20) }, { id: 'c|VCB|mgmt', symbol: 'VCB', event_type: 'mgmt', published_at: iso(1) }],
+      finance_function_runs: [{ fn: 'insight-sync', mode: 'news', run_at: iso(10), ok: true }, { fn: 'insight-sync', mode: 'news', run_at: iso(2), ok: false }, { fn: 'insight-sync', mode: 'thesis', run_at: iso(1), ok: true }],
+    });
+    const r = await API.insight.newsEvents(7);
+    expect(r.events.map((x) => x.symbol)).toEqual(['VCB', 'FPT']); expect(r.days).toBe(7); expect(r.lastRun.ok).toBe(false);
+    expect((await API.insight.newsEvents(30)).events).toHaveLength(3);
+    expect((await API.insight.newsEvents(9999)).days).toBe(120); expect((await API.insight.newsEvents('x')).days).toBe(30);
+    const viaGas = await callGAS('getNewsEvents', { days: 7 });
+    expect(viaGas.status).toBe('success'); expect(viaGas.data.events).toHaveLength(2);
+  });
+  it('inboxInputs: giới hạn 2 ngày, lệnh chờ duyệt, cảnh báo dữ liệu chưa xử lý, hàm lỗi 36 giờ, tên thành viên', async () => {
+    const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const { API, callGAS } = boot({
+      finance_compliance_log: [{ log_date: day(0), user_id: USER, breaches: [{ kind: 'single' }], warns: [] }, { log_date: day(9), user_id: USER, breaches: [{ kind: 'old' }], warns: [] }],
+      finance_order_requests: [{ id: 'o1', symbol: 'FPT', side: 'buy', created_by: USER, created_at: iso(30), status: 'pending' }, { id: 'o2', symbol: 'HPG', side: 'sell', created_by: USER, created_at: iso(2), status: 'approved' }],
+      finance_data_health: [{ kind: 'stale_price', severity: 'warn', symbol: 'ABC', ref_date: day(1), dedupe_key: 'k1', resolved: false, detected_at: iso(5) }, { kind: 'x', severity: 'info', resolved: false, detected_at: iso(5) }, { kind: 'y', severity: 'error', resolved: true, detected_at: iso(5) }],
+      finance_function_runs: [{ fn: 'bt-data', mode: 'fill', ok: false, run_at: iso(3) }, { fn: 'bt-data', mode: 'fill', ok: true, run_at: iso(2) }, { fn: 'old', mode: 'x', ok: false, run_at: iso(24 * 5) }],
+    });
+    const r = await API.insight.inboxInputs();
+    expect(r.compliance.map((x) => x.breaches[0].kind)).toEqual(['single']); expect(r.approvals.map((x) => x.id)).toEqual(['o1']);
+    expect(r.health.map((x) => x.kind)).toEqual(['stale_price']); expect(r.runs.map((x) => x.fn)).toEqual(['bt-data']);
+    expect(r.members[USER]).toBe('Tôi'); expect(r.notes).toEqual([]);
+    expect((await callGAS('getInboxInputs', {})).status).toBe('success');
+  });
+});

@@ -1,4 +1,4 @@
-// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch, valuation-watch, vb-data, source-watch, sim-watch và insight-sync (Deno không đọc được thư mục lib/ của app).
+// Sao chép các thư viện thuần của app vào các Edge Function check-limits, approval-watch, valuation-watch, vb-data, source-watch, sim-watch, insight-sync và bt-data (Deno không đọc được thư mục lib/ của app).
 // Bản sao = nguyên văn lib/<tên>.js + một dòng `globalThis.<Tên> = <Tên>;` ở cuối (để các thư viện phụ thuộc nhau thấy global như khi nạp bằng thẻ <script>).
 // Chạy sau mỗi lần sửa lib/finance-calc.js, portfolio-calc.js, group-calc.js, limits-calc.js hoặc approval-calc.js:  node scripts/sync-edge-libs.mjs
 // tests/unit/check-limits.test.js kiểm tra bản sao khớp với lib/ nên quên chạy sẽ làm CI đỏ.
@@ -33,8 +33,13 @@ export const SIMWATCH_LIBS = [{ file: 'sim-score.js', global: 'SimScore' }, { fi
 // sim-watch cũng cần phần chuẩn hoá sự kiện doanh nghiệp (cổ tức, thưởng, chia tách) của hàm stock-events để điều chỉnh giá các mã trước khi chấm "danh mục giữ nguyên": bản sao nguyên văn tệp .ts
 export const SIMWATCH_TS = [{ from: 'supabase/functions/stock-events/parse.ts', to: 'supabase/functions/sim-watch/events-parse.ts' }];
 // insight-sync: kiểm luận điểm (ThesisCalc) và đọc dữ liệu sở hữu (OwnershipCalc) bằng đúng bản của trang; news-parse.ts là bản sao nguyên văn parse.ts của market-news (cùng nguồn RSS)
-export const INSIGHT_LIBS = [{ file: 'thesis-calc.js', global: 'ThesisCalc' }, { file: 'ownership-calc.js', global: 'OwnershipCalc' }];
+export const INSIGHT_LIBS = [{ file: 'thesis-calc.js', global: 'ThesisCalc' }, { file: 'ownership-calc.js', global: 'OwnershipCalc' }, { file: 'news-events.js', global: 'NewsEvents' }, { file: 'action-inbox.js', global: 'ActionInbox' }];
 export const INSIGHT_TS = [{ from: 'supabase/functions/market-news/parse.ts', to: 'supabase/functions/insight-sync/news-parse.ts' }];
+// bt-data dựng ngược bảng số liệu theo thời điểm bằng đúng buildSnapshot / bảng mã chỉ số của market-data-sync (bản sao nguyên văn peers.ts và logic.ts)
+export const BTDATA_TS = [
+  { from: 'supabase/functions/market-data-sync/peers.ts', to: 'supabase/functions/bt-data/peers.ts' },
+  { from: 'supabase/functions/market-data-sync/logic.ts', to: 'supabase/functions/bt-data/logic.ts' },
+];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -74,6 +79,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const c of INSIGHT_TS) {
     fs.writeFileSync(path.join(root, c.to), fs.readFileSync(path.join(root, c.from), 'utf8'));
     console.log('đã sao chép (insight-sync)', c.to);
+  }
+  for (const c of BTDATA_TS) {
+    fs.writeFileSync(path.join(root, c.to), fs.readFileSync(path.join(root, c.from), 'utf8'));
+    console.log('đã sao chép (bt-data)', c.to);
   }
   for (const lib of SOURCEWATCH_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'source-watch', lib.file), expectedCopy(lib));

@@ -5215,7 +5215,7 @@ const MUTATING_ACTIONS = new Set([
     'provisionUser', 'updateUserGroup', 'removeUser', 'setUserActive', 'updateNickname',
     'addAssetTransaction', 'deleteAssetTransaction', 'setMarketPrice', 'setHoldingLevel', 'setAlertPrefs', 'setCashDebt', 'saveStockValuation',
     'saveStockQuarter', 'deleteStockQuarter', 'deleteStockValuation', 'pushStockToPortfolio', 'saveStockValuationBatch', 'saveStockQuarterBatch', 'saveDecision', 'saveDecisionReview', 'deleteDecision', 'saveSimRun', 'updateSimRun', 'deleteSimRun',
-    'saveThesisCondition', 'deleteThesisCondition', 'setThesisManual', 'saveForecast', 'deleteForecast',
+    'saveThesisCondition', 'deleteThesisCondition', 'setThesisManual', 'saveForecast', 'deleteForecast', 'labSaveRun', 'labDeleteRun',
     'grantFinRole', 'revokeFinRole', 'updateMemberRole',
     'applyCorporateEvents', 'dismissCorporateEvent', 'restoreCorporateEvent', 'saveIdea', 'setIdeaStatus', 'addIdeaComment', 'deleteIdeaComment', 'voteIdea', 'removeIdea', 'saveLimit', 'removeLimit', 'setLimitActive', 'addRestricted', 'setRestrictedActive', 'resolveDataHealth', 'addCashFlow', 'deleteCashFlow', 'addCorporateAction', 'deleteCorporateAction', 'upsertBenchmarkPrice',
     'savePolicy', 'saveReconciliation', 'saveApprovalPolicy', 'setSelfApprovers', 'reviewApprovalAudit', 'createOrderRequest', 'decideOrderRequest', 'cancelOrderRequest', 'importAssetTransactions', 'undoAssetImportBatch', 'addWatchlistItem', 'updateWatchlistItem', 'removeWatchlistItem', 'saveAllocationTargets',
@@ -5453,6 +5453,11 @@ async function _dispatchAction(action, params = {}) {
             case 'deleteSimRun': result = await API.asset.simRuns.remove(params.email, params.id); break;
             case 'getUnplannedTrades': result = await API.asset.journal.unplannedTrades(params.email, params.days); break;
             // Insight (lớp dữ liệu ở insight/insight-api.js, nạp sau api.js; trang không nạp nó thì gọi các action này sẽ báo lỗi rõ ràng)
+            // Phòng kiểm thử (lớp dữ liệu ở lab/lab-api.js; tải kho giá lớn gọi thẳng API.lab, không qua đây để bộ nhớ đệm của lớp đồng bộ không phải giữ hàng chục MB)
+            case 'labListRuns': result = await API.lab.listRuns(); break;
+            case 'labGetRun': result = await API.lab.getRun(params.id); break;
+            case 'labSaveRun': result = await API.lab.saveRun(params.email, params); break;
+            case 'labDeleteRun': result = await API.lab.deleteRun(params.email, params.id); break;
             case 'getPitStatus': result = await API.insight.pitStatus(); break;
             case 'getPitDay': result = await API.insight.pitDay(params.date); break;
             case 'getPitFundamentals': result = await API.insight.pitFundamentals(params.symbol); break;
@@ -5461,6 +5466,8 @@ async function _dispatchAction(action, params = {}) {
             case 'syncOwnership': result = await API.insight.syncOwnership(params.symbols); break;
             case 'listThesis': result = await API.insight.thesisList(); break;
             case 'getThesisContext': result = await API.insight.thesisContext(params.symbols); break;
+            case 'getNewsEvents': result = await API.insight.newsEvents(params.days); break;
+            case 'getInboxInputs': result = await API.insight.inboxInputs(); break;
             case 'saveThesisCondition': result = await API.insight.saveThesisCondition(params.email, params.condition); break;
             case 'deleteThesisCondition': result = await API.insight.deleteThesisCondition(params.email, params.id); break;
             case 'setThesisManual': result = await API.insight.setThesisManual(params.email, params.id, params.met); break;

@@ -4,14 +4,20 @@
 //                    -> finance_shareholders, finance_insider_trades, finance_ownership_sync. Gọi từ app thì bỏ qua mã vừa đồng bộ trong 60 phút (chống lạm dụng).
 //   mode "thesis"    (pg_cron 19:35 VN ngày làm việc): kiểm mọi điều kiện luận điểm của ý tưởng đang mở (lib/thesis-calc.js, cùng bản với trang), ghi trạng thái và nhật ký chuyển trạng thái,
 //                    email cho chủ ý tưởng (đã bật email cảnh báo) khi một điều kiện QUAN TRỌNG bị phá vỡ; chỉ báo một lần cho mỗi lần sai.
+//   mode "events"    (chạy tay, hoặc tự chạy sau mode news): trích SỰ KIỆN (lợi nhuận, cổ tức, giải chấp, đình chỉ, giao dịch nội bộ...) từ tiêu đề các tin đã gắn mã (lib/news-events.js) -> finance_news_events;
+//                    chạy tay thì quét lại tin 120 ngày gần nhất (sửa luật xong chạy lại; id cố định nên không nhân đôi).
+//   mode "digest"    (pg_cron 08:30 VN ngày làm việc): HỘP VIỆC CẦN LÀM -- gom luận điểm bị phá, tin xấu nghiêm trọng của mã đang nắm / theo dõi, nội bộ mua bán đồng loạt, vượt giới hạn, lệnh chờ duyệt, lỗi dữ liệu và hàm
+//                    (lib/action-inbox.js, cùng bản với trang) rồi email cho người đã bật email cảnh báo, CHỈ khi có mục MỚI mức nghiêm trọng / cao so với email trước (finance_digest_state); không gửi email chỉ có việc mức vừa.
 //   mode "pit"       : chạy tay hàm chụp kho dữ liệu theo thời điểm (fn_pit_capture; cron SQL 19:05 VN đã tự chạy hằng ngày).
 // Nguồn không có cam kết dịch vụ: lỗi một mã / một báo không làm hỏng phần còn lại; mỗi lần chạy ghi finance_function_runs (app cảnh báo khi hàm quá hạn). Phản hồi chỉ có SỐ LƯỢNG.
 // verify_jwt = true. {"selftest":true} chạy không đụng mạng / CSDL. {"mode":"thesis","dry":true} tính nhưng không ghi, không gửi email.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import "./thesis-calc.js";
 import "./ownership-calc.js";
+import "./news-events.js";
+import "./action-inbox.js";
 import { FEEDS, merge, parseRss, type NewsItem } from "./news-parse.ts";
-import { evaluateAll, insiderRows, newsRows, shareholderRows, tagSymbols, thesisEmail, trackedSymbols } from "./logic.ts";
+import { evaluateAll, eventRows, heldByUser, inboxForUser, insiderRows, newsRows, shareholderRows, tagSymbols, thesisEmail, trackedSymbols } from "./logic.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -71,7 +77,35 @@ async function runNews(supabase: any) {
     const { error } = await supabase.from("finance_pit_news").upsert(part, { onConflict: "id", ignoreDuplicates: true });
     if (error) console.error("insight-sync: ghi tin lỗi", error.message); else stored += part.length;
   }
-  return { ok: okFeeds > 0, feeds: FEEDS.length, feedsOk: okFeeds, items: items.length, tagged: rows.filter((r) => r.symbols.length).length, submitted: stored };
+  // sự kiện của các tin vừa đọc (tin đã có thì id sự kiện trùng, bỏ qua); lỗi phần này không làm hỏng việc lưu tin
+  let events = 0;
+  try { events = await storeEvents(supabase, eventRows(rows.filter((r) => r.symbols.length))); } catch (e) { console.error("insight-sync: ghi sự kiện lỗi", String((e as Error).message || e)); }
+  return { ok: okFeeds > 0, feeds: FEEDS.length, feedsOk: okFeeds, items: items.length, tagged: rows.filter((r) => r.symbols.length).length, submitted: stored, events };
+}
+
+// ---------- events ----------
+async function storeEvents(supabase: any, rows: any[]): Promise<number> {
+  let n = 0;
+  for (const part of chunk(rows, 200)) {
+    const { error } = await supabase.from("finance_news_events").upsert(part, { onConflict: "id", ignoreDuplicates: true });
+    if (error) throw new Error(error.message); n += part.length;
+  }
+  return n;
+}
+// Quét lại các tin đã lưu (luật mới / lần đầu): mọi tin có mã trong `days` ngày gần nhất
+async function runEvents(supabase: any, days: number) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const news: any[] = [];
+  for (let from = 0; from < 5000; from += 1000) {
+    const { data, error } = await supabase.from("finance_pit_news").select("id, title, summary, symbols, published_at, link, source").gte("first_seen", since).order("first_seen", { ascending: false }).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    news.push(...(data ?? []).filter((r: any) => r.symbols && r.symbols.length));
+    if (!data || data.length < 1000) break;
+  }
+  const rows = eventRows(news);
+  const stored = await storeEvents(supabase, rows);
+  const byType: Record<string, number> = {}; rows.forEach((r) => { byType[r.event_type] = (byType[r.event_type] ?? 0) + 1; });
+  return { ok: true, news: news.length, events: stored, byType };
 }
 
 // ---------- ownership ----------
@@ -128,11 +162,13 @@ async function runThesis(supabase: any, dry: boolean) {
     ideas.push(...(data ?? []));
   }
   const symbols = [...new Set(ideas.map((i) => String(i.symbol).toUpperCase()))];
-  const [snapRes, ratioRes, insRes, syncRes] = await Promise.all([
+  const [snapRes, ratioRes, insRes, syncRes, evRes, newsRes] = await Promise.all([
     supabase.from("finance_market_snapshot").select("symbol, metrics").in("symbol", symbols),
     supabase.from("finance_stock_ratios").select("symbol, metrics").in("symbol", symbols),
     supabase.from("finance_insider_trades").select("id, symbol, trader, action, status, shares_before, shares_after, registered, acquired, start_date, end_date, public_date").in("symbol", symbols).gte("public_date", new Date(Date.now() - 100 * 86400000).toISOString().slice(0, 10)),
     supabase.from("finance_ownership_sync").select("symbol").eq("ok", true).in("symbol", symbols),
+    supabase.from("finance_news_events").select("symbol, event_type, direction, severity, published_at").in("symbol", symbols).gte("published_at", new Date(Date.now() - 100 * 86400000).toISOString()).limit(5000),
+    supabase.from("finance_pit_news").select("id", { count: "exact", head: true }).gte("first_seen", new Date(Date.now() - 48 * 3600000).toISOString()),
   ]);
   const snapshots: Record<string, any> = {}, ratios: Record<string, any> = {}, insider: Record<string, any[]> = {};
   (snapRes.data ?? []).forEach((r: any) => { snapshots[r.symbol] = r.metrics; });
@@ -140,7 +176,9 @@ async function runThesis(supabase: any, dry: boolean) {
   (insRes.data ?? []).forEach((r: any) => { (insider[r.symbol] = insider[r.symbol] || []).push(r); });
   const synced = new Set((syncRes.data ?? []).map((r: any) => r.symbol));
   const nowIso = new Date().toISOString();
-  const r = evaluateAll(ideas, conds, snapshots, ratios, insider, synced, nowIso.slice(0, 10), nowIso);
+  const evBySymbol: Record<string, any[]> = {};
+  (evRes.data ?? []).forEach((e: any) => { (evBySymbol[e.symbol] = evBySymbol[e.symbol] || []).push(e); });
+  const r = evaluateAll(ideas, conds, snapshots, ratios, insider, synced, nowIso.slice(0, 10), nowIso, { ready: !evRes.error && (newsRes.count ?? 0) > 0, bySymbol: evBySymbol });
   const stats = { ok: true, conditions: conds.length, ideas: r.ideas.length, broken: r.ideas.filter((x) => x.status === "broken").length, warning: r.ideas.filter((x) => x.status === "warning").length, changes: r.logs.length, alerts: r.alerts.length };
   if (dry) return Object.assign({ dry: true }, stats);
   for (const part of chunk(r.updates, 20)) await Promise.all(part.map((u) => supabase.from("finance_thesis_conditions").update(u.patch).eq("id", u.id)));
@@ -166,6 +204,74 @@ async function runThesis(supabase: any, dry: boolean) {
   return Object.assign(stats, { configured: !!Deno.env.get("RESEND_API_KEY"), sent, failed });
 }
 
+// ---------- digest ----------
+async function fetchPages(build: () => any, cap = 20000): Promise<any[]> {
+  const out: any[] = [];
+  for (let from = 0; from < cap; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+async function runDigest(supabase: any, dry: boolean) {
+  const AI = g.ActionInbox;
+  const nowIso = new Date().toISOString(), since3 = new Date(Date.now() - 3 * 86400000).toISOString(), since36h = new Date(Date.now() - 36 * 3600000).toISOString();
+  const since2d = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), since100 = new Date(Date.now() - 100 * 86400000).toISOString().slice(0, 10);
+  const [{ data: users }, { data: prefs }, { data: mgrs }] = await Promise.all([
+    supabase.from("users").select("id, email, nickname, group_key, active").in("group_key", ["finance", "admin"]),
+    supabase.from("finance_alert_prefs").select("user_id").eq("email_enabled", true),
+    supabase.from("fin_roles").select("user_id").eq("role", "asset_manager"),
+  ]);
+  const optIn = new Set((prefs ?? []).map((p: any) => p.user_id)), mgrSet = new Set((mgrs ?? []).map((p: any) => p.user_id));
+  const targets = (users ?? []).filter((u: any) => u.active !== false && u.email && optIn.has(u.id)).map((u: any) => ({ id: u.id as string, email: u.email as string, nickname: u.nickname ?? null, manager: mgrSet.has(u.id) || u.group_key === "admin" }));
+  if (!targets.length) return { ok: true, recipients: 0, sent: 0, note: "Chưa ai bật email cảnh báo." };
+  const ids = targets.map((t) => t.id);
+  const [txns, watch, ideas, events, compliance, approvals, health, runs, state] = await Promise.all([
+    fetchPages(() => supabase.from("finance_transactions").select("user_id, symbol, type, quantity").in("user_id", ids).is("deleted_at", null).order("id")),
+    fetchPages(() => supabase.from("finance_watchlist").select("user_id, symbol").in("user_id", ids).order("id")),
+    fetchPages(() => supabase.from("finance_ideas").select("id, user_id, symbol, title").in("user_id", ids).in("status", OPEN_STATUSES).order("id")),
+    fetchPages(() => supabase.from("finance_news_events").select("news_id, symbol, event_type, direction, severity, published_at, title, link").gte("published_at", since3).in("severity", ["alert", "watch"]).order("published_at", { ascending: false })),
+    fetchPages(() => supabase.from("finance_compliance_log").select("log_date, user_id, breaches, warns").gte("log_date", since2d).order("log_date", { ascending: false })),
+    fetchPages(() => supabase.from("finance_order_requests").select("id, symbol, side, created_by, created_at").eq("status", "pending").order("created_at")),
+    fetchPages(() => supabase.from("finance_data_health").select("kind, symbol, severity, ref_date, dedupe_key, detail").eq("resolved", false).in("severity", ["warn", "error"]).gte("detected_at", since3)),
+    fetchPages(() => supabase.from("finance_function_runs").select("fn, mode, ok, run_at").eq("ok", false).gte("run_at", since36h)),
+    fetchPages(() => supabase.from("finance_digest_state").select("user_id, item_ids, sent_at").in("user_id", ids)),
+  ]);
+  // mỗi người / nhóm chỉ lấy bản tuân thủ MỚI NHẤT
+  const latestLog = new Map<string, any>(); compliance.forEach((r: any) => { const k = r.user_id ?? "group"; if (!latestLog.has(k)) latestLog.set(k, r); });
+  const heldMap = heldByUser(txns), watchMap = new Map<string, Set<string>>();
+  watch.forEach((w: any) => { const s = watchMap.get(w.user_id) ?? new Set<string>(); s.add(String(w.symbol).toUpperCase()); watchMap.set(w.user_id, s); });
+  const tracked = new Set<string>(); heldMap.forEach((s) => s.forEach((x) => tracked.add(x))); watchMap.forEach((s) => s.forEach((x) => tracked.add(x))); ideas.forEach((i: any) => tracked.add(String(i.symbol).toUpperCase()));
+  const trades: any[] = [];
+  for (const part of chunk([...tracked].slice(0, 300), 60)) { const { data } = await supabase.from("finance_insider_trades").select("id, symbol, trader, action, status, shares_before, shares_after, registered, acquired, start_date, end_date, public_date").in("symbol", part).gte("public_date", since100).limit(5000); trades.push(...(data ?? [])); }
+  const insiderBySymbol = new Map<string, any[]>(); trades.forEach((t) => { const a = insiderBySymbol.get(t.symbol) ?? []; a.push(t); insiderBySymbol.set(t.symbol, a); });
+  const conds = ideas.length ? await fetchPages(() => supabase.from("finance_thesis_conditions").select("idea_id, metric, op, threshold, severity, label, last_state, state_since").in("idea_id", ideas.map((i: any) => i.id)).order("id")) : [];
+  const nameOf = new Map<string, string>((users ?? []).map((u: any) => [u.id, u.nickname || String(u.email || "").split("@")[0]]));
+  const data = {
+    heldByUser: heldMap, watchByUser: watchMap, ideas, conds, events, insiderBySymbol, compliance: [...latestLog.values()],
+    approvals: approvals.map((a: any) => ({ id: a.id, symbol: a.symbol, side: a.side, requester: nameOf.get(a.created_by) ?? null, created_at: a.created_at })),
+    health: health.map((h: any) => ({ kind: h.kind, severity: h.severity, symbol: h.symbol, ref_date: h.ref_date, dedupe_key: h.dedupe_key, label: h.kind })),
+    runs,
+  };
+  const prev = new Map<string, string[]>(state.map((s: any) => [s.user_id, s.item_ids ?? []]));
+  const apiKey = Deno.env.get("RESEND_API_KEY"), from = Deno.env.get("ALERT_FROM_EMAIL") || "WorkHub <onboarding@resend.dev>";
+  let sent = 0, failed = 0, skipped = 0, withItems = 0;
+  for (const u of targets) {
+    const items = inboxForUser(data, u, nowIso), list = items.filter((x: any) => x.sev <= 3);
+    if (list.length) withItems++;
+    const fresh = AI.fresh(list, prev.get(u.id) ?? []), urgentNew = fresh.some((x: any) => x.sev <= 2);
+    if (!urgentNew) { skipped++; continue; }
+    if (dry) { sent++; continue; }
+    if (!apiKey) { failed++; continue; }
+    const mail = AI.digest(list, { newIds: fresh.map((x: any) => x.id) });
+    const ok = await sendEmail(apiKey, from, u.email, mail.subject, mail.html, mail.text);
+    if (ok) { sent++; await supabase.from("finance_digest_state").upsert({ user_id: u.id, item_ids: list.map((x: any) => x.id), sent_at: nowIso }, { onConflict: "user_id" }); } else failed++;
+  }
+  return { ok: true, recipients: targets.length, withItems, sent, failed, skipped, configured: !!apiKey, dry: dry || undefined };
+}
+
 // ---------- tự kiểm ----------
 function selfTest() {
   const O = g.OwnershipCalc, T = g.ThesisCalc;
@@ -182,7 +288,7 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, result: selfTest() });
   const mode = String(body?.mode || "");
-  if (!["news", "ownership", "thesis", "pit"].includes(mode)) return json({ ok: false, error: "mode không hợp lệ" }, 400);
+  if (!["news", "ownership", "thesis", "events", "digest", "pit"].includes(mode)) return json({ ok: false, error: "mode không hợp lệ" }, 400);
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();
   let result: any, ok = true;
@@ -190,6 +296,8 @@ Deno.serve(async (req: Request) => {
     if (mode === "news") result = await runNews(supabase);
     else if (mode === "ownership") result = await runOwnership(supabase, body.symbols);
     else if (mode === "thesis") result = await runThesis(supabase, !!body.dry);
+    else if (mode === "digest") result = await runDigest(supabase, !!body.dry);
+    else if (mode === "events") result = await runEvents(supabase, Math.min(Math.max(Number(body.days) || 120, 1), 400));
     else { const { data, error } = await supabase.rpc("fn_pit_capture"); if (error) throw new Error(error.message); result = data; }
     ok = result?.ok !== false;
   } catch (e) {

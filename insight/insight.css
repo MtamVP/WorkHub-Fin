@@ -106,3 +106,16 @@ body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subt
 .ins-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); font-size: 0.86rem; line-height: 1.6; }
 .ins-empty i { display: block; font-size: 1.4rem; margin-bottom: 8px; color: var(--finance-accent); }
 .ins-nav-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-color); margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
+
+/* việc cần làm */
+.ins-inbox { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ins-inbox-item { border: 1px solid var(--border-color); border-left-width: 4px; border-radius: var(--radius-sm); background: var(--card-bg); padding: 10px 14px; display: grid; gap: 4px; }
+.ins-inbox-item.s1 { border-left-color: var(--danger-color); } .ins-inbox-item.s2 { border-left-color: var(--warning-color); } .ins-inbox-item.s3 { border-left-color: var(--finance-accent); } .ins-inbox-item.s4 { border-left-color: var(--border-strong); }
+.ins-inbox-top { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.ins-inbox-when { margin-left: auto; font-size: 0.72rem; }
+.ins-inbox-title { font-weight: 600; font-size: 0.92rem; color: var(--text-primary); }
+.ins-inbox-detail { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+.ins-sym { font-family: var(--font-mono); }
+.ins-field-inline { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+.ins-details > summary { cursor: pointer; font-weight: 600; font-size: 0.86rem; padding: 4px 0; }
+.ins-table td.ins-evt-title { min-width: 260px; }

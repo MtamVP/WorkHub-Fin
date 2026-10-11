@@ -1,0 +1,48 @@
+/* --- FILE: /lab/lab.css ---
+   Phòng kiểm thử: dùng lại toàn bộ hệ thiết kế của Insight (insight.css, tiền tố ins-) và chỉ thêm thành phần riêng, tiền tố lab-.
+   Cùng accent đồng thau của Insight (hai trang cùng họ công cụ phân tích); đủ cả sáng và tối. */
+
+body.desk[data-bench="lab"] {
+  --finance-accent: #8A5A12; --finance-accent-hover: #9E6A18; --finance-accent-subtle: rgba(138, 90, 18, 0.10); --finance-accent-line: rgba(138, 90, 18, 0.30);
+  --ins-up: #12855A; --ins-down: #C23B3B; --ins-warn: #B7791F; --ins-flat: #8A8377; --ins-grid: rgba(28, 25, 21, 0.08); --ins-on-accent: #FFFFFF;
+}
+:root[data-theme="dark"] body.desk[data-bench="lab"] {
+  --finance-accent: #E0B15A; --finance-accent-hover: #EBC376; --finance-accent-subtle: rgba(224, 177, 90, 0.13); --finance-accent-line: rgba(224, 177, 90, 0.34);
+  --ins-up: #3DBA87; --ins-down: #E8695B; --ins-warn: #E0B15A; --ins-flat: #9C968A; --ins-grid: rgba(237, 233, 222, 0.09); --ins-on-accent: #20180A;
+}
+:root[data-theme="dark"] body.desk[data-bench="lab"] .desk-wordmark .glyph { color: #20180A; }
+body[data-bench="lab"] .desk-who .av { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+
+.lab-lbl { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-right: 8px; }
+.lab-hint { font-size: 0.7rem; font-weight: 400; color: var(--text-muted); line-height: 1.4; }
+.lab-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.lab-sect { border-top: 1px solid var(--border-color); padding: 12px 0 4px; margin-top: 10px; }
+.lab-sect h4 { margin: 0 0 8px; font-size: 0.84rem; color: var(--text-primary); }
+.lab-row { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(110px, 1fr) minmax(90px, 1fr) auto; gap: 10px; align-items: end; margin-bottom: 8px; }
+.lab-row .ins-field input, .lab-row .ins-field select { width: 100%; }
+@media (max-width: 760px) { .lab-row { grid-template-columns: 1fr 1fr; } .lab-row .ins-field:first-child { grid-column: 1 / -1; } }
+.lab-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 10px; }
+.lab-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; }
+.lab-check input { accent-color: var(--finance-accent); }
+
+.lab-verdict { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-color-2); margin-bottom: 14px; font-size: 0.86rem; line-height: 1.55; color: var(--text-secondary); }
+.lab-verdict > i { font-size: 1.15rem; margin-top: 2px; }
+.lab-verdict b { color: var(--text-primary); }
+.lab-verdict.good { border-color: var(--success-color); } .lab-verdict.good > i { color: var(--ins-up); }
+.lab-verdict.warn { border-color: var(--warning-color); } .lab-verdict.warn > i { color: var(--ins-warn); }
+.lab-verdict.bad { border-color: var(--danger-color); } .lab-verdict.bad > i { color: var(--ins-down); }
+.lab-chks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lab-chk { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--card-bg); font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary); }
+.lab-chk > i { margin-top: 3px; }
+.lab-chk b { color: var(--text-primary); }
+.lab-chk.good > i { color: var(--ins-up); } .lab-chk.warn > i { color: var(--ins-warn); } .lab-chk.bad > i { color: var(--ins-down); }
+.lab-chk.bad { border-color: var(--danger-color); } .lab-chk.warn { border-color: var(--warning-color); }
+
+/* yếu tố */
+.lab-bar { display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(0, 3fr) 70px; gap: 10px; align-items: center; padding: 5px 0; font-size: 0.82rem; }
+.lab-bar .track { position: relative; height: 12px; background: var(--bg-color-2); border-radius: var(--radius-pill); }
+.lab-bar .track .zero { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--border-strong); }
+.lab-bar .track .fill { position: absolute; top: 1px; bottom: 1px; border-radius: var(--radius-pill); }
+.lab-bar .track .fill.pos { left: 50%; background: var(--ins-up); } .lab-bar .track .fill.neg { right: 50%; background: var(--ins-down); }
+.lab-bar .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.lab-bar .lbl small { display: block; color: var(--text-muted); font-size: 0.7rem; }

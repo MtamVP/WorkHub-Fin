@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Kiểm thử | WorkHub Finance</title>
+    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&family=DM+Mono:wght@300;400;500&family=Lora:wght@500;600&subset=vietnamese&display=swap" rel="stylesheet">
+    <script>
+      /* Dong bo dark mode voi app shell truoc khi trang ve (cung logic voi cac trang Investment Workbench: auto = 18h-6h) */
+      (function () {
+        try {
+          var t = localStorage.getItem('user-theme');
+          var h = new Date().getHours();
+          if (t === 'dark' || ((t === 'auto' || !t) && (h >= 18 || h < 6))) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/style.css?v=1788630490059">
+    <link rel="stylesheet" href="/finance-shared.css?v=2.14">
+    <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
+    <link rel="stylesheet" href="/insight/insight.css?v=1793000000000">
+    <link rel="stylesheet" href="/lab/lab.css?v=1793100000000">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#8A5A12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkHub">
+    <link rel="apple-touch-icon" href="/logo.png">
+</head>
+<body class="desk" data-bench="lab">
+
+    <header class="desk-topbar">
+        <div class="desk-topbar-inner">
+            <div class="desk-wordmark">
+                <span class="glyph" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+                </span>
+                WorkHub Finance <span class="sub">· Kiểm thử</span>
+            </div>
+            <nav class="desk-nav">
+                <a href="/lab/#backtest" class="active" aria-current="page"><i class="fa-solid fa-flask-vial"></i> Kiểm thử chiến lược</a>
+                <a href="/lab/#factors"><i class="fa-solid fa-layer-group"></i> Yếu tố và phong cách</a>
+                <a href="/mastersheet/" title="Về Investment Workbench (quản lý đầu tư)"><i class="fa-solid fa-arrow-left"></i> Investment</a>
+            </nav>
+            <div class="desk-topbar-right">
+                <span class="desk-sync"><span class="dot"></span><span class="txt">Dữ liệu trực tiếp</span></span>
+                <a href="/" class="desk-iconbtn" title="Về trang Finance"><i class="fa-solid fa-house"></i></a>
+                <button class="desk-iconbtn" id="theme-btn" title="Đổi giao diện sáng / tối" onclick="toggleDeskTheme()" aria-label="Đổi giao diện sáng / tối"><i class="fa-solid fa-moon" id="theme-ic"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="asset-container desk">
+        <div class="desk-byline">
+            <h1 id="lab-title">Phòng kiểm thử</h1>
+            <span class="desk-who">
+                <span class="av"><i class="fa-solid fa-flask-vial"></i></span>
+                <span>Kiểm thử chiến lược trên lịch sử · yếu tố và phong cách của danh mục</span>
+            </span>
+            <div class="desk-byline-actions">
+                <span id="lab-status" class="ins-status" role="status"></span>
+            </div>
+        </div>
+        <main id="lab-root" class="ins-root" aria-live="polite"></main>
+        <p class="tl-hint ins-foot">Kết quả kiểm thử là MÔ TẢ quá khứ, không phải dự báo hay khuyến nghị đầu tư. Thử càng nhiều cấu hình trên cùng dữ liệu thì kết quả đẹp nhất càng dễ chỉ là may rủi: hãy đọc kết quả cùng các phép thử độ tin cậy. Dữ liệu từ nguồn công khai (VNDirect), không có cam kết dịch vụ.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../api.js?v=1792600000000"></script>
+    <script src="lab-api.js?v=1793300000000"></script>
+    <script src="../lib/finance-calc.js?v=2"></script>
+    <script src="../lib/sector-map.js?v=1791900000000"></script>
+    <script src="../lib/portfolio-calc.js?v=1791900000000"></script>
+    <script src="../lib/group-calc.js?v=1791900000000"></script>
+    <script src="../lib/risk-calc.js?v=1791900000000"></script>
+    <script src="../lib/pit-calc.js?v=1793300000000"></script>
+    <script src="../lib/bt-panel.js?v=1793300000000"></script>
+    <script src="../lib/strategy-backtest.js?v=1793300000000"></script>
+    <script src="../lib/factor-model.js?v=1793300000000"></script>
+    <script src="/bench-nav.js?v=1793000000000"></script>
+    <script src="../insight/insight-util.js?v=1793000000000"></script>
+    <script src="lab-views.js?v=1793300000000"></script>
+    <script src="lab-factor-views.js?v=1793300000000"></script>
+    <script src="lab-app.js?v=1793300000000"></script>
+    <script src="lab-factors.js?v=1793300000000"></script>
+</body>
+</html>

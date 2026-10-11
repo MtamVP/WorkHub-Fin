@@ -203,4 +203,32 @@ API.insight = {
         if (error) throw error;
         return 'Đã xoá dự phóng';
     },
+
+    // ---------- Sự kiện trích từ tin theo mã (lib/news-events.js; máy chủ ghi finance_news_events mỗi 3 giờ) ----------
+    newsEvents: async (days) => {
+        const d = Math.min(Math.max(Math.round(Number(days)) || 30, 1), 120);
+        const since = new Date(Date.now() - d * 86400000).toISOString();
+        const [ev, last] = await Promise.all([
+            sbClient.from('finance_news_events').select('id, news_id, symbol, event_type, direction, severity, confidence, matched, multi, published_at, title, link, source').gte('published_at', since).order('published_at', { ascending: false }).limit(3000),
+            sbClient.from('finance_function_runs').select('run_at, ok').eq('fn', 'insight-sync').eq('mode', 'news').order('run_at', { ascending: false }).limit(1),
+        ]);
+        if (ev.error) throw ev.error;
+        return { events: ev.data || [], days: d, lastRun: last.data && last.data[0] ? last.data[0] : null };
+    },
+
+    // ---------- Việc cần làm: các nguồn ngoài luận điểm / tin / sở hữu / dòng tiền (RLS quyết định người dùng thấy gì; thiếu quyền thì phần đó rỗng) ----------
+    inboxInputs: async () => {
+        const since3 = new Date(Date.now() - 3 * 86400000).toISOString(), since2d = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10), since36h = new Date(Date.now() - 36 * 3600000).toISOString();
+        const soft = async (p, label, notes) => { try { const r = await p; if (r.error) throw r.error; return r.data || []; } catch (e) { notes.push(label); return []; } };
+        const notes = [];
+        const [compliance, approvals, health, runs, users] = await Promise.all([
+            soft(sbClient.from('finance_compliance_log').select('log_date, user_id, breaches, warns').gte('log_date', since2d).order('log_date', { ascending: false }).limit(300), 'giới hạn đầu tư', notes),
+            soft(sbClient.from('finance_order_requests').select('id, symbol, side, created_by, created_at').eq('status', 'pending').order('created_at', { ascending: true }).limit(200), 'lệnh chờ duyệt', notes),
+            soft(sbClient.from('finance_data_health').select('kind, symbol, severity, ref_date, dedupe_key').eq('resolved', false).in('severity', ['warn', 'error']).gte('detected_at', since3).limit(200), 'chất lượng dữ liệu', notes),
+            soft(sbClient.from('finance_function_runs').select('fn, mode, ok, run_at').eq('ok', false).gte('run_at', since36h).order('run_at', { ascending: false }).limit(100), 'nhật ký hàm tự chạy', notes),
+            soft(sbClient.from('users').select('id, email, nickname').in('group_key', ['finance', 'admin']), 'danh sách thành viên', notes),
+        ]);
+        const members = {}; users.forEach(u => { members[u.id] = u.nickname || String(u.email || '').split('@')[0]; });
+        return { compliance, approvals, health, runs, members, notes };
+    },
 };

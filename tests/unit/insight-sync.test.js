@@ -13,6 +13,8 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g,
 
 globalThis.ThesisCalc = require('../../lib/thesis-calc.js');
 globalThis.OwnershipCalc = require('../../lib/ownership-calc.js');
+globalThis.NewsEvents = require('../../lib/news-events.js');
+globalThis.ActionInbox = require('../../lib/action-inbox.js');
 
 describe('bản sao trong thư mục hàm', () => {
   it.each(INSIGHT_LIBS)('$file khớp lib/ (chạy node scripts/sync-edge-libs.mjs nếu lệch)', (lib) => {
@@ -126,5 +128,89 @@ describe('dòng ghi vào cơ sở dữ liệu', () => {
     expect(rows[0]).toMatchObject({ id: 'a', symbol: 'FPT', action: 'S', status: 'done', shares_before: 10000, shares_after: 6000, registered: 5000, acquired: 4000, start_date: '2026-09-18', end_date: '2026-09-19', public_date: '2026-09-20', url: 'http://u' });
     expect(rows[0].pct_after).toBeCloseTo(0.1, 9);
     expect(globalThis.OwnershipCalc.summarize([L.insiderFromDb(rows[0])], '2026-10-11', 90).netQty).toBe(-4000);
+  });
+});
+
+describe('sự kiện từ tin', () => {
+  const news = [
+    { id: 'n1', title: 'FLC: Chủ tịch bị khởi tố, bắt tạm giam', summary: null, symbols: ['FLC'], published_at: '2026-10-09T03:00:00.000Z', link: 'https://x/1', source: 'cafef' },
+    { id: 'n2', title: 'Thị trường đi ngang', summary: null, symbols: [], published_at: '2026-10-09T03:00:00.000Z', link: 'https://x/2', source: 'cafef' },
+    { id: 'n3', title: 'Thị trường hôm nay', summary: null, symbols: ['AAA'], published_at: '2026-10-09T03:00:00.000Z', link: null, source: null },
+  ];
+  it('eventRows: chỉ tin có mã và có sự kiện; khớp cột finance_news_events; id ổn định', () => {
+    const rows = L.eventRows(news);
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    const r = rows.find((x) => x.event_type === 'legal');
+    expect(r).toMatchObject({ id: 'n1|FLC|legal', news_id: 'n1', symbol: 'FLC', direction: -1, severity: 'alert', multi: false, link: 'https://x/1', source: 'cafef' });
+    expect(Object.keys(r).sort()).toEqual(['confidence', 'direction', 'event_type', 'id', 'link', 'matched', 'multi', 'news_id', 'published_at', 'severity', 'source', 'symbol', 'title']);
+    expect(L.eventRows(news)).toEqual(rows);
+    expect(L.eventRows([])).toEqual([]);
+  });
+  const NOW = '2026-10-11T12:35:00.000Z';
+  const cond = (o) => Object.assign({ id: 'x', idea_id: 'i1', metric: 'evtAlert30d', op: '<=', threshold: 0, severity: 'critical', label: null, manual_met: null, last_state: null, state_since: null, notified_state: null }, o || {});
+  const ideas = [{ id: 'i1', user_id: 'u1', symbol: 'AAA', title: 'A' }];
+  const ev = (type, sev, dir, d) => ({ symbol: 'AAA', event_type: type, severity: sev, direction: dir, published_at: d });
+  it('chỉ tiêu tin tức: đếm tin xấu nghiêm trọng trong cửa sổ; có tin xấu thì điều kiện critical sai và có cảnh báo', () => {
+    const events = { ready: true, bySymbol: { AAA: [ev('legal', 'alert', -1, '2026-10-05T00:00:00Z'), ev('mgmt', 'watch', 0, '2026-09-01T00:00:00Z'), ev('delist', 'alert', -1, '2026-07-20T00:00:00Z')] } };
+    const r = L.evaluateAll(ideas, [cond({ id: 'a30' }), cond({ id: 'a90', metric: 'evtAlert90d', threshold: 1 }), cond({ id: 'm90', metric: 'evtMgmt90d', op: '<=', threshold: 0, severity: 'watch' })], { AAA: { marketcap: 1e12, shares: 1e7 } }, {}, {}, new Set(), '2026-10-11', NOW, events);
+    const p = (id) => r.updates.find((u) => u.id === id).patch;
+    expect(p('a30')).toMatchObject({ last_state: 'fail', last_value: 1 });        // 1 tin xấu nghiêm trọng trong 30 ngày (pháp lý); đình chỉ cách 83 ngày không tính
+    expect(p('a90')).toMatchObject({ last_state: 'fail', last_value: 2 });        // 2 trong 90 ngày > ngưỡng 1
+    expect(p('m90')).toMatchObject({ last_state: 'fail', last_value: 1 });
+    expect(r.alerts.map((a) => a.condId).sort()).toEqual(['a30', 'a90']);
+  });
+  it('không có tin xấu thì đúng; kho tin chưa chạy thì "chưa có số liệu", KHÔNG phải 0', () => {
+    const ok = L.evaluateAll(ideas, [cond()], { AAA: {} }, {}, {}, new Set(), '2026-10-11', NOW, { ready: true, bySymbol: {} });
+    expect(ok.updates[0].patch).toMatchObject({ last_state: 'ok', last_value: 0 });
+    const notReady = L.evaluateAll(ideas, [cond()], { AAA: {} }, {}, {}, new Set(), '2026-10-11', NOW, { ready: false, bySymbol: {} });
+    expect(notReady.updates[0].patch.last_state).toBe('unknown');
+    expect(L.evaluateAll(ideas, [cond()], { AAA: {} }, {}, {}, new Set(), '2026-10-11', NOW).updates[0].patch.last_state).toBe('unknown');
+  });
+  it('index.ts có chế độ events, dùng bản sao news-events.js và không lộ khoá', () => {
+    const src = read('supabase/functions/insight-sync/index.ts');
+    expect(src).toContain('import "./news-events.js"'); expect(src).toContain('"events"'); expect(src).toContain('finance_news_events');
+    expect(src).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}|sb_publishable_/);
+  });
+});
+
+describe('email việc cần làm (digest)', () => {
+  const NOW = '2026-10-12T01:30:00.000Z';
+  it('heldByUser: chỉ mã có tổng mua > tổng bán, tách theo người', () => {
+    const m = L.heldByUser([{ user_id: 'u1', symbol: 'fpt', type: 'buy', quantity: 100 }, { user_id: 'u1', symbol: 'FPT', type: 'sell', quantity: 40 }, { user_id: 'u1', symbol: 'HPG', type: 'buy', quantity: 50 }, { user_id: 'u1', symbol: 'HPG', type: 'sell', quantity: 50 }, { user_id: 'u2', symbol: 'VCB', type: 'buy', quantity: '10' }]);
+    expect([...m.get('u1')]).toEqual(['FPT']); expect([...m.get('u2')]).toEqual(['VCB']);
+  });
+  it('ideaStatusFromConditions: sai điều kiện critical = bị phá vỡ; chỉ sai điều kiện watch = cần chú ý; còn lại ok', () => {
+    const c = (o) => Object.assign({ last_state: 'ok', severity: 'watch', metric: 'roae', op: '>=', threshold: 15, label: null, state_since: null }, o);
+    expect(L.ideaStatusFromConditions([c({ last_state: 'fail', severity: 'critical' }), c({})]).status).toBe('broken');
+    expect(L.ideaStatusFromConditions([c({ last_state: 'fail' }), c({})]).status).toBe('warning');
+    expect(L.ideaStatusFromConditions([c({}), c({ last_state: 'unknown' })]).status).toBe('ok');
+    expect(L.ideaStatusFromConditions([c({ last_state: 'fail' })]).conditions[0].label).toContain('ROE');
+  });
+  const data = (extra) => Object.assign({
+    heldByUser: new Map([['u1', new Set(['FPT', 'HPG'])]]), watchByUser: new Map([['u1', new Set(['VCB'])]]),
+    ideas: [{ id: 'i1', user_id: 'u1', symbol: 'FPT', title: 'AI' }, { id: 'i9', user_id: 'u2', symbol: 'ZZZ', title: 'khác' }],
+    conds: [{ idea_id: 'i1', metric: 'price', op: '>=', threshold: 52000, severity: 'critical', label: 'Giá không thủng cắt lỗ', last_state: 'fail', state_since: '2026-10-10T00:00:00Z' }, { idea_id: 'i9', metric: 'price', op: '>=', threshold: 1, severity: 'critical', last_state: 'fail' }],
+    events: [{ news_id: 'n1', symbol: 'HPG', event_type: 'delist', direction: -1, severity: 'alert', published_at: '2026-10-11T08:00:00Z', title: 'HPG bị cảnh báo', link: 'https://x' }, { news_id: 'n2', symbol: 'XYZ', event_type: 'legal', direction: -1, severity: 'alert', published_at: '2026-10-11T08:00:00Z', title: 'khác' }],
+    insiderBySymbol: new Map([['VCB', [1, 2, 3].map((k) => ({ id: 't' + k, symbol: 'VCB', trader: 'N' + k, action: 'B', status: 'done', acquired: 10000, shares_before: 1, shares_after: 10001, registered: 10000, start_date: '2026-09-20', end_date: '2026-09-20', public_date: '2026-09-25' }))]]),
+    compliance: [{ user_id: 'u1', log_date: '2026-10-11', breaches: [{ kind: 'single', subject: 'FPT > 25% NAV', mode: 'block', current: '31%', threshold: '25%' }], warns: [] }, { user_id: null, log_date: '2026-10-11', breaches: [{ kind: 'sector', subject: 'Ngành NH', mode: 'warn' }], warns: [] }],
+    approvals: [{ id: 'a1', symbol: 'FPT', side: 'buy', requester: 'Minh', created_at: '2026-10-10T00:00:00Z' }], health: [{ kind: 'stale_price', severity: 'warn', symbol: 'ABC', ref_date: '2026-10-09', dedupe_key: 'k1' }], runs: [{ fn: 'bt-data', mode: 'fill', ok: false, run_at: '2026-10-11T12:30:00Z' }],
+  }, extra || {});
+  it('inboxForUser: người thường chỉ thấy việc của chính mình (luận điểm, tin mã mình có, nội bộ mã theo dõi, giới hạn của mình)', () => {
+    const items = L.inboxForUser(data(), { id: 'u1', nickname: 'Tôi', manager: false }, NOW);
+    const kinds = items.map((x) => x.kind + ':' + (x.symbol || ''));
+    expect(kinds).toContain('thesis:FPT'); expect(kinds).toContain('event:HPG'); expect(kinds).toContain('insider:VCB'); expect(kinds.some((k) => k.startsWith('limit'))).toBe(true);
+    expect(kinds).not.toContain('event:XYZ'); expect(items.some((x) => x.kind === 'approval' || x.kind === 'health' || x.kind === 'system')).toBe(false);
+    expect(items.filter((x) => x.kind === 'limit').length).toBe(1);               // bản tuân thủ của nhóm chỉ dành cho quản lý
+    expect(items[0].sev).toBe(1);
+  });
+  it('inboxForUser: quản lý thêm bản tuân thủ nhóm, lệnh chờ duyệt, cảnh báo dữ liệu và hàm lỗi', () => {
+    const items = L.inboxForUser(data(), { id: 'u1', nickname: 'Tôi', manager: true }, NOW);
+    expect(items.filter((x) => x.kind === 'limit').length).toBe(2);
+    ['approval', 'health', 'system'].forEach((k) => expect(items.some((x) => x.kind === k), k).toBe(true));
+  });
+  it('thư viện hộp việc có bản sao nguyên văn trong hàm và mode digest được đăng ký, không lộ khoá', () => {
+    const src = read('supabase/functions/insight-sync/index.ts');
+    expect(src).toContain('import "./action-inbox.js"'); expect(src).toContain('"digest"'); expect(src).toContain('finance_digest_state');
+    expect(src).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}|sb_publishable_/);
   });
 });

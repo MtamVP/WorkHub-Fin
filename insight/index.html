@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/style.css?v=1788630490059">
     <link rel="stylesheet" href="/finance-shared.css?v=2.14">
     <link rel="stylesheet" href="/mastersheet/assets/tools.css?v=1791900000000">
-    <link rel="stylesheet" href="/insight/insight.css?v=1793000000000">
+    <link rel="stylesheet" href="/insight/insight.css?v=1793100000000">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#8A5A12">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +43,9 @@
                 WorkHub Finance <span class="sub">· Insight</span>
             </div>
             <nav class="desk-nav">
+                <a href="/insight/#inbox"><i class="fa-solid fa-inbox"></i> Việc cần làm</a>
                 <a href="/insight/#thesis" class="active" aria-current="page"><i class="fa-solid fa-list-check"></i> Luận điểm</a>
+                <a href="/insight/#events"><i class="fa-solid fa-newspaper"></i> Sự kiện</a>
                 <a href="/insight/#liquidity"><i class="fa-solid fa-droplet"></i> Thanh khoản</a>
                 <a href="/insight/#cash"><i class="fa-solid fa-wallet"></i> Dòng tiền</a>
                 <a href="/insight/#ownership"><i class="fa-solid fa-user-tie"></i> Sở hữu</a>
@@ -65,7 +67,7 @@
             <h1 id="ins-title">Insight</h1>
             <span class="desk-who">
                 <span class="av"><i class="fa-solid fa-binoculars"></i></span>
-                <span>Luận điểm · thanh khoản · dòng tiền · sở hữu · luân chuyển ngành · độ chính xác</span>
+                <span>Việc cần làm · sự kiện · luận điểm · thanh khoản · dòng tiền · sở hữu · luân chuyển ngành · độ chính xác</span>
             </span>
             <div class="desk-byline-actions">
                 <span id="ins-status" class="ins-status" role="status"></span>
@@ -77,7 +79,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../api.js?v=1792600000000"></script>
-    <script src="insight-api.js?v=1793000000000"></script>
+    <script src="insight-api.js?v=1793100000000"></script>
     <script src="../lib/finance-calc.js?v=2"></script>
     <script src="../lib/sector-map.js?v=1791900000000"></script>
     <script src="../lib/portfolio-calc.js?v=1791900000000"></script>
@@ -97,11 +99,14 @@
     <script src="../lib/cashflow-calc.js?v=1793000000000"></script>
     <script src="../lib/thesis-calc.js?v=1793000000000"></script>
     <script src="../lib/forecast-accuracy.js?v=1793000000000"></script>
+    <script src="../lib/news-events.js?v=1793100000000"></script>
+    <script src="../lib/action-inbox.js?v=1793100000000"></script>
     <script src="/bench-nav.js?v=1793000000000"></script>
     <script src="insight-util.js?v=1793000000000"></script>
     <script src="insight-views-a.js?v=1793000000000"></script>
     <script src="insight-views-b.js?v=1793000000000"></script>
     <script src="insight-views-c.js?v=1793000000000"></script>
-    <script src="insight-app.js?v=1793000000000"></script>
+    <script src="insight-views-d.js?v=1793100000000"></script>
+    <script src="insight-app.js?v=1793100000000"></script>
 </body>
 </html>
