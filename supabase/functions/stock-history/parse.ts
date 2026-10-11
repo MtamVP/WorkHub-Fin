@@ -55,12 +55,13 @@ export function parseDchart(json: any, symbol: string): Series {
   return [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 }
 
-// Phản hồi VNDirect finfo v4 { data:[{date, close}] } (nguồn dự phòng, chỉ cho cổ phiếu) -> cùng định dạng chuỗi.
+// Phản hồi VNDirect finfo v4 { data:[{date, close, adClose}] } (nguồn dự phòng, chỉ cho cổ phiếu) -> cùng định dạng chuỗi.
+// Dùng adClose (giá đã điều chỉnh cổ tức tiền và cổ phiếu thưởng, trùng với `c` của dchart) để hai nguồn nhất quán: app KHÔNG điều chỉnh thêm bằng sự kiện (xem RiskCalc.adjustSeries). Thiếu adClose mới dùng close.
 export function parseFinfo(json: any): Series {
   const rows = json && Array.isArray(json.data) ? json.data : [];
   const byDate = new Map<string, number>();
   for (const r of rows) {
-    const close = Number(r && r.close);
+    const close = Number(r && r.adClose) > 0 ? Number(r.adClose) : Number(r && r.close);
     if (!(close > 0) || !r.date) continue;
     byDate.set(String(r.date).slice(0, 10), Math.round(close * 1000));
   }

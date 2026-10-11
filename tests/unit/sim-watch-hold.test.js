@@ -35,9 +35,13 @@ const IDX = series(1, 600, 0), EVENTS = [
 ];
 
 describe('giá các mã: khớp RiskCalc của trang', () => {
-  it('adjustSeries cho cùng kết quả (thưởng, cổ tức cổ phiếu, cổ tức tiền; quyền mua không đổi giá)', () => {
+  it('applyEvents cho cùng kết quả (thưởng, cổ tức cổ phiếu, cổ tức tiền; quyền mua không đổi giá)', () => {
     const s = series(2, 600, 0.05);
-    ['AAA', 'BBB', 'CCC'].forEach((sym) => expect(SW.adjustSeries(s, EVENTS, sym)).toEqual(RiskCalc.adjustSeries(s, EVENTS, sym)));
+    ['AAA', 'BBB', 'CCC'].forEach((sym) => expect(SW.applyEvents(s, EVENTS, sym)).toEqual(RiskCalc.applyEvents(s, EVENTS, sym)));
+  });
+  it('adjustSeries giống RiskCalc và KHÔNG áp sự kiện (giá dchart đã điều chỉnh sẵn)', () => {
+    const s = series(5, 600, 0.05);
+    ['AAA', 'BBB'].forEach((sym) => { expect(SW.adjustSeries(s, EVENTS, sym)).toEqual(RiskCalc.adjustSeries(s, EVENTS, sym)); expect(SW.adjustSeries(s, EVENTS, sym)).toEqual(s); });
   });
   it('căn theo lịch VN-Index (điền tiếp tối đa 5 ngày) cho cùng kết quả với alignSeries', () => {
     const idx = IDX, s = series(3, 600, 0.12).filter((_, i) => i < 150 || i > 170), adj = RiskCalc.adjustSeries(s, EVENTS, 'AAA');
@@ -89,20 +93,24 @@ describe('chấm danh mục giữ nguyên ở máy chủ', () => {
   const rawB = DATES.map((d, i) => [d, Math.round(20000 * Math.pow(IX[i] / IX[0], 1.3))]);
   const idx = { dates: DATES, index: IX };
 
-  it('có sự kiện thưởng: giá đã điều chỉnh cho lợi suất đúng; bỏ qua sự kiện thì sai rõ rệt', () => {
+  it('giá nguồn đã điều chỉnh sẵn (như dchart): chấm đúng lợi suất, và sự kiện không bị áp lần hai', () => {
     const ev = [{ symbol: 'AAA', kind: 'bonus', exDate, ratio: 25 }];
-    const adj = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: rawA, BBB: rawB }, ev)), raw = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: rawA, BBB: rawB }, []));
-    const a = adj.horizons[2], b = raw.horizons[2];
+    const adjA = SW.applyEvents(rawA, ev, 'AAA');                        // mô phỏng nguồn đã điều chỉnh sẵn
+    const good = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: adjA, BBB: rawB }, ev)), again = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: adjA, BBB: rawB }, []));
+    const a = good.horizons[2], c = again.horizons[2];
     expect(a.due).toBe(true);
     // so với lợi suất đúng tính tay từ chuỗi gốc (không bị thưởng)
     const i0 = CUT - 1, iT = i0 + 63;
     const qty = { A: snap.positions[0].qty, B: snap.positions[1].qty }, p0 = { A: snap.positions[0].price, B: snap.positions[1].price };
     const truth = (qty.A * p0.A * (IX[iT] / IX[i0]) + qty.B * p0.B * Math.pow(IX[iT] / IX[i0], 1.3) + snap.cash) / snap.nav0 - 1;
     expect(Math.abs(a.hold.ret - truth)).toBeLessThan(0.002);
-    expect(b.hold.ret).toBeLessThan(a.hold.ret - 0.02);
+    expect(c.hold.ret).toBe(a.hold.ret);                                 // thêm hay bớt sự kiện không đổi kết quả: không điều chỉnh hai lần
+    // chuỗi thô (chưa điều chỉnh) mà đưa vào thì sai rõ rệt: nguồn giá bắt buộc là giá đã điều chỉnh
+    const bad = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: rawA, BBB: rawB }, ev)).horizons[2];
+    expect(bad.hold.ret).toBeLessThan(a.hold.ret - 0.02);
   });
   it('digest ghi phần danh mục giữ nguyên (ret, pit, in90) cho mốc đã tới', () => {
-    const sc = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: rawA, BBB: rawB }, [{ symbol: 'AAA', kind: 'bonus', exDate, ratio: 25 }]));
+    const sc = SS.scoreRun(snap, SW.buildStocks(idx, { AAA: SW.applyEvents(rawA, [{ symbol: 'AAA', kind: 'bonus', exDate, ratio: 25 }], 'AAA'), BBB: rawB }, []));
     const w = SW.digest(snap, {}, sc, null, 'T');
     w.horizons.filter((h) => h.due).forEach((h) => { expect(h.hold).toBeTruthy(); expect(typeof h.hold.ret).toBe('number'); expect(typeof h.hold.in90).toBe('boolean'); expect(h.hold.pit).toBeGreaterThanOrEqual(0); });
     const idxOnly = SW.digest(snap, {}, SS.scoreRun(snap, idx), null, 'T');

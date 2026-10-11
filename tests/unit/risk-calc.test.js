@@ -68,22 +68,22 @@ describe('drawdownOf / cumulate', () => {
   });
 });
 
-describe('adjustSeries', () => {
+describe('applyEvents (nguồn giá thô)', () => {
   const s = [['2026-05-20', 110], ['2026-05-21', 110], ['2026-05-22', 100], ['2026-05-25', 101]];
   it('cổ phiếu thưởng 10%: giá trước ngày không hưởng quyền chia 1,1 -> không còn cú rơi giả', () => {
-    const adj = RiskCalc.adjustSeries(s, [{ symbol: 'HPG', kind: 'stock_dividend', exDate: '2026-05-22', ratio: 10 }], 'HPG');
+    const adj = RiskCalc.applyEvents(s, [{ symbol: 'HPG', kind: 'stock_dividend', exDate: '2026-05-22', ratio: 10 }], 'HPG');
     expect(adj[0][1]).toBeCloseTo(100, 9); expect(adj[1][1]).toBeCloseTo(100, 9);
     expect(adj[2][1]).toBe(100); expect(adj[3][1]).toBe(101);
     expect(s[0][1]).toBe(110);   // không sửa bản gốc
   });
   it('cổ tức tiền: điều chỉnh theo tổng lợi suất (giá liền trước x (1 - dps/giá))', () => {
-    const adj = RiskCalc.adjustSeries(s, [{ symbol: 'HPG', kind: 'cash_dividend', exDate: '2026-05-22', dps: 10 }], 'HPG');
+    const adj = RiskCalc.applyEvents(s, [{ symbol: 'HPG', kind: 'cash_dividend', exDate: '2026-05-22', dps: 10 }], 'HPG');
     expect(adj[1][1]).toBeCloseTo(110 * (1 - 10 / 110), 9);   // = 100
     expect(adj[2][1]).toBe(100);
   });
   it('sự kiện của mã khác hoặc ngoài chuỗi không ảnh hưởng; nhiều sự kiện nhân cộng dồn', () => {
-    expect(RiskCalc.adjustSeries(s, [{ symbol: 'ABC', kind: 'bonus', exDate: '2026-05-22', ratio: 10 }], 'HPG')[0][1]).toBe(110);
-    const two = RiskCalc.adjustSeries(s, [{ symbol: 'HPG', kind: 'bonus', exDate: '2026-05-22', ratio: 10 }, { symbol: 'HPG', kind: 'bonus', exDate: '2026-05-21', ratio: 10 }], 'HPG');
+    expect(RiskCalc.applyEvents(s, [{ symbol: 'ABC', kind: 'bonus', exDate: '2026-05-22', ratio: 10 }], 'HPG')[0][1]).toBe(110);
+    const two = RiskCalc.applyEvents(s, [{ symbol: 'HPG', kind: 'bonus', exDate: '2026-05-22', ratio: 10 }, { symbol: 'HPG', kind: 'bonus', exDate: '2026-05-21', ratio: 10 }], 'HPG');
     expect(two[0][1]).toBeCloseTo(110 / 1.21, 9);
     expect(two[1][1]).toBeCloseTo(110 / 1.1, 9);
   });
@@ -220,17 +220,20 @@ describe('analyze: thống kê trên lịch sử giá', () => {
     expect(r.symbols.find(s => s.symbol === 'XXX').missing).toBe(true);
     expect(r.warnings.some(w => w.code === 'coverage')).toBe(true);
   });
-  it('điều chỉnh theo cổ phiếu thưởng loại bỏ cú rơi giả khỏi biến động', () => {
-    // HPG: có cú rơi -9,09% đúng ngày 2026-08-03 do chia thưởng 10%
-    const raw = HIST.HPG.map(p => p.slice());
-    const cut = raw.findIndex(p => p[0] >= '2026-08-03');
-    for (let i = 0; i < cut; i++) raw[i][1] *= 1.1;
-    const hist = { VNINDEX: HIST.VNINDEX, HPG: raw };
-    const noAdj = RiskCalc.analyze({ holdings: [hold('HPG', 100e6)], cash: 0, debt: 0, histories: hist });
-    const adj = RiskCalc.analyze({ holdings: [hold('HPG', 100e6)], cash: 0, debt: 0, histories: hist, events: [{ symbol: 'HPG', kind: 'bonus', exDate: raw[cut][0], ratio: 10 }] });
-    expect(noAdj.portfolio.worstDayPct).toBeLessThan(adj.portfolio.worstDayPct - 3);
-    expect(adj.coverage.adjusted).toBe(true);
-    expect(adj.portfolio.annVol).toBeLessThan(noAdj.portfolio.annVol);
+  it('giá nguồn đã điều chỉnh sẵn: sự kiện doanh nghiệp KHÔNG được áp thêm (tránh điều chỉnh hai lần)', () => {
+    // dchart/adClose đã gồm cổ tức tiền và cổ phiếu thưởng. Cho thêm sự kiện mà kết quả đổi là đang điều chỉnh lần hai (đo thật: DPM +86% một ngày, HPG +14%).
+    const hist = { VNINDEX: HIST.VNINDEX, HPG: HIST.HPG };
+    const exDate = HIST.HPG[Math.floor(HIST.HPG.length / 2)][0];
+    const base = RiskCalc.analyze({ holdings: [hold('HPG', 100e6)], cash: 0, debt: 0, histories: hist });
+    const withEv = RiskCalc.analyze({ holdings: [hold('HPG', 100e6)], cash: 0, debt: 0, histories: hist, events: [{ symbol: 'HPG', kind: 'bonus', exDate: exDate, ratio: 30 }, { symbol: 'HPG', kind: 'cash_dividend', exDate: exDate, dps: 1000 }] });
+    expect(withEv.portfolio.annVol).toBe(base.portfolio.annVol);
+    expect(withEv.portfolio.worstDayPct).toBe(base.portfolio.worstDayPct);
+    expect(withEv.coverage.adjusted).toBe(true);
+  });
+  it('adjustSeries chỉ làm sạch: bỏ giá không dương, chuẩn hoá ngày, không sửa bản gốc', () => {
+    const raw = [['2026-05-20T00:00:00Z', 110], ['2026-05-21', 0], ['2026-05-22', 100]];
+    expect(RiskCalc.adjustSeries(raw, [{ symbol: 'HPG', kind: 'bonus', exDate: '2026-05-22', ratio: 10 }], 'HPG')).toEqual([['2026-05-20', 110], ['2026-05-22', 100]]);
+    expect(raw[0][1]).toBe(110);
   });
   it('lịch sử quá ngắn -> không tính thống kê nhưng vẫn có tập trung', () => {
     const short = { VNINDEX: HIST.VNINDEX.slice(-20), FPT: HIST.FPT.slice(-20) };

@@ -42,6 +42,8 @@ describe('stock-history: parseDchart / parseFinfo', () => {
     expect(parseFinfo({ data: [{ date: '2026-09-02', close: 30.1 }, { date: '2026-09-01', close: 29.5 }, { date: '2026-09-03', close: 0 }] }))
       .toEqual([['2026-09-01', 29500], ['2026-09-02', 30100]]);
     expect(parseFinfo(null)).toEqual([]);
+    // adClose (đã điều chỉnh) được ưu tiên hơn close thô; thiếu adClose mới dùng close
+    expect(parseFinfo({ data: [{ date: '2026-09-01', close: 51.5, adClose: 26.359 }, { date: '2026-09-02', close: 52 }] })).toEqual([['2026-09-01', 26359], ['2026-09-02', 52000]]);
   });
 });
 

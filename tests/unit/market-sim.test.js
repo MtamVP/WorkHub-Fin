@@ -281,7 +281,7 @@ describe('backtest', () => {
 });
 
 describe('fromHistories', () => {
-  it('điều chỉnh cổ tức tiền, căn theo lịch VN-Index, thanh khoản = trung vị giá trị 20 phiên', () => {
+  it('căn theo lịch VN-Index, giá nguồn đã điều chỉnh sẵn (không áp sự kiện lần hai), thanh khoản = trung vị giá trị 20 phiên', () => {
     const dates = ['2026-01-05', '2026-01-06', '2026-01-07', '2026-01-08', '2026-01-09', '2026-01-12'];
     const raw = {
       histories: { VNINDEX: dates.map((d, i) => [d, 1200 + i]), AAA: dates.filter((d) => d !== '2026-01-08').map((d, i) => [d, 10000 + 100 * i]) },
@@ -292,7 +292,7 @@ describe('fromHistories', () => {
     expect(inp.dates).toEqual(dates); expect(inp.index[0]).toBe(1200);
     expect(inp.stocks.AAA.exchange).toBe('HNX');
     expect(inp.stocks.AAA.closes[3]).toBeCloseTo(inp.stocks.AAA.closes[2], 9);   // ngày 08 thiếu: điền giá ngày trước
-    expect(inp.stocks.AAA.closes[0]).toBeCloseTo(10000 * (1 - 1000 / 10200), 6);   // trước ngày không hưởng quyền: nhân hệ số điều chỉnh
+    expect(inp.stocks.AAA.closes[0]).toBe(10000);                                // giữ nguyên giá nguồn: sự kiện cổ tức KHÔNG điều chỉnh thêm (nguồn đã điều chỉnh)
     expect(inp.stocks.AAA.adv).toBeCloseTo(1000 * 10200, 6);
   });
 });

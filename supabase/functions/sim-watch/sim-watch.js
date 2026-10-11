@@ -49,8 +49,12 @@ const SimWatch = (function () {
   const num0 = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
   const iso = (v) => String(v || '').slice(0, 10);
   const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
-  // series: [[YYYY-MM-DD, giá]] tăng dần; events: [{ symbol, kind, exDate, ratio (%), dps }] -> chuỗi mới đã điều chỉnh (giá trước ngày không hưởng quyền nhân hệ số)
+  // Giá dchart ĐÃ được VNDirect điều chỉnh cổ tức tiền và cổ phiếu thưởng (đo 11/10/2026): adjustSeries chỉ làm sạch chuỗi, KHÔNG áp sự kiện (áp thêm là điều chỉnh hai lần, như RiskCalc.adjustSeries).
   function adjustSeries(series, events, symbol) {
+    return (series || []).map((x) => [iso(x[0]), num0(x[1])]).filter((x) => x[1] > 0);
+  }
+  // series: [[YYYY-MM-DD, giá THÔ]] tăng dần; events: [{ symbol, kind, exDate, ratio (%), dps }] -> chuỗi mới đã điều chỉnh (giá trước ngày không hưởng quyền nhân hệ số); cho nguồn giá chưa điều chỉnh
+  function applyEvents(series, events, symbol) {
     const out = (series || []).map((x) => [iso(x[0]), num0(x[1])]).filter((x) => x[1] > 0);
     const evs = (events || []).filter((e) => e.symbol === symbol && e.exDate).sort((a, b) => (a.exDate < b.exDate ? 1 : -1));
     evs.forEach((e) => {
@@ -201,7 +205,7 @@ const SimWatch = (function () {
     return ((snap && snap.events) || []).filter((e) => h[e.id] && m[e.id] !== true && m[e.id] !== false && h[e.id].status !== 'unclear').map((e) => Object.assign({ id: e.id, title: e.title }, h[e.id]));
   }
 
-  return { VERSION, STATUSES, MAX_EVENTS, RECHECK_MS, parseDchart, adjustSeries, alignCloses, buildStocks, markFor, digest, newlyDue, pendingEvents, mergeEvents, applyChecks, freshHappened, revertFresh, buildEmail, hintsToShow, keyOf };
+  return { VERSION, STATUSES, MAX_EVENTS, RECHECK_MS, parseDchart, adjustSeries, applyEvents, alignCloses, buildStocks, markFor, digest, newlyDue, pendingEvents, mergeEvents, applyChecks, freshHappened, revertFresh, buildEmail, hintsToShow, keyOf };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SimWatch;
