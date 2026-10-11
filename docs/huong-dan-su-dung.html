@@ -81,6 +81,7 @@
   <li><span class="n">13</span><a href="#s13">Giới hạn và nguyên tắc dùng đúng</a></li>
   <li><span class="n">14</span><a href="#s14">Xử lý sự cố và câu hỏi thường gặp</a></li>
   <li><span class="n">15</span><a href="#s15">Market Simulation: mô phỏng xác suất (mới 0.1.18)</a></li>
+  <li><span class="n">16</span><a href="#s16">Insight: bảy công cụ phân tích sâu (mới 0.1.20)</a></li>
   <li><span class="n">A</span><a href="#pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</a></li>
   <li><span class="n">B</span><a href="#pb">Phụ lục B: thư viện phương pháp</a></li>
   <li><span class="n">C</span><a href="#pc">Phụ lục C: thuật ngữ</a></li>
@@ -555,6 +556,62 @@
   <li>Mô hình học từ khoảng 7 năm giá: cú sốc chưa từng có trong giai đoạn đó (khủng hoảng hệ thống, đổi chính sách lớn) có thể lớn hơn mô hình nghĩ. Thẻ sự kiện là cách đưa phán đoán của bạn vào.</li>
   <li>Các lần lưu sát nhau dùng chung một giai đoạn thị trường nên không độc lập hẳn; cần nhiều tháng mới đánh giá được độ chính xác thật.</li>
   <li>Phần chấm "danh mục giữ nguyên" do máy chủ tính mỗi ngày làm việc từ giá đóng cửa các mã và sự kiện doanh nghiệp (cổ tức, thưởng) của VNDirect, đã điều chỉnh giá; mã nào không tải được thì bỏ, thiếu quá 25% giá trị thì bỏ qua lần đó.</li>
+</ul></div>
+
+<h1 id="s16">16. Insight: bảy công cụ phân tích sâu (mới 0.1.20)</h1>
+<p>Trang <span class="ui">Insight</span> (thanh điều hướng của Investment Workbench) gom bảy công cụ bổ sung cho các trang đã có. Mọi công cụ <b>mô tả và cảnh báo theo điều kiện bạn đặt</b>, không phải khuyến nghị đầu tư; mỗi mục ghi số liệu tính đến lúc nào.</p>
+<table>
+  <thead><tr><th style="width:22%">Mục</th><th>Trả lời câu hỏi</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ui">Luận điểm</span></td><td>Ý tưởng đầu tư của tôi còn đúng không? Mỗi ý tưởng có vài điều kiện đo được; máy chủ kiểm mỗi ngày làm việc.</td></tr>
+    <tr><td><span class="ui">Thanh khoản</span></td><td>Bán hết mất mấy phiên, tốn bao nhiêu vì tác động giá, danh mục còn lớn thêm được bao nhiêu?</td></tr>
+    <tr><td><span class="ui">Dòng tiền</span></td><td>Vài tuần tới tuần nào thiếu hay thừa tiền mặt?</td></tr>
+    <tr><td><span class="ui">Sở hữu</span></td><td>Cổ đông lớn, lãnh đạo đang mua hay bán, khối ngoại còn room không?</td></tr>
+    <tr><td><span class="ui">Luân chuyển ngành</span></td><td>Ngành nào đang mạnh lên hay yếu đi so với VN-Index?</td></tr>
+    <tr><td><span class="ui">Độ chính xác</span></td><td>Các dự phóng của chính tôi đã đúng đến đâu, lệch về phía nào?</td></tr>
+    <tr><td><span class="ui">Kho dữ liệu</span></td><td>Hệ thống đã lưu những gì để sau này kiểm thử chiến lược không bị "nhìn trước tương lai"?</td></tr>
+  </tbody>
+</table>
+<h2>16.1 Luận điểm</h2>
+<ol class="steps">
+  <li>Tạo ý tưởng ở <span class="ui">Nghiên Cứu → Ý tưởng</span>, rồi mở <span class="ui">Insight → Luận điểm</span> và bấm <span class="ui">Điều kiện</span> trên ý tưởng đó.</li>
+  <li>Chọn chỉ tiêu (giá, ROE, nợ/vốn, tăng trưởng, phòng khối ngoại, nội bộ mua ròng…), phép so, ngưỡng và mức độ: <b>Quan trọng</b> (sai nghĩa là luận điểm bị phá vỡ) hoặc <b>Chú ý</b> (cảnh báo). Nút gợi ý điền sẵn ngưỡng quanh số liệu hiện tại; hãy chỉnh theo luận điểm của bạn.</li>
+  <li>Việc không đo tự động được (vd "được cấp phép dự án X") dùng <b>sự kiện tự xác nhận</b> và bạn tự bật <span class="ui">Đã xảy ra</span> / <span class="ui">Không</span>.</li>
+  <li>Máy chủ kiểm lúc 19:35 mỗi ngày làm việc, ghi lần đổi trạng thái và <b>email cho bạn một lần</b> khi điều kiện quan trọng bị phá vỡ (nếu đã bật email cảnh báo). Mỗi ý tưởng tối đa 12 điều kiện.</li>
+</ol>
+<p>Thiếu số liệu không bị coi là đúng hay sai ("chưa có số liệu"). Số liệu thị trường là ảnh chụp cuối ngày, không phải trong phiên.</p>
+<h2>16.2 Thanh khoản và sức chứa</h2>
+<ul>
+  <li><b>Ngày thoát</b> = số cổ phiếu / (tỷ lệ tối đa × khối lượng bình quân ngày). <b>Tác động giá</b> theo cùng công thức căn bậc hai của Market Simulation, chia đều số phiên cần để bán.</li>
+  <li><b>Hệ số quy mô</b>: nhân cả danh mục lên tối đa mấy lần thì mọi vị thế vẫn thoát được trong số phiên đã chọn, và mã nào chặn trước. Dưới 1 nghĩa là <b>đã vượt</b>.</li>
+  <li><b>Ứng viên</b>: mã theo dõi và ý tưởng chưa giữ, so quy mô dự định với sức chứa để biết có xây được trong số phiên đã chọn không.</li>
+</ul>
+<div class="callout warn"><b class="t">Cận trên lạc quan</b><p>Khối lượng quá khứ không bảo đảm thanh khoản lúc hoảng loạn; mã chạm sàn có thể không bán được nhiều phiên liền. Mọi con số về khả năng thoát là cận trên.</p></div>
+<h2>16.3 Dòng tiền</h2>
+<p>Gộp cổ tức tiền (đã công bố hoặc ước tính theo khoản đã trả, đã trừ thuế 5%), tiền bán chưa về (ngày T+2, bỏ cuối tuần và ngày nghỉ lễ), đề xuất lệnh đang chờ hoặc đã duyệt chưa khớp, lệnh dự kiến bạn tự thêm, và lãi vay nếu bạn nhập lãi suất. Trang cho biết ngày thiếu tiền đầu tiên, số dư thấp nhất, <b>tiền triển khai được</b> mà không phá mức tối thiểu bạn đặt, và số dư thấp nhất nếu chỉ tính các khoản chắc chắn. Lệnh dự kiến lưu trên máy bạn dùng (không đồng bộ). Lịch nghỉ lễ 2027 chưa đầy đủ nên ngày tiền về năm 2027 có thể lệch.</p>
+<h2>16.4 Sở hữu</h2>
+<ul>
+  <li><b>Giao dịch nội bộ</b> là thông tin <b>công bố</b>: người liên quan <b>đăng ký</b> mua / bán rồi mới thực hiện. Trang tách giao dịch <b>đã thực hiện</b> (tính vào mua / bán ròng) khỏi đăng ký (ý định, chưa chắc xảy ra; hết hạn thì không còn tính).</li>
+  <li><b>Mua đồng loạt</b>: từ 3 người khác nhau cùng mua thật trong 90 ngày, dấu hiệu mạnh hơn một lần mua đơn lẻ. Bán thường vì lý do không liên quan triển vọng (thuế, trả nợ, chia tài sản).</li>
+  <li><b>Phòng khối ngoại</b> còn dưới 2% là gần hết room, dưới 10% là hẹp. Cổ đông lớn lấy từ Vietcap; có dòng rất cũ, trang bỏ số quá 24 tháng khi tính mức tập trung.</li>
+  <li>Máy chủ đồng bộ 19:15 mỗi ngày làm việc cho mã đang giữ, theo dõi và có ý tưởng mở; mã khác bấm <span class="ui">Đồng bộ</span> ngay trong chi tiết.</li>
+</ul>
+<h2>16.5 Luân chuyển ngành</h2>
+<p>Mỗi chấm là một chỉ số ngành HOSE so với VN-Index, kiểu Relative Rotation Graph: ngang là sức mạnh tương đối so với xu hướng dài của chính nó (RS-Ratio), dọc là đà (RS-Mom). Bốn góc: <b>Dẫn đầu</b>, <b>Suy yếu</b>, <b>Tụt hậu</b>, <b>Cải thiện</b>; ngành thường đi vòng theo chiều Cải thiện → Dẫn đầu → Suy yếu → Tụt hậu nhưng không đều đặn. Số liệu <b>tự tính</b> từ giá đóng cửa nên không so trực tiếp được với phần mềm khác; chỉ số tính theo giá, chưa gồm cổ tức.</p>
+<h2>16.6 Độ chính xác dự phóng</h2>
+<ul>
+  <li>Chấm bốn thứ: <b>giá trị hợp lý</b> đã lưu ở Valuation Bench (kỳ 3 / 6 / 12 tháng, từng phương pháp, từng người lập), <b>ý tưởng</b> (đã duyệt, đang trong danh mục hoặc đã đóng), <b>quyết định</b> trong Nhật Ký Quyết Định, và <b>dự phóng lợi nhuận / doanh thu</b> bạn ghi ngay tại trang.</li>
+  <li>Giá được <b>điều chỉnh</b> cổ tức tiền, thưởng, chia tách và luôn <b>so với VN-Index cùng kỳ</b>. Chỉ chấm khi đã đủ kỳ.</li>
+  <li>Tỷ lệ luôn kèm khoảng tin cậy 95% và nhãn <b>mẫu nhỏ</b> khi dưới 10 mẫu: "đúng 4/5" không chứng minh được gì.</li>
+  <li>Dự phóng lợi nhuận ghi rồi <b>không sửa được</b> và ngày ghi do máy chủ đặt; muốn đổi thì ghi dự phóng mới, bản cũ vẫn được chấm. Sai số dương là lạc quan.</li>
+  <li>Mức tin tưởng của ý tưởng và mức tự tin của quyết định được so với tỷ lệ thành công thật để thấy bạn có tự tin thái quá không.</li>
+</ul>
+<h2>16.7 Kho dữ liệu theo thời điểm</h2>
+<p>Mỗi ngày làm việc lúc 19:05 hệ thống chụp chỉ số của cả thị trường (khoảng 1.500 mã) theo ngày của số liệu; mỗi khi báo cáo tài chính một mã đổi thì thêm một dòng kèm ngày <b>lần đầu thấy</b>; tin các báo được lưu mỗi 3 giờ. Mục đích: sau này backtest chiến lược chạy trên số liệu <b>đúng như đã thấy vào ngày đó</b>, không phải số liệu đã bị nguồn sửa về sau. Trang cho biết số ngày đã chụp, ngày thiếu, tiến độ tới lúc đủ dữ liệu, và cho phép xem số liệu của một mã hay chạy một bộ lọc "như ngày D".</p>
+<div class="callout"><b class="t">Giới hạn cần biết</b><ul>
+  <li>Kho chỉ tích luỹ từ ngày bắt đầu chụp (11/10/2026); không bù ngược được từ nguồn miễn phí. Backtest cân bằng lại hằng tháng cần khoảng 315 ngày chụp.</li>
+  <li>Báo cáo tài chính đã có trước đó chỉ biết ngày đầu thấy, không phải ngày công bố thật. Khi cần số liệu giai đoạn cũ, dùng hạn công bố bảo thủ (quý +45 ngày, năm +90 ngày).</li>
+  <li>Dung lượng khoảng 50–60 MB mỗi năm; dữ liệu từ nguồn công khai không có cam kết dịch vụ nên có thể có ngày thiếu (trang liệt kê).</li>
 </ul></div>
 
 <h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>

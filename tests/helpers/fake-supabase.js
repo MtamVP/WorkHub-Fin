@@ -82,7 +82,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
   function builder(t) {
     const q = { t, op: 'select', filters: [], order: null, limit: null, payload: null, single: null, returning: false, onConflict: null, ignoreDuplicates: false };
     const api = {
-      select() { if (q.op !== 'select') q.returning = true; return api; },
+      select(cols, o) { if (q.op !== 'select') q.returning = true; if (o && o.count) q.count = true; if (o && o.head) q.head = true; return api; },
       insert(p) { q.op = 'insert'; q.payload = p; return api; },
       update(p) { q.op = 'update'; q.payload = p; return api; },
       upsert(p, o) { q.op = 'upsert'; q.payload = p; q.onConflict = o && o.onConflict; q.ignoreDuplicates = !!(o && o.ignoreDuplicates); return api; },
@@ -144,6 +144,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
       } else if (q.op === 'delete') {
         for (let i = rows.length - 1; i >= 0; i--) if (matchRow(rows[i], q.filters)) { result.push({ ...rows[i] }); rows.splice(i, 1); }
       }
+      const total = result.length;                                                // đếm trước khi cắt trang / giới hạn (select(..., { count: 'exact' }))
       if (q.orders) result.sort((a, b) => { for (const o of q.orders) { const d = ((a[o.col] > b[o.col]) - (a[o.col] < b[o.col])) * (o.asc ? 1 : -1); if (d) return d; } return 0; });
       if (q.range) result = result.slice(q.range[0], q.range[1] + 1);
       if (q.limit) result = result.slice(0, q.limit);
@@ -151,6 +152,7 @@ export function createFakeSupabase(seed = {}, opts = {}) {
       if (q.op === 'select' && opts.maxRows && result.length > opts.maxRows) result = result.slice(0, opts.maxRows);
       if (error) return { data: null, error };
       if ((q.op === 'insert' || q.op === 'update' || q.op === 'upsert' || q.op === 'delete') && !q.returning) return { data: null, error: null };
+      if (q.op === 'select' && q.count) return { data: q.head ? null : result, count: total, error: null };
       if (q.single === 'maybe') return { data: result[0] || null, error: null };
       if (q.single === 'one') return result.length === 1 ? { data: result[0], error: null } : { data: null, error: { message: 'Expected 1 row, got ' + result.length } };
       return { data: result, error: null };

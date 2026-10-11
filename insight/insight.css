@@ -1,0 +1,108 @@
+/* --- FILE: /insight/insight.css ---
+   Insight: dùng lại hệ thiết kế của Investment Workbench (finance-shared.css, tools.css) và chỉ thêm thành phần riêng, tiền tố ins-.
+   Accent ĐỒNG THAU (khác xanh rừng của Investment, xanh mực của Valuation Bench, tím mực của Mô phỏng); đủ cả sáng và tối. Màu ngữ nghĩa lấy từ token chung. */
+
+body.desk[data-bench="insight"] {
+  --finance-accent: #8A5A12; --finance-accent-hover: #9E6A18; --finance-accent-subtle: rgba(138, 90, 18, 0.10); --finance-accent-line: rgba(138, 90, 18, 0.30);
+  --ins-up: #12855A; --ins-down: #C23B3B; --ins-warn: #B7791F; --ins-flat: #8A8377; --ins-grid: rgba(28, 25, 21, 0.08); --ins-on-accent: #FFFFFF;
+}
+:root[data-theme="dark"] body.desk[data-bench="insight"] {
+  --finance-accent: #E0B15A; --finance-accent-hover: #EBC376; --finance-accent-subtle: rgba(224, 177, 90, 0.13); --finance-accent-line: rgba(224, 177, 90, 0.34);
+  --ins-up: #3DBA87; --ins-down: #E8695B; --ins-warn: #E0B15A; --ins-flat: #9C968A; --ins-grid: rgba(237, 233, 222, 0.09); --ins-on-accent: #20180A;
+}
+:root[data-theme="dark"] body.desk[data-bench="insight"] .desk-wordmark .glyph { color: #20180A; }
+body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subtle); color: var(--finance-accent); }
+
+.ins-root { min-width: 0; }
+.ins-root * { min-width: 0; }
+.ins-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ins-muted { color: var(--text-muted); }
+.ins-up { color: var(--ins-up); } .ins-down { color: var(--ins-down); } .ins-warn { color: var(--ins-warn); }
+.ins-status { font-size: 0.76rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
+.ins-foot { margin-top: 18px; }
+.ins-root .tl-card-head h3 i { color: var(--finance-accent); }
+
+/* nút */
+.ins-btn { border: 1px solid var(--finance-accent); background: var(--finance-accent); color: var(--ins-on-accent); font: inherit; font-weight: 700; font-size: 0.84rem; padding: 9px 16px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.15s ease, border-color 0.15s ease; }
+.ins-btn:hover { background: var(--finance-accent-hover); border-color: var(--finance-accent-hover); }
+.ins-btn[disabled] { opacity: 0.5; cursor: wait; }
+.ins-btn.ghost { background: var(--card-bg); color: var(--text-secondary); border-color: var(--border-strong); }
+.ins-btn.ghost:hover { color: var(--text-primary); border-color: var(--finance-accent); }
+.ins-btn.sm { padding: 5px 10px; font-size: 0.76rem; }
+.ins-btn.danger { background: var(--card-bg); color: var(--danger-color); border-color: var(--border-strong); }
+.ins-btn:focus-visible, .ins-seg button:focus-visible, .ins-link:focus-visible { outline: 2px solid var(--finance-accent); outline-offset: 2px; }
+.ins-link { border: 0; background: transparent; padding: 0; font: inherit; color: var(--finance-accent); font-weight: 600; cursor: pointer; text-align: left; }
+.ins-link:hover { text-decoration: underline; }
+
+.ins-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--bg-color-2); border: 1px solid var(--border-color); border-radius: var(--radius-sm); }
+.ins-seg button { border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.78rem; font-weight: 600; padding: 6px 11px; border-radius: 5px; cursor: pointer; }
+.ins-seg button:hover { color: var(--text-primary); }
+.ins-seg button[aria-pressed="true"] { background: var(--card-bg); color: var(--finance-accent); box-shadow: var(--shadow-soft); }
+
+/* bố cục */
+.ins-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.ins-grid.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 980px) { .ins-grid, .ins-grid.even { grid-template-columns: 1fr; } }
+.ins-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 14px; }
+.ins-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--text-muted); font-weight: 600; }
+.ins-field input, .ins-field select { font: inherit; font-size: 0.84rem; font-weight: 400; color: var(--text-primary); background: var(--card-bg); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 7px 9px; }
+.ins-field input:focus-visible, .ins-field select:focus-visible { outline: 2px solid var(--finance-accent); outline-offset: 1px; }
+.ins-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+.ins-note { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-color-2); color: var(--text-secondary); font-size: 0.8rem; line-height: 1.55; }
+.ins-note.warn { border-color: var(--warning-color); background: var(--warning-bg); }
+.ins-note.bad { border-color: var(--danger-color); background: var(--danger-bg); }
+.ins-note b { color: var(--text-primary); }
+
+/* thẻ số liệu */
+.ins-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ins-kpi { padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-color-2); }
+.ins-kpi .k { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.ins-kpi .v { margin-top: 4px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.15rem; color: var(--text-primary); }
+.ins-kpi .s { margin-top: 3px; font-size: 0.72rem; color: var(--text-muted); }
+.ins-kpi.bad { border-color: var(--danger-color); } .ins-kpi.warn { border-color: var(--warning-color); } .ins-kpi.good { border-color: var(--success-color); }
+
+/* bảng */
+.ins-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.ins-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.ins-table th { text-align: right; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.ins-table th:first-child, .ins-table td:first-child { text-align: left; }
+.ins-table td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-table td:first-child { font-family: inherit; white-space: normal; }
+.ins-table td.t, .ins-table th.t { text-align: left; font-family: inherit; white-space: normal; }
+.ins-table tbody tr:hover td { background: var(--hover-bg); }
+.ins-table tr.sel td { background: var(--finance-accent-subtle); }
+.ins-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--radius-pill); font-size: 0.66rem; font-weight: 700; background: var(--finance-accent-subtle); color: var(--finance-accent); white-space: nowrap; font-family: inherit; }
+.ins-tag.ok { background: var(--success-bg); color: var(--success-color); }
+.ins-tag.warn { background: var(--warning-bg); color: var(--warning-color); }
+.ins-tag.bad { background: var(--danger-bg); color: var(--danger-color); }
+.ins-tag.muted { background: var(--bg-color-2); color: var(--text-muted); }
+
+/* thanh tỷ lệ */
+.ins-meter { height: 8px; border-radius: var(--radius-pill); background: var(--bg-color-2); overflow: hidden; }
+.ins-meter span { display: block; height: 100%; background: var(--finance-accent); border-radius: var(--radius-pill); }
+.ins-meter.bad span { background: var(--ins-down); } .ins-meter.warn span { background: var(--ins-warn); } .ins-meter.good span { background: var(--ins-up); }
+
+/* luận điểm */
+.ins-idea { border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); margin-bottom: 12px; overflow: hidden; }
+.ins-idea.broken { border-color: var(--danger-color); } .ins-idea.warning { border-color: var(--warning-color); }
+.ins-idea-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 14px; }
+.ins-idea-head .sym { font-weight: 800; font-size: 1rem; }
+.ins-idea-head .ttl { flex: 1 1 200px; color: var(--text-secondary); font-size: 0.84rem; }
+.ins-cond { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--border-color); font-size: 0.82rem; }
+.ins-cond .st { font-size: 0.95rem; text-align: center; }
+.ins-cond .st.ok { color: var(--ins-up); } .ins-cond .st.fail { color: var(--ins-down); } .ins-cond .st.unknown { color: var(--text-muted); }
+.ins-cond .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-primary); text-align: right; }
+.ins-cond .meta { color: var(--text-muted); font-size: 0.72rem; }
+@media (max-width: 640px) { .ins-cond { grid-template-columns: 22px minmax(0, 1fr); } .ins-cond .val, .ins-cond .act { grid-column: 2; text-align: left; } }
+
+/* sơ đồ */
+.ins-chart { width: 100%; height: auto; display: block; }
+.ins-chart text { fill: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.ins-chart .grid { stroke: var(--ins-grid); stroke-width: 1; }
+.ins-chart .axis { stroke: var(--border-strong); stroke-width: 1; }
+.ins-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 0.74rem; color: var(--text-muted); }
+.ins-prose { font-size: 0.86rem; line-height: 1.65; color: var(--text-secondary); max-width: 80ch; }
+.ins-prose p { margin: 0 0 8px; }
+.ins-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); font-size: 0.86rem; line-height: 1.6; }
+.ins-empty i { display: block; font-size: 1.4rem; margin-bottom: 8px; color: var(--finance-accent); }
+.ins-nav-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-color); margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
