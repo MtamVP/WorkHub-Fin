@@ -13,6 +13,10 @@ const EXCLUDE_TOP_LEVEL = new Set([
   // docs/ = nguồn và PDF hướng dẫn mọi phiên bản (~13 MB, app không mở tới; PDF phát hành kèm GitHub Release) -- từng làm bộ cài 0.1.15 nặng 15,6 MB
   'docs', '.github', 'vitest.config.mjs', '.htmlvalidate.json',
 ]);
+// Thư mục bỏ qua ở MỌI tầng: môi trường Python / gói / bộ đệm trên máy build (bản 0.1.18 từng đóng gói nhầm pipeline/parser_backend/venv, app.exe 21,6 -> 43,5 MB)
+const EXCLUDE_DIR_ANYWHERE = new Set(['venv', '.venv', 'env', '__pycache__', '.pytest_cache', 'node_modules', '.git', '.wrangler']);
+// Đường dẫn con chỉ dùng ở máy chủ, app không mở tới: mã Python của dịch vụ đọc tệp (Dockerfile, main.py...)
+const EXCLUDE_SUBPATH = new Set(['pipeline/parser_backend']);
 // Tệp ở gốc chỉ dành cho người phát triển (migration SQL, ghi chú .md/.txt): không đưa vào app
 const EXCLUDE_ROOT_FILE = /\.(sql|md|txt)$/i;
 
@@ -23,6 +27,8 @@ function copyDir(src, dst, isRoot) {
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     if (isRoot && EXCLUDE_TOP_LEVEL.has(entry.name)) continue;
+    if (entry.isDirectory() && EXCLUDE_DIR_ANYWHERE.has(entry.name)) continue;
+    if (EXCLUDE_SUBPATH.has(path.relative(root, path.join(src, entry.name)).split(path.sep).join('/'))) continue;
     if (isRoot && entry.isFile() && EXCLUDE_ROOT_FILE.test(entry.name)) continue;
     const s = path.join(src, entry.name);
     const d = path.join(dst, entry.name);
