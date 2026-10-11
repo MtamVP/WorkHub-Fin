@@ -3,7 +3,18 @@
    (so với VN-Index và giá thật, chỉ dùng dữ liệu sau ngày chạy), cây sống của một lần chạy (nhánh thực tế đã đi + sự kiện đã đánh dấu -> xác suất có điều kiện phía trước),
    và ghi quyết định vào Nhật Ký Quyết Định kèm liên kết tới lần mô phỏng làm căn cứ. Mọi phép tính ở /lib/sim-score.js (có kiểm thử). */
 
-SIM.runs = { state: 'idle', list: [], error: '', sel: null, series: null, seriesKey: '', scores: {}, decisions: [], decState: 'idle', jform: null, saving: false };
+// scope: 'group' (cả nhóm Finance, mỗi dòng kèm tên người chạy) hoặc 'mine'; nhớ lựa chọn trong máy. Lần chạy của người khác chỉ xem (r.mine === false): API và RLS cũng chỉ cho chủ sửa / xoá.
+const RUNS_SCOPE_KEY = 'wh.fin.simruns.scope.v1';
+const runsReadScope = () => { try { return localStorage.getItem(RUNS_SCOPE_KEY) === 'mine' ? 'mine' : 'group'; } catch (e) { return 'group'; } };
+SIM.runs = { state: 'idle', list: [], error: '', sel: null, series: null, seriesKey: '', scores: {}, decisions: [], decState: 'idle', jform: null, saving: false, scope: runsReadScope() };
+const runsIsMine = (r) => !!r && r.mine !== false;
+const runsOwnerName = (r) => (r && r.owner && (r.owner.name || r.owner.email)) || 'Không rõ';
+function runsSetScope(scope) {
+    scope = scope === 'mine' ? 'mine' : 'group';
+    if (SIM.runs.scope === scope) return;
+    SIM.runs.scope = scope; try { localStorage.setItem(RUNS_SCOPE_KEY, scope); } catch (e) { /* chỉ mất ghi nhớ lựa chọn */ }
+    SIM.runs.sel = null; SIM.runs.jform = null; SIM.runs.decState = 'idle'; SIM.runs.state = 'idle'; runsLoad();
+}
 
 // ---------- lưu lần chạy ----------
 function runChosenDefault(res) { const hh = res.byHorizon[res.byHorizon.length - 1]; return (hh.best && hh.best.ce) || res.policies[0].id; }
@@ -63,7 +74,7 @@ function runsRoute(id) {
 async function runsLoad() {
     SIM.runs.state = 'loading'; SIM.runs.error = ''; if (SIM.view === 'runs') render();
     try {
-        const list = await simCall('listSimRuns', { email: SIM.email, limit: 120 });
+        const list = await simCall('listSimRuns', { email: SIM.email, limit: 120, scope: SIM.runs.scope });
         SIM.runs.list = (list || []).filter((r) => r && r.snapshot && r.snapshot.v === SimScore.VERSION);
         // VN-Index trước để chấm phần thị trường; giá các mã (danh mục giữ nguyên) chỉ tải khi có lần chạy đã tới mốc
         let inp = await getInputs([]);
@@ -86,7 +97,8 @@ function runsScoreAll(series) {
 function learnCompute() {
     const R = SIM.runs;
     try {
-        SIM.learn.res = SimScore.learnShocks(R.list.map((r) => ({ snap: r.snapshot, score: R.scores[r.id], marks: r.marks || {} })));
+        // chỉ học từ lần chạy CỦA MÌNH: xem nhật ký cả nhóm không được làm đổi hệ số cú sốc đang đưa vào mô phỏng của riêng mình
+        SIM.learn.res = SimScore.learnShocks(R.list.filter(runsIsMine).map((r) => ({ snap: r.snapshot, score: R.scores[r.id], marks: r.marks || {} })));
         if (SIM.market.state === 'ok' && ctxEvents().length && SIM.market.ctxKey !== ctxKey()) ctxRefreshOutlook();
     } catch (e) { SIM.learn.res = null; }
 }
@@ -120,17 +132,18 @@ function runsMarkSeen(r) {
     try { localStorage.setItem(RUNS_SEEN_KEY, JSON.stringify(m)); } catch (e) { /* không lưu được: chỉ mất nhãn mới */ }
 }
 async function runsSetMark(id, eventId, val) {
-    const r = SIM.runs.list.find((x) => x.id === id); if (!r) return;
+    const r = SIM.runs.list.find((x) => x.id === id); if (!r || !runsIsMine(r)) return;
     const marks = Object.assign({}, r.marks || {});
     if (val === 'yes') marks[eventId] = true; else if (val === 'no') marks[eventId] = false; else delete marks[eventId];
     r.marks = marks; learnCompute(); render();
     try { await simCall('updateSimRun', { email: SIM.email, id: id, patch: { marks: marks } }); } catch (e) { showToast(e.message || String(e), 'error'); }
 }
 async function runsSaveNote(id) {
-    const el = document.getElementById('rn-note'), r = SIM.runs.list.find((x) => x.id === id); if (!el || !r) return;
+    const el = document.getElementById('rn-note'), r = SIM.runs.list.find((x) => x.id === id); if (!el || !r || !runsIsMine(r)) return;
     try { await simCall('updateSimRun', { email: SIM.email, id: id, patch: { note: el.value } }); r.note = el.value.trim() || null; showToast('Đã lưu ghi chú.'); } catch (e) { showToast(e.message || String(e), 'error'); }
 }
 async function runsDelete(id) {
+    if (!runsIsMine(SIM.runs.list.find((x) => x.id === id))) return;
     if (!confirm('Xoá lần mô phỏng này khỏi nhật ký? Quyết định đã ghi trong Nhật Ký Quyết Định vẫn giữ nguyên.')) return;
     try { await simCall('deleteSimRun', { email: SIM.email, id: id }); SIM.runs.list = SIM.runs.list.filter((x) => x.id !== id); if (SIM.runs.sel === id) SIM.runs.sel = SIM.runs.list.length ? SIM.runs.list[0].id : null; location.hash = SIM.runs.sel ? '#runs/' + SIM.runs.sel : '#runs'; render(); }
     catch (e) { showToast(e.message || String(e), 'error'); }
@@ -143,7 +156,7 @@ function runReasonText(r) {
         ', khoảng 90% ' + sPct(last.q05, 1, true) + ' … ' + sPct(last.q95, 1, true) + ', P(lỗ >10%) ' + sProb(last.pLoss10) + (s.chosen !== s.policies[0].id ? '; Giữ nguyên trung vị ' + sPct(last.holdMedian, 1, true) : '') + '.' + (r.note ? ' ' + r.note : '');
 }
 function runsOpenJournal(id) {
-    const r = SIM.runs.list.find((x) => x.id === id); if (!r) return;
+    const r = SIM.runs.list.find((x) => x.id === id); if (!r || !runsIsMine(r)) return;
     const pos = (r.snapshot.positions || []).filter((p) => p.symbol !== MarketSim.INDEX);
     const sym = pos.length ? pos[0].symbol : 'VNINDEX';
     SIM.runs.jform = { runId: id, symbol: sym, action: r.snapshot.chosen === 'hold' ? 'hold' : (/^(trim|cash|stop|trail|tp)/.test(r.snapshot.chosen) ? 'sell' : 'hold'), price: pos.length ? pos[0].price : null, reason: runReasonText(r), horizon: 3, confidence: '' };
@@ -180,7 +193,7 @@ function renderRunsView() {
     const R = SIM.runs;
     if (R.state === 'loading' || R.state === 'idle') return loadingHtml('Đang tải nhật ký mô phỏng và VN-Index để chấm điểm…');
     if (R.state === 'error') return errorHtml('Không tải được nhật ký mô phỏng: ' + R.error + (/finance_sim_runs/.test(R.error) ? ' (quản trị cần chạy finance-sim-runs-migration.sql)' : ''), 'runsLoad()');
-    if (!R.list.length) return '<section class="tl-card"><div class="tl-empty"><i class="fa-solid fa-bookmark"></i>Chưa lưu lần mô phỏng nào. Ở mục <b>Mô phỏng</b> (sau khi chạy) hoặc <b>Triển vọng</b>, bấm <b>Lưu</b> để giữ dự báo lại; khi các mốc 1 tuần / 1 tháng / 3 tháng tới, trang tự so với thực tế.</div></section>';
+    if (!R.list.length) return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-list"></i> Các lần đã lưu</h3><div class="tl-card-tools">' + runsScopeHtml() + '</div></div><div class="tl-empty"><i class="fa-solid fa-bookmark"></i>' + (R.scope === 'group' ? 'Cả nhóm chưa lưu lần mô phỏng nào. ' : 'Bạn chưa lưu lần mô phỏng nào. ') + 'Ở mục <b>Mô phỏng</b> (sau khi chạy) hoặc <b>Triển vọng</b>, bấm <b>Lưu</b> để giữ dự báo lại; khi các mốc 1 tuần / 1 tháng / 3 tháng tới, trang tự so với thực tế.</div></section>';
     return runsAggregateHtml() + runsLearnHtml() + runsTableHtml() + runsDetailHtml();
 }
 // Hệ số độ lớn cú sốc đã học theo loại sự kiện + tần suất xảy ra thật so với xác suất đã đặt
@@ -204,26 +217,37 @@ function runsAggregateHtml() {
         '<td class="' + sCls(a.bss) + '">' + (a.bss === null ? '—' : (a.bss >= 0 ? '+' : '−') + Math.abs(a.bss).toFixed(2)) + '</td>' +
         '<td>' + (a.ctx.n ? sPct(a.ctx.crps, 2) + ' / ' + sPct(a.ctx.crpsBase, 2) + ' <span class="sim-tag ' + (a.ctx.crps < a.ctx.crpsBase ? 'ok' : 'bad') + '">' + (a.ctx.crps < a.ctx.crpsBase ? 'bối cảnh tốt hơn' : 'bối cảnh kém hơn') + '</span> <span class="sim-muted">(' + a.ctx.n + ')</span>' : '<span class="sim-muted">chưa có</span>') + '</td>' +
         '<td>' + (a.hold.n ? cov(a.hold.cover90, 0.9, a.hold.n) + ' <span class="sim-muted">(' + a.hold.n + ')</span>' : '—') + '</td></tr>').join('');
-    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-balanced"></i> Dự báo đã lưu đúng đến đâu</h3><span class="tl-hint" style="margin:0">' + R.list.length + ' lần lưu · ' + matured + ' lượt đã tới mốc</span></div>' +
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-scale-balanced"></i> Dự báo đã lưu đúng đến đâu</h3><span class="tl-hint" style="margin:0">' + (R.scope === 'group' ? 'cả nhóm · ' : 'của tôi · ') + R.list.length + ' lần lưu · ' + matured + ' lượt đã tới mốc</span></div>' +
         '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Mốc</th><th>Đã tới</th><th>Thực tế trong khoảng 50%</th><th>trong 90%</th><th>PIT</th><th title="Sai số xác suất liên tục của VN-Index: càng thấp càng tốt">CRPS</th><th title="Điểm kỹ năng Brier của xác suất 3 nhánh so với tần suất lịch sử trước ngày chạy">BSS nhánh</th><th title="Chỉ các lần chạy có bối cảnh: CRPS có bối cảnh / chỉ lịch sử, trên cùng các lần đó">Có bối cảnh / chỉ lịch sử</th><th title="Danh mục lúc chạy nếu cứ giữ nguyên, so với dự báo của Giữ nguyên">Danh mục trong 90%</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<p class="tl-hint">Chỉ chấm bằng dữ liệu SAU ngày chạy: mốc 1 tuần = 5 phiên giao dịch sau ngày dữ liệu cuối của lần chạy. Mô hình tốt: thực tế nằm trong khoảng 50% khoảng một nửa số lần và trong khoảng 90% khoảng 9/10 số lần; PIT gần phẳng; BSS dương. Dưới 8 lượt thì chưa tô màu: quá ít để kết luận. Các lần lưu sát nhau dùng chung một giai đoạn thị trường nên không độc lập hẳn. CRPS ở đây tính xấp xỉ từ 39 phân vị đã lưu.</p></section>';
+}
+// Chuyển giữa lần chạy của mình và cả nhóm Finance
+function runsScopeHtml() {
+    const sc = SIM.runs.scope;
+    return '<div class="sim-seg" role="group" aria-label="Phạm vi nhật ký">' + [['mine', 'Của tôi'], ['group', 'Cả nhóm']].map((o) => '<button type="button" aria-pressed="' + (sc === o[0]) + '" onclick="runsSetScope(\'' + o[0] + '\')">' + o[1] + '</button>').join('') + '</div>';
+}
+// Tên người chạy: tên hiển thị (nickname), email nhỏ bên dưới; "(bạn)" khi là của chính mình
+function runsOwnerCell(r) {
+    const o = r.owner || {};
+    return '<b>' + sE(runsOwnerName(r)) + '</b>' + (runsIsMine(r) ? ' <span class="sim-muted">(bạn)</span>' : '') + (o.email && o.email !== runsOwnerName(r) ? '<div class="sim-muted" style="font-size:0.72rem">' + sE(o.email) + '</div>' : '');
 }
 function runsTableHtml() {
     const R = SIM.runs;
     const rows = R.list.map((r) => {
         const s = r.snapshot, sc = R.scores[r.id] || { horizons: [] }, pol = s.policies.find((p) => p.id === s.chosen) || s.policies[0];
         return '<tr class="' + (r.id === R.sel ? 'sel' : '') + '"><td><button type="button" class="sim-row-btn" onclick="runsSelect(\'' + sE(r.id) + '\')">' + sE(fmtDate(s.asOf)) + '</button><div class="sim-muted" style="font-size:0.72rem">lưu ' + sE(new Date(r.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })) + '</div></td>' +
+            '<td>' + runsOwnerCell(r) + '</td>' +
             '<td>' + sE(subjectLabel(r.subject)) + (runsUnseen(r).length ? '<span class="sim-tag ok" title="Có mốc mới tới từ lần xem trước">mới tới mốc</span>' : '') + (s.events.length ? '<span class="sim-tag warn" title="Có ' + s.events.length + ' sự kiện bối cảnh">bối cảnh</span>' : '') + '</td><td>' + sE(s.subject === 'outlook' ? '—' : pol.label) + '</td>' +
             s.horizons.map((h, i) => '<td>' + runStatusTag(sc.horizons[i]) + '</td>').join('') + '</tr>';
     }).join('');
-    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-list"></i> Các lần đã lưu</h3><div class="tl-card-tools"><button type="button" class="sim-btn ghost sm" onclick="SIM.runs.state=\'idle\';simInputsCache={};runsLoad()"><i class="fa-solid fa-rotate"></i> Tải lại</button></div></div>' +
-        '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Ngày dữ liệu</th><th>Đối tượng</th><th>Cách xử lý đã chọn</th><th>VN-Index sau 1 tuần</th><th>sau 1 tháng</th><th>sau 3 tháng</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-list"></i> Các lần đã lưu</h3><div class="tl-card-tools">' + runsScopeHtml() + '<button type="button" class="sim-btn ghost sm" onclick="SIM.runs.state=\'idle\';simInputsCache={};runsLoad()"><i class="fa-solid fa-rotate"></i> Tải lại</button></div></div>' +
+        '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Ngày dữ liệu</th><th>Người chạy</th><th>Đối tượng</th><th>Cách xử lý đã chọn</th><th>VN-Index sau 1 tuần</th><th>sau 1 tháng</th><th>sau 3 tháng</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         '<p class="tl-hint">Nhãn: thực tế nằm trong khoảng 50% / 90% của dự báo lúc đó, hay ngoài 90%. Bấm ngày để xem chi tiết và cây sống.</p></section>';
 }
 function runsDetailHtml() {
     const R = SIM.runs, r = R.list.find((x) => x.id === R.sel);
     if (!r) return '';
-    const s = r.snapshot, sc = R.scores[r.id] || { horizons: [], prefix: '' }, L = s.indexLevel;
+    const s = r.snapshot, sc = R.scores[r.id] || { horizons: [], prefix: '' }, L = s.indexLevel, mine = runsIsMine(r);
     const pol = s.policies.find((p) => p.id === s.chosen) || s.policies[0];
     const qAt = (g, lv) => { const i = s.levels.findIndex((x) => Math.abs(x - lv) < 1e-9); return i === -1 || !g ? null : g[i]; };
     const fc = s.horizons.map((h, i) => {
@@ -233,17 +257,18 @@ function runsDetailHtml() {
             '<td>' + (s.subject === 'outlook' ? '—' : sPct(o.median, 1, true) + ' <span class="sim-muted">' + sPct(o.q05, 0, true) + '…' + sPct(o.q95, 0, true) + '</span>') + '</td><td>' + (x.hold ? '<span class="' + sCls(x.hold.ret) + '">' + sPct(x.hold.ret, 1, true) + '</span>' + (x.hold.in90 ? '' : ' <span class="sim-tag bad">ngoài 90%</span>') : '—') + '</td></tr>';
     }).join('');
     const head = '<section class="tl-card" id="run-detail"><div class="tl-card-head"><h3><i class="fa-solid fa-bookmark"></i> ' + sE(r.label || subjectLabel(r.subject)) + ' · ' + sE(fmtDate(s.asOf)) + '</h3><div class="tl-card-tools">' +
-        (s.subject !== 'outlook' ? '<button type="button" class="sim-btn sm" onclick="runsOpenJournal(\'' + sE(r.id) + '\')"><i class="fa-solid fa-book"></i> Ghi vào Nhật Ký Quyết Định</button>' : '') +
-        '<button type="button" class="sim-btn ghost sm" onclick="runsDelete(\'' + sE(r.id) + '\')"><i class="fa-solid fa-trash-can"></i> Xoá</button></div></div>' +
+        (mine && s.subject !== 'outlook' ? '<button type="button" class="sim-btn sm" onclick="runsOpenJournal(\'' + sE(r.id) + '\')"><i class="fa-solid fa-book"></i> Ghi vào Nhật Ký Quyết Định</button>' : '') +
+        (mine ? '<button type="button" class="sim-btn ghost sm" onclick="runsDelete(\'' + sE(r.id) + '\')"><i class="fa-solid fa-trash-can"></i> Xoá</button>' : '') + '</div></div>' +
+        '<p class="sim-prose" style="margin:0 0 6px"><i class="fa-solid fa-user"></i> Người chạy: <b>' + sE(runsOwnerName(r)) + '</b>' + (r.owner && r.owner.email && r.owner.email !== runsOwnerName(r) ? ' <span class="sim-muted">(' + sE(r.owner.email) + ')</span>' : '') + ' · lưu lúc ' + sE(new Date(r.created_at).toLocaleString('vi-VN')) + (mine ? '' : ' · <span class="sim-muted">chỉ xem: chỉ người chạy sửa hoặc xoá được</span>') + '</p>' +
         '<p class="sim-prose" style="margin:0 0 10px">VN-Index lúc chạy ' + sNum(L, 2) + ' · ' + sNum(s.paths) + ' đường · mô hình ' + sE(s.model) + (s.events.length ? ' · ' + s.events.length + ' sự kiện bối cảnh' : ' · chỉ lịch sử') + (s.subject !== 'outlook' ? ' · NAV ' + sVnd(s.nav0) + ' · đã chọn <b>' + sE(pol.label) + '</b>' + (s.bestFinal && s.bestFinal !== s.chosen ? ' <span class="sim-muted">(mô phỏng xếp "' + sE((s.policies.find((p) => p.id === s.bestFinal) || {}).label) + '" hợp khẩu vị nhất)</span>' : '') : '') + '</p>' +
         '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Mốc</th><th>VN-Index dự báo 90%</th><th>Trung vị</th><th>Thực tế</th><th>Đánh giá</th><th>Nhánh thực tế</th><th>Cách đã chọn: dự báo</th><th>Danh mục giữ nguyên: thực tế</th></tr></thead><tbody>' + fc + '</tbody></table></div>' +
         '<div class="sim-chart" style="margin-top:12px"><canvas id="run-fan" aria-label="Dự báo VN-Index lúc lưu và giá trị thực tế"></canvas></div><div class="sim-legend"><span><i style="background:var(--sim-band-outer)"></i>90% dự báo</span><span><i style="background:var(--sim-band-inner)"></i>50%</span><span><i style="background:var(--finance-accent)"></i>Trung vị dự báo</span><span><i style="background:var(--text-muted)"></i>VN-Index thực tế</span></div>' +
-        '<div class="sim-form" style="margin-top:12px"><label class="sim-field" style="grid-column:1/-1">Ghi chú<input class="tl-input" id="rn-note" maxlength="1000" value="' + sE(r.note || '') + '" placeholder="Vì sao chọn cách này, điều gì sẽ làm bạn đổi ý"></label></div><div class="sim-actions" style="margin-top:6px"><button type="button" class="sim-btn ghost sm" onclick="runsSaveNote(\'' + sE(r.id) + '\')">Lưu ghi chú</button></div></section>';
+        '<div class="sim-form" style="margin-top:12px"><label class="sim-field" style="grid-column:1/-1">Ghi chú<input class="tl-input" id="rn-note" maxlength="1000" value="' + sE(r.note || '') + '"' + (mine ? '' : ' readonly') + ' placeholder="' + (mine ? 'Vì sao chọn cách này, điều gì sẽ làm bạn đổi ý' : '') + '"></label></div>' + (mine ? '<div class="sim-actions" style="margin-top:6px"><button type="button" class="sim-btn ghost sm" onclick="runsSaveNote(\'' + sE(r.id) + '\')">Lưu ghi chú</button></div>' : '') + '</section>';
     return head + runsLiveHtml(r, sc) + runsJournalHtml(r);
 }
 // Cây sống: nút hiện tại theo nhánh thực tế + sự kiện đã đánh dấu; xác suất có điều kiện của các nhánh phía trước
 function runsLiveHtml(r, sc) {
-    const s = r.snapshot, marks = r.marks || {};
+    const s = r.snapshot, marks = r.marks || {}, mine = runsIsMine(r);
     const markedId = Object.keys(marks).find((k) => (s.eventTrees || []).some((t) => t.id === k));
     const live = SimScore.liveTree(s, sc.prefix, markedId ? { eventId: markedId, happened: marks[markedId] } : null);
     const branchCell = (id) => id.replace(/^[YN]/, '').split('').map((c, i) => '<span>' + STAGE_LABEL[i] + ': <b>' + BR_WORD[+c] + '</b></span>').join('<span class="sep">›</span>');
@@ -254,9 +279,9 @@ function runsLiveHtml(r, sc) {
         const v = marks[e.id], hasTree = (s.eventTrees || []).some((t) => t.id === e.id), h = hints.find((x) => x.id === e.id);
         const hint = h ? '<div class="sim-hint"><i class="fa-solid fa-robot"></i> <b>AI đọc tin' + (h.at ? ' ' + sE(fmtDate(h.at.slice(0, 10))) : '') + ':</b> có vẻ ' + (h.status === 'happened' ? '<b>đã xảy ra</b>' : '<b>không xảy ra</b>') + (h.reason ? '. ' + sE(h.reason) : '') +
             (h.refs && h.refs.length ? '<div class="sim-ev-refs">' + h.refs.map((x) => '<a href="' + sE(x.link) + '" target="_blank" rel="noopener noreferrer" onclick="return simOpenLink(event, this.href)"><i class="fa-regular fa-newspaper"></i> ' + sE(x.title) + (x.sourceName ? ' <span class="sim-muted">· ' + sE(x.sourceName) + '</span>' : '') + '</a>').join('') + '</div>' : '') +
-            '<div class="sim-actions" style="margin-top:6px"><button type="button" class="sim-btn ghost sm" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + (h.status === 'happened' ? 'yes' : 'no') + '\')">Xác nhận</button><span class="sim-muted">Chỉ là gợi ý: đọc tin rồi mới xác nhận.</span></div></div>' : '';
+            (mine ? '<div class="sim-actions" style="margin-top:6px"><button type="button" class="sim-btn ghost sm" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + (h.status === 'happened' ? 'yes' : 'no') + '\')">Xác nhận</button><span class="sim-muted">Chỉ là gợi ý: đọc tin rồi mới xác nhận.</span></div>' : '') + '</div>' : '';
         return '<div class="sim-live-ev"><div><b>' + sE(e.title) + '</b> <span class="sim-muted">· ' + sProb(e.p) + ' khả năng lúc chạy</span>' + (e.signposts.length ? '<ul>' + e.signposts.map((x) => '<li>' + sE(x) + '</li>').join('') + '</ul>' : '') + hint + '</div>' +
-            '<div class="sim-seg" role="group" aria-label="Sự kiện đã xảy ra chưa">' + [['', 'Chưa rõ'], ['yes', 'Đã xảy ra'], ['no', 'Không xảy ra']].map((o) => '<button type="button" aria-pressed="' + ((o[0] === 'yes' && v === true) || (o[0] === 'no' && v === false) || (o[0] === '' && v === undefined)) + '" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + o[0] + '\')"' + (!hasTree && o[0] ? ' title="Sự kiện này không có cây riêng (chỉ 3 sự kiện đầu có): đánh dấu chỉ để ghi nhớ"' : '') + '>' + o[1] + '</button>').join('') + '</div></div>';
+            '<div class="sim-seg" role="group" aria-label="Sự kiện đã xảy ra chưa">' + [['', 'Chưa rõ'], ['yes', 'Đã xảy ra'], ['no', 'Không xảy ra']].map((o) => '<button type="button"' + (mine ? '' : ' disabled') + ' aria-pressed="' + ((o[0] === 'yes' && v === true) || (o[0] === 'no' && v === false) || (o[0] === '' && v === undefined)) + '" onclick="runsSetMark(\'' + sE(r.id) + '\',\'' + sE(e.id) + '\',\'' + o[0] + '\')"' + (!hasTree && o[0] ? ' title="Sự kiện này không có cây riêng (chỉ 3 sự kiện đầu có): đánh dấu chỉ để ghi nhớ"' : '') + '>' + o[1] + '</button>').join('') + '</div></div>';
     }).join('');
     return '<section class="tl-card"><div class="tl-card-head"><h3><i class="fa-solid fa-seedling"></i> Cây sống</h3><span class="tl-hint" style="margin:0">' + (live.eventTitle ? 'theo sự kiện: ' + sE(live.eventTitle) + ' (' + (live.root === 'Y' ? 'đã xảy ra' : 'không xảy ra') + ')' : 'theo VN-Index') + '</span></div>' +
         (r.watched_at ? '<p class="tl-hint" style="margin:0 0 6px"><i class="fa-solid fa-server"></i> Máy chủ chấm lần cuối ' + sE(new Date(r.watched_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })) + ' (mỗi ngày làm việc, cả khi không mở app; email nhắc khi tới mốc nếu bạn đã bật email cảnh báo).</p>' : '') +
@@ -267,6 +292,7 @@ function runsLiveHtml(r, sc) {
         (evRows ? '<h4 class="sim-sub">Sự kiện của bối cảnh lúc chạy: đánh dấu khi đã rõ</h4><div class="sim-live-evs">' + evRows + '</div><p class="tl-hint">Đánh dấu một sự kiện (trong 3 sự kiện đầu) đã xảy ra hay không thì cây sống chuyển sang cây theo sự kiện đó, gốc tương ứng. Theo dõi các dấu hiệu bên dưới mỗi sự kiện để biết khi nào đã rõ. Mỗi tối máy chủ nhờ AI đọc tin xem các sự kiện còn chưa rõ đã xảy ra chưa; gợi ý hiện ngay dưới sự kiện và chỉ được tính khi bạn xác nhận.</p>' : '') + '</section>';
 }
 function runsJournalHtml(r) {
+    if (!runsIsMine(r)) return '';      // Nhật Ký Quyết Định là của riêng từng người: không hiện quyết định của lần chạy do người khác lưu
     const R = SIM.runs, f = R.jform && R.jform.runId === r.id ? R.jform : null, s = r.snapshot;
     const list = R.decState === 'ok' && R.decisions.length ? '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Ngày</th><th>Mã</th><th>Hành động</th><th>Lý do</th></tr></thead><tbody>' +
         R.decisions.map((d) => '<tr><td>' + sE(fmtDate(d.decided_at)) + '</td><td><b>' + sE(d.symbol) + '</b></td><td>' + sE({ buy: 'Mua', sell: 'Bán', hold: 'Giữ', skip: 'Bỏ qua' }[d.action] || d.action) + '</td><td class="sim-muted">' + sE(String(d.reason || '').slice(0, 140)) + '</td></tr>').join('') + '</tbody></table></div><p class="tl-hint">Xem và đánh giá lại ở <a href="/mastersheet/assets/#journal">Nhật Ký Quyết Định</a>.</p>' : '';

@@ -5123,7 +5123,7 @@ async function populateAuditLogEmails() {
       const {data} = await supabaseClient 
         .from('users')
         .select('email')
-        .eq('group_key', 'admin')
+        .in('group_key', ['admin', 'finance'])
       if(data){
         emailSelected.innerHTML = "<option value=''>Tất cả email</option>" +
           data.map(u=>`<option value="${escapeHtml(u.email)}">${escapeHtml(u.email)}</option>`).join('')
@@ -5197,7 +5197,14 @@ const AUDIT_LOG_ENTITY_LABELS = {
   tasks: 'Công việc', projects: 'Dự án', events: 'Sự kiện', project_milestones: 'Cột mốc',
   messages: 'Tin nhắn', users: 'Người dùng', fin_roles: 'Vai trò Finance',
   finance_transactions: 'Giao dịch', finance_cash_flows: 'Dòng tiền',
-  finance_corporate_actions: 'Hành động doanh nghiệp'
+  finance_corporate_actions: 'Hành động doanh nghiệp',
+  finance_sim_runs: 'Nhật ký mô phỏng', finance_decisions: 'Nhật Ký Quyết Định', finance_bt_runs: 'Lần kiểm thử đã lưu',
+  finance_assets: 'Tiền mặt / dư nợ', finance_allocation_targets: 'Tỷ trọng mục tiêu',
+  finance_order_requests: 'Đề xuất lệnh', finance_approval_policy: 'Chính sách duyệt lệnh', finance_approval_audit: 'Kiểm tra lệnh lớn',
+  finance_limits: 'Giới hạn đầu tư', finance_limit_exceptions: 'Ngoại lệ giới hạn', finance_restricted_symbols: 'Mã hạn chế',
+  finance_ideas: 'Ý tưởng đầu tư', finance_idea_comments: 'Bình luận ý tưởng', finance_idea_votes: 'Bình chọn ý tưởng', finance_thesis_conditions: 'Điều kiện luận điểm',
+  finance_reconciliations: 'Đối soát', finance_vb_valuations: 'Định giá', finance_policy_weights: 'Trọng số chính sách', finance_forecasts: 'Dự phóng',
+  member_roles: 'Vai trò thành viên', org_units: 'Đơn vị tổ chức'
 };
 const AUDIT_LOG_OP_LABELS = { INSERT: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa' };
 

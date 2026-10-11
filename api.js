@@ -3291,13 +3291,20 @@ const API = {
 
         // --- Nhật ký mô phỏng (Market Simulation): ảnh chụp dự báo để tự chấm điểm khi các mốc tới; kiểm tra dữ liệu ở lib/sim-score.js ---
         simRuns: {
-            list: async (email, limit) => {
+            // scope 'group': cả nhóm Finance (RLS vốn cho nhóm finance / admin xem); mặc định chỉ của người gọi. Mỗi dòng kèm owner { id, email, name } và mine (true nếu của người gọi)
+            // để Nhật ký đọc được TÊN người thực hiện; người khác chỉ xem: update / remove bên dưới vẫn chỉ cho chủ.
+            list: async (email, limit, scope) => {
                 const userId = await getUserId(email);
                 if (!userId) return [];
-                const { data, error } = await sbClient.from('finance_sim_runs').select('*')
-                    .eq('user_id', userId).is('deleted_at', null).order('created_at', { ascending: false }).limit(Math.min(Math.max(Number(limit) || 60, 1), 200));
+                let q = sbClient.from('finance_sim_runs').select('*').is('deleted_at', null);
+                if (scope !== 'group') q = q.eq('user_id', userId);
+                const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(Math.max(Number(limit) || 60, 1), 200));
                 if (error) throw error;
-                return data || [];
+                const rows = data || [];
+                const ids = [...new Set(rows.map(r => r.user_id).concat([userId]))];
+                const { data: us } = await sbClient.from('users').select('id, email, nickname').in('id', ids);
+                const byId = new Map((us || []).map(u => [u.id, { id: u.id, email: u.email, name: u.nickname || u.email }]));
+                return rows.map(r => Object.assign({}, r, { owner: byId.get(r.user_id) || { id: r.user_id, email: '', name: 'Không rõ' }, mine: r.user_id === userId }));
             },
             save: async (email, input) => {
                 if (typeof SimScore === 'undefined') throw new Error("Thiếu thư viện nhật ký mô phỏng (lib/sim-score.js)");
@@ -5447,7 +5454,7 @@ async function _dispatchAction(action, params = {}) {
             case 'saveDecision': result = await API.asset.journal.save(params.email, params.decision); break;
             case 'saveDecisionReview': result = await API.asset.journal.saveReview(params.email, params.id, params.review); break;
             case 'deleteDecision': result = await API.asset.journal.remove(params.email, params.id); break;
-            case 'listSimRuns': result = await API.asset.simRuns.list(params.email, params.limit); break;
+            case 'listSimRuns': result = await API.asset.simRuns.list(params.email, params.limit, params.scope); break;
             case 'saveSimRun': result = await API.asset.simRuns.save(params.email, params.run); break;
             case 'updateSimRun': result = await API.asset.simRuns.update(params.email, params.id, params.patch); break;
             case 'deleteSimRun': result = await API.asset.simRuns.remove(params.email, params.id); break;

@@ -64,11 +64,33 @@ describe('API.asset.simRuns', () => {
     expect(fake.table('finance_sim_runs')[0].deleted_at).toBeTruthy();
     expect(await API.asset.simRuns.list(EMAIL)).toHaveLength(0);
   });
+  it('nhật ký cả nhóm: mỗi dòng kèm TÊN người chạy; mặc định chỉ lần chạy của mình; người khác không sửa / xoá được', async () => {
+    const { API, fake } = boot({ users: [{ id: USER, email: EMAIL, nickname: 'Phúc' }, { id: 'u-2', email: 'lan@example.com', nickname: 'Lan' }, { id: 'u-3', email: 'khong-ten@example.com', nickname: null }] });
+    const mine = await API.asset.simRuns.save(EMAIL, { snapshot: SNAP, label: 'của Phúc' });
+    const lan = await API.asset.simRuns.save('lan@example.com', { snapshot: SNAP, label: 'của Lan', note: 'ghi chú của Lan' });
+    await API.asset.simRuns.save('khong-ten@example.com', { snapshot: SNAP, label: 'không tên' });
+    const own = await API.asset.simRuns.list(EMAIL);
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatchObject({ label: 'của Phúc', mine: true, owner: { id: USER, email: EMAIL, name: 'Phúc' } });
+    const all = await API.asset.simRuns.list(EMAIL, 50, 'group');
+    expect(all).toHaveLength(3);
+    const byLabel = Object.fromEntries(all.map((r) => [r.label, r]));
+    expect(byLabel['của Lan']).toMatchObject({ mine: false, owner: { id: 'u-2', email: 'lan@example.com', name: 'Lan' } });
+    expect(byLabel['không tên'].owner.name).toBe('khong-ten@example.com');     // chưa đặt biệt danh: hiện email
+    expect(byLabel['của Phúc'].mine).toBe(true);
+    // người khác chỉ xem: sửa / xoá bằng tài khoản của mình không chạm tới lần chạy của Lan
+    await API.asset.simRuns.update(EMAIL, lan.id, { note: 'bị sửa trái phép' });
+    await API.asset.simRuns.remove(EMAIL, lan.id);
+    const row = fake.table('finance_sim_runs').find((r) => r.id === lan.id);
+    expect(row.note).toBe('ghi chú của Lan'); expect(row.deleted_at == null).toBe(true);
+    expect(mine.id).toBeTruthy();
+  });
   it('qua callGAS (các thao tác ghi nằm trong MUTATING_ACTIONS)', async () => {
     const { callGAS, fake } = boot();
     const r = await callGAS('saveSimRun', { email: EMAIL, run: { snapshot: SNAP } });
     expect(r.status).toBe('success');
     expect((await callGAS('listSimRuns', { email: EMAIL })).data).toHaveLength(1);
+    expect((await callGAS('listSimRuns', { email: EMAIL, scope: 'group' })).data[0].owner.email).toBe(EMAIL);
     expect((await callGAS('deleteSimRun', { email: EMAIL, id: fake.table('finance_sim_runs')[0].id })).status).toBe('success');
     const src = read('api.js');
     ['saveSimRun', 'updateSimRun', 'deleteSimRun'].forEach((a) => expect(src).toMatch(new RegExp("MUTATING_ACTIONS = new Set\\(\\[[\\s\\S]*'" + a + "'")));
