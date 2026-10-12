@@ -111,3 +111,21 @@ describe('refTarget: tham chiếu của hàng trong thẻ danh sách', () => {
     expect(U.refTarget(null, L, M)).toBeNull();
   });
 });
+
+describe('thẻ hướng dẫn trong giao diện', () => {
+  const src = read('lib/butler-ui.js');
+  it("có renderer cho thẻ 'guide' (chỉ nhận đường dẫn /guide/#id, chữ qua textContent) và nút có chữ 'Đọc trong hướng dẫn'", () => {
+    expect(src).toMatch(/card\.type === 'guide'/);
+    expect(src).toMatch(/guideHref\(it\.href\)/);
+    expect(src).toMatch(/Đọc trong hướng dẫn/);
+    expect(src.replace(/\/\/.*$/gm, '')).not.toMatch(/innerHTML|insertAdjacentHTML/);
+  });
+  it('mất kết nối máy chủ: tải chỉ mục hướng dẫn theo yêu cầu (không nạp sẵn ở mọi trang) rồi hiểu câu hỏi bằng quy tắc', () => {
+    expect(src).toMatch(/function ensureGuide\(\)/);
+    expect(src).toMatch(/'\/lib\/butler-guide-data\.js'/);
+    expect(src).toMatch(/core\.understand\(q, \{ sym: symFromHash\(location\.hash, L\(\)\) \}, map, guide\)/);
+    expect(src).toMatch(/const local = await localAnswer\(q\)/);
+    ['index.html', 'insight/index.html', 'valuation/index.html'].forEach((f) => expect(read(f), f).not.toMatch(/butler-guide-data/));
+  });
+  it('CSS có kiểu cho phần tóm tắt hướng dẫn', () => { expect(read('butler.css')).toMatch(/\.bt-guide-sum/); });
+});

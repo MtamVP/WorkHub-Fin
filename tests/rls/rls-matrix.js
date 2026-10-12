@@ -28,7 +28,7 @@ const MATRIX = [
   T('finance_compliance_log', 'team-read-server-write'), T('finance_function_runs', 'team-read-server-write'), T('finance_thesis_log', 'team-read-server-write'),
   T('finance_valuation_alert_state', 'team-read-server-write'), T('finance_valuation_history', 'team-read-server-write'),
   T('finance_alert_log', 'server-only'), T('cron_guard_state', 'server-only'),
-  T('butler_usage', 'owner-private', 'user_id'), T('butler_log', 'owner-private', 'user_id'),
+  T('butler_usage', 'owner-private', 'user_id'), T('butler_log', 'owner-private', 'user_id'), T('butler_guide', 'shared'),
   // dùng chung các app: kiểm hành vi riêng (audit_log chỉ admin đọc, personal_* chỉ chủ, users đọc công khai có chủ ý...)
   T('audit_log', 'shared'), T('app_settings', 'shared'), T('calendar_connections', 'shared'), T('calendar_google_sync', 'shared'), T('events', 'shared'), T('files', 'shared'), T('fin_roles', 'shared'),
   T('lounge_players', 'shared'), T('member_roles', 'shared'), T('messages', 'shared'), T('org_units', 'shared'), T('personal_items', 'shared'), T('personal_sync_files', 'shared'),
@@ -41,5 +41,6 @@ const OPEN_READ_ALLOWED = {
   org_units: 'sơ đồ tổ chức hiển thị cho mọi người dùng; chưa siết cùng users',
   app_settings: 'cài đặt dùng chung, mọi người dùng đăng nhập đọc (ghi cũng đang mở cho người đăng nhập: cần xem lại)',
   lounge_players: 'tính năng giải trí',
+  butler_guide: 'chỉ mục hướng dẫn sử dụng của Quản gia: tài liệu công khai trong app, mọi người dùng đăng nhập đọc; không có chính sách ghi (chỉ migration / service role)',
 };
 module.exports = { MATRIX, OPEN_READ_ALLOWED };

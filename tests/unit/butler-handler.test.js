@@ -2,6 +2,8 @@
 // (xác thực, quy tắc, "hôm nay", công cụ dữ liệu qua butler-data, AI chọn tính năng, hết lượt, lỗi hạ tầng, phản hồi, nhật ký không lưu nội dung câu hỏi).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const GUIDE_DATA = require('../../lib/butler-guide-data.js');
+const GUIDE_ROWS = GUIDE_DATA.sections.map((s, i) => ({ id: s.id, ord: i + 1, ver: GUIDE_DATA.version, n: s.n, t: s.t, ct: s.ct, s: s.s, k: s.k, w: s.w, p: s.p || null }));
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', GEMINI_API_KEY: 'gk' };
 let handler = null;
 globalThis.Deno = { env: { get: (k) => env[k] }, serve: (fn) => { handler = fn; } };
@@ -66,7 +68,7 @@ const call = async (body, headers) => {
 beforeEach(() => {
   state.user = { email: 'An@Example.com' }; state.logs.length = 0; state.takes.length = 0; state.rpcRole = 'editor'; state.takeResult = { ok: true, used: 1, cap: 30 }; state.failTables = {};
   state.users = [{ id: 'u1', email: 'an@example.com', nickname: 'An', group_key: 'finance', active: true }];
-  state.rows = { projects: [{ id: 'p1', name: 'Đầu tư', group_key: 'finance' }], task_assignees: [{ task_id: 't1' }], tasks: [{ id: 't1', project_id: 'p1', name: 'Duyệt đề xuất', status: 'Not Started', priority: 'High', due_date: new Date(Date.now() - 2 * 86400000).toISOString() }], events: [], project_milestones: [] };
+  state.rows = { projects: [{ id: 'p1', name: 'Đầu tư', group_key: 'finance' }], task_assignees: [{ task_id: 't1' }], tasks: [{ id: 't1', project_id: 'p1', name: 'Duyệt đề xuất', status: 'Not Started', priority: 'High', due_date: new Date(Date.now() - 2 * 86400000).toISOString() }], events: [], project_milestones: [], butler_guide: GUIDE_ROWS };
   net.calls.length = 0; net.data = {}; net.gemini = null; globalThis.fetch.mockClear();
 });
 
@@ -178,6 +180,32 @@ describe('công cụ dữ liệu qua butler-data', () => {
   });
 });
 
+describe('hướng dẫn sử dụng (AI chọn mục)', () => {
+  it('quy tắc không chắc -> Gemini chọn id mục hướng dẫn (chỉ id), server dựng thẻ từ chỉ mục', async () => {
+    net.gemini = { intent: 'guide', guide: ['s5-3', 'khong-co'], features: [], tools: [], sym: '' };
+    const q = 'giá trị nội tại tính sao qxzv';
+    const r = await call({ q });
+    expect(r.json).toMatchObject({ ok: true, mode: 'ai', intent: 'guide' });
+    expect(r.json.cards[0].items.map((i) => i.id)).toEqual(['s5-3']);
+    expect(state.takes).toHaveLength(1);
+    const sent = JSON.stringify(net.calls.find((c) => c.url.includes('googleapis')).body);
+    expect(sent).toMatch(/G:s5-3 \| 5\.3 Bốn con số/);
+  });
+  it('AI trả mục hướng dẫn lạ -> kế hoạch bị loại, rơi về gợi ý theo quy tắc, không bịa', async () => {
+    net.gemini = { intent: 'guide', guide: ['bịa-ra'], features: [], tools: [], sym: '' };
+    const r = await call({ q: 'monte carlo trong định giá' });
+    expect(r.json.ok).toBe(true);
+    expect(JSON.stringify(r.json.cards)).not.toMatch(/bịa-ra/);
+    expect(r.json.cards.some((c) => c.type === 'guide')).toBe(true);
+    expect(r.json.notices.join(' ')).toMatch(/chưa chắc/);
+  });
+  it('không dùng AI (ai:false) vẫn đưa các mục hướng dẫn khớp nhất kèm lời báo chưa chắc', async () => {
+    const r = await call({ q: 'monte carlo trong định giá', ai: false });
+    expect(r.json).toMatchObject({ ok: true, mode: 'rule' });
+    expect(r.json.cards.some((c) => c.type === 'guide')).toBe(true);
+  });
+});
+
 describe('AI khi quy tắc không chắc', () => {
   it('Gemini chọn tính năng -> trả thẻ, tốn đúng một lượt, kế hoạch được lưu đệm cho lần sau', async () => {
     net.gemini = { intent: 'features', features: ['journal'], tools: [], sym: '' };
@@ -241,5 +269,43 @@ describe('phản hồi', () => {
     expect((await call({ feedback: { id: 'x', rating: 1 } })).status).toBe(400);
     expect((await call({ feedback: { id: '11111111-2222-3333-4444-555555555555', rating: 5 } })).status).toBe(400);
     expect((await call({ feedback: { id: '11111111-2222-3333-4444-555555555555', rating: -1 } })).json.ok).toBe(true);
+  });
+});
+
+describe('hướng dẫn sử dụng (quy tắc, không AI)', () => {
+  it('"biên an toàn là gì": thẻ guide nguyên văn từ chỉ mục, không gọi Gemini, không tốn lượt AI', async () => {
+    const r = await call({ q: 'Biên an toàn là gì?' });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, mode: 'rule', intent: 'guide' });
+    const card = r.json.cards[0];
+    expect(card.type).toBe('guide');
+    expect(card.items[0]).toMatchObject({ id: 'pc-bien-an-toan', href: '/guide/#pc-bien-an-toan' });
+    expect(card.items[0].summary).toMatch(/giá/);
+    expect(net.calls.some((c) => c.url.includes('googleapis') || c.url.includes('butler-data'))).toBe(false);
+    expect(state.takes).toHaveLength(0);
+    expect(state.logs[0]).toMatchObject({ intent: 'guide', mode: 'rule', ok: true });
+    expect(JSON.stringify(state.logs[0])).not.toMatch(/biên an toàn/i);
+  });
+  it('hướng dẫn mở cho mọi nhóm (kể cả không phải Finance); số liệu thì không', async () => {
+    state.users = [{ id: 'u2', email: 'an@example.com', nickname: 'An', group_key: 'science', active: true }];
+    const r = await call({ q: 'DCF theo động lực dùng thế nào' });
+    expect(r.json).toMatchObject({ ok: true, intent: 'guide' });
+    expect(r.json.cards[0].items[0].id).toBe('s8-1');
+  });
+  it('hỏi cách làm: thẻ chức năng trước, kèm thẻ hướng dẫn liên quan phía sau', async () => {
+    const r = await call({ q: 'cách kiểm thử chiến lược' });
+    expect(r.json).toMatchObject({ ok: true, mode: 'rule', intent: 'features' });
+    expect(r.json.cards[0].type).toBe('features');
+    expect(r.json.cards.some((c) => c.type === 'guide')).toBe(true);
+    expect(net.calls.some((c) => c.url.includes('googleapis'))).toBe(false);
+  });
+  it('hỏi đường thuần tuý không kèm thẻ hướng dẫn thừa', async () => {
+    const r = await call({ q: 'Tôi muốn nhập sao kê' });
+    expect(r.json.cards.every((c) => c.type !== 'guide')).toBe(true);
+  });
+  it('selftest cho biết số mục và phiên bản hướng dẫn', async () => {
+    const r = await call({ selftest: true }, { authorization: 'Bearer pk' });
+    expect(r.json.guide).toBeGreaterThanOrEqual(80);
+    expect(r.json.guideVersion).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });

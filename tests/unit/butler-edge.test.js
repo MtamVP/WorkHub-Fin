@@ -50,3 +50,14 @@ describe('butler: bản sao và cấu trúc', () => {
     expect(src).toMatch(/tools\.push\(tool\)/);                     // công cụ dữ liệu đi qua doData -> butler-data (kiểm ở butler-data.test.js)
   });
 });
+
+describe('butler: chỉ mục hướng dẫn đọc từ bảng', () => {
+  it('index.ts nạp chỉ mục bằng fetchGuide (bảng butler_guide, chỉ đọc) và đệm có hạn; không còn nhúng tệp dữ liệu hướng dẫn vào hàm', () => {
+    const idx = read(DIR + '/index.ts'), tools = read(DIR + '/tools.ts');
+    expect(idx).toMatch(/fetchGuide\(sb\)/);
+    expect(idx).toMatch(/GUIDE_TTL/);
+    expect(idx).not.toMatch(/butler-guide-data/);
+    expect(tools).toMatch(/\.from\("butler_guide"\)\.select\(/);
+    expect(readdirSync(path.join(ROOT, DIR))).not.toContain('butler-guide-data.js');
+  });
+});

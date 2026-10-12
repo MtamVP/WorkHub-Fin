@@ -97,3 +97,4 @@ a.bt-row:hover { background: var(--bt-hover); }
 .bt-kpi.bt-bad dd { color: var(--bt-bad); }
 .bt-kpi.bt-warn dd { color: var(--bt-warn); }
 .bt-dot.bt-up { background: var(--bt-up); }
+.bt-guide-sum { margin: 0; font-size: 0.8rem; line-height: 1.5; color: var(--bt-sub); }

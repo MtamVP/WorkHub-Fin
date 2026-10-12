@@ -9,7 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import "./butler-core.js";
 import "./butler-map-fin.js";
 import { callAi, chainFor, createCooldown, fail, pickProvider, statusFor, summarizeWithFallback } from "./ai.ts";
-import { fetchToday, type Me } from "./tools.ts";
+import { fetchGuide, fetchToday, type Me } from "./tools.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +24,19 @@ export const BUTLER_MODELS_DEFAULT = "gemini-3.5-flash-lite,gemini-3.1-flash-lit
 const capDefault = () => { const n = Number(Deno.env.get("BUTLER_DAILY_CAP")); return n > 0 && n <= 200 ? Math.floor(n) : 30; };
 const cooldown = createCooldown(() => Date.now());
 let lastProbe = 0;
+
+// Chỉ mục hướng dẫn sử dụng đọc từ bảng butler_guide (mọi người dùng đăng nhập đọc được; sinh từ docs/huong-dan-su-dung.html, xem scripts/build-guide-web.mjs). Đệm 10 phút dùng chung mọi người; lỗi thì giữ bản cũ, không có bản nào thì trả lời không kèm hướng dẫn.
+let guideCache: { at: number; data: any } | null = null;
+const GUIDE_TTL = 10 * 60000;
+async function loadGuide(sb: any) {
+  if (guideCache && Date.now() - guideCache.at < GUIDE_TTL) return guideCache.data;
+  try {
+    const g = await fetchGuide(sb);
+    if (g) guideCache = { at: Date.now(), data: g };
+    else if (guideCache) guideCache.at = Date.now() - GUIDE_TTL + 60000;
+  } catch (_e) { if (guideCache) guideCache.at = Date.now() - GUIDE_TTL + 60000; }          // lỗi đọc: thử lại sau 1 phút, trong lúc đó dùng bản cũ
+  return guideCache ? guideCache.data : null;
+}
 
 // Bộ nhớ đệm kế hoạch AI (kế hoạch chỉ chứa id nên dùng chung được cho mọi người): cùng một câu hỏi trong 30 phút không tốn thêm lượt
 const planCache = new Map<string, { at: number; plan: any; model: string }>();
@@ -102,13 +115,14 @@ Deno.serve(async (req: Request) => {
   const cfg = aiConfig();
   if (body && body.selftest === true) {
     const C = BC(), M = MAP();
-    return json({ ok: true, hasKey: cfg.hasKey, separateKey: cfg.separateKey, provider: cfg.pick ? cfg.pick.provider : null, models: cfg.models, cooling: cooldown.state().map((c) => c.model), dailyCap: capDefault(), version: C.VERSION, features: M.features.length, tools: Object.keys(C.TOOLS).filter((k) => C.TOOLS[k].enabled) });
+    return json({ ok: true, hasKey: cfg.hasKey, separateKey: cfg.separateKey, provider: cfg.pick ? cfg.pick.provider : null, models: cfg.models, cooling: cooldown.state().map((c) => c.model), dailyCap: capDefault(), version: C.VERSION, features: M.features.length, guide: guideCache ? guideCache.data.sections.length : 0, guideVersion: guideCache ? guideCache.data.version : null, tools: Object.keys(C.TOOLS).filter((k) => C.TOOLS[k].enabled) });
   }
   const sb = userClient(req);
   const who = await whoAmI(sb, req);
   if ("error" in who) return json({ ok: false, code: "auth", error: who.error }, who.status);
   const { me, role } = who, C = BC(), M = MAP(), t0 = Date.now();
   const user = { group: me.group, admin: me.admin, role };
+  const GD = await loadGuide(sb);
 
   if (body && body.probe === true) {
     if (!cfg.pick) { const f = fail("no_key"); return json(f, statusFor(f.code)); }
@@ -132,12 +146,19 @@ Deno.serve(async (req: Request) => {
 
   const q = C.sanitizeQuestion(body && body.q);
   const ctx = { page: typeof body?.ctx?.page === "string" ? body.ctx.page.slice(0, 80) : "", sym: C.validArg("sym", body?.ctx?.sym) || "" };
-  const und = C.understand(q, { sym: ctx.sym }, M);
+  const und = C.understand(q, { sym: ctx.sym }, M, GD);
   const useAi = !(body && body.ai === false);
   const notices: string[] = [];
   const tools: string[] = [];
   let reply: { text: string; cards: any[] } | null = null, mode = "rule", intent = und.intent, model = "", fallback = "";
 
+  // Hỏi "cách làm / ở đâu" mà hướng dẫn sử dụng cũng có phần khớp rõ: đưa thêm một thẻ "xem thêm trong hướng dẫn" sau câu chỉ đường
+  function withGuide(r: { text: string; cards: any[] }, u: any) {
+    const g = (u.guide || []).filter((x: any) => x.score >= 5).slice(0, 2);
+    if (!g.length) return r;
+    const x = C.composeGuide(g.map((y: any) => y.id), GD, { extra: true });
+    return { text: r.text, cards: r.cards.concat(x.cards.filter((c: any) => c.type === "guide")) };
+  }
   async function doToday() {
     tools.push("today");
     // Việc / lịch (bắt buộc) + tín hiệu đầu tư (tuỳ chọn: thiếu quyền hoặc lỗi thì bỏ qua, không làm hỏng câu trả lời)
@@ -165,7 +186,8 @@ Deno.serve(async (req: Request) => {
     else if (und.intent === "symbol") reply = C.composeSymbol(und.sym);
     else if (und.intent === "today") reply = await doToday();
     else if (und.intent === "data" && und.data) reply = await doData(und.data.tool, und.data.args);
-    else if (und.intent === "features" && und.confident) reply = C.composeFeatures(und.features.slice(0, 3).map((f: any) => f.id), M, user, und.sym);
+    else if (und.intent === "guide" && und.confident) reply = C.composeGuide(und.guide.slice(0, 3).map((g: any) => g.id), GD);
+    else if (und.intent === "features" && und.confident) reply = withGuide(C.composeFeatures(und.features.slice(0, 3).map((f: any) => f.id), M, user, und.sym), und);
 
     if (!reply) {
       // Quy tắc không chắc: hỏi AI chọn tính năng (một lượt), nếu được phép và còn lượt
@@ -179,11 +201,11 @@ Deno.serve(async (req: Request) => {
           const take = await takeAiTurn(sb);
           if (!take.ok) fallback = take.reason === "cap" ? "cap" : "usage";
           else {
-            const p = C.buildPlanPrompt(q, M, ctx), pick = cfg.pick;
+            const p = C.buildPlanPrompt(q, M, ctx, GD), pick = cfg.pick;
             const res = await summarizeWithFallback({
               models: cfg.models, cooldown, now: () => Date.now(), budgetMs: 20000,
               attempt: (m: string) => callAi({ provider: pick.provider, key: pick.key, model: m, system: p.system, user: p.user, fetchFn: fetch, signal: AbortSignal.timeout(9000), thinking: "low", maxTokens: 400 }),
-              parse: (text: string) => C.parsePlan(text, M),
+              parse: (text: string) => C.parsePlan(text, M, GD),
             });
             if (res.ok) { plan = (res as any).parsed; model = (res as any).model; mode = "ai"; cachePut(key, plan, model); }
             else fallback = String((res as any).code || "upstream");
@@ -195,8 +217,14 @@ Deno.serve(async (req: Request) => {
         const dataTool = plan.intent === "data" ? plan.tools.find((t: any) => C.TOOLS[t.id] && C.TOOLS[t.id].data) : null;
         if (dataTool) { intent = "data"; reply = await doData(dataTool.id, dataTool.args); }
         else if (plan.intent === "today" || plan.tools.some((t: any) => t.id === "today")) { intent = "today"; reply = await doToday(); }
-        else if (plan.intent === "features") { intent = "features"; reply = C.composeFeatures(plan.features, M, user, sym); }
-        else { intent = "chat"; reply = { text: "Mình chỉ hỗ trợ các việc trong WorkHub Fin: chỉ đường tới chức năng, việc hôm nay và số liệu trong phạm vi quyền của bạn. Bạn thử hỏi theo kiểu \"tôi muốn nhập sao kê\" hoặc \"hôm nay có việc gì\".", cards: [{ type: "chips", items: M.examples.slice(0, 6) }] }; }
+        else if (plan.intent === "guide") { intent = "guide"; reply = C.composeGuide(plan.guide, GD); }
+        else if (plan.intent === "features") { intent = "features"; reply = withGuide(C.composeFeatures(plan.features, M, user, sym), und); }
+        else { intent = "chat"; reply = { text: "Mình chỉ hỗ trợ các việc trong WorkHub Fin: chỉ đường tới chức năng, giải thích theo hướng dẫn sử dụng, việc hôm nay và số liệu trong phạm vi quyền của bạn. Bạn thử hỏi theo kiểu \"tôi muốn nhập sao kê\" hoặc \"hôm nay có việc gì\".", cards: [{ type: "chips", items: M.examples.slice(0, 6) }] }; }
+      } else if (und.intent === "guide" && und.guide.length) {
+        // Không dùng được AI: đưa các mục hướng dẫn khớp nhất, nói rõ là gợi ý
+        intent = "guide";
+        reply = C.composeGuide(und.guide.slice(0, 3).map((g: any) => g.id), GD);
+        notices.push("Mình chưa chắc đây là điều bạn cần; đây là các mục hướng dẫn khớp nhất với câu hỏi.");
       } else if (und.features.length) {
         // Không dùng được AI: vẫn đưa các mục khớp nhất bằng quy tắc, nói rõ là gợi ý
         intent = "features";

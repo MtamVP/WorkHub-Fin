@@ -133,7 +133,7 @@ describe('kế hoạch AI: chỉ nhận id có thật', () => {
   it('parsePlan: chịu rào ```json, loại id lạ, giới hạn 3 id', () => {
     const t = '```json\n{"intent":"features","features":["journal","khong-co","ledger","backup","risk"],"tools":[],"sym":"fpt"}\n```';
     const r = C.parsePlan(t, M);
-    expect(r).toEqual({ intent: 'features', features: ['journal', 'ledger', 'backup'], tools: [], sym: 'FPT' });
+    expect(r).toEqual({ intent: 'features', features: ['journal', 'ledger', 'backup'], guide: [], tools: [], sym: 'FPT' });
   });
   it('parsePlan: công cụ chỉ nhận id đang bật; tham số sai bị loại', () => {
     const r = C.parsePlan('{"intent":"today","features":[],"tools":[{"id":"today","args":{}},{"id":"drop_table","args":{}},{"id":"portfolio_summary","args":{}}]}', M);

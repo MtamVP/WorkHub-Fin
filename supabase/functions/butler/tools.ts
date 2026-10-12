@@ -43,6 +43,22 @@ export function buildToday(input: {
   return { date: today, tasks, events, milestones };
 }
 
+// Chỉ mục hướng dẫn sử dụng từ các dòng bảng butler_guide -> { version, sections } đúng dạng lib/butler-guide-data.js; không có dòng hợp lệ thì null.
+export function guideFromRows(rows: any[]): { version: string; sections: any[] } | null {
+  const ok = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r.id === "string" && typeof r.t === "string");
+  if (!ok.length) return null;
+  const sorted = ok.slice().sort((a, b) => Number(a.ord || 0) - Number(b.ord || 0));
+  return {
+    version: String(sorted[0].ver || ""),
+    sections: sorted.map((r) => { const o: any = { id: r.id, n: String(r.n || ""), t: r.t, ct: String(r.ct || ""), s: String(r.s || ""), k: Array.isArray(r.k) ? r.k.map(String) : [], w: String(r.w || "") }; if (r.p) o.p = String(r.p); return o; }),
+  };
+}
+export async function fetchGuide(sb: any) {
+  const { data, error } = await sb.from("butler_guide").select("id, ord, ver, n, t, ct, s, k, w, p").order("ord", { ascending: true }).limit(500);
+  if (error) throw new Error("butler_guide: " + error.message);
+  return guideFromRows(data || []);
+}
+
 const chunk = <T>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
 
 // Đọc CSDL cho "hôm nay". Dự án: giống api.js listMine (admin thấy tất cả; người khác thấy dự án của nhóm mình và nhóm 'all'); việc: bảng task_assignees theo email của chính người hỏi.
