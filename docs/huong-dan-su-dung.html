@@ -83,6 +83,7 @@
   <li><span class="n">15</span><a href="#s15">Market Simulation: mô phỏng xác suất (mới 0.1.18)</a></li>
   <li><span class="n">16</span><a href="#s16">Insight: chín công cụ phân tích sâu (mới 0.1.20)</a></li>
   <li><span class="n">17</span><a href="#s17">Phòng kiểm thử: thử chiến lược trên lịch sử và phân rã lợi suất (mới 0.1.20)</a></li>
+  <li><span class="n">18</span><a href="#s18">Nối các màn, đối soát kế toán, nhật ký kiểm toán và kiểm tra hệ thống (mới 0.1.20)</a></li>
   <li><span class="n">A</span><a href="#pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</a></li>
   <li><span class="n">B</span><a href="#pb">Phụ lục B: thư viện phương pháp</a></li>
   <li><span class="n">C</span><a href="#pc">Phụ lục C: thuật ngữ</a></li>
@@ -652,6 +653,35 @@
   <li>Mô hình tự dựng từ số liệu miễn phí, không so trực tiếp được với MSCI Barra hay Fama-French của Mỹ; vũ trụ Việt Nam nhỏ nên yếu tố nhiễu.</li>
   <li>Hồi quy dùng <b>tỷ trọng hiện tại</b> áp ngược về quá khứ, không phản ánh danh mục bạn đã giữ thật; các yếu tố tương quan nhau nên hệ số riêng lẻ khó đọc khi hệ số VIF lớn.</li>
 </ul></div>
+<h1 id="s18">18. Nối các màn, đối soát kế toán, nhật ký kiểm toán và kiểm tra hệ thống (mới 0.1.20)</h1>
+<p>Các khu của Investment Workbench (Danh Mục, Nghiên Cứu, Valuation, Insight, Kiểm thử, Mô phỏng, Thị trường, Toàn Nhóm) giờ nối với nhau: từ một mã cổ phiếu hay một việc cần làm, bạn nhảy thẳng sang màn liên quan mà không phải tự tìm lại mã.</p>
+<h2>18.1 Mã bấm được và menu “…”</h2>
+<ul>
+  <li><b>Bấm vào mã</b> (bảng danh mục, theo dõi, rủi ro, sự kiện, lệnh, tin ở trang Thị trường, kết quả Insight, Mô phỏng…) mở hồ sơ định giá của mã trong Valuation Bench. Mã chưa có hồ sơ thì mở Valuation thay vì báo lỗi.</li>
+  <li><b>Nút “…” cạnh mã</b> mở menu: Nghiên cứu, Luận điểm, Sự kiện, Sở hữu, Thanh khoản, Mô phỏng. Insight mở đúng tab và lọc sẵn theo mã (thanh <span class="ui">Đang xem mã</span> cho biết đang lọc); Mô phỏng mở chế độ “Tự chọn mã” với mã đó.</li>
+  <li><b>Việc cần làm</b> (Insight) và email buổi sáng dẫn thẳng tới tab đích: Giới hạn, Duyệt lệnh, Dữ liệu (Toàn Nhóm), Lịch (Danh Mục), Luận điểm, Sự kiện, Sở hữu, Dòng tiền.</li>
+  <li>Địa chỉ trang có thêm phần sau dấu <b>#</b> (ví dụ <span class="ui">#liquidity/FPT</span>, <span class="ui">#runs/…</span>): sao chép địa chỉ là chia sẻ được đúng màn đang xem, và nút Quay lại của trình duyệt hoạt động.</li>
+</ul>
+<h2>18.2 Nhật ký mô phỏng: của tôi và cả nhóm</h2>
+<p>Ở Market Simulation &gt; <span class="ui">Nhật ký</span>, nút <span class="ui">Của tôi</span> / <span class="ui">Cả nhóm</span> chọn xem lần chạy của riêng bạn hay của mọi thành viên; mỗi lần chạy ghi rõ <b>người chạy</b>. Bạn chỉ lưu, đánh dấu sự kiện và xoá được lần chạy của chính mình (lần chạy của người khác chỉ xem); phần “học độ lớn cú sốc” chỉ dùng các lần chạy của bạn.</p>
+<h2>18.3 Nhật Ký Kiểm Toán</h2>
+<p>Mục <span class="ui">Nhật Ký Kiểm Toán</span> (trang chủ, dành cho quản trị) ghi <b>ai làm gì, khi nào</b> trên các bảng dữ liệu quan trọng, gồm nay cả các bảng tài chính: lệnh, hành động doanh nghiệp, giới hạn đầu tư và ngoại lệ, duyệt lệnh, ý tưởng, luận điểm, nhật ký quyết định, lần chạy mô phỏng và kiểm thử… (31 bảng). Có thể lọc theo người, theo loại đối tượng và theo nhóm. Nhật ký được ghi <b>tự động ở cơ sở dữ liệu</b> (không phụ thuộc app) và app không có cách sửa hay xoá dòng nào.</p>
+<h2>18.4 Liên kết web kế toán</h2>
+<p>Ở Danh Mục &gt; <span class="ui">Báo Cáo</span>, thẻ <span class="ui">Liên kết kế toán</span> cho thấy web kế toán (OnyxLine Accounting) sẽ nhận gì từ sổ lệnh của bạn trong một tháng: bút toán theo hệ thống tài khoản TT200 (mua, bán, cổ tức, dự phòng giảm giá…). Phần đối soát nay soát hai chiều:</p>
+<ul>
+  <li><b>Chưa gửi / bị từ chối</b>: nghiệp vụ đã có ở Fin mà web kế toán chưa có chứng từ tương ứng.</li>
+  <li><b>Lệch</b>: Fin đổi nghiệp vụ SAU khi đã gửi (ngày, số lượng, giá, phí, giá vốn; số tiền nếu chứng từ đã ghi sổ).</li>
+  <li><b>Mồ côi</b>: có chứng từ bên kế toán nhưng nghiệp vụ gốc đã bị xoá ở Fin.</li>
+  <li><b>Dự phòng bổ sung</b>: dự phòng giảm giá (TK 2291) đã ghi sổ nhưng số cần lập đổi, đề xuất chứng từ bổ sung thay vì sửa chứng từ cũ.</li>
+</ul>
+<div class="callout warn"><b class="t">Giới hạn cần biết</b><ul>
+  <li>Hệ thống <b>không tự sửa hay tự đảo</b> chứng từ đã gửi (để giữ nhật ký phê duyệt): chứng từ nháp thì từ chối rồi gửi lại, đã ghi sổ thì đảo rồi gửi lại.</li>
+  <li>Chứng từ nháp chưa có dòng sổ cái nên chỉ so được ngày và diễn giải; số tiền chỉ so được khi đã ghi sổ.</li>
+  <li>Vay ký quỹ và lãi vay, phí lưu ký, thuế thu nhập cá nhân của cổ tức, thưởng / chia tách chưa tự lập bút toán (chỉ ghi chú). Sổ cái web kế toán là <b>một sổ chung</b>, không tách theo người dùng.</li>
+</ul></div>
+<h2>18.5 Kiểm tra hệ thống</h2>
+<p>Menu tài khoản (góc trên bên phải) &gt; <span class="ui">Kiểm tra hệ thống</span> thử từng thứ app cần: phiên đăng nhập, giá trực tiếp, nguồn dự phòng, lịch nghỉ lễ, ghi tệp, thông báo, ảnh chụp thị trường, dữ liệu định giá. Nay có thêm hai mục phía máy chủ: <b>lịch chạy nền (pg_cron)</b> (có lịch nào lỗi hay không chạy quá hạn không) và <b>dữ liệu nền cập nhật đúng hạn</b> (kho giá, kho dữ liệu theo thời điểm, tin, sở hữu, nhật ký mô phỏng, đệm báo cáo tài chính; có tính cuối tuần và ngày lễ). Mục nào cảnh báo hoặc lỗi sẽ nêu rõ lần cập nhật gần nhất để biết hàm nào cần xem.</p>
+<div class="callout"><b class="t">Lịch chạy nền đã được khoá</b><p>Các hàm chạy nền trên máy chủ (cập nhật giá, cảnh báo, theo dõi mô phỏng, kiểm tra giới hạn…) nay chỉ nhận lệnh từ lịch hệ thống hoặc từ người đã đăng nhập; khoá công khai của ứng dụng không còn đủ để gọi chúng. Bạn không cần làm gì. Nếu một thao tác báo “Chỉ lịch hệ thống hoặc người dùng đăng nhập được gọi hàm này”, hãy đăng nhập lại rồi thử lại.</p></div>
 <h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>
 <p>Bảng do ứng dụng dùng thật (sinh trực tiếp từ mã nguồn). Vai trò mặc định; bạn đổi được trong tab Quy trình. Phương pháp nào chưa tính được (ví dụ cần bạn nhập NAV) sẽ hiện là lỗ hổng nếu là Chính hoặc Hỗ trợ.</p>
 <!--ARCH_TABLE-->
