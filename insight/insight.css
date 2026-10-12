@@ -4,11 +4,11 @@
 
 body.desk[data-bench="insight"] {
   --finance-accent: #8A5A12; --finance-accent-hover: #9E6A18; --finance-accent-subtle: rgba(138, 90, 18, 0.10); --finance-accent-line: rgba(138, 90, 18, 0.30);
-  --ins-up: #12855A; --ins-down: #C23B3B; --ins-warn: #B7791F; --ins-flat: #8A8377; --ins-grid: rgba(28, 25, 21, 0.08); --ins-on-accent: #FFFFFF;
+  --ins-up: var(--wh-up); --ins-down: var(--wh-down); --ins-warn: var(--wh-warn); --ins-flat: var(--wh-flat); --ins-grid: var(--wh-grid); --ins-on-accent: #FFFFFF;
 }
 :root[data-theme="dark"] body.desk[data-bench="insight"] {
   --finance-accent: #E0B15A; --finance-accent-hover: #EBC376; --finance-accent-subtle: rgba(224, 177, 90, 0.13); --finance-accent-line: rgba(224, 177, 90, 0.34);
-  --ins-up: #3DBA87; --ins-down: #E8695B; --ins-warn: #E0B15A; --ins-flat: #9C968A; --ins-grid: rgba(237, 233, 222, 0.09); --ins-on-accent: #20180A;
+  --ins-up: var(--wh-up); --ins-down: var(--wh-down); --ins-warn: var(--wh-warn); --ins-flat: var(--wh-flat); --ins-grid: var(--wh-grid); --ins-on-accent: #20180A;
 }
 :root[data-theme="dark"] body.desk[data-bench="insight"] .desk-wordmark .glyph { color: #20180A; }
 body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subtle); color: var(--finance-accent); }
@@ -62,15 +62,8 @@ body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subt
 .ins-kpi.bad { border-color: var(--danger-color); } .ins-kpi.warn { border-color: var(--warning-color); } .ins-kpi.good { border-color: var(--success-color); }
 
 /* bảng */
-.ins-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
-.ins-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.ins-table th { text-align: right; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
-.ins-table th:first-child, .ins-table td:first-child { text-align: left; }
-.ins-table td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ins-table td:first-child { font-family: inherit; white-space: normal; }
+/* bảng: nền chung .wh-table / .ins-table nằm ở finance-shared.css; ở đây chỉ phần riêng */
 .ins-table td.t, .ins-table th.t { text-align: left; font-family: inherit; white-space: normal; }
-.ins-table tbody tr:hover td { background: var(--hover-bg); }
-.ins-table tr.sel td { background: var(--finance-accent-subtle); }
 .ins-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--radius-pill); font-size: 0.66rem; font-weight: 700; background: var(--finance-accent-subtle); color: var(--finance-accent); white-space: nowrap; font-family: inherit; }
 .ins-tag.ok { background: var(--success-bg); color: var(--success-color); }
 .ins-tag.warn { background: var(--warning-bg); color: var(--warning-color); }
@@ -103,8 +96,7 @@ body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subt
 .ins-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 0.74rem; color: var(--text-muted); }
 .ins-prose { font-size: 0.86rem; line-height: 1.65; color: var(--text-secondary); max-width: 80ch; }
 .ins-prose p { margin: 0 0 8px; }
-.ins-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); font-size: 0.86rem; line-height: 1.6; }
-.ins-empty i { display: block; font-size: 1.4rem; margin-bottom: 8px; color: var(--finance-accent); }
+.ins-empty i { color: var(--finance-accent); opacity: 1; }        /* trạng thái rỗng: nền chung .wh-state ở finance-shared.css */
 .ins-nav-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-color); margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
 
 /* việc cần làm */

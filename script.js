@@ -3283,9 +3283,9 @@ function renderCalendarGrid(date) {
 
   let html = `
     <div class="calendar-header">
-        <button class="btn-nav-month" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+        <button class="btn-nav-month" onclick="changeMonth(-1)" aria-label="Tháng trước" title="Tháng trước"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
         <h2>${monthNames[month]} ${year}</h2>
-        <button class="btn-nav-month" onclick="changeMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="btn-nav-month" onclick="changeMonth(1)" aria-label="Tháng sau" title="Tháng sau"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
     </div>
     <div class="calendar-grid">
         <div class="calendar-day-name">CN</div>

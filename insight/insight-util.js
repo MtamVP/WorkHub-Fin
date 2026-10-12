@@ -45,7 +45,7 @@ const InsUtil = (function () {
   const meter = (frac, tone) => '<div class="ins-meter' + (tone ? ' ' + tone : '') + '"><span style="width:' + Math.max(0, Math.min(100, Math.round((Number(frac) || 0) * 100))) + '%"></span></div>';
   const table = (head, rows, opts) => {
     const o = opts || {};
-    return '<div class="ins-table-wrap"><table class="ins-table"><thead><tr>' + head.map((h, i) => '<th' + (o.left && o.left.indexOf(i) !== -1 ? ' class="t"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+    return '<div class="ins-table-wrap"><table class="ins-table"><thead><tr>' + head.map((h, i) => '<th scope="col"' + (o.left && o.left.indexOf(i) !== -1 ? ' class="t"' : '') + '>' + h + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
   };
   // Mã cổ phiếu hợp lệ từ ô nhập
   const parseSymbols = (text, cap) => { const seen = {}, out = []; String(text || '').split(/[,;\s]+/).forEach((t) => { const s = t.trim().toUpperCase(); if (/^[A-Z0-9]{1,12}$/.test(s) && !seen[s]) { seen[s] = 1; out.push(s); } }); return out.slice(0, cap || 40); };

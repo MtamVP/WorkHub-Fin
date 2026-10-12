@@ -119,8 +119,7 @@
 .mk-range { position: relative; height: 8px; border-radius: var(--radius-pill); margin: 12px 0 6px; background: linear-gradient(90deg, color-mix(in srgb, var(--mk-up) 55%, var(--bg-color-2)), var(--bg-color-2) 50%, color-mix(in srgb, var(--mk-down) 55%, var(--bg-color-2))); }
 .mk-range i { position: absolute; top: -4px; width: 4px; height: 16px; border-radius: 2px; background: var(--text-primary); transform: translateX(-2px); box-shadow: 0 0 0 2px var(--card-bg); }
 .mk-range-legend { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); }
-.mk-empty { padding: 22px 10px; text-align: center; color: var(--text-muted); font-size: 0.84rem; }
-.mk-empty i { display: block; font-size: 1.3rem; margin-bottom: 8px; opacity: 0.5; }
+/* .mk-empty: nền chung .wh-state ở finance-shared.css */
 .mk-source { margin-top: var(--mk-gap); }
 .mk-skel { height: 160px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--bg-color-2), var(--hover-bg), var(--bg-color-2)); background-size: 200% 100%; animation: mk-shimmer 1.4s linear infinite; }
 @keyframes mk-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }

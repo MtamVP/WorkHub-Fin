@@ -4,11 +4,11 @@
 
 body.desk[data-bench="lab"] {
   --finance-accent: #8A5A12; --finance-accent-hover: #9E6A18; --finance-accent-subtle: rgba(138, 90, 18, 0.10); --finance-accent-line: rgba(138, 90, 18, 0.30);
-  --ins-up: #12855A; --ins-down: #C23B3B; --ins-warn: #B7791F; --ins-flat: #8A8377; --ins-grid: rgba(28, 25, 21, 0.08); --ins-on-accent: #FFFFFF;
+  --ins-up: var(--wh-up); --ins-down: var(--wh-down); --ins-warn: var(--wh-warn); --ins-flat: var(--wh-flat); --ins-grid: var(--wh-grid); --ins-on-accent: #FFFFFF;
 }
 :root[data-theme="dark"] body.desk[data-bench="lab"] {
   --finance-accent: #E0B15A; --finance-accent-hover: #EBC376; --finance-accent-subtle: rgba(224, 177, 90, 0.13); --finance-accent-line: rgba(224, 177, 90, 0.34);
-  --ins-up: #3DBA87; --ins-down: #E8695B; --ins-warn: #E0B15A; --ins-flat: #9C968A; --ins-grid: rgba(237, 233, 222, 0.09); --ins-on-accent: #20180A;
+  --ins-up: var(--wh-up); --ins-down: var(--wh-down); --ins-warn: var(--wh-warn); --ins-flat: var(--wh-flat); --ins-grid: var(--wh-grid); --ins-on-accent: #20180A;
 }
 :root[data-theme="dark"] body.desk[data-bench="lab"] .desk-wordmark .glyph { color: #20180A; }
 body[data-bench="lab"] .desk-who .av { background: var(--finance-accent-subtle); color: var(--finance-accent); }

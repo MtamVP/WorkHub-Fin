@@ -5,13 +5,13 @@
 
 body.desk[data-bench="simulation"] {
   --finance-accent: #4B3A78; --finance-accent-hover: #5A4790; --finance-accent-subtle: rgba(75, 58, 120, 0.10); --finance-accent-line: rgba(75, 58, 120, 0.28);
-  --sim-band-outer: rgba(75, 58, 120, 0.12); --sim-band-inner: rgba(75, 58, 120, 0.24); --sim-grid: rgba(28, 25, 21, 0.07); --sim-ref: rgba(28, 25, 21, 0.45);
-  --sim-down: #C23B3B; --sim-flat: #8A8377; --sim-up: #12855A; --sim-on-accent: #FFFFFF;
+  --sim-band-outer: rgba(75, 58, 120, 0.12); --sim-band-inner: rgba(75, 58, 120, 0.24); --sim-grid: var(--wh-grid); --sim-ref: rgba(28, 25, 21, 0.45);
+  --sim-down: var(--wh-down); --sim-flat: var(--wh-flat); --sim-up: var(--wh-up); --sim-on-accent: #FFFFFF;
 }
 :root[data-theme="dark"] body.desk[data-bench="simulation"] {
   --finance-accent: #B6A3E8; --finance-accent-hover: #C5B6EE; --finance-accent-subtle: rgba(182, 163, 232, 0.14); --finance-accent-line: rgba(182, 163, 232, 0.34);
-  --sim-band-outer: rgba(182, 163, 232, 0.13); --sim-band-inner: rgba(182, 163, 232, 0.27); --sim-grid: rgba(237, 233, 222, 0.08); --sim-ref: rgba(237, 233, 222, 0.45);
-  --sim-down: #E8695B; --sim-flat: #9C968A; --sim-up: #3DBA87; --sim-on-accent: #17122A;
+  --sim-band-outer: rgba(182, 163, 232, 0.13); --sim-band-inner: rgba(182, 163, 232, 0.27); --sim-grid: var(--wh-grid); --sim-ref: rgba(237, 233, 222, 0.45);
+  --sim-down: var(--wh-down); --sim-flat: var(--wh-flat); --sim-up: var(--wh-up); --sim-on-accent: #17122A;
 }
 :root[data-theme="dark"] body.desk[data-bench="simulation"] .desk-wordmark .glyph { color: #17122A; }
 body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-subtle); color: var(--finance-accent); }
@@ -55,7 +55,7 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 /* luận điểm mở đầu: một câu số liệu lớn */
 .sim-thesis { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: end; padding: 20px 22px; margin-bottom: 18px; border: 1px solid var(--finance-accent-line); border-radius: var(--radius-md); background: linear-gradient(135deg, var(--finance-accent-subtle), transparent 70%), var(--card-bg); }
 .sim-thesis .eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--finance-accent); }
-.sim-thesis h2 { margin: 6px 0 0; font-family: 'Lora', Georgia, serif; font-weight: 500; font-size: clamp(1.35rem, 2.6vw, 1.85rem); line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; color: var(--text-primary); }
+.sim-thesis h2 { margin: 6px 0 0; font-family: var(--font-prose); font-weight: 500; font-size: clamp(1.35rem, 2.6vw, 1.85rem); line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; color: var(--text-primary); }
 .sim-thesis p { margin: 8px 0 0; color: var(--text-secondary); font-size: 0.86rem; line-height: 1.55; max-width: 70ch; }
 .sim-thesis .side { text-align: right; }
 .sim-thesis .side b { display: block; font-family: var(--font-mono); font-size: 1.6rem; font-variant-numeric: tabular-nums; color: var(--text-primary); }
@@ -75,13 +75,7 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 .sim-tri .d { background: var(--sim-down); } .sim-tri .f { background: var(--sim-flat); opacity: 0.55; } .sim-tri .u { background: var(--sim-up); }
 
 /* bảng */
-.sim-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
-.sim-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.sim-table th { text-align: right; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
-.sim-table th:first-child, .sim-table td:first-child { text-align: left; }
-.sim-table td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sim-table td:first-child { font-family: inherit; white-space: normal; }
-.sim-table tr.sel td { background: var(--finance-accent-subtle); }
+/* bảng: nền chung .wh-table / .sim-table nằm ở finance-shared.css; ở đây chỉ phần riêng */
 .sim-table tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--finance-accent); }
 .sim-table tbody tr:hover td { background: var(--hover-bg); }
 .sim-table tbody tr.sel:hover td { background: var(--finance-accent-subtle); }
@@ -171,7 +165,7 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 
 /* văn bản phương pháp */
 .sim-prose { max-width: 78ch; font-size: 0.88rem; line-height: 1.65; color: var(--text-secondary); }
-.sim-prose h3 { font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 1.25rem; color: var(--text-primary); margin: 22px 0 6px; }
+.sim-prose h3 { font-family: var(--font-prose); font-weight: 600; font-size: 1.25rem; color: var(--text-primary); margin: 22px 0 6px; }
 .sim-prose h3:first-child { margin-top: 0; }
 .sim-prose b { color: var(--text-primary); }
 .sim-prose ul { padding-left: 1.2em; margin: 6px 0; }
@@ -186,7 +180,7 @@ body[data-bench="simulation"] .desk-who .av { background: var(--finance-accent-s
 .sim-table td:first-child { min-width: 170px; }
 
 /* bối cảnh: thẻ sự kiện */
-.sim-ctx-summary { margin: 0 0 6px; font-family: 'Lora', Georgia, serif; font-size: 1.05rem; line-height: 1.5; color: var(--text-primary); max-width: 80ch; }
+.sim-ctx-summary { margin: 0 0 6px; font-family: var(--font-prose); font-size: 1.05rem; line-height: 1.5; color: var(--text-primary); max-width: 80ch; }
 .sim-evs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-bottom: 18px; align-items: start; }
 @media (max-width: 640px) { .sim-evs { grid-template-columns: 1fr; } }
 .sim-ev { position: relative; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px 14px 19px; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }

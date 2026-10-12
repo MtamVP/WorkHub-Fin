@@ -118,7 +118,7 @@ function renderLimitsPanel() {
         ${mine.map(r => `<tr><td>${lmEsc(LimitsCalc.KINDS[r.kind].label)}</td><td>${lmEsc(r.symbol || r.sector || 'Tất cả')}</td><td class="text-right">${r.kind === 'blocked_symbol' ? '—' : lmNum(r.value, 2) + ' ' + lmEsc(LimitsCalc.KINDS[r.kind].unit)}</td>
             <td><span class="tl-badge ${LM_MODE_CLS[r.mode]}">${lmEsc(LimitsCalc.MODES[r.mode].label)}</span></td>
             <td><input type="checkbox" ${r.active ? 'checked' : ''} onchange="lmToggle('${r.id}', this.checked)" aria-label="Bật giới hạn"></td>
-            <td><button type="button" class="tl-link tl-danger" onclick="lmRemove('${r.id}')"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>` : ''}
+            <td><button type="button" class="tl-link tl-danger" onclick="lmRemove('${r.id}')" aria-label="Xoá giới hạn" title="Xoá giới hạn"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></td></tr>`).join('')}</tbody></table></div>` : ''}
         <form class="lm-form" onsubmit="lmAdd(event)">
             <label>Loại<select id="lm-kind" class="tl-select" onchange="lmKindChanged()">${Object.keys(LimitsCalc.KINDS).map(k => `<option value="${k}">${lmEsc(LimitsCalc.KINDS[k].label)}</option>`).join('')}</select></label>
             <label id="lm-subject-wrap">Mã / ngành (tuỳ chọn)<input type="text" id="lm-subject" class="tl-input" placeholder="VD: FPT hoặc Ngân hàng" maxlength="40"></label>

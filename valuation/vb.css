@@ -5,11 +5,11 @@
 body.desk[data-bench="valuation"] {
   --finance-accent: #27476E; --finance-accent-hover: #2F5784; --finance-accent-subtle: rgba(39, 71, 110, 0.10); --finance-accent-line: rgba(39, 71, 110, 0.28);
   --shadow-gold: 0 6px 18px rgba(39, 71, 110, 0.18);
-  --vb-up: #12855A; --vb-down: #C23B3B; --vb-ma20: #D98E04; --vb-ma50: #2F6AE0; --vb-ma200: #7B3FA0; --vb-grid: rgba(28, 25, 21, 0.07); --vb-band: rgba(39, 71, 110, 0.10); --vb-cloud-up: rgba(18, 133, 90, 0.12); --vb-cloud-down: rgba(194, 59, 59, 0.12);
+  --vb-up: var(--wh-up); --vb-down: var(--wh-down); --vb-ma20: #D98E04; --vb-ma50: #2F6AE0; --vb-ma200: #7B3FA0; --vb-grid: var(--wh-grid); --vb-band: rgba(39, 71, 110, 0.10); --vb-cloud-up: rgba(18, 133, 90, 0.12); --vb-cloud-down: rgba(194, 59, 59, 0.12);
 }
 :root[data-theme="dark"] body.desk[data-bench="valuation"] {
   --finance-accent: #7FA8DC; --finance-accent-hover: #93B7E4; --finance-accent-subtle: rgba(127, 168, 220, 0.14); --finance-accent-line: rgba(127, 168, 220, 0.34);
-  --vb-up: #3DBA87; --vb-down: #E8695B; --vb-ma20: #E3A93C; --vb-ma50: #5AA3F0; --vb-ma200: #B58AD6; --vb-grid: rgba(237, 233, 222, 0.08); --vb-band: rgba(127, 168, 220, 0.14); --vb-cloud-up: rgba(61, 186, 135, 0.14); --vb-cloud-down: rgba(232, 105, 91, 0.14);
+  --vb-up: var(--wh-up); --vb-down: var(--wh-down); --vb-ma20: #E3A93C; --vb-ma50: #5AA3F0; --vb-ma200: #B58AD6; --vb-grid: var(--wh-grid); --vb-band: rgba(127, 168, 220, 0.14); --vb-cloud-up: rgba(61, 186, 135, 0.14); --vb-cloud-down: rgba(232, 105, 91, 0.14);
 }
 :root[data-theme="dark"] body.desk[data-bench="valuation"] .desk-wordmark .glyph { color: #0E1A2C; }
 

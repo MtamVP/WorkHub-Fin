@@ -975,3 +975,24 @@ small { display: block; color: var(--text-muted); font-size: 0.78rem; margin-top
 .wh-symmenu a i { width: 14px; text-align: center; color: var(--text-muted); }
 .wh-symmenu a:hover, .wh-symmenu a:focus-visible { background: var(--finance-accent-subtle); color: var(--finance-accent); }
 .wh-symmenu a:hover i, .wh-symmenu a:focus-visible i { color: var(--finance-accent); }
+
+/* ===== Nền chung (12/10/2026): token ngữ nghĩa, bảng số liệu, trạng thái rỗng / đang tải / lỗi =====
+   Insight, Phòng kiểm thử, Mô phỏng, Định giá, Thị trường và Công cụ trước đây mỗi nơi tự khai báo lại màu lên / xuống / cảnh báo, cùng một kiểu bảng và trạng thái rỗng.
+   Nay MỘT nơi định nghĩa; từng khu chỉ đặt lại tên token riêng (--ins-up: var(--wh-up)...) và giữ phần riêng của mình.
+   Màu lên / xuống / cảnh báo luôn đi kèm chữ, dấu hoặc biểu tượng (không chỉ màu): xem a11y-polish.js và tests/unit/a11y-static.test.js. */
+body { --wh-up: var(--success-color); --wh-down: var(--danger-color); --wh-warn: var(--warning-color); --wh-flat: #8A8377; --wh-grid: rgba(28, 25, 21, 0.08); --font-prose: 'Lora', Georgia, serif; }
+:root[data-theme="dark"] body.desk { --wh-flat: #9C968A; --wh-grid: rgba(237, 233, 222, 0.09); }
+
+.wh-table-wrap, .ins-table-wrap, .sim-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.wh-table, .ins-table, .sim-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.wh-table th, .ins-table th, .sim-table th { text-align: right; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.wh-table th:first-child, .wh-table td:first-child, .ins-table th:first-child, .ins-table td:first-child, .sim-table th:first-child, .sim-table td:first-child { text-align: left; }
+.wh-table td, .ins-table td, .sim-table td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wh-table td:first-child, .ins-table td:first-child, .sim-table td:first-child { font-family: inherit; white-space: normal; }
+.wh-table tbody tr:hover td, .ins-table tbody tr:hover td, .sim-table tbody tr:hover td { background: var(--hover-bg); }
+.wh-table tr.sel td, .ins-table tr.sel td, .sim-table tr.sel td { background: var(--finance-accent-subtle); }
+
+.wh-state, .ins-empty, .mk-empty, .tl-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); font-size: 0.86rem; line-height: 1.6; }
+.wh-state i, .ins-empty i, .mk-empty i, .tl-empty i { display: block; font-size: 1.4rem; margin-bottom: 8px; opacity: 0.55; }
+.wh-state.error, .wh-state.error i { color: var(--wh-down); }
+.wh-state.error i { opacity: 1; }

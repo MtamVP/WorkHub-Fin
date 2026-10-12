@@ -1225,7 +1225,7 @@
   <aside id="observation-drawer">
     <div class="drawer-header">
       <h4><i class="fa-solid fa-radar" style="color: var(--gold);"></i> Observation</h4>
-      <button class="header-btn" id="drawer-close-btn" onclick="toggleObservationDrawer()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="header-btn" id="drawer-close-btn" onclick="toggleObservationDrawer()" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="drawer-body" id="observation-logs-container">
 
@@ -1245,7 +1245,7 @@
     <div class="members-search-box">
       <i class="fa-solid fa-magnifying-glass search-icon"></i>
       <input type="text" id="members-search-input" placeholder="Tìm kiếm theo email, tên..." oninput="filterMembersList()">
-      <button id="members-clear-search" class="clear-search-btn" style="display:none;" onclick="clearMembersSearch()"><i class="fa-solid fa-circle-xmark"></i></button>
+      <button id="members-clear-search" class="clear-search-btn" style="display:none;" onclick="clearMembersSearch()" aria-label="Xoá tìm kiếm" title="Xoá tìm kiếm"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i></button>
     </div>
 
     <div class="members-filter-tabs">
@@ -1342,7 +1342,7 @@
                      không bao giờ được JS gỡ display:none -- giữ trong DOM vì script.js vẫn
                      reference trực tiếp (getElementById), không xoá để tránh lỗi null. -->
                 <button type="button" id="auth-cancel-btn" onclick="closeAuthModal()" style="display:none;">Hủy</button>
-                <button type="button" id="auth-modal-close-btn" onclick="closeAuthModal()" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" id="auth-modal-close-btn" onclick="closeAuthModal()" style="display:none;" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
               </form>
             </div>
 
@@ -1375,7 +1375,7 @@
     <div class="modal-card" style="max-width: 620px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-list-check" style="color: var(--gold);"></i> Thêm / Sửa Công Việc</h3>
-        <button class="header-btn" onclick="closeAppModal('add-task-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('add-task-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <form id="task-form" onsubmit="handleTaskFormSubmit(event)">
@@ -1464,7 +1464,7 @@
     <div class="modal-card" style="max-width: 480px;">
       <div class="modal-header">
         <h3 id="personal-item-modal-title"><i class="fa-solid fa-user-lock" style="color: var(--gold);"></i> Thêm mục cá nhân</h3>
-        <button class="header-btn" onclick="closeAppModal('personal-item-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('personal-item-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <form id="personal-item-form" onsubmit="submitPersonalItemForm(event)">
@@ -1517,7 +1517,7 @@
     <div class="modal-card" style="max-width: 460px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-sliders" style="color: var(--gold);"></i> Tuỳ chỉnh Không Gian Riêng</h3>
-        <button class="header-btn" onclick="closeAppModal('personal-customize-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('personal-customize-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:12px;">Kéo để sắp xếp, tắt để ẩn — chỉ ảnh hưởng đến giao diện của riêng bạn.</p>
@@ -1536,7 +1536,7 @@
     <div class="modal-card" style="max-width: 760px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-plug" style="color: var(--gold);"></i> Tích hợp</h3>
-        <button class="header-btn" onclick="closeAppModal('personal-integrations-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('personal-integrations-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
       <div class="personal-integrations-body">
@@ -1560,7 +1560,7 @@
     <div class="modal-card" style="max-width: 560px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-comment-dots" style="color: var(--gold);"></i> Chi tiết: <span id="task-activity-name"></span></h3>
-        <button class="header-btn" onclick="closeAppModal('task-activity-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('task-activity-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div class="task-activity-tabs">
@@ -1635,7 +1635,7 @@
     <div class="modal-card" style="max-width: 640px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-trash-can" style="color: var(--danger-color);"></i> Thùng rác</h3>
-        <button class="header-btn" onclick="closeAppModal('trash-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('trash-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:14px;">
@@ -1713,7 +1713,7 @@
     <div class="modal-card" style="max-width: 760px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-database" style="color: var(--gold);"></i> Sao lưu & Phục hồi</h3>
-        <button class="header-btn" onclick="closeAppModal('backup-restore-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('backup-restore-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div id="backup-restore-guard"></div>
@@ -1769,7 +1769,7 @@
     <div class="modal-card" style="max-width: 640px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-user-shield" style="color: var(--gold);"></i> Phân quyền thành viên</h3>
-        <button class="header-btn" onclick="closeAppModal('role-mgmt-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('role-mgmt-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div class="table-container" style="max-height: 400px; overflow-y: auto;">
@@ -1798,7 +1798,7 @@
     <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-paperclip" style="color: var(--gold);"></i> Tệp của: <span id="task-files-modal-name"></span></h3>
-        <button class="header-btn" onclick="closeAppModal('task-files-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('task-files-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <input type="file" id="task-files-modal-input" style="display:none;" onchange="handleTaskModalFileUpload()">
@@ -1817,7 +1817,7 @@
     <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-flag-checkered" style="color: var(--gold);"></i> Cột mốc: <span id="milestones-project-name"></span></h3>
-        <button class="header-btn" onclick="closeAppModal('milestones-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('milestones-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div id="milestone-list" class="milestone-list"><div style="padding: 8px; color: var(--text-muted); font-size: 12.5px;">Đang tải...</div></div>
@@ -1838,7 +1838,7 @@
     <div class="modal-card" style="max-width: 640px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-chart-line" style="color: var(--gold);"></i> Tiến độ: <span id="burndown-project-name"></span></h3>
-        <button class="header-btn" onclick="closeAppModal('burndown-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('burndown-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div style="position: relative; height: 320px;">
@@ -1856,7 +1856,7 @@
     <div class="modal-card" style="max-width: 640px;">
       <div class="modal-header">
         <h3><i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color, #e53e3e);"></i> Thay đổi ngoại tuyến không đồng bộ được</h3>
-        <button class="header-btn" onclick="closeAppModal('sync-conflict-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('sync-conflict-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <div id="sync-conflict-list"></div>
@@ -1869,7 +1869,7 @@
     <div class="modal-card" style="max-width: 600px;">
       <div class="modal-header">
         <h3 id="event-modal-title"><i class="fa-solid fa-calendar-plus" style="color: var(--gold);"></i> Thêm Sự Kiện Lịch Mới</h3>
-        <button class="header-btn" onclick="closeAppModal('add-event-modal')"><i class="fa-solid fa-xmark"></i></button>
+        <button class="header-btn" onclick="closeAppModal('add-event-modal')" aria-label="Đóng" title="Đóng"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body">
         <form id="event-form" onsubmit="handleEventFormSubmit(event)">
