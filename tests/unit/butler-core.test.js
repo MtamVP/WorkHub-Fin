@@ -82,7 +82,7 @@ describe('understand: câu hỏi mẫu (có dấu và không dấu)', () => {
     ['Tôi muốn nhập sao kê', 'ledger-import'], ['toi muon nhap sao ke', 'ledger-import'],
     ['xem giới hạn đầu tư ở đâu', 'group-limits'], ['cách ghi nhật ký quyết định', 'journal'],
     ['kiểm thử chiến lược ở đâu', 'lab-backtest'], ['tôi muốn sao lưu dữ liệu', 'backup'],
-    ['duyệt lệnh', 'group-approvals'], ['giá mục tiêu', 'price-alerts'], ['ai đã xoá dữ liệu', 'audit-log'],
+    ['duyệt lệnh ở đâu', 'group-approvals'], ['giá mục tiêu', 'price-alerts'], ['ai đã xoá dữ liệu', 'audit-log'],
     ['rủi ro danh mục', 'risk'], ['làm sao để tạo nhiệm vụ', 'tasks-manage'], ['cách xem việc cần làm của insight', 'insight-inbox'],
     ['web kế toán ở đâu', 'accounting-link'], ['kiểm tra hệ thống', 'self-check'], ['lọc cổ phiếu theo tiêu chí', 'stock-screener'],
   ])('%s -> %s', (q, id) => {
@@ -183,7 +183,7 @@ describe('composeToday', () => {
   };
   it('đếm đúng và nêu thứ trong tuần', () => {
     const r = C.composeToday(data);
-    expect(r.counts).toEqual({ late: 1, due: 1, events: 1, milestones: 1, soon: 1 });
+    expect(r.counts).toEqual({ late: 1, due: 1, events: 1, milestones: 1, soon: 1, signals: 0 });
     expect(r.text).toMatch(/^Thứ hai 12\/10: bạn có 1 việc quá hạn, 1 việc đến hạn hôm nay, 1 sự kiện trên lịch, 1 mốc dự án; ngoài ra 1 việc sắp đến hạn/);
   });
   it('thẻ: quá hạn trước, có hàng và liên kết tới mục đúng; luôn kèm gợi ý Việc cần làm của Insight', () => {

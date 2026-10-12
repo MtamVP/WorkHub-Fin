@@ -38,6 +38,23 @@ function aiConfig() {
   return { pick, models, hasKey: !!pick, separateKey: !!(Deno.env.get("BUTLER_GEMINI_KEY") || "").trim() };
 }
 
+// Gọi hàm butler-data cùng dự án, chuyển tiếp chính tiêu đề xác thực của người hỏi (hàm kia cũng chạy bằng JWT của họ nên RLS giữ nguyên)
+async function callData(req: Request, tool: string, args: any): Promise<{ ok: true; facts: any } | { ok: false; code: string; error: string }> {
+  const base = Deno.env.get("SUPABASE_URL");
+  if (!base) return { ok: false, code: "upstream", error: "thiếu cấu hình máy chủ" };
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const a = req.headers.get("authorization"), k = req.headers.get("apikey");
+  if (a) headers["authorization"] = a;
+  if (k) headers["apikey"] = k;
+  try {
+    const res = await fetch(base + "/functions/v1/butler-data", { method: "POST", headers, body: JSON.stringify({ tool, args: args || {} }), signal: AbortSignal.timeout(25000) });
+    let j: any = null;
+    try { j = await res.json(); } catch (_e) { /* thân không phải JSON */ }
+    if (res.ok && j && j.ok) return { ok: true, facts: j.facts };
+    return { ok: false, code: String((j && j.code) || "upstream"), error: String((j && j.error) || "máy chủ dữ liệu không trả lời") };
+  } catch (_e) { return { ok: false, code: "upstream", error: "không kết nối được máy chủ dữ liệu" }; }
+}
+
 function userClient(req: Request) {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: req.headers.get("authorization") || "" } },
@@ -123,14 +140,31 @@ Deno.serve(async (req: Request) => {
 
   async function doToday() {
     tools.push("today");
-    const data = await fetchToday(sb, me, Date.now());
-    return C.composeToday(data, Date.now());
+    // Việc / lịch (bắt buộc) + tín hiệu đầu tư (tuỳ chọn: thiếu quyền hoặc lỗi thì bỏ qua, không làm hỏng câu trả lời)
+    const [data, sg] = await Promise.all([fetchToday(sb, me, Date.now()), callData(req, "signals", {})]);
+    if (sg.ok) tools.push("signals");
+    return C.composeToday(data, Date.now(), sg.ok ? sg.facts : null);
+  }
+  // Công cụ dữ liệu (hàm butler-data, cùng JWT người hỏi). Lỗi / không đủ quyền -> không bịa: trả lối tới màn hình tương ứng kèm lý do.
+  const FEATURE_OF: Record<string, string> = { portfolio: "assets-holdings", group: "group-portfolio", limits: "group-limits", approvals: "group-approvals" };
+  async function doData(tool: string, args: any) {
+    tools.push(tool);
+    const r = await callData(req, tool, args);
+    if (r.ok) {
+      const c = C.composeData(tool, r.facts, args);
+      if (c) { if (c.notices) notices.push(...c.notices); return { text: c.text, cards: c.cards }; }
+    }
+    const f = FEATURE_OF[tool] ? C.composeFeatures([FEATURE_OF[tool]], M, user, "") : (args && args.sym ? C.composeSymbol(args.sym) : C.composeHelp(M));
+    if (!r.ok && r.code === "forbidden") return { text: r.error, cards: f.cards };
+    notices.push("Chưa đọc được số liệu lúc này (" + (r.ok ? "không dựng được câu trả lời" : r.error) + "); bạn có thể xem trực tiếp ở màn hình dưới đây.");
+    return { text: f.text, cards: f.cards };
   }
 
   try {
     if (und.intent === "help") reply = C.composeHelp(M);
     else if (und.intent === "symbol") reply = C.composeSymbol(und.sym);
     else if (und.intent === "today") reply = await doToday();
+    else if (und.intent === "data" && und.data) reply = await doData(und.data.tool, und.data.args);
     else if (und.intent === "features" && und.confident) reply = C.composeFeatures(und.features.slice(0, 3).map((f: any) => f.id), M, user, und.sym);
 
     if (!reply) {
@@ -158,7 +192,9 @@ Deno.serve(async (req: Request) => {
       }
       if (plan) {
         const sym = plan.sym || und.sym;
-        if (plan.intent === "today" || plan.tools.some((t: any) => t.id === "today")) { intent = "today"; reply = await doToday(); }
+        const dataTool = plan.intent === "data" ? plan.tools.find((t: any) => C.TOOLS[t.id] && C.TOOLS[t.id].data) : null;
+        if (dataTool) { intent = "data"; reply = await doData(dataTool.id, dataTool.args); }
+        else if (plan.intent === "today" || plan.tools.some((t: any) => t.id === "today")) { intent = "today"; reply = await doToday(); }
         else if (plan.intent === "features") { intent = "features"; reply = C.composeFeatures(plan.features, M, user, sym); }
         else { intent = "chat"; reply = { text: "Mình chỉ hỗ trợ các việc trong WorkHub Fin: chỉ đường tới chức năng, việc hôm nay và số liệu trong phạm vi quyền của bạn. Bạn thử hỏi theo kiểu \"tôi muốn nhập sao kê\" hoặc \"hôm nay có việc gì\".", cards: [{ type: "chips", items: M.examples.slice(0, 6) }] }; }
       } else if (und.features.length) {

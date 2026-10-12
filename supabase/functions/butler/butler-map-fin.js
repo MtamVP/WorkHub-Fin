@@ -2,7 +2,7 @@
 // Đường dẫn LUÔN do lib/links.js dựng (to(L, sym) nhận global Links) hoặc là đường dẫn mục của trang chính ('/#section=KHOÁ', '/#do=HÀNH_ĐỘNG') nên không thể lệch với các trang đích;
 // tests/unit/butler-map.test.js kiểm: id không trùng, mọi đường dẫn trỏ tới trang có thật, hash được trang đích khai báo, mục cần mã có `sym: true`, mỗi từ khoá khớp đúng mục của nó.
 // Giữ bản đồ NGẮN và CHÍNH XÁC: chỉ ghi bước thao tác khi chắc chắn có nút / tab đó trong giao diện (nhãn lấy từ chính HTML). Sửa giao diện thì sửa ở đây (test bắt các đường dẫn hỏng).
-// need: null (ai cũng thấy) | { admin: true } | { minRole: 'editor' }. Nạp bằng thẻ <script> thường (global ButlerMapFin) và module.exports cho Vitest; bản sao chạy ở Edge Function butler.
+// data: tên công cụ DỮ LIỆU của Quản gia (butler-data) trả lời được câu hỏi về mục này (danh mục, nhóm, giới hạn, lệnh chờ duyệt). need: null (ai cũng thấy) | { admin: true } | { minRole: 'editor' }. Nạp bằng thẻ <script> thường (global ButlerMapFin) và module.exports cho Vitest; bản sao chạy ở Edge Function butler.
 const ButlerMapFin = (function () {
   const sec = (key) => () => '/#section=' + key;
   const act = (key) => () => '/#do=' + key;
@@ -36,11 +36,11 @@ const ButlerMapFin = (function () {
       keys: ['cập nhật ứng dụng', 'kiểm tra cập nhật', 'phiên bản mới', 'bản mới', 'update', 'nâng cấp ứng dụng'], steps: ['Mở menu tài khoản ở góc trên bên phải.', 'Chọn "Kiểm tra cập nhật".'] },
 
     // ===== Investment Workbench: Toàn Nhóm =====
-    { id: 'group-portfolio', area: 'Toàn Nhóm', label: 'Xem danh mục chung của cả nhóm', icon: 'fa-layer-group', to: (L) => L.group('portfolio'),
-      keys: ['danh mục chung', 'danh mục nhóm', 'danh mục của cả nhóm', 'toàn nhóm', 'cả nhóm đang nắm', 'tổng danh mục'], steps: ['Vào Investment Workbench › Toàn Nhóm › "Danh Mục Chung".'] },
+    { id: 'group-portfolio', data: 'group', area: 'Toàn Nhóm', label: 'Xem danh mục chung của cả nhóm', icon: 'fa-layer-group', to: (L) => L.group('portfolio'),
+      keys: ['danh mục chung', 'danh mục nhóm', 'danh mục của nhóm', 'danh mục của cả nhóm', 'toàn nhóm', 'cả nhóm đang nắm', 'tổng danh mục'], steps: ['Vào Investment Workbench › Toàn Nhóm › "Danh Mục Chung".'] },
     { id: 'group-members', area: 'Toàn Nhóm', label: 'Xem thành viên và vai trò trong nhóm', icon: 'fa-user-group', to: (L) => L.group('members'),
       keys: ['thành viên nhóm', 'danh sách thành viên', 'ai trong nhóm', 'thành viên'], steps: ['Vào Toàn Nhóm › "Thành Viên".'] },
-    { id: 'group-limits', area: 'Toàn Nhóm', label: 'Xem và đặt giới hạn đầu tư, mã hạn chế', icon: 'fa-gauge-high', to: (L) => L.group('limits'),
+    { id: 'group-limits', data: 'limits', area: 'Toàn Nhóm', label: 'Xem và đặt giới hạn đầu tư, mã hạn chế', icon: 'fa-gauge-high', to: (L) => L.group('limits'),
       keys: ['giới hạn', 'hạn mức', 'giới hạn đầu tư', 'vượt giới hạn', 'mã hạn chế', 'mã cấm', 'tỷ trọng tối đa', 'limit', 'ngoại lệ giới hạn'], steps: ['Vào Toàn Nhóm › "Giới Hạn".', 'Quản lý tài sản đặt hoặc sửa giới hạn; thành viên xem mức đang dùng và xin ngoại lệ.'] },
     { id: 'group-quant', area: 'Toàn Nhóm', label: 'Phân tích định lượng của cả nhóm', icon: 'fa-chart-simple', to: (L) => L.group('quant'),
       keys: ['định lượng', 'phân tích định lượng', 'quant', 'mô hình rủi ro nhóm', 'sổ đăng ký mô hình'], steps: ['Vào Toàn Nhóm › "Định Lượng".'] },
@@ -50,8 +50,8 @@ const ButlerMapFin = (function () {
       keys: ['khớp lệnh', 'chất lượng khớp', 'trượt giá', 'vwap', 'tca', 'chi phí giao dịch'], steps: ['Vào Toàn Nhóm › "Khớp Lệnh".'] },
     { id: 'group-journey', area: 'Toàn Nhóm', label: 'Theo dõi hành trình từ ý tưởng đến lệnh', icon: 'fa-route', to: (L) => L.group('journey'),
       keys: ['hành trình', 'ý tưởng đầu tư', 'ý tưởng', 'đề xuất đầu tư', 'idea', 'ý tưởng nào được duyệt'], steps: ['Vào Toàn Nhóm › "Hành Trình".'] },
-    { id: 'group-approvals', area: 'Toàn Nhóm', label: 'Xem và duyệt các lệnh lớn đang chờ', icon: 'fa-stamp', to: (L) => L.group('approvals'),
-      keys: ['duyệt lệnh', 'phê duyệt', 'lệnh chờ duyệt', 'lệnh lớn', 'approval', 'xin duyệt lệnh'], steps: ['Vào Toàn Nhóm › "Duyệt Lệnh".', 'Người có quyền duyệt xem chi tiết rồi duyệt hoặc bác.'] },
+    { id: 'group-approvals', data: 'approvals', area: 'Toàn Nhóm', label: 'Xem và duyệt các lệnh lớn đang chờ', icon: 'fa-stamp', to: (L) => L.group('approvals'),
+      keys: ['duyệt lệnh', 'phê duyệt', 'chờ duyệt', 'lệnh chờ duyệt', 'lệnh lớn', 'approval', 'xin duyệt lệnh'], steps: ['Vào Toàn Nhóm › "Duyệt Lệnh".', 'Người có quyền duyệt xem chi tiết rồi duyệt hoặc bác.'] },
     { id: 'group-strategy', area: 'Toàn Nhóm', label: 'Chiến lược và cân bằng danh mục về chuẩn của nhóm', icon: 'fa-bullseye', to: (L) => L.group('strategy'),
       keys: ['chiến lược nhóm', 'cân bằng về chuẩn', 'danh mục chuẩn', 'tỷ trọng mục tiêu nhóm', 'cân bằng nhóm'], steps: ['Vào Toàn Nhóm › "Chiến Lược".'] },
     { id: 'group-activity', area: 'Toàn Nhóm', label: 'Xem hoạt động gần đây của cả nhóm', icon: 'fa-receipt', to: (L) => L.group('activity'),
@@ -60,8 +60,8 @@ const ButlerMapFin = (function () {
       keys: ['báo cáo nhóm', 'báo cáo toàn nhóm', 'báo cáo cho hội đồng', 'hồ sơ họp đầu tư'], steps: ['Vào Toàn Nhóm › "Báo Cáo".'] },
 
     // ===== Investment Workbench: Danh Mục cá nhân =====
-    { id: 'assets-holdings', area: 'Danh Mục', label: 'Xem danh mục tôi đang nắm giữ, NAV và lãi lỗ', icon: 'fa-sack-dollar', to: (L) => L.assets('holdings'),
-      keys: ['danh mục của tôi', 'danh mục cá nhân', 'đang nắm giữ', 'cổ phiếu của tôi', 'vị thế', 'nav', 'lãi lỗ', 'tôi đang giữ gì', 'tài sản của tôi'], steps: ['Vào Investment Workbench › Danh Mục › "Danh Mục".'] },
+    { id: 'assets-holdings', data: 'portfolio', area: 'Danh Mục', label: 'Xem danh mục tôi đang nắm giữ, NAV và lãi lỗ', icon: 'fa-sack-dollar', to: (L) => L.assets('holdings'),
+      keys: ['danh mục', 'danh mục của tôi', 'danh mục cá nhân', 'đang nắm giữ', 'cổ phiếu của tôi', 'vị thế', 'nav', 'lãi lỗ', 'tôi đang giữ gì', 'tài sản của tôi'], steps: ['Vào Investment Workbench › Danh Mục › "Danh Mục".'] },
     { id: 'price-alerts', area: 'Danh Mục', label: 'Đặt giá mục tiêu và ngưỡng cắt lỗ, nhận cảnh báo giá', icon: 'fa-bell', to: (L) => L.assets('holdings'),
       keys: ['giá mục tiêu', 'cắt lỗ', 'ngưỡng cắt lỗ', 'cảnh báo giá', 'email cảnh báo', 'báo khi giá chạm', 'chốt lời'], steps: ['Vào Danh Mục › "Danh Mục".', 'Đặt giá mục tiêu và ngưỡng cắt lỗ cho từng mã; bật email cảnh báo nếu muốn nhận khi app đã tắt.'] },
     { id: 'watchlist', area: 'Danh Mục', label: 'Theo dõi mã quan tâm và giá muốn mua', icon: 'fa-eye', to: (L) => L.assets('watchlist'),

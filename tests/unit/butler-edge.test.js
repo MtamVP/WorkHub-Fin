@@ -46,6 +46,7 @@ describe('butler: bản sao và cấu trúc', () => {
   });
   it('mọi công cụ khai báo trong ButlerCore.TOOLS có hàm tương ứng trong index.ts', () => {
     const C = require('../../lib/butler-core.js'), src = read(DIR + '/index.ts');
-    Object.keys(C.TOOLS).filter((k) => C.TOOLS[k].enabled).forEach((k) => expect(src, k).toMatch(new RegExp('tools\\.push\\("' + k + '"\\)')));
+    Object.keys(C.TOOLS).filter((k) => C.TOOLS[k].enabled && !C.TOOLS[k].data).forEach((k) => expect(src, k).toMatch(new RegExp('tools\\.push\\("' + k + '"\\)')));
+    expect(src).toMatch(/tools\.push\(tool\)/);                     // công cụ dữ liệu đi qua doData -> butler-data (kiểm ở butler-data.test.js)
   });
 });

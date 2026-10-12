@@ -87,3 +87,13 @@ a.bt-row:hover { background: var(--bt-hover); }
 @media (max-width: 520px) { .bt-launcher-txt { display: none; } .bt-launcher { padding: 0 13px; } .bt-panel { width: 100vw; } }
 @media (prefers-reduced-motion: reduce) { .bt-launcher { transition: none; } .bt-launcher:hover { transform: none; } }
 @media print { .bt-root { display: none; } }
+
+/* thẻ số liệu (KPI) và tông "tăng" (xanh) của chấm trạng thái; luôn có dấu +/− trong chữ nên không chỉ dựa vào màu */
+.bt-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.bt-kpi { padding: 8px 10px; background: var(--bt-bg); border: 1px solid var(--bt-line); border-radius: 10px; min-width: 0; }
+.bt-kpi dt { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bt-muted); }
+.bt-kpi dd { margin: 2px 0 0; font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bt-kpi.bt-up dd { color: var(--bt-up); }
+.bt-kpi.bt-bad dd { color: var(--bt-bad); }
+.bt-kpi.bt-warn dd { color: var(--bt-warn); }
+.bt-dot.bt-up { background: var(--bt-up); }

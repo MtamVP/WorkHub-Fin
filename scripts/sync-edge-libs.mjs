@@ -45,6 +45,9 @@ export const CRON_GUARD_FUNCTIONS = ['bt-data', 'insight-sync', 'sim-watch', 'ma
 // butler (AI Quản gia): lõi + bản đồ tính năng dùng đúng bản của trang, và ai.ts (khuôn gọi Gemini, chuỗi mô hình dự phòng, chống tiêm lệnh) là bản sao nguyên văn của market-news-ai/ai.ts
 export const BUTLER_LIBS = [{ file: 'butler-core.js', global: 'ButlerCore' }, { file: 'butler-map-fin.js', global: 'ButlerMapFin' }];
 export const BUTLER_TS = [{ from: 'supabase/functions/market-news-ai/ai.ts', to: 'supabase/functions/butler/ai.ts' }];
+// butler-data (công cụ dữ liệu của Quản gia, chỉ đọc bằng JWT người hỏi): dùng đúng bốn thư viện tính của check-limits (EDGE_LIBS) và compliance.ts (chấm tuân thủ giới hạn)
+export const BUTLERDATA_LIBS = EDGE_LIBS;
+export const BUTLERDATA_TS = [{ from: 'supabase/functions/check-limits/compliance.ts', to: 'supabase/functions/butler-data/compliance.ts' }];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -100,6 +103,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const c of BUTLER_TS) {
     fs.writeFileSync(path.join(root, c.to), fs.readFileSync(path.join(root, c.from), 'utf8'));
     console.log('đã sao chép (butler)', c.to);
+  }
+  for (const lib of BUTLERDATA_LIBS) {
+    fs.writeFileSync(path.join(root, 'supabase', 'functions', 'butler-data', lib.file), expectedCopy(lib));
+    console.log('đã sao chép (butler-data)', lib.file);
+  }
+  for (const c of BUTLERDATA_TS) {
+    fs.writeFileSync(path.join(root, c.to), fs.readFileSync(path.join(root, c.from), 'utf8'));
+    console.log('đã sao chép (butler-data)', c.to);
   }
   const guard = fs.readFileSync(path.join(root, 'supabase', 'functions', '_shared', 'cron-guard.ts'), 'utf8');
   for (const fn of CRON_GUARD_FUNCTIONS) {

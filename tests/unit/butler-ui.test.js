@@ -99,3 +99,15 @@ describe('trang chính xử lý liên kết sâu của bản đồ', () => {
     expect(s).toMatch(/addEventListener\('hashchange', applyLaunchHash\)/);
   });
 });
+
+describe('refTarget: tham chiếu của hàng trong thẻ danh sách', () => {
+  it('section / mã cổ phiếu / tính năng; tham chiếu lạ -> null', () => {
+    expect(U.refTarget({ kind: 'section', key: 'mytasks' }, L, M)).toEqual({ href: '/#section=mytasks', section: 'mytasks' });
+    expect(U.refTarget({ kind: 'symbol', sym: 'FPT' }, L, M)).toEqual({ href: '/valuation/#stock/FPT' });
+    expect(U.refTarget({ kind: 'symbol', sym: '../x' }, L, M)).toBeNull();
+    expect(U.refTarget({ kind: 'feature', id: 'group-limits' }, L, M)).toMatchObject({ href: '/mastersheet/#limits' });
+    expect(U.refTarget({ kind: 'feature', id: 'khong-co' }, L, M)).toBeNull();
+    expect(U.refTarget({ kind: 'url', href: 'javascript:alert(1)' }, L, M)).toBeNull();
+    expect(U.refTarget(null, L, M)).toBeNull();
+  });
+});
