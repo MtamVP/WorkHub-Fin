@@ -5595,6 +5595,24 @@ async function updateMemberRoleAction(userId, newRole) {
 // 6. INITIALIZATION
 // ==========================================
 
+// Liên kết sâu tới trang chính (Quản gia và các trang khác dùng): "/#section=KHOÁ" mở một mục ở thanh bên, "/#do=HÀNH_ĐỘNG" mở hộp thoại tương ứng.
+// Khoá hợp lệ khai báo ở SECTION_KEYS và LAUNCH_ACTIONS (tests/unit/butler-map.test.js đối chiếu với lib/butler-map-fin.js). Xử lý xong thì xoá hash để làm mới trang không mở lại.
+const LAUNCH_ACTIONS = {
+  'selfcheck': () => openSelfCheckModal(),
+  'backup': () => openBackupRestoreModal(),
+  'update': () => openUpdateModal(),
+};
+function applyLaunchHash() {
+  const m = /^#(section|do)=([\w-]+)$/.exec(String(location.hash || ''));
+  if (!m || !CURRENT_USER.email) return;
+  try {
+    if (m[1] === 'section') switchSection(m[2]);
+    else if (LAUNCH_ACTIONS[m[2]]) LAUNCH_ACTIONS[m[2]]();
+  } catch (e) { console.warn('applyLaunchHash:', e && e.message); }
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* bỏ qua */ }
+}
+window.addEventListener('hashchange', applyLaunchHash);
+
 document.addEventListener('DOMContentLoaded', async () => {
   setupThemeToggle();
   renderObservationLogs();
@@ -5657,6 +5675,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await initAuth();
+  applyLaunchHash();
 
   const notiBtn = document.getElementById('observation-toggle-btn');
   if (notiBtn) notiBtn.addEventListener('click', toggleObservationDrawer);
