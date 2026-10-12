@@ -16,7 +16,7 @@ function boot(data, opts) {
     document: { getElementById: el },
     window: { open() {} },
     localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
-    console, Date, JSON, Math, Promise, TextEncoder, TextDecoder, setTimeout,
+    console, Date, JSON, Math, Promise, TextEncoder, TextDecoder, setTimeout, URL,
     targetEmail: 'a@b.test',
     callGAS: async (action, params) => {
       calls.push(action);
@@ -29,7 +29,7 @@ function boot(data, opts) {
     saveBytesToDisk: async (name, bytes) => { saved.push([name, new TextDecoder().decode(bytes)]); return name; },
     openExternalUrl: (u) => opened.push(u),
   });
-  ['lib/portfolio-calc.js', 'lib/accounting-bridge.js', 'mastersheet/assets/accounting-link-ui.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
+  ['lib/portfolio-calc.js', 'lib/accounting-bridge.js', 'lib/external-links.js', 'mastersheet/assets/accounting-link-ui.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
   vm.runInContext('globalThis.UI = AccountingLinkUI;', ctx);
   return { UI: vm.runInContext('UI', ctx), els, store, saved, opened, toasts, calls };
 }

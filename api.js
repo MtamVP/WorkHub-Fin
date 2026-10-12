@@ -1,12 +1,38 @@
+// Chỉ mở liên kết tuyệt đối http(s) và mailto: (chặn javascript:, file:, data:, đường dẫn tương đối...). Địa chỉ người dùng tự lưu (lối tắt), URL tệp đính kèm hay kết quả tìm kiếm đều đi qua đây.
+window.safeExternalUrl = function (url) {
+    try {
+        const p = new URL(String(url === null || url === undefined ? '' : url).trim());
+        return ['http:', 'https:', 'mailto:'].indexOf(p.protocol) !== -1 ? p.href : '';
+    } catch (e) { return ''; }
+};
 window.openExternalUrl = function (url) {
+    const safe = window.safeExternalUrl(url);
+    if (!safe) {
+        console.warn('Bỏ qua liên kết không hợp lệ:', url);
+        if (typeof window.showToast === 'function') { try { window.showToast('Liên kết không hợp lệ hoặc không được hỗ trợ.', 'error'); } catch (e) { /* không có giao diện thông báo */ } }
+        return false;
+    }
     if (window.__TAURI__ && window.__TAURI__.opener) {
-        window.__TAURI__.opener.openUrl(url).catch(function (err) {
+        window.__TAURI__.opener.openUrl(safe).catch(function (err) {
             console.error('Không mở được link trong app desktop:', err);
         });
-        return;
+        return true;
     }
-    window.open(url, '_blank', 'noopener');
+    window.open(safe, '_blank', 'noopener,noreferrer');
+    return true;
 };
+// Neo <a href> chung: chặn javascript:/data:/file:/vbscript: ở mọi nơi (kể cả tệp đính kèm do đồng nghiệp ghi), và trong app desktop mở neo target=_blank http(s) bằng trình duyệt hệ thống
+// (webview của Tauri không tự mở). Chạy ở pha nổi bọt và bỏ qua khi trang đã tự xử lý (onclick trả false -> defaultPrevented) nên không mở hai lần.
+if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return;
+        const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a) return;
+        const href = a.getAttribute('href') || '';
+        if (/^\s*(javascript|data|vbscript|file):/i.test(href)) { e.preventDefault(); console.warn('Đã chặn liên kết không an toàn:', href.slice(0, 40)); return; }
+        if (a.getAttribute('target') === '_blank' && /^\s*https?:\/\//i.test(href) && window.__TAURI__ && window.__TAURI__.opener) { e.preventDefault(); window.openExternalUrl(href); }
+    });
+}
 
 window.escapeHtml = function (value) {
     return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function (ch) {

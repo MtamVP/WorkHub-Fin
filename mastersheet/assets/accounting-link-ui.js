@@ -5,8 +5,7 @@
    TK 121 cần số dư sổ + giá cuối kỳ nên làm ở web kế toán. Dùng global của script.js: callGAS, targetEmail, showToast, escapeAssetHtml.
    Không ghi gì lên máy chủ từ đây. */
 const AccountingLinkUI = (function () {
-    const URL_KEY = 'wh.fin.accounting.url.v1';
-    const DEFAULT_URL = 'https://accounting-2de.pages.dev/app#finlink';
+    const DEFAULT_URL = ExternalLinks.accountingUrl('finlink');          // địa chỉ cấu hình ở lib/external-links.js (có thể đặt lại ở ô "Địa chỉ web kế toán")
     const S = { result: null, month: null, busy: false };
     const esc = (s) => escapeAssetHtml(String(s === null || s === undefined ? '' : s));
     const vnd = (n) => Math.round(Number(n) || 0).toLocaleString('en-US');
@@ -14,13 +13,9 @@ const AccountingLinkUI = (function () {
     const cls = (n) => (n > 0 ? 'tl-up' : (n < 0 ? 'tl-down' : ''));
     const dmy = (iso) => String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7);
 
-    function accountingUrl() {
-        try { const u = localStorage.getItem(URL_KEY); if (u && /^https?:\/\//i.test(u)) return u; } catch (e) { /* dùng mặc định */ }
-        return DEFAULT_URL;
-    }
+    function accountingUrl() { return ExternalLinks.accountingUrl('finlink'); }
     function saveUrl(v) {
-        const u = String(v || '').trim();
-        try { if (!u) localStorage.removeItem(URL_KEY); else if (/^https?:\/\//i.test(u)) localStorage.setItem(URL_KEY, u); else if (typeof showToast === 'function') showToast('Địa chỉ phải bắt đầu bằng http:// hoặc https://', 'error'); } catch (e) { /* bỏ qua */ }
+        if (!ExternalLinks.setAccountingUrl(v) && typeof showToast === 'function') showToast('Địa chỉ phải bắt đầu bằng http:// hoặc https://', 'error');
     }
 
     function init() {

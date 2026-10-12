@@ -251,9 +251,136 @@ describe('kiểm tra ngẫu nhiên: mọi bút toán cân và khớp sổ FIFO c
   }
 });
 
+// ---------- đối soát hai chiều (12/10/2026): chứng từ đã gửi nhưng Fin đã đổi, chứng từ mồ côi, dự phòng bổ sung, soát toàn lịch sử ----------
+describe('plan: phát hiện chứng từ đã gửi bị lệch so với Fin', () => {
+  const T = () => buy('FPT', 100, 100000, 15000, '2026-08-12', { id: 'tx-drift-1' });
+  const asExisting = (v, over) => Object.assign({ id: v.id, status: 'Draft', date: v.date, memo: v.memo, amount: 0 }, over || {});
+  it('đúng như đã gửi -> không lệch', () => {
+    const r = AB.build({ txns: [T()], period: '2026-08' });
+    const p = AB.plan(r.vouchers, [asExisting(r.vouchers[0])])[0];
+    expect(p.state).toBe('sent'); expect(p.drift).toBeNull();
+  });
+  it('lệnh bị sửa sau khi gửi (số lượng/giá/phí đổi diễn giải) -> lệch, nêu lý do', () => {
+    const old = AB.build({ txns: [T()], period: '2026-08' }).vouchers[0];
+    const edited = AB.build({ txns: [Object.assign(T(), { quantity: 120 })], period: '2026-08' });
+    const p = AB.plan(edited.vouchers, [asExisting(old)])[0];
+    expect(p.state).toBe('sent');
+    expect(p.drift.reasons.join(' ')).toMatch(/diễn giải/);
+  });
+  it('đổi ngày -> lệch ngày; chứng từ đã ghi sổ còn so số tiền', () => {
+    const old = AB.build({ txns: [T()], period: '2026-08' }).vouchers[0];
+    const moved = AB.build({ txns: [Object.assign(T(), { trade_date: '2026-08-14' })], period: '2026-08' });
+    const d1 = AB.plan(moved.vouchers, [asExisting(old)])[0].drift;
+    expect(d1.reasons.join(' ')).toMatch(/ngày 12\/08\/2026 → 14\/08\/2026/);
+    const same = AB.build({ txns: [T()], period: '2026-08' }).vouchers[0];
+    const d2 = AB.plan([same], [asExisting(same, { status: 'Posted', amount: same.total + 500 })])[0].drift;
+    expect(d2.reasons.join(' ')).toMatch(/số tiền/);
+    expect(AB.plan([same], [asExisting(same, { status: 'Posted', amount: same.total })])[0].drift).toBeNull();
+  });
+  it('đã đảo thì không báo lệch; nguồn không có memo thì không kết luận (tương thích bản cũ)', () => {
+    const v = AB.build({ txns: [T()], period: '2026-08' }).vouchers[0];
+    expect(AB.plan([v], [asExisting(v, { status: 'Reversed', memo: 'khác hẳn' })])[0].drift).toBeNull();
+    expect(AB.plan([v], [{ id: v.id, status: 'Draft' }])[0].drift).toBeNull();
+  });
+  it('bị từ chối thì vẫn cho gửi lại ~2 như cũ', () => {
+    const v = AB.build({ txns: [T()], period: '2026-08' }).vouchers[0];
+    const p = AB.plan([v], [asExisting(v, { status: 'Rejected' })])[0];
+    expect(p.state).toBe('rejected'); expect(p.sendId).toBe(v.id + '~2');
+  });
+});
+
+describe('orphans: chứng từ mồ côi', () => {
+  it('lệnh đã xoá khỏi Fin -> chứng từ FIN-* trong kỳ báo mồ côi; chứng từ ngoài kỳ, đã từ chối/đảo và dự phòng thì không', () => {
+    const keep = buy('FPT', 10, 1000, 0, '2026-08-05', { id: 'keep-1' });
+    const r = AB.build({ txns: [keep], period: '2026-08' });
+    const ex = [
+      { id: r.vouchers[0].id, status: 'Draft', date: '2026-08-05', memo: 'x' },
+      { id: 'FIN-MUA-GONE', status: 'Posted', date: '2026-08-07', memo: 'Mua đã xoá', amount: 5000 },
+      { id: 'FIN-MUA-OLD', status: 'Posted', date: '2026-07-07', memo: 'ngoài kỳ' },
+      { id: 'FIN-MUA-REJ', status: 'Rejected', date: '2026-08-08', memo: 'đã từ chối' },
+      { id: 'FIN-MUA-REV', status: 'Reversed', date: '2026-08-09', memo: 'đã đảo' },
+      { id: 'FIN-DP-20260831', status: 'Posted', date: '2026-08-31', memo: 'dự phòng' },
+      { id: 'HAND-1', status: 'Posted', date: '2026-08-10', memo: 'nhập tay' },
+    ];
+    const o = AB.orphans(r.vouchers, ex, AB.periodRange('2026-08'));
+    expect(o.map((x) => x.id)).toEqual(['FIN-MUA-GONE']);
+    expect(o[0].amount).toBe(5000);
+  });
+  it('chứng từ gửi lại ~2 vẫn thuộc về nghiệp vụ còn trong Fin', () => {
+    const r = AB.build({ txns: [buy('FPT', 10, 1000, 0, '2026-08-05', { id: 'k2' })], period: '2026-08' });
+    const id = r.vouchers[0].id;
+    expect(AB.orphans(r.vouchers, [{ id: id + '~2', status: 'Draft', date: '2026-08-05' }], AB.periodRange('2026-08'))).toEqual([]);
+  });
+  it('thiếu ngày trong dữ liệu chứng từ: không kết luận', () => {
+    expect(AB.orphans([], [{ id: 'FIN-MUA-X', status: 'Posted' }], AB.periodRange('2026-08'))).toEqual([]);
+  });
+});
+
+describe('plan: dự phòng đã ghi sổ mà vẫn còn chênh -> bút toán bổ sung', () => {
+  // mua 100 @ 100.000, cuối tháng giá 90.000 -> cần dự phòng 1.000.000
+  const input = (booked) => ({ txns: [buy('VNM', 100, 100000, 0, '2026-08-05', { id: 'dp-1' })], period: '2026-08', prices: { VNM: 90000 }, books: { provision: booked } });
+  it('chưa ghi: gửi mã gốc; đang chờ duyệt: coi là đã gửi', () => {
+    const r = AB.build(input(0));
+    const v = r.vouchers.find((x) => x.kind === 'provision');
+    expect(v.id).toBe('FIN-DP-20260831');
+    expect(AB.plan([v], [])[0]).toMatchObject({ state: 'new', sendId: 'FIN-DP-20260831' });
+    expect(AB.plan([v], [{ id: v.id, status: 'Draft', date: v.date, memo: v.memo }])[0]).toMatchObject({ state: 'sent', drift: null });
+  });
+  it('đã GHI SỔ bút toán trước nhưng giá đổi làm số cần lập lớn hơn: đề xuất bổ sung -B2, rồi -B3', () => {
+    const first = AB.build(input(0)).vouchers.find((x) => x.kind === 'provision');
+    // sổ đã có 600.000 (đã ghi sổ phần trước), giá giảm thêm nên cần 1.000.000 -> chênh 400.000
+    const r = AB.build(input(600000));
+    const v = r.vouchers.find((x) => x.kind === 'provision');
+    expect(v.meta.delta).toBe(400000);
+    const p = AB.plan([v], [{ id: first.id, status: 'Posted', date: first.date, memo: first.memo, amount: 600000 }])[0];
+    expect(p).toMatchObject({ state: 'new', sendId: 'FIN-DP-20260831-B2', supplement: true });
+    // bổ sung B2 đã ghi sổ mà vẫn chênh nữa -> B3
+    const p3 = AB.plan([v], [{ id: first.id, status: 'Posted', date: first.date, memo: first.memo }, { id: 'FIN-DP-20260831-B2', status: 'Posted', date: first.date, memo: 'b2' }])[0];
+    expect(p3.sendId).toBe('FIN-DP-20260831-B3');
+    // B2 đang chờ duyệt: coi là đã gửi, không gửi chồng
+    expect(AB.plan([v], [{ id: first.id, status: 'Posted', date: first.date }, { id: 'FIN-DP-20260831-B2', status: 'Draft', date: first.date, memo: v.memo }])[0].state).toBe('sent');
+  });
+  it('bút toán đã đảo cũng mở đường cho đề xuất mới; bị từ chối thì gửi lại ~2 như thường', () => {
+    const v = AB.build(input(0)).vouchers.find((x) => x.kind === 'provision');
+    expect(AB.plan([v], [{ id: v.id, status: 'Reversed', date: v.date }])[0]).toMatchObject({ state: 'new', sendId: 'FIN-DP-20260831-B2' });
+    expect(AB.plan([v], [{ id: v.id, status: 'Rejected', date: v.date }])[0]).toMatchObject({ state: 'rejected', sendId: v.id + '~2' });
+  });
+});
+
+describe('audit: soát toàn bộ lịch sử', () => {
+  const txns = [buy('FPT', 100, 100000, 0, '2026-06-10', { id: 'au-1' }), buy('HPG', 50, 20000, 0, '2026-07-03', { id: 'au-2' }), sell('FPT', 40, 110000, 0, 0, '2026-08-12', { id: 'au-3' })];
+  const flows = [{ id: 'f-1', flow_type: 'deposit', amount: 5000000, flow_date: '2026-06-01' }];
+  it('nhiều tháng: đếm đã gửi / chưa gửi / lệch / mồ côi theo từng tháng', () => {
+    const all = AB.build({ txns, flows, from: '2026-01-01', to: '2026-08-31' });
+    const ex = all.vouchers.map((v) => ({ id: v.id, status: 'Posted', date: v.date, memo: v.memo, amount: v.total }));
+    // bỏ chứng từ của lệnh tháng 8 (chưa gửi), làm lệch chứng từ tháng 7, thêm một chứng từ mồ côi tháng 6
+    const sentOnly = ex.filter((e) => !/AU3/i.test(e.id));
+    const bad = sentOnly.map((e) => (/AU2/i.test(e.id) ? Object.assign({}, e, { memo: 'đã sửa tay' }) : e)).concat([{ id: 'FIN-MUA-DELETED', status: 'Draft', date: '2026-06-20', memo: 'đã xoá khỏi Fin' }]);
+    const a = AB.audit({ txns, flows, to: '2026-08-31' }, bad);
+    expect(a.from).toBe('2026-06-01'); expect(a.total).toBe(4);
+    expect(a.new).toBe(1); expect(a.drift).toBe(1); expect(a.orphans).toBe(1); expect(a.sent).toBe(3);
+    expect(a.clean).toBe(false);
+    expect(a.months.find((m) => m.month === '2026-08').new).toBe(1);
+    expect(a.months.find((m) => m.month === '2026-07').drift).toBe(1);
+    expect(a.months.find((m) => m.month === '2026-06').orphan).toBe(1);
+    expect(a.driftList[0].reasons.join(' ')).toMatch(/diễn giải/);
+  });
+  it('khớp hoàn toàn -> clean; sổ rỗng và không có nghiệp vụ -> clean', () => {
+    const all = AB.build({ txns, flows, from: '2026-01-01', to: '2026-08-31' });
+    const ex = all.vouchers.map((v) => ({ id: v.id, status: 'Draft', date: v.date, memo: v.memo }));
+    expect(AB.audit({ txns, flows, to: '2026-08-31' }, ex).clean).toBe(true);
+    expect(AB.audit({ txns: [], flows: [], to: '2026-08-31' }, []).clean).toBe(true);
+  });
+  it('bỏ qua nghiệp vụ đã xoá mềm và không tính dự phòng', () => {
+    const a = AB.audit({ txns: txns.concat([Object.assign(buy('VNM', 1, 1000, 0, '2026-08-01', { id: 'au-del' }), { deleted_at: '2026-08-02' })]), flows, to: '2026-08-31', prices: { FPT: 1 }, books: { provision: 0 } }, []);
+    expect(a.total).toBe(4);
+  });
+});
+
 describe('bản sao ở web kế toán không được lệch', () => {
   const copy = process.env.ONYXLINE_PATH ? process.env.ONYXLINE_PATH + '/src/accounting-bridge.js' : null;
   (copy && existsSync(copy) ? it : it.skip)('src/accounting-bridge.js giống hệt lib/accounting-bridge.js', () => {
-    expect(readFileSync(copy, 'utf8')).toBe(readFileSync(new URL('../../lib/accounting-bridge.js', import.meta.url), 'utf8'));
+    const norm = (t) => t.replace(/\r\n/g, '\n');     // Windows autocrlf: cùng nội dung nhưng khác kiểu xuống dòng
+    expect(norm(readFileSync(copy, 'utf8'))).toBe(norm(readFileSync(new URL('../../lib/accounting-bridge.js', import.meta.url), 'utf8')));
   });
 });
