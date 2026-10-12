@@ -60,7 +60,13 @@ function boot(o = {}) {
     writeFile: async (p, b) => { if (opt.fsFail) throw new Error(opt.fsFail); files.set(p, Buffer.from(b).toString('utf8')); events.push('write'); },
     readFile: async (p) => new TextEncoder().encode(files.get(p)), remove: async (p) => { files.delete(p); events.push('remove'); } };
   const win = { __TAURI__: opt.tauri ? { fs: fsApi, app: { getVersion: async () => '0.1.12' }, notification: { isPermissionGranted: async () => opt.notifGranted, requestPermission: async () => 'granted', sendNotification: (n) => events.push('notify:' + n.title) } } : undefined,
-    supabaseClient: { auth: { getSession: async () => ({ data: { session: opt.session ? { expires_at: Math.floor(Date.now() / 1000) + 1800 } : null } }) } },
+    supabaseClient: { auth: { getSession: async () => ({ data: { session: opt.session ? { expires_at: Math.floor(Date.now() / 1000) + 1800 } : null } }) },
+      // hai RPC phía máy chủ (fn_cron_health / fn_data_freshness): trả dữ liệu "khoẻ" tính theo giờ hiện tại
+      rpc: async (name) => {
+        const now = Date.now(), iso = new Date(now).toISOString();
+        if (name === 'fn_cron_health') return { data: [{ jobname: 'thu', schedule: '* * * * *', active: true, last_start: iso, last_status: 'succeeded', last_message: '1 row', runs_48h: 5, fails_48h: 0 }], error: null };
+        return { data: { price_days: SC.lastDueDay(now - 30 * 60000, 12, 30), pit_market: SC.lastDueDay(now - 30 * 60000, 12, 5), nav_history: new Date(now + 7 * 3600000).toISOString().slice(0, 10), sim_runs_open: 0, pit_news: iso, financials: iso, ownership: iso, market_snapshot: iso, data_health_open_errors: 0 }, error: null };
+      } },
     WorkHubMarketHistory: { refreshStatus: async () => ({ summary: opt.history, error: null }) } };
   const U = { snapshot: snapRows(opt.snapN, opt.snapNew), stats: STATS, meta: { FPT: { name: 'FPT', exchange: 'HOSE' } }, asOf: opt.asOf };
   const API = { asset: { market: {

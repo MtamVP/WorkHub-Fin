@@ -1,6 +1,8 @@
 // Shared file-storage proxy for WorkHub-Fin / WorkHub-Sci / WorkHub-ORG.
 // Keeps the MinIO (TrueNAS) root credential server-side only — clients never see it.
 // Routes: POST .../storage-proxy/upload, GET .../storage-proxy/download, DELETE .../storage-proxy/delete
+// Hiện đang tạm tắt ở phía app (api.js: USE_MINIO_STORAGE = false). Khi bật lại: mỗi bucket chỉ cho nhóm tương ứng dùng (BUCKET_GROUPS), tài khoản bị vô hiệu bị chặn,
+// khoá đối tượng được kiểm (validPath). Trước 12/10/2026 chỉ kiểm "đã đăng nhập" nên mọi người dùng đọc/ghi/xoá được mọi bucket.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   S3Client,
@@ -15,11 +17,22 @@ const BUCKET_MAP: Record<string, string> = {
   general: "wh-org-files",
 };
 const KNOWN_BUCKETS = new Set(Object.values(BUCKET_MAP));
+// Nhóm được dùng từng bucket (admin dùng được mọi bucket); danh sách rỗng = mọi người dùng đang hoạt động
+const BUCKET_GROUPS: Record<string, string[]> = {
+  "wh-fin-files": ["finance", "admin"],
+  "wh-sci-files": ["science", "admin"],
+  "wh-org-files": [],
+};
 
 function resolveBucket(name: string): string {
   if (KNOWN_BUCKETS.has(name)) return name;
   if (BUCKET_MAP[name]) return BUCKET_MAP[name];
   throw new Error(`Unknown bucket: ${name}`);
+}
+
+// Khoá đối tượng: không rỗng, không bắt đầu bằng "/", không có đoạn "." hoặc "..", không có ký tự điều khiển, tối đa 512 ký tự
+function validPath(p: string): boolean {
+  return p.length > 0 && p.length <= 512 && !p.startsWith("/") && !/[\u0000-\u001f]/.test(p) && !p.split("/").some((seg) => seg === ".." || seg === ".");
 }
 
 function s3Client(): S3Client {
@@ -37,7 +50,7 @@ function s3Client(): S3Client {
   });
 }
 
-async function requireUser(req: Request, url: URL): Promise<string> {
+async function requireUser(req: Request, url: URL, bucket?: string): Promise<string> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace(/^Bearer\s+/i, "") || url.searchParams.get("token");
   if (!token) throw new Error("auth: missing token");
@@ -47,6 +60,14 @@ async function requireUser(req: Request, url: URL): Promise<string> {
   const supabase = createClient(supabaseUrl, anonKey);
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) throw new Error("auth: invalid or expired token");
+  if (bucket) {
+    // nhóm + trạng thái hoạt động của người dùng (bảng users ai cũng đọc được theo RLS; dùng chính JWT của người gọi)
+    const asUser = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: "Bearer " + token } } });
+    const { data: u } = await asUser.from("users").select("group_key, active").eq("auth_user_id", data.user.id).maybeSingle();
+    if (!u || u.active === false) throw new Error("forbidden: tài khoản không hoạt động hoặc không có hồ sơ");
+    const allowed = BUCKET_GROUPS[bucket];
+    if (allowed && allowed.length && allowed.indexOf(String(u.group_key)) === -1) throw new Error("forbidden: nhóm của bạn không được dùng kho tệp này");
+  }
   return data.user.id;
 }
 
@@ -76,14 +97,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (action === "upload" && req.method === "POST") {
-      await requireUser(req, url);
       const form = await req.formData();
       const bucket = resolveBucket(String(form.get("bucket") || ""));
+      await requireUser(req, url, bucket);
       const path = String(form.get("path") || "");
       const file = form.get("file");
       if (!path || !(file instanceof File)) {
         return jsonResponse({ error: "Missing path or file" }, 400);
       }
+      if (!validPath(path)) return jsonResponse({ error: "Invalid path" }, 400);
       const body = new Uint8Array(await file.arrayBuffer());
       await s3Client().send(
         new PutObjectCommand({
@@ -97,10 +119,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "download" && req.method === "GET") {
-      await requireUser(req, url);
       const bucket = resolveBucket(url.searchParams.get("bucket") || "");
+      await requireUser(req, url, bucket);
       const path = url.searchParams.get("path") || "";
       if (!path) return jsonResponse({ error: "Missing path" }, 400);
+      if (!validPath(path)) return jsonResponse({ error: "Invalid path" }, 400);
 
       const result = await s3Client().send(new GetObjectCommand({ Bucket: bucket, Key: path }));
       const stream = (result.Body as { transformToWebStream?: () => ReadableStream } | undefined)
@@ -115,11 +138,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "delete" && req.method === "DELETE") {
-      await requireUser(req, url);
       const payload = await req.json().catch(() => ({}));
       const bucket = resolveBucket(String(payload.bucket || ""));
+      await requireUser(req, url, bucket);
       const path = String(payload.path || "");
       if (!path) return jsonResponse({ error: "Missing path" }, 400);
+      if (!validPath(path)) return jsonResponse({ error: "Invalid path" }, 400);
 
       await s3Client().send(new DeleteObjectCommand({ Bucket: bucket, Key: path }));
       return jsonResponse({ ok: true });
@@ -128,7 +152,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Not found" }, 404);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const status = /^auth:/.test(message) ? 401 : 500;
+    const status = /^auth:/.test(message) ? 401 : (/^forbidden:/.test(message) ? 403 : 500);
     return jsonResponse({ error: message }, status);
   }
 });

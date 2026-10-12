@@ -260,7 +260,15 @@ const API = {
     auth: {
         getRealEmail: async (username) => {
             if (!sbClient) return null;
-            const safe = String(username || '').replace(/[,()]/g, '');
+            const ident = String(username || '').trim();
+            if (!ident) return null;
+            // RPC fn_resolve_login (security-followup): chỉ trả đúng một email, không để người chưa đăng nhập liệt kê bảng users.
+            // Chưa cài RPC (lỗi) thì dùng đường cũ để không chặn đăng nhập.
+            try {
+                const rpc = await sbClient.rpc('fn_resolve_login', { p_ident: ident });
+                if (!rpc.error) return rpc.data || null;
+            } catch (e) { /* dùng đường cũ bên dưới */ }
+            const safe = ident.replace(/[,()]/g, '');
             if (!safe) return null;
             const { data, error } = await sbClient.from('users')
                 .select('email').or(`nickname.eq.${safe},email.eq.${safe}`).maybeSingle();

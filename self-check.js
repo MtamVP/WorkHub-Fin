@@ -129,6 +129,22 @@
             if (!s.ok) return { status: 'warn', detail: 'Bộ máy chạy nhưng không định giá được FPT: ' + s.reason };
             return { status: 'ok', detail: 'FPT: giá trị hợp lý ' + fmtVnd(s.fairBase) + ' (khoảng ' + fmtVnd(s.fairLow) + ' đến ' + fmtVnd(s.fairHigh) + '), giá ' + fmtVnd(s.price) + ', tính trong ' + (Date.now() - t0) + ' ms. Đường định giá hàng loạt hoạt động.' };
         } },
+        { id: 'server-cron', label: 'Máy chủ: lịch chạy nền (pg_cron)', timeoutMs: 20000, run: async function () {
+            var sb = window.supabaseClient;
+            if (!sb) throw new Error('Chưa khởi tạo kết nối máy chủ');
+            var r = await sb.rpc('fn_cron_health');
+            if (r.error) return { status: 'warn', detail: 'Không đọc được trạng thái lịch chạy (' + r.error.message + '). Cần chạy finance-system-health-migration.sql, và tài khoản thuộc nhóm tài chính hoặc quản trị.' };
+            return SelfCheck.cronHealth(r.data || [], Date.now());
+        } },
+        { id: 'server-data', label: 'Máy chủ: dữ liệu nền cập nhật đúng hạn', timeoutMs: 20000, run: async function () {
+            var sb = window.supabaseClient;
+            if (!sb) throw new Error('Chưa khởi tạo kết nối máy chủ');
+            var r = await sb.rpc('fn_data_freshness');
+            if (r.error || !r.data || !Object.keys(r.data).length) return { status: 'warn', detail: 'Không đọc được độ tươi dữ liệu nền' + (r.error ? ' (' + r.error.message + ')' : ' (tài khoản không có quyền)') + '.' };
+            var isTD = (typeof VnHolidays !== 'undefined' && VnHolidays.isHoliday) ? function (iso) { var w = new Date(iso + 'T00:00:00Z').getUTCDay(); return w >= 1 && w <= 5 && !VnHolidays.isHoliday(iso); } : null;
+            return SelfCheck.freshnessVerdict(SelfCheck.dataFreshness(r.data, Date.now(), { isTradingDay: isTD }));
+        } },
+
         { id: 'local-store', label: 'Bộ nhớ trình duyệt của app (lưu diễn biến trong ngày)', run: async function () {
             var k = 'wh.fin.selfcheck.tmp';
             localStorage.setItem(k, 'x'); var ok = localStorage.getItem(k) === 'x'; localStorage.removeItem(k);

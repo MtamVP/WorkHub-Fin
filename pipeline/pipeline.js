@@ -3,76 +3,17 @@
 
 window.isAutoPaused = false;
 
-const GEMINI_API_KEYS = [
-  "AIzaSyCxtj-tIcHY1CvIc7P56ZTPSS95W0ssLlU",
-  "AIzaSyDNFAQTDO4EmmgLKpa8uZupvMT5N9j0DO8",
-  "AIzaSyCIKmmjT8d4cAL3AhNX47Box1ArP9x0E10",
-  "AIzaSyABuiBHLYeWT-jm9jOxg5CpygkdomqM2k4",
-  "AIzaSyArWJsCc45mY6-_q5WBdX5HqeYSFXSrGVg"
-];
-let currentGeminiKeyIndex = 0;
-
+// Gemini được gọi qua Edge Function pipeline-ai (khoá GEMINI_API_KEY nằm ở máy chủ). TRƯỚC ĐÂY 5 khoá nằm cứng ở đây và bị đóng gói vào app + lên git công khai (đã bị coi là lộ: phải thu hồi).
 async function callGemini(prompt, isJsonMode = false, modelFallback = null) {
-  const model = modelFallback || "gemini-2.5-flash";
-  let maxRetries = GEMINI_API_KEYS.length;
-  let attempt = 0;
-  
-  while (attempt < maxRetries) {
-    const key = GEMINI_API_KEYS[currentGeminiKeyIndex];
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    
-    const requestBody = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2 }
-    };
-    
-    if (isJsonMode) {
-      requestBody.generationConfig.responseMimeType = "application/json";
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody)
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        if (response.status === 429 || response.status === 403 || response.status >= 500) {
-           console.warn(`[Gemini] Key ${currentGeminiKeyIndex} failed with ${response.status}. Switching key...`);
-           currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
-           attempt++;
-           continue;
-        }
-        throw new Error(data.error?.message || "Unknown API Error");
-      }
-      
-      if (data.candidates && data.candidates.length > 0) {
-        return data.candidates[0].content.parts[0].text;
-      } else {
-        throw new Error("No candidates returned from Gemini");
-      }
-    } catch (err) {
-      if (err.message.includes("Failed to fetch") || err.message.includes("network")) {
-        console.warn(`[Gemini] Network error with key ${currentGeminiKeyIndex}. Switching key...`);
-        currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
-        attempt++;
-        continue;
-      }
-      // Ném lỗi ra ngoài vòng lặp nếu là lỗi khác (nhưng nếu là lỗi 503/429 nó đã continue ở trên)
-      throw err;
-    }
+  if (typeof sbClient === 'undefined' || !sbClient) throw new Error("Chưa kết nối máy chủ để gọi AI. Đăng nhập lại rồi thử lại.");
+  const { data, error } = await sbClient.functions.invoke("pipeline-ai", { body: { prompt: String(prompt), json: !!isJsonMode, model: modelFallback || undefined } });
+  if (error) {
+    let msg = error.message || "Không gọi được dịch vụ AI.";
+    try { const body = error.context && typeof error.context.json === "function" ? await error.context.json() : null; if (body && body.error) msg = body.error; } catch (e) { /* giữ thông báo gốc */ }
+    throw new Error(msg);
   }
-  
-  // Nếu quét hết các key cho gemini-2.5-flash mà vẫn xịt (tức là model sập chung)
-  if (!modelFallback) {
-      console.warn(`[Gemini] All keys failed for gemini-2.5-flash. Falling back to gemini-3.5-flash...`);
-      return callGemini(prompt, isJsonMode, "gemini-3.5-flash");
-  }
-  
-  throw new Error("Tất cả API keys và Models đều bị quá tải. Vui lòng thử lại sau.");
+  if (!data || data.ok !== true || typeof data.text !== "string") throw new Error((data && data.error) || "Dịch vụ AI không trả kết quả.");
+  return data.text;
 }
 // ------------------------------
 

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quick-capture",
+  "description": "Cửa sổ ghi nhanh (Không Gian Riêng): chỉ cần cửa sổ / sự kiện / mở liên kết. KHÔNG có quyền ghi tệp, cơ sở dữ liệu cục bộ, hộp thoại, thông báo hay phím tắt toàn cục (trước 12/10/2026 dùng chung quyền của cửa sổ chính).",
+  "windows": [
+    "quick-capture"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default"
+  ]
+}
