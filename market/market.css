@@ -188,3 +188,6 @@
 .mk-ref:hover { border-color: var(--gold); color: var(--gold); }
 .mk-ref:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .mk-ai-err { margin: 0; font-size: 0.84rem; color: var(--text-secondary); }
+
+a.mk-tk { text-decoration: none; }
+a.mk-tk:hover, a.mk-tk:focus-visible { border-color: var(--finance-accent); color: var(--finance-accent); }

@@ -40,7 +40,7 @@ const VBCard = (function () {
   }
 
   function pctTxt(m) { return m === null ? '—' : (m > 0 ? '+' : (m < 0 ? '−' : '')) + dec(Math.abs(m) * 100, 1) + '%'; }
-  function vbHref(symbol) { return '/valuation/#stock/' + encodeURIComponent(symbol); }
+  function vbHref(symbol) { return Links.valuation(symbol); }
 
   // Huy hiệu nhỏ cho dòng Danh Mục / bảng so sánh
   function badge(rec, livePrice, now) {

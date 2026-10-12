@@ -58,7 +58,14 @@ async function loadGroup(force) {
         grCompute();
     } catch (e) { GR.state = 'error'; GR.error = e.message || String(e); }
     grRender();
+    if (!GR.hashApplied) { GR.hashApplied = true; const t = grTabFromHash(); if (t && t !== GR.tab) switchGroupTab(t); }      // mở thẳng tab theo liên kết /mastersheet/#limits (lib/links.js)
 }
+// Tab theo hash (#limits, #approvals...). Chỉ nhận tab có thật
+function grTabFromHash() {
+    const h = String(location.hash || '').replace(/^#/, '').split('/')[0];
+    return typeof Links !== 'undefined' && Links.GROUP_TABS.indexOf(h) !== -1 ? h : null;
+}
+window.addEventListener('hashchange', function () { const t = grTabFromHash(); if (t && t !== GR.tab && GR.state === 'ok') switchGroupTab(t); });
 
 // Lãi phi rủi ro theo ngày (TPCP 1 năm) và cổ tức tiền mặt của một thành viên (userId) hoặc cả nhóm (null), cho PerfCalc
 function grRfSeries() { return PerfCalc.rfFromRates(GR.rates || [], '1Y'); }
@@ -91,6 +98,7 @@ function grLimits() {
 
 function switchGroupTab(tab) {
     GR.tab = tab;
+    try { if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab); } catch (e) { /* hash chỉ để chia sẻ liên kết */ }
     if (tab === 'strategy' && typeof gsLoad === 'function') gsLoad();
     if (tab === 'approvals' && typeof gqLoad === 'function') gqLoad(true);
     if (tab === 'journey' && typeof gjLoad === 'function') gjLoad();

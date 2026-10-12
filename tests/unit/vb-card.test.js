@@ -51,7 +51,7 @@ describe('badge', () => {
   it('bản cũ có lớp stale', () => { expect(VBCard.badge(Object.assign({}, REC, { as_of: '2026-01-01' }), 70000, NOW)).toContain('stale'); });
   it('escape ký tự đặc biệt trong mã và nhận định', () => {
     const h = VBCard.badge(Object.assign({}, REC, { symbol: 'A"B', stance: '<img onerror=x>' }), 70000, NOW);
-    expect(h).not.toContain('<img'); expect(h).toContain('A%22B');
+    expect(h).not.toContain('<img'); expect(h).toContain('href="/valuation/"');    // mã lạ không đi vào đường dẫn (Links.valuation chỉ nhận mã hợp lệ)
   });
 });
 

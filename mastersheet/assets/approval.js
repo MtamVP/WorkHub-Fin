@@ -120,7 +120,7 @@ function apRenderMine() {
     body.innerHTML = pol + `<div class="spreadsheet-wrapper"><table class="excel-table asset-table"><thead><tr><th>Gửi lúc</th><th>Lệnh</th><th class="text-right">Giá trị</th><th>Trạng thái</th><th>Ghi chú của quản lý</th><th></th></tr></thead><tbody>
         ${AP.rows.map(r => { const st = ApprovalCalc.effectiveStatus(r, today), S = ApprovalCalc.STATUS[st] || { label: st, tone: 'mute' };
             const usable = st === 'approved';
-            return `<tr><td>${apDate(r.created_at)}</td><td><span class="txn-type-badge ${r.side === 'sell' ? 'sell' : 'buy'}">${r.side === 'sell' ? 'Bán' : 'Mua'}</span> <b>${apEsc(r.symbol)}</b> ${apNum(r.quantity)} × ${apNum(r.price_ref)}</td>
+            return `<tr><td>${apDate(r.created_at)}</td><td><span class="txn-type-badge ${r.side === 'sell' ? 'sell' : 'buy'}">${r.side === 'sell' ? 'Bán' : 'Mua'}</span> ${Links.symHtml(r.symbol, { from: 'group' })} ${apNum(r.quantity)} × ${apNum(r.price_ref)}</td>
                 <td class="text-right">${apVnd(r.value)}${r.order_pct === null || r.order_pct === undefined ? '' : `<span class="symbol-sub">${apNum(r.order_pct, 1)}% NAV</span>`}</td>
                 <td><span class="tl-badge ${S.tone}">${S.label}</span>${usable ? `<span class="symbol-sub">dùng được tới ${apDate(r.valid_until + 'T00:00:00')}</span>` : ''}</td>
                 <td class="gq-reason">${apEsc(r.decision_note || '')}</td>

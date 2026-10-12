@@ -57,13 +57,13 @@ function gaActivityHtml() {
         </tbody></table></div>`;
 
     html += `<div class="ce-group-title">Theo mã</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mã</th><th class="text-right">Mua</th><th class="text-right">Bán</th><th class="text-right">Ròng</th><th>Người mua</th><th>Người bán</th><th>Nhận định</th></tr></thead><tbody>
-        ${f.symbols.slice(0, 30).map(s => { const st = GA_STANCE[s.stance] || GA_STANCE.mixed; return `<tr><td><span class="symbol-name">${rkEsc(s.symbol)}<span class="symbol-sub">${rkEsc(s.sector)}</span></span></td><td class="text-right">${rkVnd(s.buyValue)}</td><td class="text-right">${rkVnd(s.sellValue)}</td>
+        ${f.symbols.slice(0, 30).map(s => { const st = GA_STANCE[s.stance] || GA_STANCE.mixed; return `<tr><td><span class="symbol-name">${Links.symHtml(s.symbol, { from: 'group' })}<span class="symbol-sub">${rkEsc(s.sector)}</span></span></td><td class="text-right">${rkVnd(s.buyValue)}</td><td class="text-right">${rkVnd(s.sellValue)}</td>
             <td class="text-right ${s.net >= 0 ? 'tl-up' : 'tl-down'}">${rkVnd(s.net)}</td><td class="gr-holders">${rkEsc(s.buyers.join(', '))}</td><td class="gr-holders">${rkEsc(s.sellers.join(', '))}</td><td><span class="tl-badge ${st[0]}">${st[1]}</span></td></tr>`; }).join('')}
         </tbody></table></div>`;
 
     const shown = rows.slice(0, 300);
     html += `<div class="ce-group-title">Sổ lệnh chung (${shown.length}${rows.length > shown.length ? ' / ' + rows.length : ''} lệnh mới nhất)</div><div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Ngày</th><th>Thành viên</th><th>Loại</th><th>Mã</th><th class="text-right">Khối lượng</th><th class="text-right">Giá</th><th class="text-right">Giá trị</th><th>Ngoại lệ giới hạn</th></tr></thead><tbody>
-        ${shown.map(r => `<tr><td>${gaDmy(r.date)}</td><td>${rkEsc(r.name)}</td><td><span class="tl-badge ${r.type === 'buy' ? 'ok' : 'warn'}">${r.type === 'buy' ? 'Mua' : 'Bán'}</span></td><td><b>${rkEsc(r.symbol)}</b>${r.imported ? ' <small class="tl-hint" style="margin:0">(sao kê)</small>' : ''}</td>
+        ${shown.map(r => `<tr><td>${gaDmy(r.date)}</td><td>${rkEsc(r.name)}</td><td><span class="tl-badge ${r.type === 'buy' ? 'ok' : 'warn'}">${r.type === 'buy' ? 'Mua' : 'Bán'}</span></td><td>${Links.symHtml(r.symbol, { from: 'group' })}${r.imported ? ' <small class="tl-hint" style="margin:0">(sao kê)</small>' : ''}</td>
             <td class="text-right">${rkNum(r.quantity, 0)}</td><td class="text-right">${rkNum(r.price, 0)}</td><td class="text-right">${rkVnd(r.value)}</td>
             <td class="gr-reason">${r.exception ? `<span class="tl-badge ${r.exception.override ? 'bad' : 'warn'}">${r.exception.override ? 'Ghi đè' : 'Có lý do'}</span> ${rkEsc(r.exception.reason)}` : ''}</td></tr>`).join('')}
         </tbody></table></div>`;

@@ -26,10 +26,18 @@ document.addEventListener('DOMContentLoaded', function () {
     bindOverviewEvents();
     loadOverview().then(function () {
         if (state.bench === 'valuation') return;
-        const m = /^#([A-Za-z0-9]{1,12})(?:\/(\d{4}))?$/.exec(location.hash || '');
-        if (m) openDetail(m[1].toUpperCase(), m[2] ? Number(m[2]) : null);
+        openFromHash();
+        window.addEventListener('hashchange', openFromHash);        // liên kết /stocksheet/#SYM từ block khác khi trang đã mở
     });
 });
+// #SYM[/năm] (ngữ pháp chung, xem lib/links.js)
+function openFromHash() {
+    const m = /^#([A-Za-z0-9]{1,12})(?:\/(\d{4}))?$/.exec(location.hash || '');
+    if (!m) return;
+    const symbol = m[1].toUpperCase(), sel = document.getElementById('stock-select');
+    if (!m[2] && sel && sel.value === symbol && state.detail) return;      // đang mở đúng mã này
+    openDetail(symbol, m[2] ? Number(m[2]) : null);
+}
 
 // Trang này phục vụ HAI khu vực (xem /bench-nav.js): Investment Workbench giữ Bảng so sánh, Ý tưởng, Chi tiết mã; Valuation Bench giữ Bộ lọc, Thị trường, Bản đồ định giá.
 // Khu vực chọn theo ?bench= (đường dẫn cũ /stocksheet/?view=market vẫn mở được và nay thuộc Valuation Bench). Không có chế độ xem nào bị xoá, chỉ đặt đúng khu.
@@ -317,7 +325,11 @@ async function openDetail(symbol, year) {
     showView('detail');
     const select = document.getElementById('stock-select');
     select.value = symbol;
-    if (select.value !== symbol) { showToast('Mã ' + symbol + ' chưa có hồ sơ định giá', 'error'); return; }
+    if (select.value !== symbol) {
+        // Valuation Bench phân tích được cả mã chưa có hồ sơ lưu: chuyển sang đó thay vì chỉ báo lỗi
+        if (typeof Links !== 'undefined' && Links.sym(symbol)) { location.replace(Links.valuation(symbol)); return; }
+        showToast('Mã ' + symbol + ' chưa có hồ sơ định giá', 'error'); return;
+    }
     document.getElementById('stock-year-select').dataset.symbol = '';
     await loadStockDetail({ force: true, year: year });
     try { history.replaceState(null, '', '#' + symbol + (year ? '/' + year : '')); } catch (e) {}
@@ -528,7 +540,7 @@ function renderDetail() {
     const notes = VU.dataNotes(n, m).concat(d.historyError ? ['Chưa lấy được giá lịch sử nên chưa có dải P/E, P/B (' + d.historyError + ').'] : []);
     const scen = `<div class="vl-card"><h3 class="vl-card-title"><i class="fa-solid fa-layer-group"></i> Ba kịch bản<span class="vl-muted">% so với giá hiện tại</span></h3>
         ${VU.scenarioTableHtml(v, a.price)}
-        ${!v.methods.length ? `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>Chưa có P/E, P/B mục tiêu nên chưa có giá hợp lý. <a class="vl-link" href="/stocksheet/autosheet/#${VU.esc(d.symbol)}/${d.year}">Mở Định Giá CP</a> và bấm “Gợi ý P/E, P/B theo lịch sử”, rồi Lưu.</span></div>` : ''}
+        ${!v.methods.length ? `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>Chưa có P/E, P/B mục tiêu nên chưa có giá hợp lý. <a class="vl-link" href="${VU.esc(Links.autosheet(d.symbol, d.year))}">Mở Định Giá CP</a> và bấm “Gợi ý P/E, P/B theo lịch sử”, rồi Lưu.</span></div>` : ''}
         ${v.scenarios.bear.auto.pe || v.scenarios.bear.auto.pb ? '<p class="vl-hint">Kịch bản xấu/tốt bạn chưa nhập nên mặc định bội số cơ sở −/+20%. Chỉnh trong Định Giá CP › Kịch bản & nâng cao.</p>' : ''}
         ${notes.map(t => `<div class="vl-note"><i class="fa-solid fa-circle-info"></i><span>${VU.esc(t)}</span></div>`).join('')}</div>`;
 
@@ -600,7 +612,8 @@ function renderDetail() {
         <div class="vl-apply-actions"><button type="button" class="btn-save" onclick="applyToPortfolio()"><i class="fa-solid fa-check"></i> Áp dụng</button>
             <span class="vl-muted">Mã đang nắm: ghi vào giá mục tiêu của mã. Giá muốn mua: thêm/cập nhật mục Theo Dõi (cảnh báo email và desktop chạy như cũ).</span></div>
         <div class="vl-apply-actions" style="margin-top:18px;border-top:1px solid var(--border-color);padding-top:14px">
-            <a class="btn-refresh" href="/stocksheet/autosheet/#${VU.esc(d.symbol)}/${d.year}"><i class="fa-solid fa-pen"></i> Sửa định giá ${d.year}</a>
+            <a class="btn-refresh" href="${VU.esc(Links.autosheet(d.symbol, d.year))}"><i class="fa-solid fa-pen"></i> Sửa định giá ${d.year}</a>
+            ${Links.symMenu(d.symbol, 'stock').map(m => `<a class="btn-refresh" href="${VU.esc(m.href)}" title="${VU.esc(m.label + ' của ' + d.symbol)}"><i class="fa-solid ${VU.esc(m.icon)}"></i> ${VU.esc(m.label)}</a>`).join('')}
             <button type="button" class="btn-refresh" onclick="refreshFinancials()"><i class="fa-solid fa-cloud-arrow-down"></i> Làm mới số liệu tự động</button>
             <button type="button" class="btn-refresh" onclick="deleteCurrentValuation()" style="color:var(--danger-color)"><i class="fa-solid fa-trash"></i> Xoá hồ sơ năm ${d.year}</button></div>
     </div>`;

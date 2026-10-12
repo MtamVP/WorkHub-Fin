@@ -58,7 +58,7 @@ function renderWatchlist() {
         const held = w.held ? '<span class="tl-badge info" title="Bạn đang giữ mã này — cảnh báo mua sẽ không gửi">Đang giữ</span>' : '';
         const targetTitle = w.targetSource === 'valuation' ? `Từ Định Giá CP (năm ${w.targetYear}). Nhập giá để ghi đè.` : (w.targetSource === 'manual' ? 'Giá mục tiêu nhập tay. Xoá trống để quay về giá từ Định Giá CP.' : 'Chưa có — nhập giá hoặc lưu định giá ở trang Định Giá CP.');
         return `<tr class="${w.signal === 'buy' ? 'tl-row-signal' : ''}">
-            <td><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span><div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;">${signal}${cheapQ}${held}</div></td>
+            <td><span class="symbol-name">${Links.symHtml(w.symbol, { from: 'assets' })}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span><div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;">${signal}${cheapQ}${held}</div></td>
             <td class="text-right"><span class="price-wrap"><span class="price-cell"><b>${w.price > 0 ? fmt(w.price) : '—'}</b></span>${age}</span></td>
             <td class="text-right"><input type="text" class="price-input level-input" data-id="${w.id}" data-kind="buyBelow" value="${w.buyBelow > 0 ? fmt(w.buyBelow) : ''}" placeholder="—" title="Báo khi giá thị trường ≤ mức này. Xoá trống để tắt." onchange="handleWatchEdit(this)"></td>
             <td class="text-right ${watchPctClass(w.buyGapPct === null ? null : -w.buyGapPct)}" title="Giá hiện tại so với giá muốn mua (âm = đã rẻ hơn mức muốn mua)">${w.buyGapPct === null ? '—' : watchPctText(w.buyGapPct)}</td>

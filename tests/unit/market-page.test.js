@@ -32,7 +32,7 @@ function boot(opts) {
     fetch: async (url, init) => { urls.push(url); inits.push(init); const j = route(url); return j === null ? { ok: false, json: async () => ({}) } : { ok: true, json: async () => j }; },
     callGAS: o.callGAS, sbClient: o.sbClient, openExternalUrl: (u) => opened.push(u),
   });
-  ['lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/sector-map.js', 'lib/valuation-history.js', 'lib/market-overview.js', 'lib/market-news.js', 'market/market.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
+  ['lib/links.js', 'lib/vn-holidays.js', 'lib/live-quotes.js', 'lib/sector-map.js', 'lib/valuation-history.js', 'lib/market-overview.js', 'lib/market-news.js', 'market/market.js'].forEach((f) => vm.runInContext(fs.readFileSync(REPO + '/' + f, 'utf8'), ctx, { filename: f }));
   vm.runInContext("LiveQuotes.session = () => '" + (o.session || 'closed') + "';", ctx);
   vm.runInContext('globalThis.MP = MarketPage;', ctx);
   return { MP: vm.runInContext('MP', ctx), els, store, urls, inits, intervals, docHandlers, ctx, opened };

@@ -6,5 +6,6 @@
 export default {
   test: {
     environment: 'node',
+    setupFiles: ['./tests/helpers/setup-globals.js'],
   },
 };

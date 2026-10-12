@@ -291,7 +291,7 @@ const MarketPage = (function () {
         if (!list.length) { box.innerHTML = head + '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Chưa có mã nào phù hợp ở sàn này.</div>'; return; }
         const rows = list.map((r, i) => {
             const t = r.atCeil ? 'mk-ceil' : (r.atFloor ? 'mk-floor' : tone(r.pct)), badge = r.atCeil ? '<span class="mk-badge mk-ceil">Trần</span>' : (r.atFloor ? '<span class="mk-badge mk-floor">Sàn</span>' : '');
-            return '<tr><td class="mk-num">' + (i + 1) + '</td><td><a href="/valuation/#stock/' + encodeURIComponent(r.symbol) + '" title="Mở hồ sơ ' + esc(r.symbol) + ' ở Valuation Bench">' + esc(r.symbol) + '</a>' + badge + '</td><td class="mk-ex">' + esc(MO.EXCHANGE_LABEL[r.exchange]) + '</td>' +
+            return '<tr><td class="mk-num">' + (i + 1) + '</td><td>' + Links.symHtml(r.symbol, { from: 'market' }) + badge + '</td><td class="mk-ex">' + esc(MO.EXCHANGE_LABEL[r.exchange]) + '</td>' +
                 '<td class="r mk-num ' + t + '">' + priceFmt(r.price) + '</td><td class="r mk-num ' + t + '">' + sgn(r.change / 1000, 2) + '</td><td class="r mk-num ' + t + '">' + sgn(r.pct, 2) + '%</td>' +
                 '<td class="r mk-num">' + vol(r.volume) + '</td><td class="r mk-num">' + ty(r.value) + '</td><td class="r mk-num ' + (isNum(r.foreignNet) ? tone(Math.abs(r.foreignNet) < 5e5 ? 0 : r.foreignNet) : '') + '">' + (isNum(r.foreignNet) ? ty(r.foreignNet, true) : '—') + '</td></tr>';
         }).join('');
@@ -376,7 +376,7 @@ const MarketPage = (function () {
         const c = MO.contributions(S.rows, S.universe.snapshot, ex, q.prev);
         if (!c.n) { box.innerHTML = head + '<div class="mk-empty"><i class="fa-regular fa-folder-open"></i>Không ghép được mã nào với vốn hoá.</div>'; return; }
         const top = (list) => list.slice(0, 5), span = Math.max(0.01, Math.max.apply(null, top(c.up).concat(top(c.down)).map((i) => Math.abs(i.points))));
-        const row = (i) => '<div class="mk-sec"><span class="mk-sec-name"><a href="/valuation/#stock/' + encodeURIComponent(i.symbol) + '" style="color:var(--text-primary);font-weight:700;text-decoration:none">' + esc(i.symbol) + '</a> <small class="' + tone(i.pct) + '">' + sgn(i.pct, 2) + '%</small></span><span class="mk-sec-bar"><i class="' + (i.points >= 0 ? 'p' : 'n') + '" style="width:' + Math.min(50, Math.abs(i.points) / span * 50).toFixed(1) + '%"></i></span><b class="' + tone(i.points) + '">' + sgn(i.points, 2) + '</b></div>';
+        const row = (i) => '<div class="mk-sec"><span class="mk-sec-name"><a href="' + esc(Links.valuation(i.symbol)) + '" style="color:var(--text-primary);font-weight:700;text-decoration:none">' + esc(i.symbol) + '</a> <small class="' + tone(i.pct) + '">' + sgn(i.pct, 2) + '%</small></span><span class="mk-sec-bar"><i class="' + (i.points >= 0 ? 'p' : 'n') + '" style="width:' + Math.min(50, Math.abs(i.points) / span * 50).toFixed(1) + '%"></i></span><b class="' + tone(i.points) + '">' + sgn(i.points, 2) + '</b></div>';
         box.innerHTML = head +
             '<p class="mk-contrib-sum mk-num">Ước tính <b class="' + tone(c.sumPoints) + '">' + sgn(c.sumPoints, 2) + '</b> điểm · thực tế <b class="' + tone(q.change) + '">' + sgn(q.change, 2) + '</b> điểm</p>' +
             '<h4 class="mk-subhead mk-up">Kéo chỉ số lên</h4>' + (top(c.up).length ? top(c.up).map(row).join('') : '<p class="tl-hint">Không có mã nào.</p>') +
@@ -480,7 +480,7 @@ const MarketPage = (function () {
         const mineChip = mine ? '<div class="mk-newsbar"><span class="mk-newsbar-k">Danh mục của bạn</span><div class="mk-chips">' + chip('Chỉ tin về mã của tôi <small>' + mineCount + '</small>', S.newsMine, 'MarketPage.toggleNewsMine()') + '</div></div>' : '';
         const shown = list.slice(0, S.newsLimit); S.newsShown = shown;
         const items = shown.map((x, i) => {
-            const tk = x.tickers.slice(0, 4).map((s) => '<span class="mk-tk' + (mine && mine.has(s) ? ' mine' : '') + '" title="' + (mine && mine.has(s) ? 'Mã trong danh mục/theo dõi của bạn' : 'Mã được nhắc') + '">' + esc(s) + '</span>').join('');
+            const tk = x.tickers.slice(0, 4).map((s) => '<a class="mk-tk' + (mine && mine.has(s) ? ' mine' : '') + '" href="' + esc(Links.valuation(s)) + '" title="' + (mine && mine.has(s) ? 'Mã trong danh mục/theo dõi của bạn' : 'Mã được nhắc') + ': mở hồ sơ định giá">' + esc(s) + '</a>').join('');
             return '<li class="mk-news-item"><a class="mk-news-title" href="' + esc(x.link) + '" target="_blank" rel="noopener noreferrer" onclick="return MarketPage.openNews(event,' + i + ')">' + esc(x.title) + '</a>' +
                 (x.summary ? '<p class="mk-news-sum">' + esc(x.summary) + '</p>' : '') +
                 '<div class="mk-news-meta"><span class="mk-src">' + esc(x.sourceName || x.source) + '</span>' + (x.ts ? '<span>' + esc(MarketNews.ago(x.ts, now)) + '</span>' : '') + '<span class="mk-topic">' + esc(MarketNews.labelOf(x.topic)) + '</span>' + tk + '</div></li>';

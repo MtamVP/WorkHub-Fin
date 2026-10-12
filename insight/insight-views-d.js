@@ -20,12 +20,14 @@ const InsViewsD = (function () {
   function itemHtml(x, now) {
     const sev = AI.SEV[x.sev], kind = AI.KINDS[x.kind] || { label: x.kind, icon: 'circle' };
     const external = isExternal(x.link);
+    // liên kết nội bộ tới tab Insight của mục có mã -> mở thẳng tab đó đã tập trung vào mã (#tab/SYM, xem lib/links.js)
+    const href = x.link && x.symbol && /^\/insight\/#[a-z]+$/.test(x.link) && Links.sym(x.symbol) ? x.link + '/' + Links.sym(x.symbol) : x.link;
     const when = x.at ? U.ago(x.at, now) : '';
     return '<li class="ins-inbox-item s' + x.sev + '">' +
-      '<div class="ins-inbox-top">' + U.tag(sev.label, SEV_TONE[x.sev]) + ' <span class="ins-tag muted"><i class="fa-solid fa-' + e(kind.icon) + '" aria-hidden="true"></i> ' + e(kind.label) + '</span>' + (x.symbol ? ' <b class="ins-sym">' + e(x.symbol) + '</b>' : '') + (when && when !== '—' ? '<span class="ins-muted ins-inbox-when">' + e(when) + '</span>' : '') + '</div>' +
+      '<div class="ins-inbox-top">' + U.tag(sev.label, SEV_TONE[x.sev]) + ' <span class="ins-tag muted"><i class="fa-solid fa-' + e(kind.icon) + '" aria-hidden="true"></i> ' + e(kind.label) + '</span>' + (x.symbol ? ' ' + Links.symHtml(x.symbol, { from: 'insight' }) + '' : '') + (when && when !== '—' ? '<span class="ins-muted ins-inbox-when">' + e(when) + '</span>' : '') + '</div>' +
       '<div class="ins-inbox-title">' + e(x.title) + '</div>' +
       (x.detail ? '<div class="ins-inbox-detail">' + e(x.detail) + '</div>' : '') +
-      (x.link ? '<a class="ins-link" href="' + e(x.link) + '"' + (external ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + (external ? 'Đọc tin gốc' : 'Mở ' + e(kind.label.toLowerCase())) + ' <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>' : '') +
+      (x.link ? '<a class="ins-link" href="' + e(href) + '"' + (external ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + (external ? 'Đọc tin gốc' : 'Mở ' + e(kind.label.toLowerCase())) + ' <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>' : '') +
       '</li>';
   }
 
@@ -84,7 +86,7 @@ const InsViewsD = (function () {
       const shown = rows.slice(0, 200);
       body += U.table(['Ngày', 'Mã', 'Sự kiện', 'Hướng', 'Mức', 'Tiêu đề tin', 'Tin cậy', 'Vì sao xếp loại này'], [shown.map((r) => {
         const d = DIR[String(r.direction)] || DIR['0'], s = SEV_EV[r.severity] || SEV_EV.info;
-        return '<tr><td>' + e(U.dateShort(r.published_at)) + '</td><td><b>' + e(r.symbol) + '</b>' + (S.held.indexOf(r.symbol) !== -1 ? ' ' + U.tag('đang giữ', 'ok') : '') + '</td><td class="t">' + e(NE.LABELS[r.event_type] || r.event_type) + '</td><td>' + U.tag(d[0], d[1]) + '</td><td>' + U.tag(s[0], s[1]) + '</td><td class="t ins-evt-title">' + (isExternal(r.link) ? '<a class="ins-link" href="' + e(r.link) + '" target="_blank" rel="noopener noreferrer">' + e(r.title) + '</a>' : e(r.title)) + (r.multi ? ' <span class="ins-muted" title="Tiêu đề nhắc nhiều mã">(nhiều mã)</span>' : '') + '</td><td>' + U.dec(Number(r.confidence) * 100, 0) + '%</td><td class="ins-muted t">' + e((r.matched || []).join(', ')) + '</td></tr>';
+        return '<tr><td>' + e(U.dateShort(r.published_at)) + '</td><td>' + Links.symHtml(r.symbol, { from: 'insight' }) + '' + (S.held.indexOf(r.symbol) !== -1 ? ' ' + U.tag('đang giữ', 'ok') : '') + '</td><td class="t">' + e(NE.LABELS[r.event_type] || r.event_type) + '</td><td>' + U.tag(d[0], d[1]) + '</td><td>' + U.tag(s[0], s[1]) + '</td><td class="t ins-evt-title">' + (isExternal(r.link) ? '<a class="ins-link" href="' + e(r.link) + '" target="_blank" rel="noopener noreferrer">' + e(r.title) + '</a>' : e(r.title)) + (r.multi ? ' <span class="ins-muted" title="Tiêu đề nhắc nhiều mã">(nhiều mã)</span>' : '') + '</td><td>' + U.dec(Number(r.confidence) * 100, 0) + '%</td><td class="ins-muted t">' + e((r.matched || []).join(', ')) + '</td></tr>';
       }).join('')], { left: [2, 5, 7] });
       if (rows.length > shown.length) body += '<p class="tl-hint">Hiển thị ' + shown.length + ' trong ' + rows.length + ' sự kiện mới nhất; thu hẹp bộ lọc để xem phần còn lại.</p>';
     }

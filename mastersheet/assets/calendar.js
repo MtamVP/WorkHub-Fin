@@ -77,7 +77,7 @@ function renderCalendar() {
     html += `<div class="ce-group-title">Sắp tới <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(90 ngày)</small></div>`;
     html += tl.length ? `<div class="cal-list">${tl.map(x => { const k = CAL_KIND[x.kind]; return `<div class="cal-row">
             <div class="cal-date"><b>${calShort(x.date)}</b><small>${calIn(x.date, i.today)}</small></div>
-            <div class="cal-main"><div><span class="symbol-name">${calEsc(x.symbol)}</span> <span class="tl-badge ${k.cls}"><i class="fa-solid ${k.icon}"></i> ${calEsc(x.title)}</span>${x.status === 'late' ? ' <span class="tl-badge bad">Quá hạn, chưa có số mới</span>' : (x.status === 'due' ? ' <span class="tl-badge warn">Đang trong kỳ công bố</span>' : '')}</div>
+            <div class="cal-main"><div><span class="symbol-name">${Links.symHtml(x.symbol, { from: 'assets' })}</span> <span class="tl-badge ${k.cls}"><i class="fa-solid ${k.icon}"></i> ${calEsc(x.title)}</span>${x.status === 'late' ? ' <span class="tl-badge bad">Quá hạn, chưa có số mới</span>' : (x.status === 'due' ? ' <span class="tl-badge warn">Đang trong kỳ công bố</span>' : '')}</div>
             <div class="cal-detail">${calEsc(x.detail)}</div></div></div>`; }).join('')}</div>` : '<div class="tl-empty" style="padding:14px"><i class="fa-solid fa-calendar-check"></i>Không có sự kiện nào trong 90 ngày tới.</div>';
 
     html += `<div class="ce-group-title">Cổ tức dự kiến theo tháng</div><div class="tl-card rk-chart-card"><div style="position:relative;height:240px"><canvas id="cal-chart"></canvas></div></div>`;

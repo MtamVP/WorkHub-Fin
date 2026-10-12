@@ -64,7 +64,7 @@ const InsViewsC = (function () {
       '<p class="tl-hint">Dự phóng đã ghi <b>không sửa được</b> và ngày ghi do máy chủ đặt — để không thể "dự đoán" sau khi đã biết kết quả. Muốn đổi thì ghi dự phóng mới; bản cũ vẫn được chấm.</p>';
     let table = '';
     if (E.rows.length) {
-      const rows = E.rows.map((r) => '<tr><td><b>' + e(r.symbol) + '</b> ' + (r.metric === 'lnst' ? 'LNST' : 'Doanh thu') + ' ' + (r.quarter ? 'Q' + r.quarter + '/' : '') + r.year + '</td><td>' + U.date(r.madeAt) + '</td><td>' + e(r.authorName || '') + '</td><td>' + U.money(r.forecast, 1) + '</td><td>' + (r.matured ? U.money(r.actual, 1) : '<span class="ins-muted">' + (r.noData ? 'chưa lấy được' : 'chưa công bố') + '</span>') + '</td><td class="' + (r.err === null || r.err === undefined ? '' : (r.err > 0 ? 'ins-down' : 'ins-up')) + '">' + (r.matured && r.err !== null ? (r.err > 0 ? '+' : '') + U.dec(r.err * 100, 1) + '%' : '—') + '</td><td>' + (r.canDelete ? '<button class="ins-btn ghost sm danger" title="Xoá" onclick="insForecastDel(\'' + e(r.id) + '\')"><i class="fa-solid fa-trash"></i></button>' : '') + '</td></tr>').join('');
+      const rows = E.rows.map((r) => '<tr><td>' + Links.symHtml(r.symbol, { from: 'insight' }) + ' ' + (r.metric === 'lnst' ? 'LNST' : 'Doanh thu') + ' ' + (r.quarter ? 'Q' + r.quarter + '/' : '') + r.year + '</td><td>' + U.date(r.madeAt) + '</td><td>' + e(r.authorName || '') + '</td><td>' + U.money(r.forecast, 1) + '</td><td>' + (r.matured ? U.money(r.actual, 1) : '<span class="ins-muted">' + (r.noData ? 'chưa lấy được' : 'chưa công bố') + '</span>') + '</td><td class="' + (r.err === null || r.err === undefined ? '' : (r.err > 0 ? 'ins-down' : 'ins-up')) + '">' + (r.matured && r.err !== null ? (r.err > 0 ? '+' : '') + U.dec(r.err * 100, 1) + '%' : '—') + '</td><td>' + (r.canDelete ? '<button class="ins-btn ghost sm danger" title="Xoá" onclick="insForecastDel(\'' + e(r.id) + '\')"><i class="fa-solid fa-trash"></i></button>' : '') + '</td></tr>').join('');
       table = U.table(['Dự phóng', 'Ngày ghi', 'Người lập', 'Dự phóng', 'Thực tế', 'Sai số (+: lạc quan)', ''], [rows], { left: [0] });
     }
     let sum = '';
@@ -144,7 +144,7 @@ const InsViewsC = (function () {
     if (!S.screenRes) return form;
     const r = S.screenRes;
     return form + '<p class="tl-hint">' + r.total + ' mã thoả điều kiện trong ' + U.int(day.n) + ' mã' + (r.total > r.rows.length ? ' (hiện ' + r.rows.length + ' mã vốn hoá lớn nhất)' : '') + '.</p>' +
-      (r.rows.length ? U.table(['Mã', 'Giá', 'Vốn hoá', 'P/E', 'ROE', 'Biến động 3T'], [r.rows.map((x) => '<tr><td><b>' + e(x.symbol) + '</b></td><td>' + U.int(x.m.price) + '</td><td>' + U.money(x.m.marketcap, 1) + '</td><td>' + U.dec(x.m.pe, 1) + '</td><td>' + U.pct(x.m.roae, 1) + '</td><td class="' + U.sign(x.m.chg3m) + '">' + U.pct(x.m.chg3m, 1, true) + '</td></tr>').join('')]) : '');
+      (r.rows.length ? U.table(['Mã', 'Giá', 'Vốn hoá', 'P/E', 'ROE', 'Biến động 3T'], [r.rows.map((x) => '<tr><td>' + Links.symHtml(x.symbol, { from: 'insight' }) + '</td><td>' + U.int(x.m.price) + '</td><td>' + U.money(x.m.marketcap, 1) + '</td><td>' + U.dec(x.m.pe, 1) + '</td><td>' + U.pct(x.m.roae, 1) + '</td><td class="' + U.sign(x.m.chg3m) + '">' + U.pct(x.m.chg3m, 1, true) + '</td></tr>').join('')]) : '');
   }
 
   return { accuracyHtml, archiveHtml, valuationsCard, outcomesCard, earningsCard, lookupCard, rate, runSummary };

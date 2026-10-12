@@ -104,7 +104,7 @@ function rkSymbolTable(r) {
         const over = r.concentration.count >= 2 && s.weightPct >= r.options.singleLimit;
         const sub = typeof VN_NAMES !== 'undefined' ? VN_NAMES[String(s.symbol).toUpperCase()] : '';
         return `<tr>
-            <td><span class="symbol-name">${rkEsc(s.symbol)}<span class="symbol-sub">${rkEsc(sub || s.sector)}</span></span></td>
+            <td><span class="symbol-name">${Links.symHtml(s.symbol, { from: 'assets' })}<span class="symbol-sub">${rkEsc(sub || s.sector)}</span></span></td>
             <td class="text-right">${rkVnd(s.value)}</td>
             <td><span class="rk-pair"><b class="${over ? 'tl-down' : ''}">${rkPct(s.weightPct, 1)}</b>${rkBar(s.weightPct, maxW, over ? 'over' : '')}</span></td>
             ${hasStats ? `<td><span class="rk-pair"><b class="${(s.riskSharePct || 0) >= s.weightPct * 1.5 && s.riskSharePct >= 25 ? 'tl-down' : ''}">${s.missing ? '—' : rkPct(s.riskSharePct, 1)}</b>${s.missing ? '' : rkBar(s.riskSharePct || 0, maxR, 'risk')}</span></td>

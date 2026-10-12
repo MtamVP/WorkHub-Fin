@@ -169,7 +169,7 @@ async function loadContext() {
     } catch (e) {
         console.error('Lỗi loadContext:', e);
     }
-    $('link-summary').href = '/stocksheet/#' + symbol + '/' + year;
+    $('link-summary').href = Links.stock(symbol, year);
     renderQuarters(); updateCtxLine(); calculate();
 }
 
@@ -348,7 +348,7 @@ async function saveToSheet() {
         await call('saveStockValuation', record);
         ctx.existingLog = log;
         ctx.loadedKey = symbol + '/' + year;
-        $('link-summary').href = '/stocksheet/#' + symbol + '/' + year;
+        $('link-summary').href = Links.stock(symbol, year);
         showToast(`Thành công! Đã lưu mã ${symbol} (${year})${a.v.fair > 0 ? ' — giá hợp lý ' + VU.vnd(a.v.fair) : ''}`, 'success');
         loadContext();
     } catch (e) {

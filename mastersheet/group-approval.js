@@ -97,7 +97,7 @@ function gqPolicyHtml() {
 
 // ---------- hàng chờ và lịch sử ----------
 function gqRowSummary(r) {
-    return `<span class="txn-type-badge ${r.side === 'sell' ? 'sell' : 'buy'}">${r.side === 'sell' ? 'Bán' : 'Mua'}</span> <b>${rkEsc(r.symbol)}</b> ${rkNum(r.quantity, 0)} cp × ${rkNum(r.price_ref, 0)}`;
+    return `<span class="txn-type-badge ${r.side === 'sell' ? 'sell' : 'buy'}">${r.side === 'sell' ? 'Bán' : 'Mua'}</span> ${Links.symHtml(r.symbol, { from: 'group' })} ${rkNum(r.quantity, 0)} cp × ${rkNum(r.price_ref, 0)}`;
 }
 function gqPctText(r) { return r.order_pct === null || r.order_pct === undefined ? '—' : `${rkNum(r.order_pct, 1)}% NAV`; }
 

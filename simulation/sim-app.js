@@ -102,6 +102,12 @@ function route() {
     if (typeof BenchNav !== 'undefined') BenchNav.setActive(SIM.view);
     const title = document.getElementById('sim-title');
     if (title) title.textContent = { outlook: 'Market Simulation', context: 'Bối cảnh thị trường', portfolio: 'Mô phỏng & quyết định', tree: 'Cây kịch bản', runs: 'Nhật ký mô phỏng', validate: 'Kiểm chứng mô hình', method: 'Phương pháp' }[SIM.view];
+    // #portfolio/SYM (liên kết "Mô phỏng" từ menu mã, lib/links.js): mô phỏng thử một mã, tự chọn "Tự chọn mã" với đúng mã đó
+    const symArg = SIM.view === 'portfolio' ? (String(location.hash || '').replace(/^#/, '').split('/')[1] || '').toUpperCase() : '';
+    if (/^[A-Z0-9]{1,12}$/.test(symArg) && !(SIM.subject === 'custom' && SIM.custom.symbols.trim().toUpperCase() === symArg)) {
+        SIM.subject = 'custom'; SIM.custom.symbols = symArg; simSave();
+        SIM.run = Object.assign({}, SIM.run, { state: 'idle', result: null }); SIM.bookState = 'idle';
+    }
     if (SIM.view === 'portfolio' && SIM.bookState === 'idle') simLoadBook();
     if (SIM.view === 'runs') runsRoute(String(location.hash || '').replace(/^#/, '').split('/')[1] || null);
     if ((SIM.view === 'outlook' || SIM.view === 'context') && SIM.market.state === 'ok' && ctxEvents().length && SIM.market.ctxKey !== ctxKey()) ctxRefreshOutlook();

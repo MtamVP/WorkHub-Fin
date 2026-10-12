@@ -55,13 +55,17 @@ function render() {
 }
 function renderDataBar() { const el = document.getElementById('lab-databar'); if (el) el.innerHTML = V.dataBarHtml(LAB); else render(); }
 function route() {
-    const h = String(location.hash || '').replace('#', '');
+    const hp = typeof Links !== 'undefined' ? Links.parseHash(location.hash) : { a: String(location.hash || '').replace('#', ''), b: '' };
+    const h = hp.a;
     LAB.view = TABS[h] ? h : 'backtest';
     if (typeof BenchNav !== 'undefined') BenchNav.setActive(LAB.view);
     document.querySelectorAll('.desk-nav a[href^="/lab/"]').forEach(function (a) { const on = a.getAttribute('href') === '/lab/#' + LAB.view; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     render();
     if (LAB.data.state === 'idle') labLoad(false);
     if (LAB.view === 'backtest' && LAB.runs.state === 'idle') labLoadRuns();
+    // #backtest/<id>: mở lại lần kiểm thử đã lưu (một lần cho mỗi id; xem lib/links.js)
+    const rid = LAB.view === 'backtest' && typeof Links !== 'undefined' ? Links.id(hp.b) : '';
+    if (rid && LAB.openedRun !== rid) { LAB.openedRun = rid; labOpenRun(rid); }
 }
 
 // ---------- dữ liệu ----------

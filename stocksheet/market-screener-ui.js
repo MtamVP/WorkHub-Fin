@@ -128,7 +128,7 @@ async function renderMkWatch() {
     if (!r) return;
     const head = '<h3 class="vl-card-title"><i class="fa-solid fa-bell" aria-hidden="true"></i> Thay đổi của bộ lọc đã lưu' + (r.state === 'ok' ? ` <span class="vl-muted">${mkDm(r.asOf)} so với ${mkDm(r.prevAsOf)}</span>` : '') + '</h3>';
     if (r.state !== 'ok') { box.innerHTML = r.state === 'web' ? '' : `<div class="vl-card">${head}<p class="vl-hint" style="margin:0">${VU.esc(r.message || '')}</p></div>`; return; }
-    const chips = (list, cls) => list.slice(0, 30).map(x => `<a class="mkw-chip ${cls}" href="/valuation/#stock/${encodeURIComponent(x.symbol)}" title="${VU.esc((x.name ? x.name + ' · ' : '') + (x.reason || ''))}">${VU.esc(x.symbol)}</a>`).join('') + (list.length > 30 ? `<span class="vl-muted">+${list.length - 30} mã khác</span>` : '');
+    const chips = (list, cls) => list.slice(0, 30).map(x => `<a class="mkw-chip ${cls}" href="${VU.esc(Links.valuation(x.symbol))}" title="${VU.esc((x.name ? x.name + ' · ' : '') + (x.reason || ''))}">${VU.esc(x.symbol)}</a>`).join('') + (list.length > 30 ? `<span class="vl-muted">+${list.length - 30} mã khác</span>` : '');
     const rows = r.items.map((it, i) => {
         if (!it.comparable) return `<div class="mkw-item"><b>${VU.esc(it.name)}</b><p class="vl-hint" style="margin:2px 0 0">Chưa so sánh được: ${VU.esc(it.why || '')}</p></div>`;
         const none = !it.entered.length && !it.left.length;
@@ -275,7 +275,7 @@ function mkRow(e, i, showVal, extra) {
         <td class="num">${r.valuationPct === null ? '—' : `<span class="vl-pill ${r.valuationPct <= 30 ? 'vl-pill-cheap' : (r.valuationPct >= 70 ? 'vl-pill-expensive' : 'vl-pill-fair')}">${VU.dec(r.valuationPct, 0)}</span>`}</td>
         <td class="num">${mkP(m.roae)}</td><td class="num">${mkP(m.epsGrowthYoY, 0)}</td><td class="num">${mkP(m.netProfitGrowthYoY, 0)}</td><td class="num">${mkP(m.divYield)}</td>
         <td class="num">${r.financial ? 'n/a' : mkX(m.debtToEquity)}</td><td class="num">${mkChg(m.chgYtd)}</td><td class="num">${mkChg(m.chg1y)}</td>${mkHealthCell(r)}${(extra || []).map(c => `<td class="num">${mkFmtCrit(c, r)}</td>`).join('')}${showVal ? mkValCells(r.symbol) : ''}
-        <td><a class="vl-link" href="/valuation/#stock/${encodeURIComponent(r.symbol)}" title="Mở hồ sơ định giá chi tiết trong Valuation Bench">Hồ sơ</a> ${inTable ? '<span class="vl-tag">Trong bảng</span>' : `<button type="button" class="vl-link" data-mk-add="${VU.esc(r.symbol)}">Thêm vào bảng</button>`}</td></tr>`;
+        <td><a class="vl-link" href="${VU.esc(Links.valuation(r.symbol))}" title="Mở hồ sơ định giá chi tiết trong Valuation Bench">Hồ sơ</a> ${inTable ? '<span class="vl-tag">Trong bảng</span>' : `<button type="button" class="vl-link" data-mk-add="${VU.esc(r.symbol)}">Thêm vào bảng</button>`}</td></tr>`;
 }
 
 function renderMkResults() {

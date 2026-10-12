@@ -119,3 +119,8 @@ body[data-bench="insight"] .desk-who .av { background: var(--finance-accent-subt
 .ins-field-inline { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
 .ins-details > summary { cursor: pointer; font-weight: 600; font-size: 0.86rem; padding: 4px 0; }
 .ins-table td.ins-evt-title { min-width: 260px; }
+
+/* Tập trung vào một mã (liên kết #tab/SYM từ block khác) */
+.ins-focus { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--finance-accent-line); border-radius: var(--radius-sm); background: var(--finance-accent-subtle); font-size: 0.84rem; }
+.ins-focus i { color: var(--finance-accent); }
+.ins-hl { background: var(--finance-accent-subtle) !important; box-shadow: inset 3px 0 0 var(--finance-accent); }

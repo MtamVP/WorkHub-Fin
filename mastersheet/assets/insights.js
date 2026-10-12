@@ -105,7 +105,7 @@ async function loadSymbolPerformance() {
             const xirrTxt = r.xirrPct === null ? '<span class="text-muted" title="Cần ít nhất 90 ngày kể từ lệnh đầu tiên — ngắn hơn thì lãi suất quy năm chỉ là nhiễu">—</span>'
                 : `<span class="${r.xirrPct >= 0 ? 'pnl-up' : 'pnl-down'}">${r.xirrPct >= 0 ? '+' : '−'}${Math.min(Math.abs(r.xirrPct), 9999).toFixed(1)}%</span>`;
             return `<tr>
-                <td><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span></td>
+                <td><span class="symbol-name">${Links.symHtml(r.symbol, { from: 'assets' })}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}</span></td>
                 <td>${status}</td>
                 <td class="text-right">${Math.round(r.bought).toLocaleString('en-US')}</td>
                 <td class="text-right ${r.realized > 0 ? 'pnl-up' : (r.realized < 0 ? 'pnl-down' : '')}">${num(r.realized)}</td>

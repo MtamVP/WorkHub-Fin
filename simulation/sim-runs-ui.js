@@ -295,7 +295,7 @@ function runsJournalHtml(r) {
     if (!runsIsMine(r)) return '';      // Nhật Ký Quyết Định là của riêng từng người: không hiện quyết định của lần chạy do người khác lưu
     const R = SIM.runs, f = R.jform && R.jform.runId === r.id ? R.jform : null, s = r.snapshot;
     const list = R.decState === 'ok' && R.decisions.length ? '<div class="sim-table-wrap"><table class="sim-table"><thead><tr><th>Ngày</th><th>Mã</th><th>Hành động</th><th>Lý do</th></tr></thead><tbody>' +
-        R.decisions.map((d) => '<tr><td>' + sE(fmtDate(d.decided_at)) + '</td><td><b>' + sE(d.symbol) + '</b></td><td>' + sE({ buy: 'Mua', sell: 'Bán', hold: 'Giữ', skip: 'Bỏ qua' }[d.action] || d.action) + '</td><td class="sim-muted">' + sE(String(d.reason || '').slice(0, 140)) + '</td></tr>').join('') + '</tbody></table></div><p class="tl-hint">Xem và đánh giá lại ở <a href="/mastersheet/assets/#journal">Nhật Ký Quyết Định</a>.</p>' : '';
+        R.decisions.map((d) => '<tr><td>' + sE(fmtDate(d.decided_at)) + '</td><td>' + Links.symHtml(d.symbol, { from: 'simulation' }) + '</td><td>' + sE({ buy: 'Mua', sell: 'Bán', hold: 'Giữ', skip: 'Bỏ qua' }[d.action] || d.action) + '</td><td class="sim-muted">' + sE(String(d.reason || '').slice(0, 140)) + '</td></tr>').join('') + '</tbody></table></div><p class="tl-hint">Xem và đánh giá lại ở <a href="/mastersheet/assets/#journal">Nhật Ký Quyết Định</a>.</p>' : '';
     let form = '';
     if (f) {
         const syms = (s.positions || []).map((p) => p.symbol).filter((x) => x !== MarketSim.INDEX);

@@ -106,7 +106,7 @@ function ceRow(p, mode) {
     }
     return `<tr>
         <td><span class="tl-badge ${kindCls}">${ceEsc(p.label)}</span></td>
-        <td class="text-bold">${ceEsc(p.symbol)}</td>
+        <td class="text-bold">${Links.symHtml(p.symbol, { from: 'assets' })}</td>
         <td title="Ngày giao dịch không hưởng quyền: mua từ ngày này trở đi thì không được nhận">${ceDate(ev.exDate)}</td>
         <td class="ce-detail">${ceDetail(p)}</td>
         <td class="text-right ce-actions">${action}</td>

@@ -89,7 +89,7 @@ function grLimitsHtml() {
     // Ngoại lệ
     html += `<div class="ce-group-title">Ngoại lệ đã ghi nhận <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(12 tháng gần nhất)</small></div>`;
     html += GL.exceptions.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Ngày</th><th>Thành viên</th><th>Mã</th><th>Giới hạn</th><th>Trước → sau lệnh</th><th>Lý do</th><th></th></tr></thead><tbody>
-        ${GL.exceptions.slice(0, 100).map(e => { const mt = e.metrics || {}; return `<tr><td>${glDate(e.trade_date || e.created_at)}</td><td>${rkEsc(glMemberName(e.user_id))}</td><td>${rkEsc(e.symbol || '—')}</td>
+        ${GL.exceptions.slice(0, 100).map(e => { const mt = e.metrics || {}; return `<tr><td>${glDate(e.trade_date || e.created_at)}</td><td>${rkEsc(glMemberName(e.user_id))}</td><td>${e.symbol ? Links.symHtml(e.symbol, { from: 'group' }) : '—'}</td>
             <td>${rkEsc(LimitsCalc.KINDS[e.kind] ? LimitsCalc.KINDS[e.kind].label : e.kind)}${mt.threshold ? ` <small>(mức ${rkNum(mt.threshold, 1)})</small>` : ''}</td>
             <td>${mt.before !== undefined ? `${rkNum(mt.before, 1)} → <b class="tl-down">${rkNum(mt.after, 1)}</b>` : '—'}</td>
             <td class="gr-reason">${rkEsc(e.reason)}</td><td>${e.override ? '<span class="tl-badge bad">Ghi đè chặn</span>' : `<span class="tl-badge ${glModeCls[e.mode] || 'mute'}">${rkEsc((LimitsCalc.MODES[e.mode] || {}).label || '')}</span>`}</td></tr>`; }).join('')}
@@ -158,7 +158,7 @@ function glReconcileHtml() {
 function glRestrictedHtml(manager) {
     const active = GL.restricted.filter(r => r.active), off = GL.restricted.filter(r => !r.active);
     const scope = (r) => r.user_id ? rkEsc(glMemberName(r.user_id)) : 'Mọi thành viên';
-    const row = (r) => `<tr><td><b>${rkEsc(r.symbol)}</b></td><td>${scope(r)}</td><td class="gr-reason">${rkEsc(r.reason)}</td><td>${glDate(r.created_at)}</td>
+    const row = (r) => `<tr><td>${Links.symHtml(r.symbol, { from: 'group' })}</td><td>${scope(r)}</td><td class="gr-reason">${rkEsc(r.reason)}</td><td>${glDate(r.created_at)}</td>
         ${manager ? `<td><button type="button" class="btn-tool" onclick="glRestrictToggle('${r.id}', ${r.active ? 'false' : 'true'})">${r.active ? '<i class="fa-solid fa-lock-open"></i> Gỡ hạn chế' : '<i class="fa-solid fa-lock"></i> Bật lại'}</button></td>` : ''}</tr>`;
     let html = `<div class="ce-group-title">Danh sách hạn chế mã <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(cấm cả mua lẫn bán, kể cả quản lý)</small></div>`;
     html += active.length ? `<div class="spreadsheet-wrapper"><table class="excel-table asset-table gr-table"><thead><tr><th>Mã</th><th>Áp dụng cho</th><th>Lý do</th><th>Từ ngày</th>${manager ? '<th></th>' : ''}</tr></thead><tbody>${active.map(row).join('')}</tbody></table></div>`

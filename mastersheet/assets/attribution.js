@@ -110,7 +110,7 @@ function atRender() {
     html += `<div class="ce-group-title">Lãi/lỗ theo mã <small style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-muted)">(thị trường chung + chọn mã)</small></div>
         <div class="tl-card rk-chart-card"><div style="position:relative;height:${Math.max(180, rows.length * 30 + 50)}px"><canvas id="at-sym-chart"></canvas></div></div>
         <div class="spreadsheet-wrapper"><table class="excel-table asset-table at-table"><thead><tr><th>Mã</th><th>Trạng thái</th><th class="text-right">Lãi/lỗ</th><th class="text-right">Đóng góp</th>${r.hasBench ? '<th class="text-right">Do thị trường</th><th class="text-right">Do chọn mã</th>' : ''}<th class="text-right">Cổ tức</th><th class="text-right">Phí/thuế</th></tr></thead><tbody>
-        ${r.rows.map(x => `<tr><td><span class="symbol-name">${atEsc(x.symbol)}<span class="symbol-sub">${atEsc(x.sector)}</span></span></td>
+        ${r.rows.map(x => `<tr><td><span class="symbol-name">${Links.symHtml(x.symbol, { from: 'assets' })}<span class="symbol-sub">${atEsc(x.sector)}</span></span></td>
             <td>${x.priceMissing ? '<span class="tl-badge warn">Thiếu giá</span>' : (x.held ? '<span class="tl-badge info">Đang giữ</span>' : '<span class="tl-badge mute">Đã bán hết</span>')}</td>
             <td class="text-right ${atCls(x.pnl)}"><b>${atVnd(x.pnl, true)}</b></td><td class="text-right ${atCls(x.contributionPct)}">${atPct(x.contributionPct, 2, true)}</td>
             ${r.hasBench ? `<td class="text-right">${atVnd(x.benchPnl, true)}</td><td class="text-right ${atCls(x.activePnl)}">${atVnd(x.activePnl, true)}</td>` : ''}

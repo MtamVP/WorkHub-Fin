@@ -118,6 +118,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     applyThemeIcon();
 
+    // Liên kết /mastersheet/assets/#journal, #calendar... từ block khác (lib/links.js): mở thẳng tab đó
+    const openTabFromHash = () => { const t = assetTabFromHash(); if (t) switchAssetTab(t); };
+    openTabFromHash();
+    window.addEventListener('hashchange', openTabFromHash);
+
     const txnForm = document.getElementById('txn-form');
     if (txnForm) {
         txnForm.addEventListener('submit', handleTxnSubmit);
@@ -165,7 +170,12 @@ async function setupTargetUserSwitcher() {
 }
 
 // --- TAB SWITCHING ---
+function assetTabFromHash() {
+    const h = String(location.hash || '').replace(/^#/, '').split('/')[0];
+    return typeof Links !== 'undefined' && Links.ASSET_TABS.indexOf(h) !== -1 ? h : null;
+}
 function switchAssetTab(tab) {
+    try { if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab); } catch (e) { /* hash chỉ để chia sẻ liên kết */ }
     ['holdings', 'watchlist', 'ledger', 'journal', 'performance', 'mirror', 'risk', 'calendar', 'reports'].forEach(t => {
         const panel = document.getElementById('tab-' + t);
         const btn = document.querySelector(`.view-toggle-btn[data-tab="${t}"]`);
@@ -325,7 +335,7 @@ function renderHoldingsRows(holdings) {
             const sub = VN_NAMES[String(h.symbol || '').toUpperCase()];
             return `
                 <tr>
-                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${sym}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}<span class="vbc-slot" data-vbc="${sym}"></span></span></span></td>
+                    <td><span class="symbol-cell"><span class="symbol-dot" style="background:${dotColor};"></span><span class="symbol-name">${Links.symHtml(h.symbol, { from: 'assets' })}${sub ? `<span class="symbol-sub">${escapeAssetHtml(sub)}</span>` : ''}<span class="vbc-slot" data-vbc="${sym}"></span></span></span></td>
                     <td class="text-right">${Number(h.quantity).toLocaleString('en-US')}</td>
                     <td class="text-right">${Number(h.avgCost).toLocaleString('en-US')}</td>
                     <td class="text-right">

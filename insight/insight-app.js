@@ -75,14 +75,41 @@ function html() {
 function render() {
     const root = document.getElementById('ins-root');
     if (!root) return;
-    try { root.innerHTML = html(); } catch (e) { console.error(e); root.innerHTML = I.card('triangle-exclamation', 'Không dựng được màn hình', I.empty('triangle-exclamation', I.esc(e.message || String(e)))); }
+    try { root.innerHTML = focusBar() + html(); } catch (e) { console.error(e); root.innerHTML = I.card('triangle-exclamation', 'Không dựng được màn hình', I.empty('triangle-exclamation', I.esc(e.message || String(e)))); }
+    focusMark(root);
+}
+// Liên kết #tab/SYM từ block khác (lib/links.js): tập trung vào một mã. Sự kiện lọc sẵn theo mã; tab khác tô sáng dòng của mã và báo ở đầu trang
+function focusBar() {
+    if (!INS.focus) return '';
+    return '<div class="ins-focus" role="status"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i> Đang xem mã <b>' + I.esc(INS.focus) + '</b> <a class="ins-link" href="#' + I.esc(INS.view) + '" onclick="insFocusClear(); return false;">Bỏ chọn mã</a></div>';
+}
+function focusMark(root) {
+    if (!INS.focus || !root || !root.querySelectorAll) return;
+    let first = null;
+    root.querySelectorAll('a.wh-sym').forEach(function (a) {
+        if ((a.textContent || '').trim() !== INS.focus) return;
+        const row = a.closest('tr, .ins-inbox-item, .ins-card');
+        if (row) { row.classList.add('ins-hl'); if (!first) first = row; }
+    });
+    if (first && first.scrollIntoView && !INS.focusScrolled) { INS.focusScrolled = true; try { first.scrollIntoView({ block: 'center' }); } catch (e) { /* trình duyệt cũ */ } }
+}
+function insFocusClear() {
+    if (INS.view === 'events') { INS.evt.filter.q = ''; if (INS.evt.state === 'ok') evtCompute(); }
+    INS.focus = ''; INS.focusScrolled = false;
+    try { history.replaceState(null, '', '#' + INS.view); } catch (e) { /* bị chặn */ }
+    render();
 }
 function route() {
-    const h = String(location.hash || '').replace('#', '');
-    INS.view = TABS[h] ? h : 'thesis';
+    const hp = typeof Links !== 'undefined' ? Links.parseHash(location.hash) : { a: String(location.hash || '').replace('#', ''), b: '' };
+    INS.view = TABS[hp.a] ? hp.a : 'inbox';
+    const sym = typeof Links !== 'undefined' ? Links.sym(hp.b) : '';
+    if (sym !== INS.focus) INS.focusScrolled = false;
+    INS.focus = sym;
+    if (sym && INS.view === 'events') { INS.evt.filter.q = sym; INS.evt.filter.scope = 'all'; if (INS.evt.state === 'ok') evtCompute(); }
     if (typeof BenchNav !== 'undefined') BenchNav.setActive(INS.view);
     const S = INS[TABS[INS.view]];
-    if (S.state === 'idle') insLoad(INS.view); else render();
+    const done = S.state === 'idle' ? insLoad(INS.view) : (render(), Promise.resolve());
+    if (sym && INS.view === 'ownership') done.then(function () { if (INS.view === 'ownership' && INS.own.state === 'ok' && INS.own.sel !== sym) insOwnSelect(sym); });
 }
 function insLoad(view, force) {
     const S = INS[TABS[view]];
@@ -503,7 +530,7 @@ function insEvt(k, v) {
 document.addEventListener('DOMContentLoaded', async function () {
     applyThemeIcon();
     restorePrefs();
-    if (typeof BenchNav !== 'undefined') BenchNav.mount({ bench: 'insight', active: 'thesis' });
+    if (typeof BenchNav !== 'undefined') BenchNav.mount({ bench: 'insight', active: 'inbox' });
     window.addEventListener('hashchange', route);
     if (typeof sbClient !== 'undefined' && sbClient) {
         try { await sbClient.auth.getSession(); const { data } = await sbClient.auth.getUser(); INS.email = data && data.user ? data.user.email : null; } catch (e) { /* chưa đăng nhập: dải báo phiên của api.js lo */ }
