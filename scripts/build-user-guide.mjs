@@ -10,7 +10,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, '..'), require = createRequire(import.meta.url);
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
-const outPdf = opt('out', path.join(root, 'docs', 'HuongDan-WorkHub-Fin-0.1.19.pdf'));
+const outPdf = opt('out', path.join(root, 'docs', 'HuongDan-WorkHub-Fin-0.1.20.pdf'));
 const candidates = [opt('browser', ''), 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].filter(Boolean);
 const browser = candidates.find((p) => fs.existsSync(p));
 if (!browser) { console.error('Không tìm thấy Edge/Chrome. Dùng --browser <đường dẫn>.'); process.exit(1); }
