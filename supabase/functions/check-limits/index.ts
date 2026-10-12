@@ -10,6 +10,7 @@ import "./portfolio-calc.js";
 import "./group-calc.js";
 import "./limits-calc.js";
 import { computeCompliance, selfTest, vnDate } from "./compliance.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -38,6 +39,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
   if (body && body.selftest === true) return json({ ok: true, rows: selfTest({ GroupCalc: g.GroupCalc, LimitsCalc: g.LimitsCalc }) });   // không đụng CSDL
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "check-limits", allowUser: false }); if (blocked) return blocked; }
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   try {
     const { data: users, error: uErr } = await supabase.from("users").select("id, email, nickname, group_key, active").in("group_key", ["finance", "admin"]);

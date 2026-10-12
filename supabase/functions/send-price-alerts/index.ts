@@ -12,6 +12,7 @@
 // muốn gửi cho nhiều người phải xác minh tên miền ở Resend rồi đặt địa chỉ gửi thuộc tên miền đó).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildEmail, evaluateAlerts, evaluateWatchAlerts, heldQuantities, valuationTarget, vnDate, type Alert, type PriceRow, type WatchRow } from "./logic.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 // App desktop gọi hàm này từ trình duyệt nhúng (origin http://tauri.localhost) -> trình duyệt gửi yêu cầu
 // "hỏi đường" OPTIONS trước; thiếu header CORS thì lời gọi bị chặn ("Failed to send a request to the Edge Function").
@@ -58,6 +59,8 @@ async function fetchAll(build: () => any): Promise<any[]> {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) hoặc người dùng đăng nhập được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "send-price-alerts", allowUser: true }); if (blocked) return blocked; }
 
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }

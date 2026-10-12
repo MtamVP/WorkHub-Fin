@@ -40,6 +40,8 @@ export const BTDATA_TS = [
   { from: 'supabase/functions/market-data-sync/peers.ts', to: 'supabase/functions/bt-data/peers.ts' },
   { from: 'supabase/functions/market-data-sync/logic.ts', to: 'supabase/functions/bt-data/logic.ts' },
 ];
+// Chốt chặn cron (supabase/functions/_shared/cron-guard.ts) được chép nguyên văn vào mọi Edge Function dùng service role mà pg_cron hoặc người dùng gọi
+export const CRON_GUARD_FUNCTIONS = ['bt-data', 'insight-sync', 'sim-watch', 'market-data-sync', 'check-limits', 'approval-watch', 'valuation-watch', 'source-watch', 'refresh-financials', 'fetch-stock-prices', 'send-price-alerts'];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -87,5 +89,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const lib of SOURCEWATCH_LIBS) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', 'source-watch', lib.file), expectedCopy(lib));
     console.log('đã sao chép (source-watch)', lib.file);
+  }
+  const guard = fs.readFileSync(path.join(root, 'supabase', 'functions', '_shared', 'cron-guard.ts'), 'utf8');
+  for (const fn of CRON_GUARD_FUNCTIONS) {
+    fs.writeFileSync(path.join(root, 'supabase', 'functions', fn, 'cron-guard.ts'), guard);
+    console.log('đã sao chép (' + fn + ')', 'cron-guard.ts');
   }
 }

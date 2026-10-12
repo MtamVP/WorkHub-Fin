@@ -7,6 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ANNUAL_ITEMS, ANNUAL_MODELS, QUARTER_ITEMS, QUARTER_MODELS, buildFinancials, type EventRow, type Row } from "./parse.ts";
 import { classify, fingerprint, latestKeys, pickSymbols, summarize, type CacheMeta, type Fin } from "./refresh.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
 const BASE = "https://api-finfo.vndirect.com.vn/v4";
@@ -62,6 +63,8 @@ async function fetchAll(build: () => any): Promise<any[]> {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "refresh-financials", allowUser: false }); if (blocked) return blocked; }
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const now = new Date();
 

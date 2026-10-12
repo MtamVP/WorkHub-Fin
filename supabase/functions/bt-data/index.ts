@@ -10,6 +10,7 @@
 // verify_jwt = true. {"selftest":true} chạy không đụng mạng / CSDL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BACKFILL_DAILY, BACKFILL_QUARTER, DAY0, INDEX_CODES, MIN_STOCKS_PER_DAY, buildPitDay, missingDays, monthEndTradingDays, parseDay, parseIndex, quarterWindow } from "./bt-logic.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,6 +177,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, result: selfTest() });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "bt-data", allowUser: false }); if (blocked) return blocked; }
   const mode = String(body?.mode || "");
   if (!["fill", "factors", "status"].includes(mode)) return json({ ok: false, error: "mode không hợp lệ" }, 400);
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

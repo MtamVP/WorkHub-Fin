@@ -13,6 +13,7 @@
 // chẩn đoán nguồn (tối đa 5 mã, KHÔNG ghi dữ liệu).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildNavRows, heldQuantities, isWeekday } from "./nav.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
 const SYMBOL_RE = /^[A-Z0-9]{1,12}$/;
@@ -172,6 +173,8 @@ async function snapshotNav(supabase: any, latestIndexDate: string | null): Promi
 }
 
 Deno.serve(async (req: Request) => {
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "fetch-stock-prices", allowUser: false }); if (blocked) return blocked; }
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
 

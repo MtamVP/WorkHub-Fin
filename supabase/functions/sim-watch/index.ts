@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import "./sim-score.js";
 import "./sim-watch.js";
 import { EVENT_TYPES, buildEvents, type CorporateEvent, type EventRow } from "./events-parse.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; WorkHubPriceSync/1.0)" };
@@ -110,6 +111,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
   if (body && body.selftest === true) return json({ ok: true, result: selfTest() });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "sim-watch", allowUser: false }); if (blocked) return blocked; }
   const dry = !!(body && body.dry === true), withNews = !!(body && body.news === true) && !dry;
   const S = g.SimScore, W = g.SimWatch;
   const apiKey = Deno.env.get("RESEND_API_KEY");

@@ -8,6 +8,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import "./vn-holidays.js";
 import { buildEmail, evaluateProbes, evaluateSnapshot, judgeDchart, judgeFinfo, judgeVci, vnDate, type Flag, type Source } from "./logic.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -71,6 +72,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
   if (body && body.selftest === true) return json({ ok: true, holidays: !!g.VnHolidays, sample: { holiday: isHoliday("2026-09-02"), trading: !isHoliday("2026-10-07") } });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "source-watch", allowUser: false }); if (blocked) return blocked; }
   const mode = body && body.mode === "daily" ? "daily" : "probe";
   const now = new Date(), today = vnDate(now), supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();

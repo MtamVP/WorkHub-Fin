@@ -8,6 +8,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import "./approval-calc.js";
 import { buildAuditEmail, buildPendingEmail, findUnapproved, selfTest, vnDate } from "./audit.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -59,6 +60,8 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   const libs = { ApprovalCalc: g.ApprovalCalc };
   if (body && body.selftest === true) return json({ ok: true, flags: selfTest(libs) });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "approval-watch", allowUser: false }); if (blocked) return blocked; }
   const mode = body && body.mode === "audit" ? "audit" : "notify";
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("ALERT_FROM_EMAIL") || "WorkHub <onboarding@resend.dev>";

@@ -11,6 +11,7 @@ import "./sector-map.js";
 import "./valuation-history.js";
 import "./valuation-alerts.js";
 import { buildEmail, currentAlerts, planNotify, sectorWeights, selfTest, vnDate } from "./watch.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -62,6 +63,8 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch (_e) { /* body rỗng từ cron */ }
   const libs = { GroupCalc: g.GroupCalc, ValuationAlerts: g.ValuationAlerts, SectorMap: g.SectorMap };
   if (body && body.selftest === true) return json({ ok: true, result: selfTest(libs) });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "valuation-watch", allowUser: false }); if (blocked) return blocked; }
   const dry = !!(body && body.dry === true);
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("ALERT_FROM_EMAIL") || "WorkHub <onboarding@resend.dev>";

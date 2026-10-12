@@ -18,6 +18,7 @@ import "./news-events.js";
 import "./action-inbox.js";
 import { FEEDS, merge, parseRss, type NewsItem } from "./news-parse.ts";
 import { evaluateAll, eventRows, heldByUser, inboxForUser, insiderRows, newsRows, shareholderRows, tagSymbols, thesisEmail, trackedSymbols } from "./logic.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const g = globalThis as any;
 const corsHeaders = {
@@ -287,6 +288,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, result: selfTest() });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) hoặc người dùng đăng nhập được gọi (xem cron-guard.ts, finance-cron-secret-migration.sql)
+  { const blocked = await cronGuard(req, { fn: "insight-sync", allowUser: !!(body && body.mode === "ownership" && Array.isArray(body.symbols)) }); if (blocked) return blocked; }
   const mode = String(body?.mode || "");
   if (!["news", "ownership", "thesis", "events", "digest", "pit"].includes(mode)) return json({ ok: false, error: "mode không hợp lệ" }, 400);
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

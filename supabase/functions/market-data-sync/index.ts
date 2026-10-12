@@ -11,6 +11,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildSnapshot, historyRows, monthEnds, sectorStats, snapshotDate, SNAP_DAILY, SNAP_QUARTER } from "./peers.ts";
 import { addDays, BAND, buildHealthEmail, comparePrices, curateRatios, detectGaps, detectJumps, latestReportDate, mergeMeta, metaGaps, parseDchartBars, parseTvYield, parseVciBars, parseVciSymbols, parseVndStocks, TENORS, type Bar, type Health } from "./logic.ts";
+import { cronGuard } from "./cron-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -275,6 +276,8 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch (_e) { /* body rỗng */ }
   if (body && body.selftest === true) return json({ ok: true, band: BAND, tenors: TENORS });
+  // Chốt chặn: chỉ lịch hệ thống (x-cron-secret) được gọi; người dùng đăng nhập chỉ được làm mới tỷ số của vài mã (app gọi mode "ratios" kèm symbols), không chạy các chế độ nặng (xem cron-guard.ts)
+  { const blocked = await cronGuard(req, { fn: "market-data-sync", allowUser: !!(body && body.mode === "ratios" && Array.isArray(body.symbols)) }); if (blocked) return blocked; }
   const mode = ["meta", "rates", "health", "ratios", "snapshot", "history", "all"].includes(body?.mode) ? body.mode : "health";
   const only: string[] = Array.isArray(body?.symbols) ? [...new Set(body.symbols.map((x: unknown) => String(x).trim().toUpperCase()))].filter((x) => /^[A-Z0-9]{1,12}$/.test(x as string)).slice(0, 15) as string[] : [];
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
