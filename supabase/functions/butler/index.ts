@@ -184,6 +184,7 @@ Deno.serve(async (req: Request) => {
   try {
     if (und.intent === "help") reply = C.composeHelp(M);
     else if (und.intent === "symbol") reply = C.composeSymbol(und.sym);
+    else if (und.intent === "propose") reply = C.composeProposal(und.proposal);      // đề xuất ghi: chỉ trả thẻ, KHÔNG ghi gì (trang ghi sau khi người dùng xác nhận)
     else if (und.intent === "today") reply = await doToday();
     else if (und.intent === "data" && und.data) reply = await doData(und.data.tool, und.data.args);
     else if (und.intent === "guide" && und.confident) reply = C.composeGuide(und.guide.slice(0, 3).map((g: any) => g.id), GD);

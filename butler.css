@@ -98,3 +98,26 @@ a.bt-row:hover { background: var(--bt-hover); }
 .bt-kpi.bt-warn dd { color: var(--bt-warn); }
 .bt-dot.bt-up { background: var(--bt-up); }
 .bt-guide-sum { margin: 0; font-size: 0.8rem; line-height: 1.5; color: var(--bt-sub); }
+
+/* Đề xuất ghi có xác nhận (giai đoạn D): form nhỏ trong câu trả lời; chỉ ghi khi bấm Xác nhận */
+.bt-proposal { padding: 0 0 10px; }
+.bt-proposal .bt-card-title { margin: 0 0 8px; }
+.bt-prop-row { display: flex; flex-direction: column; gap: 3px; padding: 0 12px 8px; }
+.bt-prop-lbl { font-size: 0.72rem; font-weight: 600; color: var(--bt-sub); }
+.bt-prop-in { width: 100%; box-sizing: border-box; padding: 7px 9px; font: inherit; font-size: 0.84rem; color: var(--bt-text); background: var(--bt-bg); border: 1px solid var(--bt-line2); border-radius: 8px; resize: vertical; }
+.bt-prop-in:focus-visible, .bt-prop-ok:focus-visible, .bt-prop-skipbtn:focus-visible { outline: 2px solid var(--bt-accent); outline-offset: 2px; }
+.bt-prop-btns { display: flex; gap: 8px; padding: 2px 12px 0; }
+.bt-prop-ok { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 8px; background: var(--bt-text); color: var(--bt-bg); font: 600 0.82rem/1 inherit; cursor: pointer; }
+.bt-prop-ok:disabled, .bt-prop-skipbtn:disabled { opacity: 0.55; cursor: not-allowed; }
+.bt-prop-skipbtn { padding: 7px 12px; border: 1px solid var(--bt-line2); border-radius: 8px; background: transparent; color: var(--bt-sub); font: 600 0.82rem/1 inherit; cursor: pointer; }
+.bt-prop-err { margin: 0 12px 8px; font-size: 0.78rem; color: var(--bt-bad); }
+.bt-prop-done, .bt-prop-skip { margin: 0; padding: 0 12px; font-size: 0.82rem; line-height: 1.5; }
+.bt-prop-done i { color: var(--bt-up); }
+
+/* Tuỳ chọn Quản gia (giai đoạn C): bản tin sáng qua email */
+.bt-prefs { padding: 10px 14px; border-top: 1px solid var(--bt-line); background: var(--bt-bg2); display: flex; flex-direction: column; gap: 8px; }
+.bt-prefs[hidden] { display: none; }
+.bt-pref { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; line-height: 1.4; cursor: pointer; }
+.bt-pref-note { margin: 0; font-size: 0.74rem; line-height: 1.5; color: var(--bt-sub); }
+.bt-pref-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bt-pref-msg { font-size: 0.76rem; color: var(--bt-sub); }

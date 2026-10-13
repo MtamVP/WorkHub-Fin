@@ -62,7 +62,9 @@ export async function fetchGuide(sb: any) {
 const chunk = <T>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
 
 // Đọc CSDL cho "hôm nay". Dự án: giống api.js listMine (admin thấy tất cả; người khác thấy dự án của nhóm mình và nhóm 'all'); việc: bảng task_assignees theo email của chính người hỏi.
-export async function fetchToday(sb: any, me: Me, nowMs: number): Promise<TodayData> {
+// opts.explicit = true khi `sb` là client SERVICE ROLE (hàm butler-brief gửi bản tin sáng, KHÔNG có RLS): sự kiện phải được lọc bằng mã đúng như chính sách RLS của bảng events
+// (cùng nhóm hoặc admin; lịch cá nhân chỉ của người tạo) để bản tin của một người không bao giờ chứa lịch của người khác. Với client của người dùng thì RLS đã lọc, không cần.
+export async function fetchToday(sb: any, me: Me, nowMs: number, opts?: { explicit?: boolean }): Promise<TodayData> {
   const C = BC(), today = C.vnDate(nowMs), email = me.email.trim().toLowerCase();
   const from = new Date(Date.parse(today + "T00:00:00+07:00")).toISOString(), to = new Date(Date.parse(today + "T00:00:00+07:00") + 86400000).toISOString();
   const pq = await sb.from("projects").select("id, name, group_key").is("deleted_at", null).is("archived_at", null).limit(1000);
@@ -78,9 +80,16 @@ export async function fetchToday(sb: any, me: Me, nowMs: number): Promise<TodayD
     tasks.push(...(tq.data || []));
   }
   // Sự kiện: bắt đầu trước hết ngày hôm nay và (kết thúc từ đầu hôm nay trở đi, hoặc là sự kiện lặp, hoặc chưa có giờ kết thúc); lọc chính xác bằng occursOn
-  const eq = await sb.from("events").select("id, title, start_time, end_time, location, is_important, recurrence, recurrence_end, deleted_at, group_key, calendar_type")
-    .is("deleted_at", null).lt("start_time", to).or("end_time.gte." + from + ",recurrence.neq.none,end_time.is.null").limit(500);
+  let evq = sb.from("events").select("id, title, start_time, end_time, location, is_important, recurrence, recurrence_end, deleted_at, group_key, calendar_type, created_by")
+    .is("deleted_at", null).lt("start_time", to).or("end_time.gte." + from + ",recurrence.neq.none,end_time.is.null");
+  const explicit = !!(opts && opts.explicit);
+  if (explicit) {
+    if (!me.admin) evq = evq.eq("group_key", me.group);
+    evq = evq.or(/[,()*]/.test(email) ? "calendar_type.is.null,calendar_type.neq.personal" : "calendar_type.is.null,calendar_type.neq.personal,created_by.eq." + email);
+  }
+  const eq = await evq.limit(500);
   if (eq.error) throw new Error("events: " + eq.error.message);
+  if (explicit) eq.data = (eq.data || []).filter((e: any) => (me.admin || e.group_key === me.group) && (e.calendar_type !== "personal" || String(e.created_by || "").trim().toLowerCase() === email));
   const pids = projects.map((p: any) => p.id);
   const milestones: any[] = [];
   for (const ids of chunk(pids, 150)) {

@@ -23,6 +23,7 @@ begin
       -- (tên, lịch UTC, hàm, body JSON, timeout ms)
       ('approval-audit-daily',      '0 9 * * 1-5',        'approval-watch',      '{"mode":"audit"}',               120000),
       ('approval-notify',           '*/10 * * * *',       'approval-watch',      '{"mode":"notify"}',               60000),
+      ('butler-brief-morning',     '45 0 * * 1-5',       'butler-brief',        '{"mode":"run"}',            120000),
       ('bt-fill-daily',             '30 12 * * 1-5',      'bt-data',             '{"mode":"fill","limit":10}',     140000),
       ('check-limits-daily',        '40 8 * * 1-5',       'check-limits',        '{}',                             120000),
       ('fetch-stock-prices-hourly', '*/5 2-7 * * 1-5',    'fetch-stock-prices',  '{}',                              55000),

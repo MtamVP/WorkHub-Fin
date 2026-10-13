@@ -48,6 +48,8 @@ export const BUTLER_TS = [{ from: 'supabase/functions/market-news-ai/ai.ts', to:
 // butler-data (công cụ dữ liệu của Quản gia, chỉ đọc bằng JWT người hỏi): dùng đúng bốn thư viện tính của check-limits (EDGE_LIBS) và compliance.ts (chấm tuân thủ giới hạn)
 export const BUTLERDATA_LIBS = EDGE_LIBS;
 export const BUTLERDATA_TS = [{ from: 'supabase/functions/check-limits/compliance.ts', to: 'supabase/functions/butler-data/compliance.ts' }];
+// butler-brief (bản tin sáng của Quản gia, service role): CHỈ dùng chốt chặn cron; allowUser theo mode ('me' = người dùng bấm Gửi thử), nên không nằm trong CRON_GUARD_FUNCTIONS (test cron-guard buộc mẫu allowUser cố định) -- tests/unit/butler-brief.test.js kiểm riêng
+export const BRIEF_GUARD_FUNCTIONS = ['butler-brief'];
 export const suffixFor = (g) => `globalThis.${g} = ${g};\n`;
 export function expectedCopy(lib) {
   let src = fs.readFileSync(path.join(root, 'lib', lib.file), 'utf8');
@@ -113,7 +115,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log('đã sao chép (butler-data)', c.to);
   }
   const guard = fs.readFileSync(path.join(root, 'supabase', 'functions', '_shared', 'cron-guard.ts'), 'utf8');
-  for (const fn of CRON_GUARD_FUNCTIONS) {
+  for (const fn of CRON_GUARD_FUNCTIONS.concat(BRIEF_GUARD_FUNCTIONS)) {
     fs.writeFileSync(path.join(root, 'supabase', 'functions', fn, 'cron-guard.ts'), guard);
     console.log('đã sao chép (' + fn + ')', 'cron-guard.ts');
   }
