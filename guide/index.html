@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>WorkHub Fin 0.1.21 · Hướng dẫn sử dụng</title>
+<title>WorkHub Fin 0.1.22 · Hướng dẫn sử dụng</title>
 <style>
   :root { --navy: #27476E; --navy-deep: #1B3350; --ink: #1F2933; --muted: #5B6773; --rule: #D5DBE3; --wash: #F2F5F9; --ok: #12755A; --warn: #A15C00; --bad: #B3362E; --info: #2F5FA8; }
   @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
@@ -65,7 +65,7 @@
 </style>
 </head>
 <body>
-<nav class="webbar" aria-label="Điều hướng hướng dẫn"><a id="web-back" href="/">&larr; Quay lại WorkHub Fin</a><span>Hướng dẫn sử dụng · phiên bản 0.1.21</span></nav>
+<nav class="webbar" aria-label="Điều hướng hướng dẫn"><a id="web-back" href="/">&larr; Quay lại WorkHub Fin</a><span>Hướng dẫn sử dụng · phiên bản 0.1.22</span></nav>
 
 <h1 class="first">Mục lục</h1>
 <div class="toc"><ol>
@@ -103,7 +103,7 @@
 
 <h2 id="s1-1">1.1 Cài đặt và cập nhật</h2>
 <ol class="steps">
-  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.21_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
+  <li>Chạy tệp cài đặt <code>WorkHub-Fin_0.1.22_x64-setup.exe</code> (do quản trị nhóm gửi hoặc tải từ trang phát hành của dự án). Nếu Windows hiện cảnh báo SmartScreen, chọn <span class="ui">Thông tin thêm → Vẫn chạy</span> (ứng dụng nội bộ chưa có chứng chỉ thương mại).</li>
   <li>Mở <span class="ui">WorkHub-Fin</span> và đăng nhập bằng tài khoản WorkHub của bạn. Cần có Internet để lấy dữ liệu thị trường.</li>
   <li>Từ các bản sau, ứng dụng <b>tự kiểm tra và cập nhật</b>: khi có bản mới sẽ hỏi bạn; không cần cài lại thủ công.</li>
 </ol>
@@ -679,6 +679,7 @@
   <li><b>Mồ côi</b>: có chứng từ bên kế toán nhưng nghiệp vụ gốc đã bị xoá ở Fin.</li>
   <li><b>Dự phòng bổ sung</b>: dự phòng giảm giá (TK 2291) đã ghi sổ nhưng số cần lập đổi, đề xuất chứng từ bổ sung thay vì sửa chứng từ cũ.</li>
 </ul>
+<p><b>Đối chiếu Fin ↔ sổ cái (mới 0.1.22, trên web kế toán)</b>: tiền mặt trong Fin là số bạn nhập (cộng nạp, rút, cổ tức); lệnh mua bán <b>không</b> tự đổi số này nên không dựng lại tiền mặt từ sổ lệnh được. Ở mục <b>Đầu tư (WorkHub Fin)</b> của web kế toán, thẻ <b>Đối chiếu Fin ↔ Sổ cái</b> đặt cạnh nhau tiền Fin ghi và số dư tài khoản tiền trong sổ (cộng các chứng từ Fin chưa ghi sổ, coi như sẽ được duyệt). Phần chênh (số dư đầu kỳ, lãi tiền gửi, khoản chưa có nghiệp vụ) được đề xuất thành một <b>chứng từ nháp đối chiếu</b> (mặc định Nợ 1121 / Có 4111, ngày và tài khoản đối ứng chỉnh được) để người duyệt xem. Chứng khoán (TK 121) chỉ được báo nếu lệch, không tự đề xuất bút toán. Tài khoản tiền gửi công ty chứng khoán phải dành riêng cho tiền ở công ty chứng khoán.</p>
 <div class="callout warn"><b class="t">Giới hạn cần biết</b><ul>
   <li>Hệ thống <b>không tự sửa hay tự đảo</b> chứng từ đã gửi (để giữ nhật ký phê duyệt): chứng từ nháp thì từ chối rồi gửi lại, đã ghi sổ thì đảo rồi gửi lại.</li>
   <li>Chứng từ nháp chưa có dòng sổ cái nên chỉ so được ngày và diễn giải; số tiền chỉ so được khi đã ghi sổ.</li>
@@ -698,6 +699,7 @@
     <tr><td>Biết hôm nay có gì</td><td>“Hôm nay có việc gì?”, “Việc quá hạn của tôi”</td><td>Việc được giao cho riêng bạn (quá hạn, đến hạn), lịch hôm nay, mốc dự án sắp tới; nhóm Finance có thêm tín hiệu đầu tư: lệnh chờ duyệt, kết quả kiểm tra giới hạn mới nhất, ý tưởng chờ phản biện.</td></tr>
     <tr><td>Xem số liệu</td><td>“Danh mục của tôi”, “FPT tôi đang giữ bao nhiêu”, “Danh mục cả nhóm”, “Giới hạn có vượt không”, “Lệnh chờ duyệt”</td><td>Số liệu dựng bằng đúng cách tính của app. Chỉ nhóm Finance và quản trị dùng được. Một mã cho vị thế của bạn và tổng của nhóm (không nêu tên người khác); danh mục cả nhóm cho NAV từng thành viên như màn Toàn Nhóm; giới hạn của người khác chỉ đếm số.</td></tr>
     <tr><td>Hiểu một khái niệm hay cách đọc</td><td>“Biên an toàn là gì?”, “Cách đọc bảng điểm độ chính xác”, “DCF theo động lực dùng thế nào”, “FCFF khác FCFE thế nào”</td><td>Phần tóm tắt trích nguyên văn từ hướng dẫn sử dụng, cùng nút <span class="ui">Đọc trong hướng dẫn</span> mở đúng mục (mục 19.2).</td></tr>
+    <tr><td>Nhờ ghi giúp (mới 0.1.22)</td><td>“Nhắc tôi nộp thuế”, “Ghi quyết định mua FPT giá 120k vì định giá rẻ”, “Tạo ý tưởng HPG: thép hồi phục”</td><td>Một <b>thẻ đề xuất</b> để bạn xem và sửa; chỉ khi bấm <span class="ui">Xác nhận</span> mới ghi (mục 19.5).</td></tr>
   </tbody>
 </table>
 <div class="callout"><b class="t">Hỏi “ở đâu / cách làm” và hỏi “là gì” khác nhau</b><p>“Nhập sao kê ở đâu” là hỏi đường, Quản gia chỉ chức năng. “Biên an toàn là gì” là hỏi ý nghĩa, Quản gia dẫn tới hướng dẫn. Câu hỏi về cách làm đôi khi cũng có mục hướng dẫn liên quan: khi đó thẻ hướng dẫn nằm ngay dưới thẻ chức năng. Câu hỏi về số liệu chỉ đọc số, không chỉ đường: muốn mở màn hình, hãy hỏi “… ở đâu”.</p></div>
@@ -717,11 +719,32 @@
 </ul></div>
 <h2 id="s19-4">19.4 Giới hạn và cách dùng đúng</h2>
 <ul>
-  <li><b>Quản gia chỉ đọc</b>: không tạo, sửa, xoá hay duyệt bất cứ thứ gì thay bạn. Muốn làm, bấm nút <span class="ui">Mở</span> rồi tự thao tác.</li>
+  <li><b>Quản gia không tự ghi gì</b>: không tạo, sửa, xoá hay duyệt thứ gì thay bạn. Với việc cá nhân, quyết định và ý tưởng, Quản gia chỉ <b>đề xuất</b>; bản thân bạn bấm <span class="ui">Xác nhận</span> mới ghi (mục 19.5). Mọi việc khác, bấm nút <span class="ui">Mở</span> rồi tự thao tác.</li>
   <li><b>Thấy đúng những gì bạn được thấy</b>: Quản gia hỏi dữ liệu bằng chính phiên đăng nhập của bạn nên quyền theo nhóm, vai trò và phân quyền Finance được giữ nguyên. Hết phiên thì Quản gia báo cần đăng nhập lại.</li>
   <li><b>Có thể hiểu sai ý</b>: nếu thẻ trả về không đúng, bấm nút “chưa đúng” dưới câu trả lời và hỏi lại bằng vài từ khoá khác (ví dụ tên màn hình). Đánh giá giúp chọn câu hỏi cần cải thiện.</li>
   <li><b>Mất kết nối máy chủ</b>: Quản gia vẫn chỉ đường và tìm hướng dẫn ngay trên máy; chỉ phần việc hôm nay và số liệu cần máy chủ.</li>
-  <li><b>Chỉ có trong app</b>: chưa gắn email, Telegram hay Zalo.</li>
+  <li><b>Kênh</b>: Quản gia trả lời trong app; email chỉ có <b>bản tin sáng</b> (mục 19.6, tự bật). Chưa có Telegram hay Zalo.</li>
+</ul>
+<h2 id="s19-5">19.5 Nhờ Quản gia ghi giúp (mới 0.1.22)</h2>
+<p>Quản gia nhận ra ba kiểu câu nhờ ghi và trả về <b>thẻ đề xuất</b> với các ô đã điền sẵn. Câu mở đầu luôn nói rõ <b>chưa ghi gì cả</b>: bạn sửa các ô, rồi bấm <span class="ui">Xác nhận</span> để ghi, hoặc <span class="ui">Bỏ qua</span> thì không có gì thay đổi. Phần này chạy hoàn toàn bằng quy tắc, <b>không dùng AI</b> và không tốn lượt AI của bạn.</p>
+<table>
+  <thead><tr><th style="width:20%">Bạn nói</th><th style="width:36%">Ví dụ</th><th>Ghi vào đâu</th></tr></thead>
+  <tbody>
+    <tr><td>Việc cần nhớ</td><td>“Nhắc tôi gọi khách hàng ABC”, “Tạo việc: nộp báo cáo tuần”</td><td>Một việc dạng danh sách đánh dấu trong <b>Không Gian Riêng</b> của bạn (chỉ bạn thấy).</td></tr>
+    <tr><td>Quyết định đầu tư</td><td>“Ghi quyết định mua FPT giá 120k vì định giá rẻ”, “Ghi nhật ký quyết định bán HPG giá 27.500: chốt lời”</td><td><b>Nhật ký quyết định</b> (hành động, mã, ngày, giá và lý do). Giá viết được dạng 120000, 27.500, 120k hoặc 1,2tr.</td></tr>
+    <tr><td>Ý tưởng đầu tư</td><td>“Tạo ý tưởng HPG: thép hồi phục”</td><td>Một <b>ý tưởng nháp</b> ở trạng thái đầu tiên; luận điểm, giá mục tiêu và rủi ro bổ sung sau trong màn Ý tưởng.</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Việc ghi dùng chính phiên đăng nhập và các chức năng sẵn có của app, nên <b>quyền và kiểm tra dữ liệu giữ nguyên</b> (ví dụ nhật ký quyết định vẫn kiểm giá mục tiêu và ngưỡng cắt lỗ). Nếu chưa ghi được, thẻ báo lý do và giữ nguyên nội dung để bạn sửa.</li>
+  <li>Thẻ đã xác nhận hoặc bỏ qua không bấm lại được, tránh ghi hai lần. Câu hỏi như “tạo việc ở đâu?” vẫn được hiểu là hỏi đường, không phải nhờ ghi.</li>
+</ul>
+<h2 id="s19-6">19.6 Bản tin sáng qua email (mới 0.1.22)</h2>
+<p>Quản gia có thể gửi mỗi sáng <b>7:45 các ngày làm việc</b> một email gồm việc quá hạn và đến hạn, sự kiện lịch hôm nay và mốc dự án sắp tới, giống câu trả lời cho “hôm nay có việc gì”. Mặc định <b>tắt</b>; bạn tự bật ở biểu tượng <span class="ui">bánh răng</span> trong khung Quản gia (ô <span class="ui">Gửi bản tin sáng qua email</span>).</p>
+<ul>
+  <li>Email chỉ gồm việc được giao cho <b>riêng bạn</b>, lịch và mốc dự án bạn được phép xem, gửi tới email đăng nhập. Không có việc, lịch hay mốc nào thì không gửi gì.</li>
+  <li>Nút <span class="ui">Gửi thử cho tôi ngay</span> gửi ngay một bản tin tới email của bạn (mỗi lần cách nhau ít nhất 10 phút) để kiểm tra trước khi chờ đến sáng hôm sau.</li>
+  <li>Tắt bất cứ lúc nào bằng cách bỏ chọn ô trên. Bản tin không dùng AI và không gửi số liệu danh mục.</li>
 </ul>
 
 <h1 id="pa">Phụ lục A: 10 mô hình kinh doanh và vai trò phương pháp</h1>

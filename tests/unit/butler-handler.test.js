@@ -209,7 +209,7 @@ describe('hướng dẫn sử dụng (AI chọn mục)', () => {
 describe('AI khi quy tắc không chắc', () => {
   it('Gemini chọn tính năng -> trả thẻ, tốn đúng một lượt, kế hoạch được lưu đệm cho lần sau', async () => {
     net.gemini = { intent: 'features', features: ['journal'], tools: [], sym: '' };
-    const q = 'tôi cần ghi lại vì sao mình ra quyết định xyzq';
+    const q = 'chỗ nào lưu lại suy nghĩ của mình trước khi mua xyzq';
     const r1 = await call({ q });
     expect(r1.json).toMatchObject({ ok: true, mode: 'ai', intent: 'features' });
     expect(r1.json.cards[0].items[0].id).toBe('journal');

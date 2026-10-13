@@ -111,6 +111,10 @@ describe('định tuyến câu hỏi tới hướng dẫn', () => {
     ['dữ liệu đến từ đâu', 's1-2'],
     ['Tong quan TT la gi', 's4-4'],
     ['Quản gia có đọc dữ liệu của tôi không', 's19-3'],
+    ['bản tin sáng là gì', 's19-6'],
+    ['gửi thử bản tin sáng', 's19-6'],
+    ['quản gia ghi giúp việc như thế nào', 's19'],
+    ['tại sao tiền mặt Fin lệch sổ cái', 's18-4'],
     ['hướng dẫn sử dụng', 's19-2'],
   ])('%s -> mục %s đứng đầu, ý định guide, tự tin', (q, id) => {
     const r = top(q);

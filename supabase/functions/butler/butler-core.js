@@ -184,7 +184,7 @@ const ButlerCore = (function () {
     // "hôm nay" + một tính năng khớp mạnh hơn nhiều (ví dụ "lịch hôm nay") vẫn coi là hỏi việc hôm nay; "công việc" đơn thuần cũng vậy
     if (today && !(top >= 6 && /\b(vao dau|o dau|muon|cach|huong dan)\b/.test(qFold))) return Object.assign({ intent: 'today', confident: true }, base);
     // Không có từ hỏi rõ ràng nhưng mục hướng dẫn khớp mạnh còn tính năng thì yếu (ví dụ chỉ gõ "WACC" hoặc "DCF theo động lực")
-    if (!nav && gTop >= 8 && gTop >= top + 3) return Object.assign({ intent: 'guide', confident: gTop - gSecond >= 1 || gTop >= 9 }, base);
+    if (!nav && gTop >= 8 && gTop >= top + (top >= 6 ? 5 : 3)) return Object.assign({ intent: 'guide', confident: gTop - gSecond >= 1 || gTop >= 9 }, base);
     if (top >= 3 && (top - second >= 1 || top >= 6)) return Object.assign({ intent: 'features', confident: true }, base);
     if (gTop >= 5 && gTop > top) return Object.assign({ intent: 'guide', confident: false }, base);
     if (top >= 2) return Object.assign({ intent: 'features', confident: false }, base);
