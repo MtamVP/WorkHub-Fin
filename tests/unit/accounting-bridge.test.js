@@ -377,6 +377,71 @@ describe('audit: soát toàn bộ lịch sử', () => {
   });
 });
 
+describe('reconcile: đối chiếu tiền mặt Fin <-> sổ cái', () => {
+  const txns = [buy('FPT', 100, 100000, 0, '2026-06-10', { id: 'rc-1' })];
+  const base = { txns, to: '2026-08-31', assets: { cash: 100000000, debt: 0 }, books: { cash: 0, securities: 0 } };
+  const buyV = () => AB.build({ txns, from: '2026-06-01', to: '2026-08-31' }).vouchers[0];
+
+  it('số dư đầu kỳ nhập tay: chênh = tiền Fin - (sổ + chứng từ Fin chưa ghi sổ) => Nợ 1121 / Có 4111 ngày giao dịch đầu', () => {
+    const r = AB.reconcile(base, []);
+    expect(r.cash).toMatchObject({ fin: 100000000, book: 0, pending: -10000000, projected: -10000000, gap: 110000000 });
+    expect(r.voucher.lines).toEqual([{ account: '1121', side: 'N', amount: 110000000 }, { account: '4111', side: 'C', amount: 110000000 }]);
+    expect(r.voucher).toMatchObject({ id: 'FIN-DC-20260610', date: '2026-06-10', kind: 'reconcile', state: 'new', balanced: true, sendId: 'FIN-DC-20260610' });
+    expect(r.securities.gap).toBe(0);
+    expect(r.notes).toEqual([]);
+  });
+  it('khớp sau khi mọi chứng từ đã ghi sổ: không đề xuất gì', () => {
+    const ex = [{ id: buyV().id, status: 'Posted', date: '2026-06-10' }, { id: 'FIN-DC-20260610', status: 'Posted', date: '2026-06-10' }];
+    const r = AB.reconcile({ ...base, books: { cash: 100000000, securities: 10000000 } }, ex);
+    expect(r.cash.gap).toBe(0);
+    expect(r.voucher).toBeNull();
+  });
+  it('chứng từ Fin đang nháp được tính như sẽ ghi sổ: duyệt xong số vẫn khớp', () => {
+    const ex = [{ id: buyV().id, status: 'Draft', date: '2026-06-10' }, { id: 'FIN-DC-20260610', status: 'Posted', date: '2026-06-10' }];
+    const r = AB.reconcile({ ...base, books: { cash: 110000000, securities: 0 } }, ex);
+    expect(r.cash).toMatchObject({ book: 110000000, pending: -10000000, gap: 0 });
+    expect(r.securities.gap).toBe(0);
+    expect(r.voucher).toBeNull();
+  });
+  it('lệnh bán và cổ tức cộng vào tiền: bán lãi 2 triệu làm chênh giảm tương ứng', () => {
+    const r = AB.reconcile({ ...base, assets: { cash: 50000000 }, txns: [...txns, sell('FPT', 100, 120000, 0, 0, '2026-07-01', { id: 'rc-2' })], flows: [{ id: 'rf-1', flow_type: 'dividend', amount: 500000, flow_date: '2026-07-15', symbol: 'FPT' }] }, []);
+    expect(r.cash.pending).toBe(-10000000 + 12000000 + 500000);
+    expect(r.cash.gap).toBe(50000000 - 2500000);
+    expect(r.securities).toMatchObject({ fin: 0, gap: 0 });
+  });
+  it('tiền Fin thấp hơn sổ: Nợ 4111 / Có 1121 ngày cuối kỳ; TK đối ứng chỉnh được', () => {
+    const r = AB.reconcile({ ...base, assets: { cash: 0 }, books: { cash: 20000000, securities: 0 } }, []);
+    expect(r.cash.gap).toBe(-10000000);
+    expect(r.voucher).toMatchObject({ date: '2026-08-31', id: 'FIN-DC-20260831' });
+    expect(r.voucher.lines).toEqual([{ account: '4111', side: 'N', amount: 10000000 }, { account: '1121', side: 'C', amount: 10000000 }]);
+    const r2 = AB.reconcile({ ...base, counter: '515', date: '2026-08-31' }, []);
+    expect(r2.voucher.lines[1]).toEqual({ account: '515', side: 'C', amount: 110000000 });
+    expect(r2.voucher.date).toBe('2026-08-31');
+  });
+  it('đã có chứng từ đối chiếu chờ duyệt: không đề xuất thêm; bị từ chối: gửi lại ~2; đã ghi sổ mà còn chênh: bổ sung -B2', () => {
+    const pend = AB.reconcile(base, [{ id: 'FIN-DC-20260610', status: 'Draft', date: '2026-06-10' }]);
+    expect(pend.voucher).toBeNull();
+    expect(pend.pendingAdjustment).toEqual({ id: 'FIN-DC-20260610', status: 'Draft' });
+    const rej = AB.reconcile(base, [{ id: 'FIN-DC-20260610', status: 'Rejected', date: '2026-06-10' }]);
+    expect(rej.voucher).toMatchObject({ state: 'rejected', sendId: 'FIN-DC-20260610~2' });
+    const posted = AB.reconcile({ ...base, books: { cash: 60000000, securities: 0 } }, [{ id: 'FIN-DC-20260610', status: 'Posted', date: '2026-06-10' }]);
+    expect(posted.voucher).toMatchObject({ state: 'new', supplement: true, sendId: 'FIN-DC-20260610-B2' });
+  });
+  it('chứng khoán lệch: chỉ báo, không đề xuất bút toán; thiếu số tiền Fin: không đối chiếu tiền', () => {
+    const r = AB.reconcile({ ...base, assets: { cash: 100000000 }, books: { cash: 90000000, securities: 12000000 } }, [{ id: buyV().id, status: 'Posted', date: '2026-06-10' }]);
+    expect(r.securities.gap).toBe(10000000 - 12000000);
+    expect(r.notes.join(' ')).toMatch(/TK 121 lệch/);
+    expect(r.voucher === null || r.voucher.kind === 'reconcile').toBe(true);
+    const none = AB.reconcile({ ...base, assets: null }, []);
+    expect(none.cash).toBeNull(); expect(none.voucher).toBeNull();
+    expect(none.notes.join(' ')).toMatch(/tiền mặt của Fin/);
+  });
+  it('FIN-DC-* không bị coi là chứng từ mồ côi khi soát', () => {
+    expect(AB.orphans([], [{ id: 'FIN-DC-20260610', status: 'Draft', date: '2026-06-10' }], { from: '2026-06-01', to: '2026-06-30' })).toEqual([]);
+    expect(AB.audit({ txns: [], flows: [], to: '2026-08-31' }, [{ id: 'FIN-DC-20260610', status: 'Posted', date: '2026-06-10' }]).orphans).toBe(0);
+  });
+});
+
 describe('bản sao ở web kế toán không được lệch', () => {
   const copy = process.env.ONYXLINE_PATH ? process.env.ONYXLINE_PATH + '/src/accounting-bridge.js' : null;
   (copy && existsSync(copy) ? it : it.skip)('src/accounting-bridge.js giống hệt lib/accounting-bridge.js', () => {
